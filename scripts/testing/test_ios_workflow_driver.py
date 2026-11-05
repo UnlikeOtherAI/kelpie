@@ -222,6 +222,12 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_keyboard_geometry(line.replace("1,1,1", "2,1,1", 1)))
         self.assertIsNone(fixed_keyboard_geometry(line + ",1"))
 
+    def test_marker_selection_includes_both_lifetime_controls(self):
+        targets, names = DRIVER.selection("marker")
+        self.assertEqual(names, {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
+                                 "testRetiredMarkerDoesNotReappearAfterTabChange"})
+        self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
+
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:
             self.assertEqual(DRIVER.shutdown_owned("owned"), "verified shutdown")
