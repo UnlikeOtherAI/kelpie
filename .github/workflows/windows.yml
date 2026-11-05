@@ -37,6 +37,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test tests/windows/g08-hosted-options.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/prepare-hosted-windows-media.ps1
       - name: Run hosted public capture diagnostic
         if: ${{ inputs.hosted_g08 }}
         shell: pwsh

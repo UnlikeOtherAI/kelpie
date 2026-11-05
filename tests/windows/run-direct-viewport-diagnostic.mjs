@@ -35,8 +35,10 @@ try{
  const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCode,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
  assert.match(sid,/^S-1-[0-9-]+$/);await exec(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+sid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"],{windowsHide:true,timeout:15000});
  const started=Date.now();child=spawn(exe,["--port","28420","--profile-dir",profile],{env,windowsHide:true,stdio:["ignore","ignore","pipe"]});
+ if(hostedG08)report.spawn={pid:child.pid??null,startedMs:started};
  closed=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",(code,signal)=>resolve({code,signal}));});void closed.catch(()=>{});
  child.stderr.on("data",chunk=>{pending+=chunk.toString();const lines=pending.split(String.fromCharCode(10));pending=lines.pop().slice(-32768);for(const line of lines)acceptLine(line.trimEnd());});
+ if(hostedG08)await writeFile(join(evidenceRoot,"hosted-spawn.json"),JSON.stringify(report.spawn),{flag:"wx"});
  while(Date.now()-started<20000){
   if(child.exitCode!==null)throw new Error("OWNED_PROCESS_EXITED");
   try{readiness=JSON.parse(await readFile(readinessPath,"utf8"));break;}catch{}

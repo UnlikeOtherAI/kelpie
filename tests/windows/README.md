@@ -9,6 +9,9 @@ file and bearer stay outside the artifact. Native WGC, visible overlay and Stop
 are not tested by this hosted diagnostic. A native-presentation failure is
 reported as unavailable with its cause unproven; it is not a compositor pass.
 The default workflow still performs its existing package build.
+The hosted path uses the SHA-256-pinned [GyanD FFmpeg 9.0.1 release archive](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.1),
+because the [Windows 2022 image inventory](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md)
+does not list FFmpeg or ffprobe. The executable hashes are recorded per run.
 
 `run-release-acceptance.mjs` is the release gate for a built Windows Kelpie
 artifact. It starts a local fixture, starts only the supplied `kelpie.exe` with
