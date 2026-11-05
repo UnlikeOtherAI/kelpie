@@ -28,6 +28,10 @@ Use a private result callback at the actual decoded-result boundary, including
 late callbacks retired by existing renderer fences. Final redaction/disposal
 must await that retirement; no automatic edit replay is permitted.
 The callback changes private redaction/disposal state only, never grants authority.
+Current-run playing/finalizing status must expose artifacts:[]; current-run download
+must return not-ready until retirement, classification and final scrub/discard have
+finished. Earlier safe terminal runs may remain downloadable during another run.
+This prevents irreversible media disclosure before a later sensitivity decision.
 
 A destroyed context that produces no result cannot reveal an unobservable
 transient classification. Preserve uncertainty; do not claim zero input or
@@ -52,7 +56,13 @@ Required portable commands passed sequentially under the same hard policy:
 pnpm --workspace-concurrency=1 -r lint (26.230s), build (16.696s), and
 test --maxWorkers=1 --minWorkers=1 (55.926s): shared143,CLI703passed/1skip.
 Focused target16/16 passed. Whole portable job99.890s.
-Native gateway generator/CAPI compile and policy parity checks are running in
-the existing noCEF/noLLM test-only tree; result will be recorded separately.
+Native gateway compile and generated policy parity passed on Maxis:
+cmake --build D:/BuildArtifacts/kelpie/capture-observations-20261104/native
+--config Release --target test_browser_gateway -- /m:1, then the resulting
+core-mcp/tests/Release/test_browser_gateway.exe printed Browser gateway contracts
+passed. Existing VS17 noCEF/noLLM stub tree only; hardJob1CPU/Normal/2GiB,
+free17768524KiB,60.526s,exit0. It covers legacy default, valid policy serialization
+and invalid policy shape/type; no shipping app was built. Existing MSVC
+DNDEBUG/UNDEBUG override warning remains, no compile errors.
 Platform callback wiring, final relinks and actual security replay remain pending.
 This checkpoint does not close SEC-01.
