@@ -28,7 +28,11 @@ def selection(scope):
             "testLiveMarkerProjectionMatchesSameSceneTarget",
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchScrollableControl",
             "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+            "testPacedCaptureWithTextInteractionDisabled",
+            "testTextInteractionPreferenceRestoresAfterStop",
+            "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
         ]
         return ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods], set(methods)
     if scope not in ("full", "navigation", "diagnostics"):
@@ -37,12 +41,15 @@ def selection(scope):
     files = [NAVIGATION_TESTS]
     if scope == "full":
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieTests/IOSWorkflowReceiptTests",
+                        "KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSG08GeometryTests",
                         "KelpieUITests/WorkflowCaptureUITests"])
-        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"),
-                      *Path("apps/ios/UITests").glob("Workflow*.swift")])
+        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"), Path("apps/ios/Tests/IOSCaptureViewportTests.swift"),
+                      Path("apps/ios/Tests/IOSG08GeometryTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
+            targets.append("KelpieTests/IOSCaptureViewportTests")
+            targets.append("KelpieTests/IOSG08GeometryTests")
             targets.append("KelpieTests/IOSWorkflowReceiptTests/testCanonicalMutationReceiptMatrix")
             targets.append("KelpieTests/IOSWorkflowReceiptTests/testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard")
             targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
@@ -64,6 +71,7 @@ def selection(scope):
                 "testDefaultPointerMotionUsesShorterNativeTiming",
                 "testLivePointerMarkerAndStopAppearDuringCapture",
                 "testNativePinchClipsTapCenterAndExportedMarker",
+                "testNativePinchScrollableControl",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
@@ -73,6 +81,9 @@ def selection(scope):
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
                 "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
                 "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+                "testPacedCaptureWithTextInteractionDisabled",
+                "testTextInteractionPreferenceRestoresAfterStop",
+                "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
                 "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
                 "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
@@ -89,6 +100,10 @@ def selection(scope):
         required.update(methods)
         if scope == "diagnostics":
             required.update([
+                "testConstantG08GeometryBindsEverySampleToBothDocuments",
+                "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+                "testProjectionUsesInsetContentOriginAndVisualViewport",
+                "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
                 "testCanonicalMutationReceiptMatrix",
                 "testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard",
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
@@ -258,7 +273,7 @@ def run_device(device, product_hashes, scope):
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
         with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + (10 if scope in ("navigation", "geometry") else 40) * 60
+            deadline = time.monotonic() + {"navigation": 10, "geometry": 20}.get(scope, 40) * 60
             while process.poll() is None and time.monotonic() < deadline:
                 tab = handoff.current_tab()
                 if tab and not cli_started:

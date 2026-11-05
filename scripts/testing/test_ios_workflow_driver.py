@@ -179,7 +179,11 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testLiveMarkerProjectionMatchesSameSceneTarget",
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchScrollableControl",
             "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+            "testPacedCaptureWithTextInteractionDisabled",
+            "testTextInteractionPreferenceRestoresAfterStop",
+            "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
         })
         self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
         _, full_names = DRIVER.selection("full")

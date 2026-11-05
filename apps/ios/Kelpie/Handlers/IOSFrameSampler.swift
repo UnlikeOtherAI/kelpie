@@ -150,7 +150,7 @@ final class IOSFrameSampler {
 
     private func requirePinnedNativeViewport(_ viewport: IOSWorkflowTab.Viewport) throws {
         guard let initial else { return }
-        guard initial.bounds == viewport.bounds, initial.pixelRatio == viewport.pixelRatio else {
+        guard initial.bounds == viewport.bounds, initial.content == viewport.content, initial.pixelRatio == viewport.pixelRatio else {
             Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
             Self.geometryDiagnostic(before: initial, after: viewport)
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
@@ -159,6 +159,7 @@ final class IOSFrameSampler {
 
     private static func resizeReason(initial: IOSWorkflowTab.Viewport, viewport: IOSWorkflowTab.Viewport) -> String {
         if initial.bounds != viewport.bounds { return "native-bounds" }
+        if initial.content != viewport.content { return "native-insets" }
         if initial.pixelRatio != viewport.pixelRatio { return "pixel-ratio" }
         if initial.layout != viewport.layout { return "layout-size" }
         if initial.visible.size != viewport.visible.size { return "visible-size" }
@@ -229,6 +230,12 @@ final class IOSFrameSampler {
                 try requirePinnedNativeViewport(viewport)
                 guard generation == tab.document else { return nil }
                 return viewport
+            },
+            admissible: { [self] viewport in
+                let insets = tab.view.scrollView.adjustedContentInset
+                return IOSCaptureViewportStability.matchesInsets(
+                    viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
+                )
             }
         )
         guard let viewport else {
@@ -284,7 +291,8 @@ final class IOSFrameSampler {
         }
         let after = try await tab.viewport()
         if after != viewport {
-            let scrolled = after.bounds == viewport.bounds && after.layout == viewport.layout &&
+            let scrolled = after.bounds == viewport.bounds && after.content == viewport.content &&
+                after.fixtureDocumentID == viewport.fixtureDocumentID && after.layout == viewport.layout &&
                 after.visible.size == viewport.visible.size && after.scale == viewport.scale && after.pixelRatio == viewport.pixelRatio
             guard scrolled else {
                 Self.diagnostic("snapshot-" + Self.resizeReason(initial: viewport, viewport: after))

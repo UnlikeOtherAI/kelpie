@@ -106,6 +106,10 @@ final class IOSWorkflowRunner {
     }
 
     private func run(_ workflow: IOSBoundWorkflow, tab: IOSWorkflowTab, grant: IOSScriptGrant, id: String) async -> Body {
+        #if DEBUG
+        let previousTextInteraction = tab.beginTestTextInteractionScope()
+        defer { tab.restoreTestTextInteraction(previousTextInteraction) }
+        #endif
         var issue: IOSWorkflowFailure?
         var media: IOSWorkflowMedia?
         var presentation: IOSWorkflowPresentation?

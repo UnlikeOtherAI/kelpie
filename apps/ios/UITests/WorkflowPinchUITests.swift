@@ -7,6 +7,7 @@ extension WorkflowCaptureUITests {
         let initialOrientation = XCUIDevice.shared.orientation
         XCUIDevice.shared.orientation = .portrait
         defer { XCUIDevice.shared.orientation = initialOrientation }
+        testLaunchArguments.append("--test-pinch-projection")
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
@@ -75,8 +76,50 @@ extension WorkflowCaptureUITests {
         geometry.name = "Actual visual viewport and clicked center"
         geometry.lifetime = .keepAlways
         add(geometry)
-        try verifyPinchMarker(data, click: click)
+        let diagnostics = try await probe.request("/v1/debug-screens", [:])
+        let evidence = try XCTUnwrap(diagnostics["testCaptureEvidence"] as? Body)
+        XCTAssertEqual(evidence["runId"] as? String, tapped["runId"] as? String)
+        let artifacts = try XCTUnwrap(evidence["artifacts"] as? Body)
+        let facts = try XCTUnwrap(artifacts[try XCTUnwrap(manifest["id"] as? String)] as? Body)
+        try verifyPinchMarker(data, click: click, facts: facts)
 
+    }
+
+    @MainActor
+    func testNativePinchScrollableControl() async throws {
+        let initialOrientation = XCUIDevice.shared.orientation
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = initialOrientation }
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let navigation = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/pinch-scroll"]]
+        ])
+        XCTAssertEqual(navigation["success"] as? Bool, true)
+        let viewport = XCUIApplication().webViews.firstMatch
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        let initial = try await pinchMetrics(tab, selector: "#zoom")
+        let initialNative = await nativeZoomEvidence()
+        viewport.pinch(withScale: 2, velocity: 1)
+        let deadline = Date().addingTimeInterval(5)
+        var zoomed = try await pinchMetrics(tab, selector: "#zoom")
+        while (zoomed["scale"] as? Double ?? 0) < (initial["scale"] as? Double ?? 1) * 1.3, Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            zoomed = try await pinchMetrics(tab, selector: "#zoom")
+        }
+        let zoomedNative = await nativeZoomEvidence()
+        let evidence = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+            "initial": initial, "zoomed": zoomed, "nativeBefore": initialNative, "nativeAfter": zoomedNative
+        ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
+        evidence.name = "Scrollable native pinch control metrics"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        let image = XCTAttachment(screenshot: viewport.screenshot())
+        image.name = "Scrollable native pinch control"
+        image.lifetime = .keepAlways
+        add(image)
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["scale"] as? Double), (initial["scale"] as? Double ?? 1) * 1.3)
     }
 
     private func nativeZoomEvidence() async -> Body {
@@ -110,13 +153,35 @@ extension WorkflowCaptureUITests {
         return try pinchValue(XCTUnwrap(response["value"] as? Body))
     }
 
-    private func verifyPinchMarker(_ png: Data, click: Body) throws {
+    private func verifyPinchMarker(_ png: Data, click: Body, facts: Body) throws {
         let source = try XCTUnwrap(CGImageSourceCreateWithData(png as CFData, nil))
         let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        let x = (try XCTUnwrap(click["expectedX"] as? Double) - XCTUnwrap(click["x"] as? Double)) /
-            (try XCTUnwrap(click["width"] as? Double)) * Double(image.width)
-        let y = (try XCTUnwrap(click["expectedY"] as? Double) - XCTUnwrap(click["y"] as? Double)) /
-            (try XCTUnwrap(click["height"] as? Double)) * Double(image.height)
+        let projection = try XCTUnwrap(facts["projection"] as? Body)
+        func number(_ key: String) throws -> Double {
+            let value = try XCTUnwrap(projection[key] as? Double)
+            XCTAssertTrue(value.isFinite)
+            return value
+        }
+        let nativeWidth = try number("nativeWidth"), nativeHeight = try number("nativeHeight")
+        let contentX = try number("contentX"), contentY = try number("contentY")
+        let contentWidth = try number("contentWidth"), contentHeight = try number("contentHeight")
+        let visualX = try number("visualX"), visualY = try number("visualY")
+        let visualWidth = try number("visualWidth"), visualHeight = try number("visualHeight")
+        XCTAssertGreaterThan(nativeWidth, 0)
+        XCTAssertGreaterThan(nativeHeight, 0)
+        XCTAssertGreaterThan(contentWidth, 0)
+        XCTAssertGreaterThan(contentHeight, 0)
+        XCTAssertGreaterThan(visualWidth, 0)
+        XCTAssertGreaterThan(visualHeight, 0)
+        XCTAssertEqual(visualX, try XCTUnwrap(click["x"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(visualY, try XCTUnwrap(click["y"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(visualWidth, try XCTUnwrap(click["width"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(visualHeight, try XCTUnwrap(click["height"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(try number("scale"), try XCTUnwrap(click["scale"] as? Double), accuracy: 0.01)
+        let x = (contentX + (try XCTUnwrap(click["expectedX"] as? Double) - visualX) * contentWidth / visualWidth) *
+            Double(image.width) / nativeWidth
+        let y = (contentY + (try XCTUnwrap(click["expectedY"] as? Double) - visualY) * contentHeight / visualHeight) *
+            Double(image.height) / nativeHeight
         let center = try XCTUnwrap(image.cropping(to: CGRect(x: x - 6, y: y - 6, width: 12, height: 12).integral))
         XCTAssertTrue(WorkflowCaptureProbe.containsMarker(center, minimumCoverage: 0.12))
     }

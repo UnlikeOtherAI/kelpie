@@ -97,9 +97,11 @@ final class WorkflowLoopbackPage {
           document.body.innerHTML='<button style="appearance:none;position:fixed;left:58vw;top:60vh;transform:translate(-50%,-50%);margin:0;background:#505050;color:#181818;border:0">Track</button>'
           document.querySelector('button').onclick=()=>{document.title='Track clicked'}
         }
-        if(location.pathname==='/pinch'){
+        if(location.pathname==='/pinch'||location.pathname==='/pinch-scroll'){
           document.documentElement.style.background='#606060';
-          document.body.style='margin:0;background:#606060;height:100vh;overflow:hidden';
+          document.body.style=location.pathname==='/pinch-scroll'
+            ? 'margin:0;background:#606060;height:200vh'
+            : 'margin:0;background:#606060;height:100vh;overflow:hidden';
           document.body.innerHTML='<button id="edge" style="position:fixed;margin:0;width:150px;height:80px;appearance:none;background:#505050;color:#181818;border:0">Edge</button><output id="zoom" style="position:absolute;left:0;top:0;color:#181818;font-size:8px"></output><output id="clicked" style="position:absolute;left:0;top:14px;color:#181818;font-size:8px"></output>';
           const edge=document.querySelector('#edge'),metrics=document.querySelector('#zoom');
           let clicks=0;

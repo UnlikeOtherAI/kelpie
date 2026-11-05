@@ -55,7 +55,7 @@ extension WorkflowCaptureUITests {
         add(evidence)
         XCTAssertEqual(click["centered"] as? Bool, true)
         XCTAssertFalse(visibleTarget.isNull)
-        XCTAssertTrue(WorkflowCaptureProbe.containsTargetMarker(screen, visibleTarget: visibleTarget, app: application.frame),
+        XCTAssertTrue(WorkflowCaptureProbe.containsCenteredMarker(screen, target: visibleTarget, app: application.frame),
                       "The live marker must meet the same-scene accessible target")
     }
 }

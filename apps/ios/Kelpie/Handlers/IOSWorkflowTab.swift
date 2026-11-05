@@ -10,12 +10,33 @@ final class IOSWorkflowTab {
         let visible: CGRect
         let scale: CGFloat
         let pixelRatio: CGFloat
+        let content: CGRect
+        let fixtureDocumentID: String?
+
+        init(
+            bounds: CGSize,
+            layout: CGSize,
+            visible: CGRect,
+            scale: CGFloat,
+            pixelRatio: CGFloat,
+            content: CGRect? = nil,
+            fixtureDocumentID: String? = nil
+        ) {
+            self.bounds = bounds
+            self.layout = layout
+            self.visible = visible
+            self.scale = scale
+            self.pixelRatio = pixelRatio
+            self.content = content ?? CGRect(origin: .zero, size: bounds)
+            self.fixtureDocumentID = fixtureDocumentID
+        }
 
         var metadata: Body { ["width": layout.width, "height": layout.height] }
+        var pointsPerCSSX: CGFloat { content.width / visible.width }
 
         func displayPoint(_ css: CGPoint) -> CGPoint {
-            CGPoint(x: (css.x - visible.minX) * bounds.width / visible.width,
-                    y: (css.y - visible.minY) * bounds.height / visible.height)
+            CGPoint(x: content.minX + (css.x - visible.minX) * pointsPerCSSX,
+                    y: content.minY + (css.y - visible.minY) * content.height / visible.height)
         }
     }
 
@@ -92,6 +113,22 @@ final class IOSWorkflowTab {
     }
 
     #if DEBUG
+    func beginTestTextInteractionScope() -> Bool? {
+        guard ProcessInfo.processInfo.arguments.contains("--test-disable-webkit-text-interaction") else { return nil }
+        let preferences = view.configuration.preferences
+        let previous = preferences.isTextInteractionEnabled
+        preferences.isTextInteractionEnabled = false
+        IOSFrameSampler.diagnostic(preferences.isTextInteractionEnabled ? "text-interaction-still-on" : "text-interaction-disabled")
+        return previous
+    }
+
+    func restoreTestTextInteraction(_ previous: Bool?) {
+        guard let previous else { return }
+        let preferences = view.configuration.preferences
+        preferences.isTextInteractionEnabled = previous
+        IOSFrameSampler.diagnostic(preferences.isTextInteractionEnabled ? "text-interaction-restored-on" : "text-interaction-restored-off")
+    }
+
     var rendererContainsFirstResponder: Bool {
         func containsResponder(_ current: UIView) -> Bool {
             current.isFirstResponder || current.subviews.contains(where: containsResponder)
@@ -110,7 +147,6 @@ final class IOSWorkflowTab {
     private func fixed(
         _ expression: String,
         mutates: Bool = false,
-        deferEdit: Bool = false,
         consume: (@MainActor (Any?) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
     ) async throws -> Any? {
@@ -131,7 +167,7 @@ final class IOSWorkflowTab {
                 guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
                 evaluationStarted = true
                 do {
-                    let result = try await evaluateFixed(expression, deferEdit: deferEdit)
+                    let result = try await BrowserControlWebKit.evaluate(expression, in: view)
                     resultReceived = true
                     // Consume privacy metadata before guards and even after the caller's deadline.
                     consume?(result)
@@ -150,36 +186,54 @@ final class IOSWorkflowTab {
         return value
     }
 
-    private func evaluateFixed(_ expression: String, deferEdit: Bool) async throws -> Any? {
-        guard deferEdit else { return try await BrowserControlWebKit.evaluate(expression, in: view) }
-        // Host-evaluated focus starts the software keyboard. Execute the same fixed
-        // edit in the next isolated-world task, outside WebKit's host-evaluation
-        // interaction scope, while retaining its single bounded callback.
-        let body = "return await new Promise((resolve,reject)=>setTimeout(()=>{try{resolve(" + expression +
-            ")}catch(error){reject(error)}},0));"
-        return try await view.callAsyncJavaScript(body, arguments: [:], in: nil, contentWorld: BrowserControlWebKit.world)
+    static func fixtureID(_ candidate: String?) -> String? {
+        candidate.flatMap {
+            $0.range(of: #"^[0-9]{13}-[a-z0-9]{1,16}\z"#, options: .regularExpression) == nil ? nil : $0
+        }
     }
 
     func viewport() async throws -> Viewport {
+        #if DEBUG
+        let bindFixture = ProcessInfo.processInfo.arguments.contains("--test-g08-document-binding")
+        #else
+        let bindFixture = false
+        #endif
+        let suffix = bindFixture ? ",document.documentElement.getAttribute('data-kelpie-g08-document-id')" : ""
         let result = try await fixed("""
         (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
         v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
-        v?.scale??1,devicePixelRatio]})()
+        v?.scale??1,devicePixelRatio\(suffix)]})()
         """)
-        guard let values = result as? [NSNumber], values.count == 8 else {
+        guard let raw = result as? [Any], raw.count == (bindFixture ? 9 : 8),
+              let values = Array(raw.prefix(8)) as? [NSNumber] else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
+        let candidate = bindFixture ? raw.last as? String : nil
+        let fixtureID = Self.fixtureID(candidate)
         let parts = values.map { CGFloat($0.doubleValue) }
         guard parts.allSatisfy({ $0.isFinite }), parts[0] > 0, parts[1] > 0,
               parts[4] > 0, parts[5] > 0, view.bounds.width > 0, view.bounds.height > 0 else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
+        let native = view.bounds.size
+        let insets = view.scrollView.adjustedContentInset
+        let insetValues = [insets.top, insets.bottom, insets.left, insets.right]
+        guard insetValues.allSatisfy({ $0.isFinite && $0 >= 0 }), insets.left + insets.right < native.width,
+              insets.top + insets.bottom < native.height else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+        let content = CGRect(
+            x: insets.left,
+            y: insets.top,
+            width: native.width - insets.left - insets.right,
+            height: native.height - insets.top - insets.bottom
+        )
         return Viewport(
-            bounds: view.bounds.size,
+            bounds: native,
             layout: CGSize(width: parts[0], height: parts[1]),
             visible: CGRect(x: parts[2], y: parts[3], width: parts[4], height: parts[5]),
             scale: parts[6],
-            pixelRatio: parts[7]
+            pixelRatio: parts[7],
+            content: content,
+            fixtureDocumentID: fixtureID
         )
     }
 
@@ -215,7 +269,6 @@ final class IOSWorkflowTab {
             value = try await fixed(
                 expression,
                 mutates: dispatch || edit != nil,
-                deferEdit: edit != nil,
                 consume: { result in
                     acknowledgement = IOSPacedTypingExecutor.consumeCallback(
                         result,
