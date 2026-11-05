@@ -19,7 +19,11 @@ VNC, custom desktop-input helpers and native UI driving remain explicitly off.
 Machine-interface evidence and native UI evidence must remain distinct.
 Each renderer must be named: macOS WebKit and Chromium are
 separate cells; iPhone/iPad, Android phone/tablet, Windows CEF and Linux CEF are
-separate cells. A platform without the capability must return a documented
+separate cells. Linux GTK and Linux CEF offscreen/OSR are distinct runtime cells;
+noCEF stub and external workers remain separate evidence. See
+[differential ingestion](differential-evidence.md) and
+[critical movie admission review](movie-admission-review.md).
+A platform without the capability must return a documented
 unsupported response; that refusal does not satisfy required native parity.
 
 Every row below starts **pending**. To close it, append an evidence record to the

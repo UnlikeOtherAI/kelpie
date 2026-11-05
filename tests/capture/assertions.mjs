@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { normalizeSnapshot, normalizeObservationBundle } from "./normalization.mjs";
 
 export const SECRET_CANARIES = ["PASSWORD", "DRAFT", "EDITOR", "HIDDEN", "JSONLD"]
   .map(kind => `CAPTURE_SECRET_${kind}_8137`);
@@ -32,13 +33,23 @@ export function assertCurvedTrajectory(points, { start, end, minimumDeviation = 
   assert.ok(speed(points[0], points[1]) < middleSpeed, "No ease-in evidence");
   assert.ok(speed(points.at(-2), points.at(-1)) < middleSpeed, "No ease-out evidence");
 }
-export function assertDifferentialObservations(left, right) {
-  const normalize = snapshot => ({
-    text: snapshot.text.replace(/document:[a-z0-9-]+/gi, "document:<id>").replace(/\s+/g, " ").trim(),
-    elements: (snapshot.elements ?? []).map(({ role, name }) => ({ role, name }))
-      .filter(element => !element.name.startsWith("document:")),
-    truncated: snapshot.truncated,
-  });
+export function assertDifferentialObservations(left, right, { leftFixture = {}, rightFixture = {} } = {}) {
   assertValueFree(left); assertValueFree(right);
-  assert.deepEqual(normalize(left), normalize(right));
+  assert.deepEqual(normalizeSnapshot(left, leftFixture), normalizeSnapshot(right, rightFixture));
+}
+export function assertDifferentialBundles(left, right, {
+  leftFixture = {}, rightFixture = {}, inputGuarantees,
+} = {}) {
+  assertValueFree(left); assertValueFree(right);
+  const a = normalizeObservationBundle(left, leftFixture);
+  const b = normalizeObservationBundle(right, rightFixture);
+  const guarantees = [a.inputGuarantee, b.inputGuarantee];
+  if (inputGuarantees) {
+    assert.deepEqual(guarantees, inputGuarantees, "Unexpected input guarantee");
+    for (const guarantee of guarantees)
+      assert.ok(["synthetic-coordinate", "trusted-coordinate"].includes(guarantee), "Unknown input guarantee");
+    delete a.inputGuarantee; delete b.inputGuarantee;
+  }
+  assert.deepEqual(a, b);
+  return { equivalent: true, inputGuarantees: guarantees };
 }

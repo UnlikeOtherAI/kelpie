@@ -23,7 +23,11 @@ export function validateEvidence(report) {
     assert.ok(Number.isFinite(Date.parse(record.observedAt)), "Invalid evidence date");
     assert.ok(["passed", "failed", "blocked", "pending"].includes(record.status));
     assert.ok(["source-review", "unit", "real-interface", "manual-ui", "manual-media"].includes(record.kind));
-    const identity = [record.requirement, record.platform, record.renderer, record.kind, record.revision].join(":");
+    if (record.deviceClass !== undefined) assert.ok(["desktop", "phone", "tablet", "worker"].includes(record.deviceClass), "Invalid device class");
+    if (record.runtimeMode !== undefined) assert.ok(["windowed", "offscreen", "stub", "worker"].includes(record.runtimeMode), "Invalid runtime mode");
+    if (record.protocol !== undefined) assert.ok(["http", "mcp-direct", "mcp-generic", "cli"].includes(record.protocol), "Invalid protocol");
+    const identity = [record.requirement, record.platform, record.renderer, record.deviceClass ?? "unspecified",
+      record.runtimeMode ?? "unspecified", record.kind, record.protocol ?? "unspecified", record.revision].join(":");
     assert.ok(!identities.has(identity), "Duplicate evidence identity");
     identities.add(identity);
     if (record.status === "blocked") nonempty(record.blocker, "blocker");
