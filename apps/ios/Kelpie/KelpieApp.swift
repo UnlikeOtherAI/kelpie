@@ -128,6 +128,7 @@ struct KelpieApp: App {
             NessieConnection.shared.setForeground(true)
             serverState.ensureMDNSAdvertising()
         case .background:
+            serverState.requestScriptAbort()
             NetworkTrafficStore.shared.flush()
             NessieConnection.shared.setForeground(false)
             serverState.stopMDNS()

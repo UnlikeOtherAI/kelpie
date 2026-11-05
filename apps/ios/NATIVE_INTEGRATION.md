@@ -4,6 +4,12 @@ The iOS store wrappers in `apps/ios/Kelpie/Browser/` now call the shared C API f
 
 The Xcode project is not updated automatically. Do not edit `project.pbxproj` by hand unless you have to. Configure the target in Xcode instead.
 
+## Workflow recording on iPhone and iPad
+
+The iOS target imports the generated workflow validator and fixed target reader from core-mcp, plus the presentation and output-redaction C APIs from core-automation. Its Tuist project references the shared Apple drawing, encoding and artifact-store source files individually. A version 1 script uses the selected WKWebView and the paired listener's current grant. The app's recording screen exposes Stop while it samples and finalizes the run.
+
+Tap and click resolve the visible center and deliver synthetic coordinate events. Fill and type use the pinned editable target. Explicit native session IDs and `press-key` fail during workflow preflight. PNG, GIF and MP4 downloads use opaque IDs and bounded authenticated chunks. See the [workflow contract](../../docs/api/script-workflows.md), [Apple media limits](../../docs/api/apple-script-media.md) and [iPhone/iPad verification record](../../docs/plans/browser-automation-capture/ios.md).
+
 ## 1. Set the bridging header
 
 For the `Kelpie` target, set:
