@@ -46,6 +46,7 @@ on:
       - 'pnpm-workspace.yaml'
       - 'package.json'
       - '.github/actions/browser-contract/**'
+      - '.github/workflows/ios.yml'
       - '.mise.toml'
       - '.swiftlint.yml'
       - 'Makefile'
@@ -78,7 +79,9 @@ jobs:
           expected = inputs.map { |path| 'apps/macos/' + path.gsub('+') { '\+' } }.sort
           abort 'No shared Swift sources found in the iOS project' if expected.empty?
           %w[pull_request push].each do |event|
-            actual = events.fetch(event).fetch('paths').select { |path| path.start_with?('apps/macos/') }.sort
+            paths = events.fetch(event).fetch('paths')
+            abort "iOS #{event} must trigger on its workflow changes" unless paths.include?('.github/workflows/ios.yml')
+            actual = paths.select { |path| path.start_with?('apps/macos/') }.sort
             abort "iOS #{event} filters differ from Project.swift: #{(expected - actual) + (actual - expected)}" unless expected == actual
           end
           RUBY
