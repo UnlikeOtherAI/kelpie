@@ -79,3 +79,59 @@ from another client/process against independent file hashes.
 
 
 The current user-authorized rollout proceeds in parallel through separate Windows, macOS, iOS, Android and Linux owners. The earlier Windows-first gate is historical. Computer Use, VNC and desktop-input helpers remain OFF; record real supported machine-interface evidence separately from blocked native UI/Stop verification. Fixed-reader source regressions use Node 24: node --test --test-concurrency=1 tests/capture/target-regressions.test.mjs. The initial 7c597780 contract fails four of these checks; see the workflow review ledger. A source regression pass still requires the corresponding real-renderer flow.
+
+
+## G08 dense animation evidence
+
+`g08-fixture.mjs` exports `startG08Fixture({host, port})` and
+`g08Workflow(tabId, curve)`. Reserve the host resource first, start a fresh
+fixture per case, open its URL in the target renderer, and run each generated
+C and S workflow through the real supported script interface. The Start click
+primes the pointer before the Finish movement; retain the fixture's ordered
+Start and Finish facts, `/events` dropped count, and both GIF and MP4 downloads.
+The fixture is white with invisible, accessible controls at 25% and 75% width.
+It records CSS geometry, document identity, viewport and event trust. Do not
+expose the unauthenticated fixture outside the bounded test network.
+
+Independently run ffprobe on each downloaded file and retain its ordered frame
+`best_effort_timestamp_time` values in seconds. Join the real facts and
+artifact metadata into a JSON file with this shape:
+
+```json
+{
+  "source": "<40 lowercase hex source SHA>",
+  "binarySHA256": "<64 lowercase hex binary SHA-256>",
+  "runtime": "windows-cef",
+  "eventsDropped": 0,
+  "cases": [
+    {
+      "curve": "c",
+      "scene": { "start": {}, "finish": {} },
+      "artifacts": [
+        { "id": "id", "mimeType": "image/gif", "file": "absolute path",
+          "sha256": "<64 lowercase hex>", "byteLength": 123, "partial": false,
+          "width": 640, "height": 360, "droppedFrames": 0, "timestamps": [] },
+        { "id": "id", "mimeType": "video/mp4", "file": "absolute path",
+          "sha256": "<64 lowercase hex>", "byteLength": 123, "partial": false,
+          "width": 640, "height": 360, "droppedFrames": 0, "timestamps": [] }
+      ]
+    }
+  ]
+}
+```
+
+The example shows one case only: the actual report must have both `c` and
+`s`, each with exactly one GIF and one MP4, and the complete fixture facts
+and timestamps. Supported runtime identifiers are listed in `g08-verify.mjs`.
+Run `node tests/capture/g08-verify.mjs input.json fresh-output.json` with
+Node 20 or newer, the built shared package, ffmpeg and ffprobe. The verifier checks file hashes, probes dimensions
+and actual PTS, streams one RGB frame at a time, and emits per-frame measurements,
+bounded onset-fit diagnostics and failure/insufficient-evidence outcomes. It
+uses the shared presentation model and a 0.7 marker opacity baseline. Retain
+all source reports, media, logs and failure results outside Git.
+
+A pass is evidence for the observed exported pixels only. It does not establish
+native overlay equivalence, navigation cleanup, media playback, dropped-frame
+causes, or a platform acceptance pass. Compare the native presentation separately
+and preserve real renderer, binary, document and viewport identity in the
+acceptance report.
