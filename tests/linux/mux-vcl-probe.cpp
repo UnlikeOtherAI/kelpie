@@ -27,7 +27,8 @@ int main(int argc,char** argv) try {
  if(mode=="fragmented")g_object_set(mux,"fragment-duration",1u,"streamable",FALSE,"trak-timescale",1000000u,nullptr);
  else {const auto scratch=(dir/"faststart-temp").string();g_object_set(mux,"fragment-duration",0u,"faststart",TRUE,"faststart-file",scratch.c_str(),"trak-timescale",1000000u,nullptr);}
  const auto codec=Read(dir/"codec.bin");auto* codecbuf=gst_buffer_new_allocate(nullptr,codec.size(),nullptr);gst_buffer_fill(codecbuf,0,codec.data(),codec.size());
- auto* caps=gst_caps_new_simple("video/x-h264","stream-format",G_TYPE_STRING,"avc","alignment",G_TYPE_STRING,"au","codec_data",GST_TYPE_BUFFER,codecbuf,nullptr);
+ auto* caps=gst_caps_new_simple("video/x-h264","stream-format",G_TYPE_STRING,"avc","alignment",G_TYPE_STRING,"au","codec_data",GST_TYPE_BUFFER,codecbuf,"width",G_TYPE_INT,1000,"height",G_TYPE_INT,702,
+   "framerate",GST_TYPE_FRACTION,15,1,nullptr);
  gst_app_src_set_caps(GST_APP_SRC(source),caps);gst_caps_unref(caps);gst_buffer_unref(codecbuf);
  std::vector<unsigned char> bytes;
  GstAppSinkCallbacks callbacks{};callbacks.new_sample=[](GstAppSink* sink,gpointer raw)->GstFlowReturn {
