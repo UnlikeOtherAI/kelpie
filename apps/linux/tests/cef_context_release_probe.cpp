@@ -29,7 +29,9 @@ class ProofApp final : public CefApp, public CefRenderProcessHandler {
     if (!nonce || std::string(nonce).find_first_not_of("0123456789abcdef") != std::string::npos) return;
     Json output = {{"type","context-released"},{"browserId",browser->GetIdentifier()},
       {"frameId",frame->GetIdentifier()},{"mainFrame",frame->IsMain()},{"contextValid",context->IsValid()}};
-    if (context->IsValid() && context->Enter()) {
+    if (context->IsValid()) {
+      const bool entered = context->Enter();
+      output["contextEntered"] = entered;
       CefRefPtr<CefV8Value> value; CefRefPtr<CefV8Exception> exception;
       const std::string key = "__kelpie_release_proof_" + std::string(nonce);
       const std::string sentinel = "__kelpie_release_nonce_" + std::string(nonce);
@@ -65,7 +67,7 @@ class ProofApp final : public CefApp, public CefRenderProcessHandler {
           }
         }
       } else if (exception) output["exception"] = exception->GetMessage().ToString();
-      context->Exit();
+      if (entered) context->Exit();
     }
     std::cerr << "KELPIE_RELEASE_PROOF " << output.dump() << std::endl;
   }
