@@ -26,7 +26,12 @@ const candidateHash = await fileHash(candidatePath), generatorHash = await fileH
 assert.equal(evidence.binarySHA256, candidateHash, "Observed app differs from requested candidate");
 assert.match(evidence.source, /^[a-f0-9]{40}$/);
 const source = spawnSync("git", ["rev-parse", "HEAD"], {encoding:"utf8",timeout:5000});
-assert.equal(source.status, 0); assert.equal(source.stdout.trim(), evidence.source);
+assert.equal(source.status, 0);
+const testSource = source.stdout.trim();
+assert.match(testSource, /^[a-f0-9]{40}$/);
+const unchanged = spawnSync("git", ["diff","--quiet",evidence.source,testSource,"--",
+  "apps/linux/src","apps/linux/CMakeLists.txt","native","packages/shared","pnpm-lock.yaml"], {timeout:10000});
+assert.equal(unchanged.status,0,"Candidate product inputs differ from model checkout");
 const mediaObjects = join(dirname(resolve(generatorPath)), "CMakeFiles/kelpie_linux_script_media.dir/src");
 const objectHashes = {
   compositor: await fileHash(join(mediaObjects, "script_frame_compositor.cpp.o")),
@@ -135,7 +140,7 @@ for (const item of entries.slice(1,4))
   assert.ok(item.frames.some(frame=>frame.roiSHA256!==model),"A retained-marker negative is invisible");
 assert.ok(entries[4].frames.every(frame=>frame.roiSHA256===model),
   "Palette-collision control is distinguishable; no ambiguity claim can be made");
-const report={version:1,confidence:"insufficient",provenance:"loader binding closure unverified",source:evidence.source,
+const report={version:1,confidence:"insufficient",provenance:"loader binding closure unverified",source:evidence.source,testSource,
   candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,generatorPID:generated.pid,
   candidateEvidenceSHA256:await fileHash(candidateEvidencePath),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
   encoder:generatedReport.encoder,roi,cases:entries};
