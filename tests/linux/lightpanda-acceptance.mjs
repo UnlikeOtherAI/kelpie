@@ -99,7 +99,7 @@ try {
   });
   const navigation = await check("cold navigation/title/url", async () => {
     await page.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 });
-    assert.equal(await page.title(), "Kelpie capture acceptance"); assert.equal(page.url(), fixture.url);
+    assert.equal(await page.title(), "Kelpie capture acceptance"); assert.equal(page.url(), new URL(fixture.url).href);
     report.verifiedMethods.push("tab.goto", "tab.title", "tab.url");
     return { title: await page.title(), url: page.url() };
   });
@@ -151,7 +151,7 @@ try {
   await check("history back/forward", async () => {
     const next = new URL("next", fixture.url).href;
     await page.goto(next, { waitUntil: "domcontentloaded", timeout: 5000 });
-    await page.goBack({ timeout: 3000 }); assert.equal(page.url(), fixture.url);
+    await page.goBack({ timeout: 3000 }); assert.equal(page.url(), new URL(fixture.url).href);
     await page.goForward({ timeout: 3000 }); assert.equal(page.url(), next);
     report.verifiedMethods.push("tab.back", "tab.forward"); return { history: true };
   });
