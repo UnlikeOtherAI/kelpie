@@ -10,6 +10,7 @@ export * from "./extension-tools.js";
 export * from "./extension-ai-tools.js";
 
 export * from "./script-workflow.js";
+export * from "./script-status.js";
 export * from "./script-bindings.js";
 export * from "./script-target.js";
 export * from "./script-presentation.js";
