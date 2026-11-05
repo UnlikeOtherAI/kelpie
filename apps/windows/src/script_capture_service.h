@@ -38,6 +38,7 @@ class WindowsScriptService : public std::enable_shared_from_this<WindowsScriptSe
   std::map<std::string, Entry> entries_;
   HWND viewport_, owner_;
   Marshal marshal_;
+  std::uint64_t last_presentation_revision_=0;
   DocumentGuard guard_;
   std::unique_ptr<ScriptNativeOverlay> overlay_;
 };

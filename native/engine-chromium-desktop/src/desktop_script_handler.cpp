@@ -1,5 +1,6 @@
 #include "desktop_script_runtime.h"
 #include "desktop_script_pause.h"
+#include "desktop_script_capture_state.h"
 #include "kelpie/desktop_script_owner.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/browser_schema.h"
@@ -18,6 +19,10 @@
 #include <stdexcept>
 
 namespace kelpie {
+namespace {
+std::atomic<std::uint64_t> presentation_revision{0};
+std::uint64_t NextPresentationRevision() { return presentation_revision.fetch_add(1)+1; }
+}
 std::string NewDesktopScriptId() {
   std::random_device random;
   std::ostringstream text;
@@ -42,12 +47,12 @@ void DesktopScriptHandler::NotifyNavigation() {
   BrowserNavigationState state;
   const auto result=impl_->engine.GetNavigationState(lease,&state,std::chrono::milliseconds(1));
   if(!result.ok || state.tab.document_version==document) return;
+  bool cleared=false;
   {
     std::lock_guard lock(impl_->mutex);
-    impl_->presentation.erase("marker"); impl_->presentation.erase("pointer"); impl_->presentation.erase("commentary");
-    impl_->presentation_latched=false;
+    cleared=ClearRetiredDesktopPresentation(impl_->presentation,{lease.id,lease.generation,document});
   }
-  try { impl_->Present(); } catch(...) { RequestLocalAbort(); }
+  if(cleared) try { impl_->Present(); } catch(...) { RequestLocalAbort(); }
 }
 bool DesktopScriptHandler::IsRunning() const { std::lock_guard lock(impl_->mutex); return impl_->running; }
 bool DesktopScriptHandler::Allows(std::string_view method) const {
@@ -137,7 +142,7 @@ void DesktopScriptHandler::Impl::Pause(int milliseconds) {
 void DesktopScriptHandler::Impl::Present() {
   if (!config.present) return;
   Json copy; std::shared_ptr<std::atomic<bool>> cancellation;
-  { std::lock_guard lock(mutex); if(presentation_latched) return; copy = presentation; copy["playing"] = running; copy["elapsedMs"]=Elapsed(); cancellation=abort; }
+  { std::lock_guard lock(mutex); copy = presentation; copy["_presentationRevision"]=NextPresentationRevision(); copy["playing"] = running; copy["elapsedMs"]=Elapsed(); cancellation=abort; }
   config.present(copy, [this,cancellation] { cancellation->store(true); changed.notify_all(); });
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
@@ -199,7 +204,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     began = Clock::now(); deadline = began + std::chrono::milliseconds(300000);
     capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json::object();
     sampler_ready = false; sampler_done = false; requested_step = completed_step = -1;
-    requested_ticket=completed_ticket=0; requested_step_document.clear(); presentation_latched=false; grant_revoked.store(false); privacy_discard.store(false);
+    requested_ticket=completed_ticket=0; requested_step_document.clear(); grant_revoked.store(false); privacy_discard.store(false);
     status = {{"success", true}, {"playing", true}, {"runId", run_id}, {"totalActions", actions.size()}};
   }
   if(config.invalidate) config.invalidate();
@@ -299,8 +304,12 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   lease.cancelled.reset(); lease.deadline = Clock::now() + std::chrono::seconds(2);
   Json ignored;
   engine.EvaluateBrowserControl(lease, "delete globalThis[" + Json(target_key).dump() + "]", &ignored, std::chrono::seconds(2));
-  { std::lock_guard lock(mutex); presentation = {{"playing", false}}; }
-  try { if (config.present) config.present({{"playing", false}}, {}); }
+  Json hidden;
+  { std::lock_guard lock(mutex);
+    presentation = {{"playing", false}};
+    hidden=presentation; hidden["_presentationRevision"]=NextPresentationRevision();
+  }
+  try { if (config.present) config.present(hidden, {}); }
   catch(...) {
     if(result.value("success",false)) result["error"]={{"code","CAPTURE_NATIVE_PRESENTATION_FAILED"},{"message","Native presentation cleanup failed"}};
     else result["captureError"]="CAPTURE_NATIVE_PRESENTATION_FAILED";
