@@ -1,5 +1,6 @@
 #include "linux_desktop_internal.h"
 #include "gui_shell.h"
+#include "script_capture_service.h"
 #include "headless_shell.h"
 #include "kelpie/response_helpers.h"
 #include "kelpie/desktop_mcp_server.h"
@@ -81,6 +82,14 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   engine.cache_path=impl_->config.profile_dir+"/cef-cache";
   engine.root_cache_path=engine.cache_path; engine.partitions_path=engine.cache_path;
   if(engine.initial_url.empty()) impl_->LoadSession(engine);
+  impl_->scripts=std::make_shared<LinuxScriptService>([this](const json& shown) {
+    if(!impl_->started || !shown.contains("tabId") || !shown.contains("generation") || !shown.contains("documentVersion")) return false;
+    for(const auto& tab:Tabs()) if(tab.active && tab.id==shown.value("tabId",std::string()) &&
+        tab.generation==shown.value("generation",std::uint64_t(0)) &&
+        tab.document_version==shown.value("documentVersion",std::string())) return true;
+    return false;
+  });
+  impl_->scripts->Configure(runtime);
   if(!impl_->desktop.Start(runtime)) { ShowToast(impl_->desktop.last_error()); return false; }
   impl_->started=true;
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);

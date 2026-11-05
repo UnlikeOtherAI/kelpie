@@ -12,12 +12,14 @@
 #include <mutex>
 
 namespace kelpie::linuxapp {
+class LinuxScriptService;
 struct LinuxApp::Impl final : DeviceInfoProvider {
   AppConfig config;
   int argc; char** argv;
   ProfileSession profile;
   DeviceInfoLinux device;
   mutable DesktopApp desktop;
+  std::shared_ptr<LinuxScriptService> scripts;
   account::AccountService account;
   std::unique_ptr<connect::Executor> connect_executor;
   std::unique_ptr<connect::Client> connection;

@@ -30,6 +30,13 @@ class DesktopCefApp final : public CefApp, public CefBrowserProcessHandler {
     command_line->AppendSwitch("use-mock-keychain");
     command_line->AppendSwitch("disable-gpu");
     command_line->AppendSwitch("disable-gpu-compositing");
+#if defined(__linux__)
+    // Offscreen rendering still initializes Ozone. Linux defaults to X11,
+    // which requires a display even when no native window is created.
+    if (command_line->HasSwitch("headless")) {
+      command_line->AppendSwitchWithValue("ozone-platform", "headless");
+    }
+#endif
   }
 
   void OnScheduleMessagePumpWork(int64_t delay_ms) override {

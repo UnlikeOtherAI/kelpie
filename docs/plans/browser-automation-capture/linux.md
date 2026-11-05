@@ -1,17 +1,15 @@
 # Linux native automation and capture
 
 Owner: Linux (desktop_backend), Maxis source development only.
-Current prerequisite source worktree:
-D:/Worktrees/kelpie/capture-desktop-20261104.
-Linux worktree to create only after the backend prerequisite is integrated:
-D:/Worktrees/kelpie/capture-linux-20261104,
-branch codex/capture-linux-20261104.
-Assigned future bounded Linux test checkout:
+Source worktree: D:/Worktrees/kelpie/capture-linux-20261104,
+branch codex/capture-linux-20261104, integrated base dc0648e284c46582708b2ea31431de85a9f9946a.
+Portable worker prerequisites are integrated and verified separately; they do not
+prove Linux native behavior. Assigned bounded Linux test checkout:
  /home/ondre/Projects/kelpie-worktrees/capture-linux-20261104.
 
-No Linux source implementation, native build or acceptance is claimed by this
-initial inventory. The user now requests all platforms; Windows remains the first
-shared runtime gate, but that does not remove any Linux requirement below.
+The native implementation checkpoint is explicitly unverified before transport
+through Git to Fedora. All48 requirements below remain pending their actual
+Linux-specific evidence; source presence is not a passing result.
 
 ## Source inventory and reuse
 
@@ -151,3 +149,155 @@ Linux test phase; codec selection is not yet complete.
 8. Root owns the integrated PR/release; platform owner supplies exact source,
    package/binary hashes and installed published native flow evidence. No
    independent PR or release is opened by this owner.
+
+## Initial native build, 5 November2026
+
+Source2f5db3c2 was transferred through a SHA-256-verified Git bundle to the
+assigned owned Fedora checkout (GitHub SSH credentials were absent; none copied).
+Native configuration passed with pinned CEF120.2.7 and GCC16.2.1, GTK3.24.52,
+Cairo1.18.6, giflib6.1.3 and GStreamer1.28.8. The existing native frozen
+pnpm/shared/generator bootstrap was retained.
+
+The first environment-only npm_config_store_dir was ignored by pnpm12 and used
+the existing global store (261 reused,0 downloaded). The corrected explicit
+--store-dir wrapper was verified under this task's .native-cache/pnpm-store/v11,
+then a supported frozen force install relinked only this checkout's dependencies.
+Subsequent configuration uses the private wrapper; no integrity check was bypassed.
+
+The first native build compiled the shared engine and Linux codec sources, then
+failed at GTK draw registration: a comma-bearing frame initializer inside a
+G_CALLBACK macro argument was split by the preprocessor. Composition now has its
+own helper outside the callback. This fixes the cause and separates native
+presentation from GTK event registration. Full app/link/tests remain pending.
+
+Official signed dev dependency installation pulled matching Mesa GBM/EGL/GL
+updates transitively. DNF reported an existing offline transaction invalidated
+by its online transaction. No update queue was manually edited or rescheduled.
+The GTK app and both focused test executables then linked at7c959a0b.
+Private artifact tests passed:0700/0600 modes, foreign owner/run refusal,
+seven-byte chunks reconstruct the PNG, inode replacement refuses access, and
+the1024-byte PNG budget retained928 bytes across8 files without an excess file.
+
+The first media run refused in preflight before any browser action. Native
+GStreamer diagnostics showed that auto-linking an unconstrained appsrc selected
+mp4mux's audio_0 pad, which rejected actual AVC video caps. The fixed pipeline now
+constrains H.264 caps before pad selection. This preserves the real codec proof
+rather than bypassing negotiation. All-frame media success remains pending.
+## Linux sandbox boundary
+
+The prior shared Linux initialization explicitly set no_sandbox=true, so no CEF
+app acceptance was attempted under it. Root authorized a Linux-only correction;
+Windows bootstrap/false behavior and other platform branches are preserved.
+
+The pinned SDK actually includes Release/chrome-sandbox (0755, ondre-owned,
+752152 bytes), contrary to the stale source comment. SHA-256:
+35163229e509ebc8b471790203d9d5720842627bc56f18fa90b070c705bb7419.
+No helper permissions/ownership were changed and no privileged helper installed.
+Fedora's unprivileged user+PID+network namespace probe succeeded; SELinux stayed
+Enforcing, max_user_namespaces47584. No sysctl or security policy was changed.
+
+[Chromium120 sandbox documentation](https://raw.githubusercontent.com/chromium/chromium/120.0.6099.234/docs/linux/sandboxing.md)
+describes supported namespaces as the default modern alternative to a setuid
+helper. The SDK cef_types.h documents no_sandbox as the disabling setting.
+Linux now leaves that setting false and lets Chromium fail closed when no usable
+sandbox exists. This is source/kernel prerequisite evidence, not yet proof of a
+sandboxed renderer. Actual child namespace/seccomp/flags and native API flows
+remain pending.
+## Startup diagnostics after sandbox correction
+
+The2657 native smoke exited before readiness. A bounded GDB run identified
+Chromium's ProcessSingleton socket setup CHECK. The task's deeply nested TMPDIR
+can exceed Linux AF_UNIX's108-byte pathname field; a short0700 owned runtime
+directory advances startup beyond that check without deleting the failed profile.
+The permanent smoke now creates short private runtime scratch and can reuse its
+preserved synthetic profile through KELPIE_TEST_PROFILE. Build caches remain
+inside the assigned test checkout. Early child exit is reported immediately.
+
+That run exposed a separate headless defect: the exact stack entered Ozone's
+X11CursorFactory and failed its property cache because the SSH session has no X
+display. Windowless rendering alone does not select a display backend.
+[Chromium120 Ozone documentation](https://raw.githubusercontent.com/chromium/chromium/120.0.6099.234/docs/ozone_overview.md)
+documents Linux's default X11 backend and explicit headless backend.
+The Linux-only CEF command-line hook now selects ozone-platform=headless for the
+existing headless launch flag. Windows behavior is preserved. Actual startup,
+renderer sandbox and HTTP/MCP success remain pending this source checkpoint.
+
+At570d2c5e, the real system codecs passed independent all-frame decoding:
+GIF5 frames/500ms/1691 bytes; H.264 MP4 5 frames/500ms/1487 bytes, matching
+red overlay centers and100ms timestamps. The2200-byte GIF budget retained a
+fully decodable10-frame/2171-byte prefix. These codec tests do not prove native
+capture, marker ACK, UI Stop, cancellation or final-container recovery.
+
+The c1e13a7c app rebuild passed. The same preserved profile reached authenticated
+HTTP readiness with headless Ozone and namespace sandbox enabled. Initial
+attestation timed out because Chromium rewrites /proc/cmdline into a single
+space-delimited argument. A bounded owned-process probe found two actual
+renderers: NoNewPrivs1, Seccomp2, nested NSpid counts3. The smoke now recognizes
+that real process shape and waits for loaded fixture text plus actual PNG bytes,
+rather than treating a configured tab URL as navigation proof. Full namespace
+comparison, MCP/shutdown and script capture remain pending the revised corpus.
+
+## Movie frame admission candidate
+
+Root's78e049d6 integration includes the shared c852787f frame-ACK interface.
+The Linux adapter now tags sampled visible markers by their creator action and
+document, keeps at most18 pending tags, and acknowledges only the minimum
+actual retained source prefix of all requested movie writers. GIF counts a
+complete compressed image, not pending BGRA. H.264 counts a retained complete
+AVC access unit containing a VCL NAL, not raw input or SPS/PPS-only buffers.
+Final mux failure still fails the run and marks retained artifacts partial.
+The compositor uses the shared clamped progress helper so a marker deliberately
+held before its fade clock is visible at progress0. New pixel/prefix/MP4-budget
+tests are source-complete and await the bounded native run.
+
+Installed Fedora package provenance was captured separately from selected plugin
+license metadata. Runtime GStreamer plugins report LGPL/BSD; the Fedora
+gstreamer1-plugins-good RPM carries a mixed license expression including GPL
+components. No blanket LGPL claim is made for the package or machine. Selected
+factory binaries and installed RPM signatures/hashes are recorded in the
+private codec-provenance artifact; no codec binary is bundled or copied into source.
+
+## Actual headless native smoke
+
+Binary90eb6830 SHA-256
+a33a42ccdb55a5a19514ab6996ba5b643aa8f67cbfda809b0ade71812549ee35,
+exercised with harness63423c7f on Fedora44, passed loaded fixture snapshot,
+actual viewport PNG, authenticated native HTTP, MCP initialize/catalogue and
+authorized shutdown with readiness removal. Two owned renderer children had
+NoNewPrivs1, Seccomp2, nested NSpid count3 and user/network/PID namespaces
+different from the browser, with no sandbox-disabling flags. The same failed
+synthetic profile recovered without state edits. Native MCP reports its existing
+serverInfo{name:kelpie,version:1}; no release-version equivalence is inferred.
+
+At90eb6830, focused media/artifact tests passed, including held marker pixels,
+dual-writer committed prefix0..4 before finalization and5 afterwards, all-frame
+GIF/MP4 decode, private artifact admission, and a90000-byte MP4 recording limit
+that retained/finalized a five-frame1487-byte decodable prefix.
+
+The Linux launcher now reuses the integrated Windows public capture corpus via
+the actual Linux executable, authenticated HTTP/MCP and artifact chunks; no
+parallel workflow implementation is introduced. It records exact executable
+hash/source, preserves synthetic profiles and shuts down its owned app.
+Initial direct-HTTP continuous capture is next; discovery expansion and other
+script/cancellation/cost/package claims remain pending actual results.
+
+## First public capture result and harness recovery
+
+The994f8a45 launcher exercised compiled90eb6830 through the shared continuous
+HTTP corpus: six actions passed, the unique button received trusted input at
+visible center(119,137), extraction returned Green tea/Black tea, and eight
+GIF/MP4/PNG artifacts were downloaded through authenticated chunks and hashed.
+The app exited cleanly and removed readiness. Independent system FFmpeg/FFprobe
+decoding passed all eight artifacts: each movie had13 frames with strictly
+increasing timestamps through about3.533s; all six step PNGs decoded.
+
+The launcher then remained alive because the reused test command helper's
+Promise.race deadline timer was not cleared after child exit. Its outer bounded
+command therefore failed despite completed app checks; that failed-run history
+is preserved. The Linux launcher now owns and clears its child/deadline timers,
+with explicit signal cancellation and app cleanup. This changes test lifecycle,
+not browser state. The next run must prove clean launcher exit.
+
+A separate decoded-pixel check now crops the actual trusted target's coordinates
+and checks the requested red marker, its center and disappearance in final movie
+frames. Its source is complete; pixel success remains pending actual execution.

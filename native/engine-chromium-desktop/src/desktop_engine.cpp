@@ -97,9 +97,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     return false;
   }
   settings.no_sandbox = false;
+#elif defined(__linux__)
+  // Chromium selects its supported namespace/seccomp sandbox. Missing kernel
+  // support must fail startup; never fall back to an unsandboxed renderer.
+  settings.no_sandbox = false;
 #else
-  // Linux's pinned CEF120 packaging does not ship the sandbox helper. Keep its
-  // existing configuration explicit until that artifact is upgraded.
   settings.no_sandbox = true;
 #endif
   settings.windowless_rendering_enabled = config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;

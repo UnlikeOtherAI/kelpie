@@ -81,6 +81,12 @@ Requires:       cups-libs
 Requires:       dbus-libs
 Requires:       fontconfig
 Requires:       gtk3
+Requires:       cairo
+Requires:       giflib
+Requires:       gstreamer1-plugins-base
+Requires:       gstreamer1-plugins-good
+Requires:       gstreamer1-plugins-bad-free
+Requires:       gstreamer1-plugin-openh264
 Requires:       libX11
 Requires:       libXcomposite
 Requires:       libXdamage
