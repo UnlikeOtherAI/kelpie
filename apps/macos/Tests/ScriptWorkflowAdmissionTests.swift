@@ -163,6 +163,40 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
+    func testJSONReceiptBooleansRejectNumbersStringsAndNull() throws {
+        func decoded(_ json: String) throws -> Body {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? Body)
+        }
+        let good = try decoded(#"{"token":"expected","ok":true,"mayHaveCompleted":true,"sensitive":false,"sensitivityKnown":true,"inputGuarantee":"synthetic-coordinate"}"#)
+        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(good, token: "expected"))
+        for field in ["ok", "mayHaveCompleted", "sensitive", "sensitivityKnown"] {
+            for raw in ["1", "0", #""true""#, "null"] {
+                var candidate = good
+                candidate[field] = try decoded("{\"value\":\(raw)}")["value"]
+                XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(candidate, token: "expected"))
+                XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedAckShape(candidate))
+                let privacy = ScriptWorkflowPrivacy(secrets: [], captures: true)
+                ScriptWorkflowTab.consumeTargetResult(candidate, mutates: true, expectedToken: "expected",
+                    consume: { privacy.consume($0, text: "full literal") },
+                    uncertain: { privacy.uncertain(text: "full literal") })
+                XCTAssertEqual(privacy.secrets, ["full literal"])
+                XCTAssertTrue(privacy.discardMedia)
+            }
+        }
+        for raw in ["1", "0", #""true""#, "null"] {
+            let candidate = try decoded("{\"editable\":\(raw)}")
+            XCTAssertThrowsError(try ScriptWorkflowActions.requireEmptyPacedEditable(candidate))
+        }
+        for raw in ["1", "0", #""true""#, "null"] {
+            let privacy = ScriptWorkflowPrivacy(secrets: [], captures: true)
+            let candidate = try decoded("{\"sensitive\":false,\"sensitivityKnown\":\(raw)}")
+            privacy.consume(candidate, text: "full literal")
+            XCTAssertEqual(privacy.secrets, ["full literal"])
+            XCTAssertTrue(privacy.discardMedia)
+        }
+    }
+
+    @MainActor
     func testFinalPacedAckDistinguishesUnknownPrivacyFromLostCallback() throws {
         let known: Body = ["token": "expected", "inputGuarantee": "synthetic-coordinate", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": true]
         let unknown: Body = ["token": "expected", "inputGuarantee": "synthetic-coordinate", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]

@@ -1,4 +1,13 @@
 import AppKit
+import CoreFoundation
+
+/// JSON numbers bridge to Bool in Swift; only CFBoolean is a Boolean receipt field.
+enum ScriptWorkflowBoolean {
+    static func value(_ raw: Any?) -> Bool? {
+        guard let number = raw as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+}
 
 /// An immutable native renderer/tab grant is shared by actions and frame sampling.
 @MainActor
@@ -230,9 +239,12 @@ final class ScriptWorkflowTab {
             throw ScriptWorkflowFailure(dispatch || edit != nil ? "INPUT_UNCERTAIN" : "TARGET_FAILED",
                                         mayHaveCompleted: dispatch || edit != nil)
         }
-        if dispatch || edit != nil, result["ok"] as? Bool == true,
-           let token, !Self.isAcknowledgedMutation(result, token: token) {
-            throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        if dispatch || edit != nil {
+            guard Self.hasValidMutationReceipt(result),
+                  let ok = ScriptWorkflowBoolean.value(result["ok"]),
+                  !ok || (token.map { Self.isAcknowledgedMutation(result, token: $0) } == true) else {
+                throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
         }
         return result
     }
@@ -248,9 +260,20 @@ final class ScriptWorkflowTab {
 
     static func isAcknowledgedMutation(_ value: Any?, token: String) -> Bool {
         guard let body = value as? Body else { return false }
-        return !token.isEmpty && body["token"] as? String == token && body["ok"] as? Bool == true && body["error"] == nil &&
-            body["mayHaveCompleted"] as? Bool == true && body["inputGuarantee"] as? String == "synthetic-coordinate" &&
-            body["sensitive"] is Bool && body["sensitivityKnown"] is Bool
+        return !token.isEmpty && body["token"] as? String == token && hasValidMutationReceipt(body) &&
+            ScriptWorkflowBoolean.value(body["ok"]) == true && ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) == true
+    }
+
+    static func hasValidMutationReceipt(_ body: Body) -> Bool {
+        guard let ok = ScriptWorkflowBoolean.value(body["ok"]),
+              ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) != nil,
+              ScriptWorkflowBoolean.value(body["sensitive"]) != nil,
+              ScriptWorkflowBoolean.value(body["sensitivityKnown"]) != nil else { return false }
+        if ok {
+            return body["error"] == nil && ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) == true &&
+                body["inputGuarantee"] as? String == "synthetic-coordinate"
+        }
+        return body["error"] is String
     }
 
     /// A malformed callback is uncertain before any subsequent authority or document guard.
@@ -263,15 +286,9 @@ final class ScriptWorkflowTab {
     ) {
         guard let body = value as? Body else { uncertain?(); return }
         consume?(body)
-        if mutates, body["ok"] as? Bool == true, let expectedToken, expectedToken.isEmpty || body["token"] as? String != expectedToken {
-            uncertain?()
-        }
-        let invalidStatus = body["ok"] as? Bool == true
-            ? body["error"] != nil || body["mayHaveCompleted"] as? Bool != true ||
-                body["inputGuarantee"] as? String != "synthetic-coordinate"
-            : !(body["error"] is String)
-        if mutates && (!(body["ok"] is Bool) || invalidStatus || !(body["sensitive"] is Bool) ||
-                       !(body["sensitivityKnown"] is Bool) || !(body["mayHaveCompleted"] is Bool)) {
+        if mutates && (!hasValidMutationReceipt(body) ||
+            (ScriptWorkflowBoolean.value(body["ok"]) == true &&
+                (expectedToken.map { !isAcknowledgedMutation(body, token: $0) } ?? true))) {
             uncertain?()
         }
     }
