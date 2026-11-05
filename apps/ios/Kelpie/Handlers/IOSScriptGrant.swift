@@ -24,6 +24,11 @@ struct IOSWorkflowFailure: Error {
         self.mayHaveCompleted = mayHaveCompleted
     }
 
+    /// Stop can arrive while the renderer retires or the encoder finishes an earlier failed action.
+    static func terminal(action: Self?, capture: Self?, stopRequested: Bool) -> Self? {
+        action ?? capture ?? (stopRequested ? Self("SCRIPT_ABORTED") : nil)
+    }
+
     var response: [String: Any] {
         var result = errorResponse(code: code, message: "Workflow stopped at its last confirmed step")
         if mayHaveCompleted { result["mayHaveCompleted"] = true }

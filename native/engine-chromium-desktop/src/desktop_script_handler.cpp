@@ -161,7 +161,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   }
   if (sensitive && (script.contains("capture") || screenshot))
     return ErrorResponse("SENSITIVE_CAPTURE_REFUSED", "Secret-bearing workflows cannot capture media");
-  if ((script.contains("capture") || screenshot) && !config.capture) return ErrorResponse("UNSUPPORTED", "Native capture is unavailable");
+  if ((script.contains("capture") || screenshot) && (!config.capture || !config.discard)) return ErrorResponse("UNSUPPORTED", "Native capture is unavailable");
   const std::set<std::string> supported={"navigate","click","tap","fill","type","press-key","scroll","wait","wait-ready","assert","screenshot","commentary","output","extract"};
   for(const auto& action:actions) if(supported.count(action.at("action").get<std::string>())==0)
     return ErrorResponse("UNSUPPORTED_SCRIPT_ACTION","Workflow contains an action this native adapter does not implement");
@@ -176,7 +176,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     began = Clock::now(); deadline = began + std::chrono::milliseconds(300000);
     capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json::object();
     sampler_ready = false; sampler_done = false; requested_step = completed_step = -1;
-    requested_ticket=completed_ticket=0; requested_step_document.clear(); presentation_latched=false; grant_revoked.store(false);
+    requested_ticket=completed_ticket=0; requested_step_document.clear(); presentation_latched=false; grant_revoked.store(false); privacy_discard.store(false);
     status = {{"success", true}, {"playing", true}, {"runId", run_id}, {"totalActions", actions.size()}};
   }
   if(config.invalidate) config.invalidate();
@@ -238,7 +238,10 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     try { RedactScriptOutputs(outputs,actions,redactions); }
     catch(const std::exception& error) {
       const std::string code=std::string(error.what())=="OUTPUT_REDACTION_COLLISION"?"OUTPUT_REDACTION_COLLISION":"OUTPUT_REDACTION_LIMIT";
+      privacy_discard.store(true);
+      const bool uncertain=result.value("mayHaveCompleted",false);
       result=ErrorResponse(code,"Named outputs could not be safely redacted"); outputs=Json::object();
+      if(uncertain) result["mayHaveCompleted"]=true;
     }
     result["outputs"] = std::move(outputs);
   } catch (...) {
@@ -248,6 +251,11 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   if(config.invalidate) config.invalidate();
   stop_sampler.store(true); changed.notify_all();
   if (sampler.joinable()) sampler.join();
+  if(privacy_discard.load()) {
+    try { if(config.discard) config.discard(run_id,owner); }
+    catch(...) { capture_error="CAPTURE_PRIVACY_CLEANUP_FAILED"; }
+    {std::lock_guard lock(mutex);artifacts=Json::array();}
+  }
   if (!capture_error.empty()) {
     if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") result=ErrorResponse(capture_error,"Capture ended at a native limit or failure");
     else result["captureError"]=capture_error;

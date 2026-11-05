@@ -354,6 +354,28 @@ try {
     const status=await api("get-script-status",{runId:result.runId});
     assert.equal(status.outputs,undefined);return {runId:result.runId};
   });
+  await check("security inferred sensitive refusal redacts earlier outputs",async()=>{
+    await navigate();
+    const canary="Synthetic Aa b+! "+crypto.randomUUID();
+    const encoded=encodeURIComponent(canary).replace(/%2B/g,"%2b");
+    const form=new URLSearchParams({value:canary}).toString().slice(6).replace(/%2B/g,"%2b");
+    assert.equal((await api("evaluate",{tabId,expression:"(()=>{document.title="+JSON.stringify(canary+" "+encoded+" "+form)+";document.body.innerHTML='<input id=password-target type=password aria-label=Password>';window.__sensitiveEdits=0;document.querySelector('input').oninput=()=>window.__sensitiveEdits++;return true;})()"})).success,true);
+    const result=await api("play-script",{...workflow([
+      {action:"output",name:"before",source:"title"},
+      {action:"fill",target:{label:"Password",exact:true},text:canary}
+    ]),capture:{formats:["screenshots"],maxWidth:640,maxBytes:8388608}});
+    const serialized=JSON.stringify(result);
+    const leaked=serialized.includes(canary)||serialized.includes(encoded)||serialized.includes(form);
+    const untouched=(await api("evaluate",{tabId,expression:"document.querySelector('input').value===''&&window.__sensitiveEdits===0"})).result===true;
+    // Persist booleans only: never include the authored canary or raw result.
+    const detail={leaked,untouched,refused:result.error?.code==="SENSITIVE_CAPTURE_REFUSED",runId:result.runId,artifactCount:result.artifacts?.length??0};
+    checks.push({name:"inferred-sensitive diagnostic",passed:!leaked&&untouched,detail});
+    assert.equal(detail.refused,true);assert.equal(untouched,true);assert.equal(leaked,false,"Earlier output retained inferred secret");
+    assert.equal(detail.artifactCount,0);assert.ok(result.outputs.before.includes("[redacted]"));
+    const status=await api("get-script-status",{runId:result.runId});assert.equal(status.artifacts.length,0);
+    assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
+    return detail;
+  });
   await check("security artifact identity and range admission",async()=>{
     await navigate();
     const run=await api("play-script",workflow([{action:"screenshot"}]));assert.equal(run.success,true);

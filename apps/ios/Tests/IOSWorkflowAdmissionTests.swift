@@ -33,6 +33,19 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         assertRejected(workflow([tap, fill.merging(["text": ["secret": "private"]]) { _, new in new }]), "UNRESOLVED_INPUT")
     }
 
+    func testLateStopPreservesSensitiveRefusalAndUncertainInput() {
+        let privacy = IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED")
+        let input = IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        let capture = IOSWorkflowFailure("CAPTURE_BUDGET_EXCEEDED")
+        XCTAssertEqual(IOSWorkflowFailure.terminal(action: privacy, capture: capture, stopRequested: true)?.code, privacy.code)
+        let uncertain = IOSWorkflowFailure.terminal(action: input, capture: nil, stopRequested: true)
+        XCTAssertEqual(uncertain?.code, input.code)
+        XCTAssertTrue(uncertain?.mayHaveCompleted == true)
+        XCTAssertEqual(IOSWorkflowFailure.terminal(action: nil, capture: capture, stopRequested: true)?.code, capture.code)
+        XCTAssertEqual(IOSWorkflowFailure.terminal(action: nil, capture: nil, stopRequested: true)?.code, "SCRIPT_ABORTED")
+        XCTAssertNil(IOSWorkflowFailure.terminal(action: nil, capture: nil, stopRequested: false))
+    }
+
     func testSuppliedCaptureDefaultsAndExplicitScreenshotScope() throws {
         let one = try IOSBoundWorkflow(workflow([tap, ["action": "screenshot"]]))
         XCTAssertFalse(one.stepScreenshots)

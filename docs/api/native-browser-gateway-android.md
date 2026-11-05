@@ -136,3 +136,8 @@ dropping the sole frame. Non-budget empty video finalization fails explicitly.
 Capture deadlines are measured from the captured origin and gate later actions
 and frame admission, including screenshots-only runs; codec finalization does not
 extend the exported movie beyond maxDurationMs.
+Android OpenAI inference registers each lazy worker before starting transport.
+ai-cancel acknowledges the number of requests whose cancellation it requested,
+including queued workers. The original ai-infer response reports
+INFERENCE_CANCELLED after that worker's provider cleanup has retired; the
+cancellation acknowledgement alone is not a terminal inference result.

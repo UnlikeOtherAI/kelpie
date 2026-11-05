@@ -329,12 +329,12 @@ final class CEFRenderer: RendererEngine {
 
     func takeScriptSnapshot(viewport: CGRect, maximumPixels: CGSize, pixelRatio: CGFloat) async throws -> NSImage {
         guard let bridge else { throw ScriptWorkflowFailure("CAPTURE_PIXEL_SOURCE_UNAVAILABLE") }
-        let data: Data? = await withCheckedContinuation { continuation in
-            bridge.takeScriptScreenshot(viewport: viewport, maximumPixels: maximumPixels, pixelRatio: pixelRatio) {
-                continuation.resume(returning: $0 as Data?)
+        let image: NSImage? = await withCheckedContinuation { continuation in
+            bridge.takeScriptScreenshot(maximumPixels: maximumPixels) {
+                continuation.resume(returning: $0)
             }
         }
-        guard let data, let image = NSImage(data: data) else { throw ScriptWorkflowFailure("CAPTURE_PIXEL_SOURCE_UNAVAILABLE") }
+        guard let image else { throw ScriptWorkflowFailure("CAPTURE_PIXEL_SOURCE_UNAVAILABLE") }
         return image
     }
 

@@ -33,10 +33,13 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
   if (name == "click" || name == "tap" || name == "fill" || name == "type") {
     auto resolved = Target(lease, action.at("target"));
     if (!resolved.value("ok", false)) return failed_target(resolved);
-    if (resolved.value("sensitive", false) && (script.contains("capture") ||
-        std::any_of(script["actions"].begin(), script["actions"].end(), [](const Json& item) { return item["action"] == "screenshot"; })))
-      return ErrorResponse("SENSITIVE_CAPTURE_REFUSED", "Sensitive controls cannot be edited while capturing");
+    const bool sensitive_capture=resolved.value("sensitive",false) && (script.contains("capture") ||
+      std::any_of(script["actions"].begin(),script["actions"].end(),[](const Json& item) {return item["action"]=="screenshot";}));
+    if(sensitive_capture) privacy_discard.store(true);
+    // Inferred sensitivity also protects outputs produced before this refusal.
     if(resolved.value("sensitive",false) && (name=="fill" || name=="type")) redactions->push_back(action.at("text"));
+    if(sensitive_capture)
+      return ErrorResponse("SENSITIVE_CAPTURE_REFUSED","Sensitive controls cannot be edited while capturing");
     BrowserNavigationState navigation;
     const auto observed = engine.GetNavigationState(lease, &navigation, std::chrono::seconds(2));
     if (!observed.ok) return ErrorResponse(observed.error_code, "Owned document is unavailable");

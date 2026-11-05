@@ -42,7 +42,7 @@ Exact candidate 9333ff50 has the machine-interface/media evidence below. Remaini
 - [ ] Release build uses pinned CEF bootstrap/sandbox and matching runtime assets; no warnings.
 - [x] Native owner-scope/HTTP test, existing native tests and compositor/codec checks pass.
 - [x] Direct HTTP, direct MCP and CLI MCP alias run the same strict workflow.
-- [ ] Native Stop, remote same-owner abort and status/download remain responsive during capture/finalize.
+- [x] Native Stop via standard UIA, remote same-owner abort and status/download work during capture; physical clicking is unclaimed.
 - [ ] Another grant/listener, invalid/revoked token, forged body owner and rotated grant fail.
 - [x] Unique semantic button/label succeeds; duplicates, missing, obscured, disabled, moved and replaced targets refuse safely.
 - [x] Trusted down-to-replacement/cancel releases native pressed state; next run works.
@@ -88,7 +88,7 @@ Every canonical requirement is tracked here. Focused unit/source evidence does n
 | EXT-01 | Passed real scalar/missing/ambiguous extraction. |
 | EXT-02 | Passed real ordered nested product records. |
 | EXT-03 | Passed real allowlisted publisher metadata; forbidden JSON-LD absent. |
-| EXT-04 | Real provenance observed; navigation-to-navigation comparison remains pending. |
+| EXT-04 | Passed real extraction URL/heading/source attribution across navigation; unavailable document revision remains explicitly unavailable. |
 | RDY-01 | Passed real DOM status versus delayed task diagnostics. |
 | RDY-02 | Passed canonical immediate readiness and unique-selector refusal. |
 | OWN-01 | External worker managed-context isolation belongs to backend flavor; native supplied session IDs refuse before mutation. |
@@ -100,10 +100,10 @@ Every canonical requirement is tracked here. Focused unit/source evidence does n
 | WFL-05 | Passed real child replacement and focus races with uncertainty and next-run recovery; no replay. |
 | TGT-01 | Passed real unique button/label, duplicate, hidden and disabled cases. |
 | TGT-02 | Passed real clipped-center hit geometry and covered refusal. |
-| TGT-03 | Real scrolled center passed at DPR1/zoom1; alternate DPR/zoom remains pending. |
+| TGT-03 | Clipped/scrolled centers passed at measured638x662 and 1042x662 with CSS zoom 1/1.5; actual DPR/visual scale1 only. Browser zoom/other DPR remain unclaimed. |
 | TGT-04 | Passed moving/replaced/focus/navigation and added movie-hold rechecks. |
 | TGT-05 | Passed fixture trusted=true and reported asynchronous CDP gap. |
-| PTR-01 | S/C and zero-duration paths run through native API; physical native pointer timeline remains blocked. |
+| PTR-01 | Actual GIF/MP4 C and S pixel trajectories and endpoints passed; no page hover during presentation. Zero duration also passed. |
 | PTR-02 | Numeric parity and composited media observed; displayed-native versus export comparison blocked. |
 | VIS-01 | Actual PNG/GIF/MP4 red marker pixels inspected; native displayed overlay remains blocked. |
 | VIS-02 | Actual early marker and clean faded endpoint inspected; native wobble/fade display remains blocked. |
@@ -113,8 +113,8 @@ Every canonical requirement is tracked here. Focused unit/source evidence does n
 | CAP-04 | Step PNGs decoded; prior-document marker PNG inspected, including GIF-only explicit PNG. |
 | CAP-05 | Actual old/new-document movie pixels passed; actual native viewport resize race remains pending. |
 | CAP-06 | Passed duration/bytes/width/FPS/preflight bounds; main15FPS min intervals GIF70ms/MP470.534ms, FPS1 >=1s. |
-| CAP-07 | Bounded committed-prefix tests and actual dropped-frame metadata passed; forced throttled encoder remains pending. |
-| CAP-08 | Passed HTTP/direct/generic MCP abort/failed status partial download and next-run recovery; physical Stop blocked. |
+| CAP-07 | Natural15FPS overrun passed:18retained+15dropped=33nominal slots over2166.5ms,351.6ms gap preserved. Encoder prefix/FIFO bounds tested; no forced MFT stall claimed. |
+| CAP-08 | Passed native Stop via standard Session1 UIA InvokePattern, remote abort/failed status, partial decode and next-run recovery. Physical clicking unclaimed. |
 | ART-01 | Passed separate Minis authenticated ID/chunk download of30 artifacts; all hashes and decoded frames match. |
 | ART-02 | Passed same-grant API/MCP, invalid bearer and old-listener revocation; current grant immutable until listener drain. |
 | ART-03 | Passed actual wrong run/pathlike ID/negative/string/oversized/zero range refusals. |
@@ -127,7 +127,7 @@ Every canonical requirement is tracked here. Focused unit/source evidence does n
 | WEB-01 | Actual CEF document.modelContext absent and native UNSUPPORTED observed. |
 | WEB-02 | Native WebMCP stays fail-closed without trusted origin/API binding; no supported-native call claim. |
 | DOC-01 | Public strict recipe/MCP examples exercised; candidate guarantee/limits documented. |
-| UI-01 | Blocked by explicit Computer Use hold: native Stop/foreground/modal and matching base/final chrome screenshots unclaimed. |
+| UI-01 | Native Stop accessibility passed; actual owned-window After pixels await reviewed PrintWindow attempt. No CUA/desktop capture or matching screenshot claim. |
 | REL-01 | Root owns integrated PR/version/release; pending. |
 | REL-02 | Root owns signed published artifact/install verification; pending. |
 
@@ -168,3 +168,27 @@ The 6 final public alias recipe artifacts and 3 security-case artifacts were als
 Normal CLI browser stop capture-9333 succeeded. PID 29076 exited; socket 28420, readiness and the CLI running record cleared without manual edits. The unrelated installed app PID 52960 remained intact. The owned SSH tunnel ended. Exact EXE/DLL/identity files are archived at D:/BuildArtifacts/kelpie/capture-windows-20261104/candidates/source-9333ff50.
 
 The 48-record canonical ledger D:/BuildArtifacts/kelpie/capture-windows-20261104/windows-evidence-9333.json passes tests/capture/evidence.mjs. It retains pending or blocked rows rather than upgrading source/unit checks to native UI or release success. Preserve both assigned worktrees and ignored media/build evidence until the coordinator archives it; source is pushed, but these files contain unique verification output.
+
+## Additional measured geometry, media and native accessibility
+
+Supported hidden starts requested 640x1000 and 1600x1400, but actual native/page viewports were 638x662 and 1042x662. These measured values are the tested cases; no tall viewport or alternate DPR/browser zoom is inferred. Semantic clipped-center trusted hits passed at CSS zoom 1 and 1.5. CSS zoom is a page layout condition, not browser zoom. Extraction URL/heading/source attribution also passed across navigation. Reports: native-geometry-640x1000-9333/report.json (4 checks), native-geometry-1600x1400-9333-final/report.json (6 checks) under the Maxis artifact root. Twenty artifacts were retrieved by authenticated IDs across hosts and all frames decoded.
+
+The permanent motion verifier independently recovered 40 C-path and 37 S-path pointer positions per format. C stayed on one side of its chord (23.65 to 60.53CSSpx); S crossed it (-22.82 to 22.80CSSpx). Final endpoint offset was 0x/0.326y CSSpx. Page events confirmed no hover dispatch before configured motion elapsed. Blue radius 12/fade-disabled and red radius 30/fade-enabled marker pixels were present, with clean final frames. These are media measurements, not native-window screenshots.
+
+Absolute client contact sheets, also visually inspected:
+- C: C:/Users/ondre/.codex/worktrees/capture-windows-client-20261104/.cache/capture-evidence/native-geometry-1600x1400-9333-final/2c0cdc8991f33142edabce742196b9f32639cf3ecd90f717-motion-contact.png
+- S: C:/Users/ondre/.codex/worktrees/capture-windows-client-20261104/.cache/capture-evidence/native-geometry-1600x1400-9333-final/32bc5d03bec2e71a607cc5a347c853f7323a11e1c61729d5-motion-contact.png
+- Prior-document marker: C:/Users/ondre/.codex/worktrees/capture-windows-client-20261104/.cache/capture-evidence/native-flow-9333/78130e6d41df829566e8b968ad0c4da1c2659c0b6eed3adc-all-0002.png
+- Destination without old marker: C:/Users/ondre/.codex/worktrees/capture-windows-client-20261104/.cache/capture-evidence/native-flow-9333/78130e6d41df829566e8b968ad0c4da1c2659c0b6eed3adc-all-0004.png
+
+Existing public resize-viewport/reset-viewport calls returned BUSY during active capture; the native viewport stayed unchanged and abort/recovery passed. No arbitrary CDP, DPR or browser-zoom setter is exposed. The native resize implementation lacks NOACTIVATE, so it was not called live outside the admission-refusal test. An OS resize/foreground/minimize/modal transition remains a separate UI test.
+
+The authorized Interactive/Limited on-demand task ran in Session1 through normal public CLI launch. Test source 4ec1496e0ad5b4305c2575a72b41072f1e499665, native source 9333, process 50156 / start 2026-11-05T01:52:44.9304340Z. Exactly one visible enabled own Button named Stop script under KelpieScriptStop exposed InvokePattern; one accessibility invocation aborted capture. Partial outputs passed ID/hash retrieval and all 3 files independently decoded; a new workflow succeeded. The public CLI closed the app and cleared readiness/socket/running record. The exact task was exported, verified and unregistered. Other-owner PID 52960 remained intact. No SetFocus, OS input, cursor, CUA or other window interaction occurred.
+
+Raw evidence: D:/BuildArtifacts/kelpie/capture-windows-20261104/uia-session1-9333/report.json and uia-task-9333-definition.xml/result.json/cleanup.json. The report records actual EXE/DLL/CLI/UIA-client/test-source hashes and protocol identities. The 3 UIA partial files were transferred by SCP of existing same-host authenticated downloads, not claimed as additional cross-host API proof. Source-only PrintWindow plan is windows-native-window-capture.md; no native-window screenshot result is claimed yet.
+
+### Inferred-sensitive capture refusal regression
+
+Old source9333 was reproduced through the authenticated public API on an isolated hidden candidate: output title before editing an unmarked password target, with screenshots capture requested. The edit was refused and no input/value mutation occurred, but earlier output retained the synthetic literal/percent reflection (leaked=true). Raw report: D:/BuildArtifacts/kelpie/capture-windows-20261104/inferred-secret-old-9333/report.json. The report stores only booleans and run identity, never the synthetic literal. Fixture shutdown and public CLI close completed; port28420 was free and other-owner52960 remained.
+
+The source fix registers the newly inferred sensitive edit text before refusing capture. This preserves no-input behavior and allows terminal output redaction to cover earlier values. The clarified privacy policy additionally latches discard independently from later error replacement: inferred-sensitive capture refusal or redaction failure revokes all exact run/owner artifacts, while ordinary failure and abort retain valid partials. Windows deletion compares volume/file identity on an opened handle and preserves replacement/unrelated files. Fixed native compilation/replay remains pending; old failing evidence is retained.

@@ -171,6 +171,29 @@ struct ScriptCodecAcceptance {
         } catch ScriptCaptureError.cancelled {
             try require(!FileManager.default.fileExists(atPath: noFrameURL.path), "GIF cancellation before first frame leaves no invalid file")
         }
+        let abortedPolicy = ScriptCaptureFinalization(started: 100, alreadyAborted: true)
+        let graceFrames = ContinuationProbe(3)
+        let abortedURL = outputs.appendingPathComponent("already-aborted.gif")
+        let aborted = try ScriptImageEncoder.gif(
+            frames: frames, fps: 30, endSeconds: 400.0 / 30, to: abortedURL, budget: outputBudget,
+            shouldContinue: { abortedPolicy.allows(now: graceFrames.proceed() ? 101 : 103, isAborted: true) }
+        )
+        try require(aborted.partial && aborted.frameCount == 3, "Already-aborted caller retains a bounded valid GIF prefix")
+        try decodeGIF(abortedURL, count: 3, duration: Double(aborted.durationMs) / 1000)
+        let partialManifest = try ScriptArtifactStore.shared.add(
+            url: abortedURL, runID: "aborted-fixture", mimeType: "image/gif", owner: "fixture",
+            extra: ["partial": true, "width": 160, "height": 90]
+        )
+        try require(partialManifest["partial"] as? Bool == true, "Aborted caller artifact remains explicitly partial")
+        let activePolicy = ScriptCaptureFinalization(started: 100, alreadyAborted: false)
+        let newlyAborted = ContinuationProbe(3)
+        let newlyAbortedURL = outputs.appendingPathComponent("newly-aborted.gif")
+        let newly = try ScriptImageEncoder.gif(
+            frames: frames, fps: 30, endSeconds: 400.0 / 30, to: newlyAbortedURL, budget: outputBudget,
+            shouldContinue: { activePolicy.allows(now: 101, isAborted: !newlyAborted.proceed()) }
+        )
+        try require(newly.partial && newly.frameCount == 3, "New abort interrupts normal finalization")
+        try decodeGIF(newlyAbortedURL, count: 3, duration: Double(newly.durationMs) / 1000)
         let recoveredURL = outputs.appendingPathComponent("recovered.gif")
         let recovered = try ScriptImageEncoder.gif(frames: Array(frames.prefix(3)), fps: 30, endSeconds: 0.1,
                                                     to: recoveredURL, budget: outputBudget)

@@ -33,21 +33,32 @@ final class WorkflowCaptureProbe {
         allow.tap()
         for _ in 0..<40 {
             let status = try await request("/v1/pair/status?requestId=" + id, method: "GET")
-            if let issued = status["token"] as? String { token = issued; return }
+            if let issued = status["token"] as? String {
+                token = issued
+                let deadline = Date().addingTimeInterval(5)
+                while allow.exists, Date() < deadline { try await Task.sleep(nanoseconds: 80_000_000) }
+                XCTAssertFalse(allow.exists, "Approved pairing sheet must retire before the next app interaction")
+                return
+            }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         throw ProbeError.pairing
     }
 
     func call(_ tool: String, _ args: Body) async throws -> Body {
+        let value = try await toolValue("kelpie_extension", ["name": tool, "arguments": args])
+        return try XCTUnwrap(value as? Body)
+    }
+
+    func toolValue(_ name: String, _ arguments: Body) async throws -> Any {
         let response = try await request("/mcp", ["jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": [
-            "name": "kelpie_extension", "arguments": ["name": tool, "arguments": args]
+            "name": name, "arguments": arguments
         ]])
         let result = try XCTUnwrap(response["result"] as? Body)
         let text = try XCTUnwrap((result["content"] as? [Body])?.first(where: { $0["type"] as? String == "text" })?["text"] as? String)
         let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? Body)
         XCTAssertEqual(envelope["ok"] as? Bool, true, "\(envelope["error"] ?? "")")
-        return try XCTUnwrap(envelope["value"] as? Body)
+        return try XCTUnwrap(envelope["value"])
     }
 
     func bytes(_ manifest: Body, run: String) async throws -> Data {
@@ -55,7 +66,9 @@ final class WorkflowCaptureProbe {
         let size = try XCTUnwrap(manifest["byteLength"] as? Int)
         var bytes = Data()
         while bytes.count < size {
-            let chunk = try await request("/v1/get-script-artifact", ["runId": run, "artifactId": id, "offset": bytes.count, "length": 32768])
+            let range: Body = ["runId": run, "artifactId": id, "offset": bytes.count, "length": 32768]
+            let chunk = bytes.isEmpty ? try await call("kelpie_get_script_artifact", range) :
+                try await request("/v1/get-script-artifact", range)
             XCTAssertEqual(chunk["artifactId"] as? String, id)
             XCTAssertEqual(chunk["offset"] as? Int, bytes.count)
             let new = try XCTUnwrap((chunk["data"] as? String).flatMap { Data(base64Encoded: $0) })
@@ -68,8 +81,20 @@ final class WorkflowCaptureProbe {
 
     enum ProbeError: Error { case invalidChunk, pairing, listener }
 
-    static func containsMarker(_ image: CGImage) -> Bool {
-        let width = 200
+    static func containsTargetMarker(_ screen: XCUIScreenshot, visibleTarget: CGRect, app: CGRect) -> Bool {
+        guard !visibleTarget.isEmpty, !app.isEmpty, let image = screen.image.cgImage else { return false }
+        let xScale = CGFloat(image.width) / app.width
+        let yScale = CGFloat(image.height) / app.height
+        let radius = min(12, visibleTarget.width / 3, visibleTarget.height / 3)
+        let crop = CGRect(x: (visibleTarget.midX - app.minX - radius) * xScale,
+                          y: (visibleTarget.midY - app.minY - radius) * yScale,
+                          width: radius * 2 * xScale, height: radius * 2 * yScale)
+        guard let center = image.cropping(to: crop.integral) else { return false }
+        return containsMarker(center, minimumCoverage: 0.12)
+    }
+
+    static func containsMarker(_ image: CGImage, minimumCoverage: Double = 0) -> Bool {
+        let width = min(200, image.width)
         let height = max(1, width * image.height / image.width)
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         return pixels.withUnsafeMutableBytes { raw in
@@ -77,8 +102,22 @@ final class WorkflowCaptureProbe {
                                       bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
             ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            for index in stride(from: 0, to: raw.count, by: 4) {
-                if raw[index + 1] > 155, raw[index] < 90, raw[index + 2] < 95 { return true }
+            func green(_ pixel: Int) -> Bool {
+                let index = 4 * pixel
+                return raw[index + 1] > 155 && raw[index] < 90 && raw[index + 2] < 95
+            }
+            guard width >= 3, height >= 3 else { return false }
+            if minimumCoverage > 0 {
+                let count = (0..<(width * height)).reduce(0) { $0 + (green($1) ? 1 : 0) }
+                guard Double(count) >= minimumCoverage * Double(width * height) else { return false }
+            }
+            for y in 1..<(height - 1) {
+                for x in 1..<(width - 1) where green(y * width + x) {
+                    let center = y * width + x
+                    if [-width, 0, width].allSatisfy({ line in
+                        [-1, 0, 1].allSatisfy { green(center + line + $0) }
+                    }) { return true }
+                }
             }
             return false
         }
@@ -113,6 +152,19 @@ final class WorkflowLoopbackPage {
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');
+        if(location.pathname==='/secret-guard'){
+          document.title='iOS Reflected+Canary! | iOS%20Reflected%2bCanary! | iOS+Reflected%2bCanary%21';
+          document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'}
+        }
+        if(location.pathname==='/scroll'){
+          document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
+          document.body.innerHTML='<button id="bottom" style="position:absolute;bottom:12px;left:12px;margin:0">Bottom</button>'
+        }
+        if(location.pathname==='/motion'){
+          document.documentElement.style.background='#606060';document.body.style='margin:0;background:#606060';
+          document.body.innerHTML='<button style="appearance:none;position:fixed;left:58vw;top:60vh;transform:translate(-50%,-50%);margin:0;background:#505050;color:#181818;border:0">Track</button>'
+          document.querySelector('button').onclick=()=>{document.title='Track clicked'}
+        }
         if(location.pathname==='/landed'){
           document.body.style.background='#1848D8';document.body.innerHTML='<h1 id="landed">Landed</h1>';document.title='Landed'
         }

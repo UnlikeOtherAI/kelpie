@@ -139,26 +139,33 @@ final class IOSWorkflowRunner {
         } catch { issue = error as? IOSWorkflowFailure ?? IOSWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
         await sampler?.stop()
+        var discardMedia = issue?.code == "SENSITIVE_CAPTURE_REFUSED"
         if let actions {
-            do { outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets) } catch { issue = IOSWorkflowFailure("OUTPUT_REDACTION_FAILED") }
+            do {
+                outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets)
+            } catch {
+                discardMedia = true
+                if issue == nil { issue = IOSWorkflowFailure("OUTPUT_REDACTION_FAILED") }
+            }
         }
         presentation?.finish()
         let artifacts = await media?.finish(
             elapsed: sampler?.elapsed ?? 0,
             dropped: sampler?.dropped ?? 0,
             partial: issue != nil,
-            discard: issue?.code == "SENSITIVE_CAPTURE_REFUSED",
+            discard: discardMedia,
             isAborted: { [state = host.playbackState] in state.isAbortRequested() }
         ) ?? []
         currentArtifacts = artifacts
-        if issue == nil { issue = media?.failure ?? sampler?.failure }
         await IOSRendererDeadline.waitForRetirement(tab.view)
         await tab.resetTargets()
         await IOSRendererDeadline.waitForRetirement(tab.view)
         await host.setRecordingMode(false)
-        if host.playbackState.isAbortRequested() {
-            issue = IOSWorkflowFailure("SCRIPT_ABORTED", mayHaveCompleted: issue?.mayHaveCompleted ?? false)
-        }
+        issue = IOSWorkflowFailure.terminal(
+            action: issue,
+            capture: media?.failure ?? sampler?.failure,
+            stopRequested: host.playbackState.isAbortRequested()
+        )
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
         guard await grant.isCurrent() else { return denied() }
         return response

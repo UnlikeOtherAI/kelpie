@@ -12,6 +12,7 @@ nice -n 10 xcrun clang++ -target "$target" -std=c++17 -I native/core-automation/
   -c native/core-automation/src/script_presentation.cpp -o "$artifacts/presentation.o"
 nice -n 10 xcrun swiftc -target "$target" -module-cache-path "$artifacts/module-cache" -O -j 1 -num-threads 1 -parse-as-library \
   -import-objc-header native/core-automation/include/kelpie/script_presentation.h \
+  apps/macos/Kelpie/Handlers/ScriptCaptureDeadline.swift \
   apps/macos/Kelpie/Handlers/ScriptCaptureError.swift \
   apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift \
   apps/macos/Kelpie/Handlers/ScriptGIFEncoder.swift \
