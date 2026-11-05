@@ -477,3 +477,9 @@ sensitivityKnown:true certifies nonsensitive provenance. Missing/legacy fields o
 missing-token/new-realm failures remain unknown after evaluation starts; a true
 sensitivity flag always protects. The thin tracker consumes both fixed fields.
 This adapter must ship with the matching regenerated common helper.
+Successful target edits are also checked for late sensitive metadata: capture
+refuses after the mutation with mayHaveCompleted:true, discards every artifact,
+scrubs earlier outputs, and executes no later action. Without capture the edit
+may finish and earlier outputs are still scrubbed. Existing concrete helper
+failures retain priority. Four authored oninput autocomplete/password ×
+capture/no-capture cases cover this boundary; native execution remains pending.

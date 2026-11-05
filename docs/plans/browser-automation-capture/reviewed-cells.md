@@ -90,6 +90,13 @@ semantics, final Before/After inventory and both release requirements.
 First three WGC attempts and c852 missing-marker failure remain historical failures;
 attempt4 does not rewrite them.
 
+## Linux GTK frozen3001
+
+CAP-08 and ART-04 are accepted for exact Linux GTK3001 Stop/partial/recovery and
+manifest-byte evidence. See [Linux3001 review](linux-3001-reviewed-cells.md) for
+source/binary/report/artifact hashes and strict separation from OSR and native UI
+pixels. Dense timeline gaps remain in [G08 inventory](g08-final-inventory.md).
+
 ## Restricted Lightpanda worker (not a native runtime cell)
 
 CLI source 9a30140514720ad34fe71e1a065b8de0209b5f00, version0.1.22;

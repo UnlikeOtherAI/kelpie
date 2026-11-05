@@ -268,6 +268,7 @@ class ScriptActions(
             if (dispatch || edit) mutationInFlight = result["mayHaveCompleted"] == true
             throw targetFailure(result)
         }
+        if (result["sensitive"] == true && captures()) throw ScriptFailure("SENSITIVE_CAPTURE_REFUSED", dispatch || edit)
         return result
     }
 

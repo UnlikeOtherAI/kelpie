@@ -11,18 +11,32 @@ import java.net.URLEncoder
 
 class ScriptPrivacyFlowTest : ScriptPublicFixture() {
     @Test
-    fun inferredPasswordRefusalScrubsEarlierRawUriFormOutputsAndDiscardsCapture() = privacyRefusal("initial", "password", "")
+    fun inferredPasswordRefusalScrubsEarlierRawUriFormOutputsAndDiscardsCapture() = privacyCase("initial", "password", "")
 
     @Test
-    fun focusAutocompleteRefusalScrubsEarlierOutputsWithoutEditing() = privacyRefusal("focus-autocomplete", "text", "this.autocomplete='current-password'")
+    fun focusAutocompleteRefusalScrubsEarlierOutputsWithoutEditing() = privacyCase("focus-autocomplete", "text", "this.autocomplete='current-password'")
 
     @Test
-    fun focusPasswordRefusalScrubsEarlierOutputsWithoutEditing() = privacyRefusal("focus-password", "text", "this.type='password'")
+    fun focusPasswordRefusalScrubsEarlierOutputsWithoutEditing() = privacyCase("focus-password", "text", "this.type='password'")
 
-    private fun privacyRefusal(
+    @Test
+    fun inputAutocompleteCaptureRefusesAfterMutationAndDiscardsAllArtifacts() = privacyCase("input-autocomplete-capture", "text", "", "this.autocomplete='current-password'")
+
+    @Test
+    fun inputPasswordCaptureRefusesAfterMutationAndDiscardsAllArtifacts() = privacyCase("input-password-capture", "text", "", "this.type='password'")
+
+    @Test
+    fun inputAutocompleteWithoutCaptureCompletesAndScrubsEarlierOutputs() = privacyCase("input-autocomplete-nocapture", "text", "", "this.autocomplete='current-password'", false)
+
+    @Test
+    fun inputPasswordWithoutCaptureCompletesAndScrubsEarlierOutputs() = privacyCase("input-password-nocapture", "text", "", "this.type='password'", false)
+
+    private fun privacyCase(
         case: String,
         type: String,
         focus: String,
+        input: String = "",
+        capture: Boolean = true,
     ) {
         val secret = "Aa b+!\uD83C\uDF0A"
         val form = URLEncoder.encode(secret, "UTF-8")
@@ -36,7 +50,7 @@ class ScriptPrivacyFlowTest : ScriptPublicFixture() {
                 server.enqueue(
                     MockResponse().setHeader("Content-Type", "text/html; charset=utf-8").setBody(
                         "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>" + title +
-                            "</title><label>Password<input type=\"$type\" autocomplete=\"off\" onfocus=\"$focus\" oninput=\"document.title='EDITED'\"></label>",
+                            "</title><label>Password<input type=\"$type\" autocomplete=\"off\" onfocus=\"$focus\" oninput=\"$input;document.title='EDITED'\"></label>",
                     ),
                 )
                 assertTrue(client.call("navigate", JSONObject().put("url", server.url("/privacy").toString())).getBoolean("success"))
@@ -49,19 +63,27 @@ class ScriptPrivacyFlowTest : ScriptPublicFixture() {
                             tab,
                             client.action("output").put("name", "before").put("source", "title"),
                             client.action("fill").put("target", JSONObject().put("label", "Password")).put("text", secret),
-                        ).put("capture", JSONObject().put("formats", org.json.JSONArray().put("screenshots")))
+                            client.action("output").put("name", "after").put("source", "title"),
+                        )
+                if (capture) script.put("capture", JSONObject().put("formats", org.json.JSONArray().put("screenshots")))
                 val result = playRecorded(client, script)
                 java.io.File(evidence, "$case-result.json").writeText(result.toString(2))
                 val status = client.call("get-script-status", JSONObject().put("runId", result.getString("runId")))
                 java.io.File(evidence, "$case-status.json").writeText(status.toString(2))
-                assertFalse(result.getBoolean("success"))
-                assertEquals("SENSITIVE_CAPTURE_REFUSED", result.getJSONObject("error").getString("code"))
-                assertEquals(1, result.getInt("actionsExecuted"))
+                assertEquals(!capture, result.getBoolean("success"))
+                if (capture) {
+                    assertEquals("SENSITIVE_CAPTURE_REFUSED", result.getJSONObject("error").getString("code"))
+                    assertFalse("No later action after privacy refusal", result.getJSONObject("outputs").has("after"))
+                    if (input.isNotEmpty()) assertTrue(result.getBoolean("mayHaveCompleted"))
+                } else {
+                    assertEquals("EDITED", result.getJSONObject("outputs").getString("after"))
+                }
+                assertEquals(if (capture) 1 else 3, result.getInt("actionsExecuted"))
                 assertEquals(0, result.getJSONArray("artifacts").length())
                 val before = result.getJSONObject("outputs").getString("before")
                 for (value in listOf(secret, uri, form)) assertFalse(before.contains(value))
-                assertEquals(title, client.core("tab.title", tab).getString("value"))
-                assertEquals("SENSITIVE_CAPTURE_REFUSED", status.getJSONObject("runError").getString("code"))
+                assertEquals(if (input.isEmpty()) title else "EDITED", client.core("tab.title", tab).getString("value"))
+                if (capture) assertEquals("SENSITIVE_CAPTURE_REFUSED", status.getJSONObject("runError").getString("code")) else assertFalse(status.has("runError"))
                 assertEquals(0, status.getJSONArray("artifacts").length())
                 assertFalse(status.has("outputs"))
                 for (value in listOf(secret, uri, form)) assertFalse(status.toString().contains(value))

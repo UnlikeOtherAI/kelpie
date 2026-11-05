@@ -17,3 +17,9 @@ export function startupSignal(line){
  }
  return null;
 }
+
+// Native fixed outcome labels only; never retain a navigation URL or error message.
+export function navigationSignal(line){
+ const match=/^\[WorkflowNavigation\] failure=(BUSY|NAVIGATION_ERROR|TIMEOUT|NO_WEBVIEW|TAB_NOT_FOUND|INVALID_URL|RECORDING_IN_PROGRESS|UNCLASSIFIED)$/.exec(line);
+ return match?.[1]??null;
+}

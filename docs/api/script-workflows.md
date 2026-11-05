@@ -107,3 +107,9 @@ Strict version 1 playback first reads `get-script-status` on the pinned authenti
 
 
 Authorized active-current artifact downloads return ARTIFACT_NOT_READY until the run's renderer work retires and its final privacy decision completes. Request shape/range validation precedes this phase fence. Foreign owners receive ARTIFACT_NOT_FOUND; earlier safe terminal runs retain their ordinary owner/expiry checks. The shared Apple store exposes an internal optional blockedRunID parameter for owner-checked platform adapters; its default preserves existing callers.
+
+### Apple late sensitivity and active artifacts
+
+Mac target callbacks consume sensitivity before document/deadline guards. An attempted target evaluation whose classification is missing registers the current edit literal for output scrubbing, including without capture; capture also latches media disposal for uncertain click/tap or edit inspection. Proven nonsensitive results require the fixed reader's explicit known classification; a later abort or document guard failure preserves ordinary partials rather than reclassifying an already known result as sensitive uncertainty. Sampling admission stops and freezes the capture end timestamp before waiting for existing renderer retirement. Retirement precedes final output redaction and capture retention. Privacy disposal survives replacement errors; the first concrete failure remains authoritative.
+
+Authorized current-run downloads validate their body before returning `ARTIFACT_NOT_READY`; foreign requests return `ARTIFACT_NOT_FOUND`. Running/finalizing status exposes no artifacts. Earlier safe terminal runs remain readable. The hosted Mac corpus includes focus-to-password/autocomplete, document change, delayed callback and post-input classification cases. These are acceptance cases, not a claim of completed native execution.

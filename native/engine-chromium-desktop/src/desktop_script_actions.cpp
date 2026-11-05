@@ -22,7 +22,10 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Target(
   Json value;
   const auto result = engine.EvaluateBrowserControl(lease, generated.at("expression"), &value, std::chrono::seconds(5));
   const bool unknown=ScriptTargetInspectionUncertain(value);
-  if(result.ok && !unknown) return value;
+  if(result.ok && ScriptTargetInspectionExplicit(value)) {
+    if(unknown) value["inspectionUncertain"]=true;
+    return value;
+  }
   if(!value.is_object()) value=Json::object();
   value["ok"]=false; value["error"]=result.ok?"TARGET_INSPECTION_INVALID":result.error_code;
   value["mayHaveCompleted"]=result.operation_may_have_completed;
@@ -38,15 +41,15 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     result["mayHaveCompleted"] = target.value("mayHaveCompleted", false);
     return result;
   };
+  const bool capturing=script.contains("capture") || std::any_of(script["actions"].begin(),script["actions"].end(),[](const Json& item){return item["action"]=="screenshot";});
+  const auto ingest_sensitive=[&](const Json& target) {
+    if(!target.is_object()) return;
+    const bool uncertain=target.value("inspectionUncertain",false);
+    if(!target.value("sensitive",false) && !uncertain) return;
+    if(capturing) privacy_discard.store(true);
+    if(name=="fill" || name=="type") redactions->push_back(action.at("text"));
+  };
   if (name == "click" || name == "tap" || name == "fill" || name == "type") {
-    const bool capturing=script.contains("capture") || std::any_of(script["actions"].begin(),script["actions"].end(),[](const Json& item){return item["action"]=="screenshot";});
-    const auto ingest_sensitive=[&](const Json& target) {
-      if(!target.is_object()) return;
-      const bool uncertain=(name=="fill" || name=="type") && (target.value("inspectionUncertain",false) || target.value("mayHaveCompleted",false));
-      if(!target.value("sensitive",false) && !uncertain) return;
-      if(capturing) privacy_discard.store(true);
-      if(name=="fill" || name=="type") redactions->push_back(action.at("text"));
-    };
     auto resolved = Target(lease, action.at("target"), "", false, capturing);
     ingest_sensitive(resolved);
     if (!resolved.value("ok", false)) return failed_target(resolved);
@@ -150,7 +153,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     do {
       if (Cancelled()) throw std::runtime_error("SCRIPT_STOPPED");
       if (name == "assert") {
-        const auto target = Target(lease, action.at("target"), "", true);
+        const auto target = Target(lease, action.at("target"), "", true, capturing);
+        ingest_sensitive(target);
         const std::string desired = action.at("state");
         const bool visible = target.value("ok", false), hidden = target.value("error", std::string()) == "TARGET_NOT_FOUND";
         if ((desired == "hidden" && hidden) || (desired == "visible" && visible) ||

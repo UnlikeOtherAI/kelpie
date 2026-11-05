@@ -11,7 +11,6 @@ final class ScriptWorkflowRunner {
     private var actionIndex = 0
     private var totalActions = 0
     private var finalizing = false
-    private var currentArtifacts: [Body] = []
     private var terminal: [(id: String, owner: String, value: Body)] = []
 
     init(host: ScriptHandler) { self.host = host }
@@ -22,7 +21,7 @@ final class ScriptWorkflowRunner {
         let authorized = await grant?.isCurrent() ?? false
         if method == "get-script-artifact" {
             guard let grant, authorized else { return denied() }
-            return ScriptArtifactStore.shared.read(body, owner: grant.owner)
+            return ScriptArtifactStore.shared.read(body, owner: grant.owner, blockedRunID: owner == grant.owner ? runID : nil)
         }
         guard Set(body.keys).isSubset(of: ["runId"]), body["runId"] == nil ||
                 (body["runId"] as? String).map({ !$0.isEmpty && $0.count <= 128 }) == true else {
@@ -54,7 +53,7 @@ final class ScriptWorkflowRunner {
         if method == "abort-script" { _ = host.playbackState.requestAbort() }
         var status = ScriptBoundWorkflow.capabilities
         status["runId"] = runID
-        if !currentArtifacts.isEmpty { status["artifacts"] = currentArtifacts }
+        status["artifacts"] = []
         status["state"] = finalizing ? "finalizing" : "running"
         status["playing"] = true
         status["actionIndex"] = min(actionIndex, max(0, totalActions - 1))
@@ -127,7 +126,10 @@ final class ScriptWorkflowRunner {
             }
         } catch { issue = error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
-        var discardCapture = issue?.code == "SENSITIVE_CAPTURE_REFUSED"
+        capture?.stopSampling()
+        // Late decoded metadata must retire before scrub/disposal becomes observable.
+        await ScriptRendererDeadline.waitForRetirement(tab.renderer)
+        var discardCapture = actions?.discardMedia == true || issue?.code == "SENSITIVE_CAPTURE_REFUSED"
         if let actions {
             do {
                 outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets)
@@ -137,9 +139,7 @@ final class ScriptWorkflowRunner {
             }
         }
         var artifacts = await capture?.finish(partial: issue != nil, discard: discardCapture) ?? []
-        currentArtifacts = artifacts
         if issue == nil, let failure = capture?.failure { issue = ScriptWorkflowFailure(failure) }
-        await ScriptRendererDeadline.waitForRetirement(tab.renderer)
         await tab.resetTargets()
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
         presentation?.stop()
@@ -148,7 +148,6 @@ final class ScriptWorkflowRunner {
             issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
         }
         if issue != nil { artifacts = artifacts.map { $0.merging(["partial": true]) { _, new in new } } }
-        currentArtifacts = artifacts
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
         host.playbackState.releaseHeldSession()
         guard await grant.isCurrent() else { return denied() }
@@ -183,7 +182,6 @@ final class ScriptWorkflowRunner {
         finalizing = false
         owner = nil
         capture = nil
-        currentArtifacts = []
         return result
     }
 }

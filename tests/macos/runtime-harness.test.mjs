@@ -1,6 +1,7 @@
+import vm from "node:vm";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,startupSignal} from "./runtime-ownership.mjs";
+import {listenerState,startupSignal,navigationSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
@@ -36,4 +37,25 @@ test("startup log classification retains fixed labels without raw diagnostics",(
  assert.equal(startupSignal("[AppReveal] Server failed: EADDRINUSE"),"APPREVEAL_ADDRESS_IN_USE");
  assert.equal(startupSignal("[AppReveal] Server failed: PRIVATE_LOG_CANARY"),"APPREVEAL_LISTENER_FAILED");
  assert.equal(startupSignal("page says [AppReveal] Server failed: PRIVATE_LOG_CANARY"),null);
+});
+
+test("privacy fixtures use bounded focus transitions and valid inline scripts",async()=>{
+ const fixture=await startFixture();
+ try{
+  for(const route of ["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"]){
+   const html=await (await fetch(fixture.url+route)).text();
+   new vm.Script(html.match(/<script>([\s\S]*)<\/script>/)[1]);
+   assert.ok(html.includes('const privacyMode='+JSON.stringify(route)));
+   assert.ok(html.includes("performance.now()+5500"));
+   assert.ok(html.includes("request.open('POST','/events',false)"));
+   assert.ok(!html.includes("value:event.target.value"));
+  }
+ }finally{await fixture.close();}
+});
+
+test("navigation diagnostics retain only exact native fixed labels",()=>{
+ assert.equal(navigationSignal("[WorkflowNavigation] failure=BUSY"),"BUSY");
+ assert.equal(navigationSignal("[WorkflowNavigation] failure=NAVIGATION_ERROR"),"NAVIGATION_ERROR");
+ assert.equal(navigationSignal("[WorkflowNavigation] failure=NAVIGATION_ERROR private-url"),null);
+ assert.equal(navigationSignal("page [WorkflowNavigation] failure=TIMEOUT"),null);
 });
