@@ -69,6 +69,7 @@ jobs:
                 curl \
                 dpkg-dev \
                 file \
+                ffmpeg \
                 git \
                 g++-12 \
                 libasound2-dev \
@@ -115,6 +116,7 @@ jobs:
                 cmake \
                 curl \
                 file \
+                ffmpeg-free \
                 fontconfig-devel \
                 gcc-c++ \
                 git \
@@ -212,7 +214,7 @@ jobs:
               } > "${package_root}/build-options.txt"
               pnpm --filter @unlikeotherai/kelpie build
               (cd packages/cli && npm pack --ignore-scripts --pack-destination "/workspace/${package_root}")
-              ctest --test-dir apps/linux/build --verbose --output-log "${package_root}/native-checks.log" -R "^linux_script_(media|artifact)_test$"
+              ctest --test-dir apps/linux/build --verbose --output-log "${package_root}/native-checks.log" -R "^(linux_script_(media|artifact)_test|linux_irregular_mp4_test)$"
               sha256sum apps/linux/build/kelpie-linux apps/linux/build/libcef.so > "${package_root}/binary-sha256.txt"
 
               bash scripts/build-linux-runtime-bundle.sh \

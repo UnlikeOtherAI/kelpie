@@ -65,7 +65,10 @@ when byte admission stops.
 MP4 retains bounded complete encoded access units with actual elapsed PTS and
 durations. Header/trailer and per-packet overhead are reserved. Final mux bytes
 are admitted exactly; unexpected overhead removes complete tail packets and
-remuxes the owned encoded prefix. This never retries a browser mutation.
+remuxes the owned encoded prefix. The nonfragmented faststart mux uses an
+exclusive mode-0600 spool inside the private capture directory; its input is
+bounded by the already admitted encoded packets, and the spool is removed on
+completion or failure. This never retries a browser mutation.
 Codec queues, raw frames, packets, output bytes, execution waits and frame count
 are bounded independently. Failure/abort/limits finalize available outputs and
 mark partial manifests. A finalization error is not reported as full success.
