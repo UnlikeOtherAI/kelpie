@@ -145,6 +145,8 @@ final class ScriptWorkflowRunner {
         if issue == nil, let failure = capture?.failure { issue = ScriptWorkflowFailure(failure) }
         await tab.resetTargets()
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
+        let markerWindow = tab.view.window
+        let markerGeometry = markerWindow.map { ScriptMarkerGeometry(tab: tab, window: $0) }
         await host.setRecordingMode(false)
         if host.playbackState.isAbortRequested(), issue == nil {
             issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
@@ -152,9 +154,9 @@ final class ScriptWorkflowRunner {
         let retiringMarker: ScriptMarkerRetiree?
         if let presentation, issue == nil, capture?.hasMovies != true,
            let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
-           let window = tab.view.window {
+           let window = markerWindow, let geometry = markerGeometry {
             presentation.keepMarkerOnly()
-            let retiree = ScriptMarkerRetiree(presentation: presentation, tab: tab, window: window, end: end)
+            let retiree = ScriptMarkerRetiree(presentation: presentation, tab: tab, window: window, end: end, geometry: geometry)
             markerRetiree = retiree
             retiringMarker = retiree
         } else {
