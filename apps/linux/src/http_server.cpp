@@ -271,7 +271,9 @@ bool HttpServer::Bind(int preferred_port, std::string* error) {
   for (int candidate = preferred_port; candidate < preferred_port + 50; ++candidate) {
     address.sin_port = htons(static_cast<std::uint16_t>(candidate));
     if (bind(server_fd_, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0) {
-      port_ = candidate;
+      socklen_t address_length = sizeof(address);
+      if (getsockname(server_fd_, reinterpret_cast<sockaddr*>(&address), &address_length) != 0) break;
+      port_ = ntohs(address.sin_port);
       if (listen(server_fd_, 16) == 0) {
         return true;
       }

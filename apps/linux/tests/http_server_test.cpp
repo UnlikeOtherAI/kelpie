@@ -36,11 +36,12 @@ int main() {
   kelpie::linuxapp::HttpServer server;
   std::string error;
   assert(!server.Start(18420,"",[](std::string_view,const nlohmann::json&,int*) { return nlohmann::json::object(); },&error));
-  assert(server.Start(18420,"secret-token",[&handled](std::string_view endpoint,const nlohmann::json& body,int*) {
+  assert(server.Start(0,"secret-token",[&handled](std::string_view endpoint,const nlohmann::json& body,int*) {
     ++handled;
     if (endpoint == "mcp" && !body.contains("id")) return nlohmann::json(nullptr); return nlohmann::json{{"success",true},{"endpoint",std::string(endpoint)}};
   },&error));
   const int port=server.port();
+  assert(port > 0 && port <= 65535);
 
   // Bound to loopback only: the host's own LAN addresses refuse the port.
   ifaddrs* interfaces=nullptr;
