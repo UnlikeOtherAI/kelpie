@@ -26,7 +26,7 @@ try {
     daemonSHA256: createHash("sha256").update(await readFile(daemon)).digest("hex") };
   for (const tool of [runner, daemon, "/usr/bin/weston", "/usr/bin/weston-debug", "/usr/bin/weston-screenshooter"])
     await access(tool, constants.X_OK);
-  const args = ["--dbus-daemon=" + daemon, "--", "/usr/bin/weston", "--backend=headless", "--renderer=pixman", "--shell=kiosk-shell.so",
+  const args = ["--dbus-daemon=" + daemon, "--", "/usr/bin/weston", "--backend=headless", "--fake-seat", "--renderer=pixman", "--shell=kiosk-shell.so",
     "--no-config", "--width=1280", "--height=900", "--socket=" + socket, "--xwayland",
     "--debug", "--debug-scopes=scene-graph", "--log=" + join(output, "weston.log"),
     "--", process.execPath, client, resolve(binaryArg), resolve(cliArg), output];
