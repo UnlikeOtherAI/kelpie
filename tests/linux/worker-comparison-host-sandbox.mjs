@@ -7,30 +7,43 @@ import {parseProcStat} from "./native-resource-snapshot.mjs";
 import {parseStatusValue,validateSandboxCollection} from "./worker-comparison-sandbox.mjs";
 const exec=promisify(execFile);
 const disabled=["--no-sandbox","--disable-setuid-sandbox","--disable-namespace-sandbox","--disable-seccomp-filter-sandbox"];
+export function summarizeRendererCandidates({rendererPids,before,after}){
+ assert.ok(Array.isArray(rendererPids)&&rendererPids.length>0&&rendererPids.length<=256&&
+  rendererPids.every(pid=>Number.isSafeInteger(pid)&&pid>0)&&new Set(rendererPids).size===rendererPids.length,"AUDIT_CDP_RENDERER_MISMATCH");
+ const candidates=new Set(rendererPids),labeled=[...before.values()].filter(item=>item.renderer);
+ return {cdpCount:rendererPids.length,hostLabeledCount:labeled.length,
+  missingMembership:rendererPids.filter(pid=>!before.has(pid)||!after.has(pid)).length,
+  unreadableCmdline:rendererPids.filter(pid=>before.has(pid)&&after.has(pid)&&
+   (!before.get(pid).cmdlinePresent||!after.get(pid).cmdlinePresent)).length,
+  omittedLabeled:labeled.filter(item=>!candidates.has(item.pid)).length};
+}
 export function validateHostSnapshot({unitPid,browserPid,startTicks,rendererPids,before,after}){
+ const counts=summarizeRendererCandidates({rendererPids,before,after});
+ assert.equal(counts.missingMembership,0,"AUDIT_CDP_MISSING");
+ assert.equal(counts.unreadableCmdline,0,"AUDIT_CDP_CMDLINE");
+ assert.equal(counts.omittedLabeled,0,"AUDIT_CDP_OMISSION");
  assert.ok(before.has(unitPid)&&before.has(browserPid),"AUDIT_IDENTITY");
  const browser=before.get(browserPid),unit=before.get(unitPid);
+ assert.ok(browser.cmdlinePresent&&after.get(browserPid)?.cmdlinePresent,"AUDIT_CDP_CMDLINE");
  assert.equal(browser.startTicks,startTicks,"AUDIT_RACE");
  assert.equal(browser.ppid,unitPid,"AUDIT_IDENTITY");
  assert.ok(unit.startTicks,"AUDIT_IDENTITY");
  assert.deepEqual([...before.keys()].sort((a,b)=>a-b),[...after.keys()].sort((a,b)=>a-b),"AUDIT_RACE");
+ const candidates=new Set(rendererPids);
  for(const [pid,item] of before){
   const next=after.get(pid);
   assert.ok(next&&next.startTicks===item.startTicks&&next.ppid===item.ppid,"AUDIT_RACE");
-  if(pid===browserPid||item.renderer||next.renderer){
-   for(const key of ["userNs","pidNs","seccomp","filters","sandboxFlagsSafe","renderer"])
+  if(pid===browserPid||item.renderer||next.renderer||candidates.has(pid)){
+   for(const key of ["userNs","pidNs","seccomp","filters","sandboxFlagsSafe","renderer","cmdlinePresent"])
     assert.equal(item[key],next[key],"AUDIT_RACE");
   }
  }
  const renderers=[];
- for(const item of before.values()){
-  if(!item.renderer)continue;
-  let parent=item.ppid,descendant=false;const seen=new Set([item.pid]);
+ for(const pid of rendererPids){
+  const item=before.get(pid);let parent=item.ppid,descendant=false;const seen=new Set([pid]);
   while(parent&&!seen.has(parent)){if(parent===browserPid){descendant=true;break;}seen.add(parent);parent=before.get(parent)?.ppid??0;}
   renderers.push({...item,owned:true,descendant});
  }
- assert.ok(Array.isArray(rendererPids)&&rendererPids.length>0&&rendererPids.length<=256&&rendererPids.every(pid=>Number.isSafeInteger(pid)&&pid>0),"AUDIT_CDP_RENDERER_MISMATCH");
- assert.deepEqual(renderers.map(x=>x.pid).sort((a,b)=>a-b),[...rendererPids].sort((a,b)=>a-b),"AUDIT_CDP_RENDERER_MISMATCH");
  return validateSandboxCollection({...browser,owned:true},renderers);
 }
 async function boundedRead(path){
@@ -77,12 +90,15 @@ export async function readHostSnapshot(group,reader){
   items.set(pid,{pid,ppid:before.ppid,startTicks:before.startTicks,userNs,pidNs,
    seccomp:parseStatusValue(status,"Seccomp"),filters:parseStatusValue(status,"Seccomp_filters"),
    sandboxFlagsSafe:!args.some(arg=>disabled.some(flag=>arg===flag||arg.startsWith(flag+"="))),
-   renderer:args.includes("--type=renderer")});
+   cmdlinePresent:args.length>0,renderer:args.includes("--type=renderer")});
  }
  return items;
 }
 export function hostAuditCategory(error){
  const text=String(error?.message??"");
+ if(text.includes("AUDIT_CDP_MISSING"))return "cdp-missing";
+ if(text.includes("AUDIT_CDP_CMDLINE"))return "cmdline-unreadable";
+ if(text.includes("AUDIT_CDP_OMISSION"))return "cdp-omission";
  if(text.includes("AUDIT_CDP_RENDERER_MISMATCH"))return "cdp-mismatch";
  if(text.includes("AUDIT_UNREADABLE"))return "proc-unreadable";
  if(text.includes("AUDIT_RACE"))return "process-race";
@@ -96,7 +112,7 @@ export function hostAuditCategory(error){
 }
 
 export function validHostSandboxHandoff(result,pid,startTicks,unitPid,nonce){
- const categories=["cdp-mismatch","proc-unreadable","process-race","budget","no-renderer","flags","filters","namespace","identity","other"];
+ const categories=["cdp-missing","cmdline-unreadable","cdp-omission","cdp-mismatch","proc-unreadable","process-race","budget","no-renderer","flags","filters","namespace","identity","other"];
  return result?.pid===pid&&result.startTicks===startTicks&&result.unitPid===unitPid&&result.nonce===nonce&&
   (result.ok===true?result.evidence?.allOwnedRenderers===true&&result.evidence?.ownedRenderer===true&&
    result.evidence?.chromiumFlagsSafe===true&&result.evidence?.rendererSeccomp===2&&
