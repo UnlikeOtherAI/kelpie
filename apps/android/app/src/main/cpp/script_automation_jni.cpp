@@ -83,6 +83,15 @@ Java_com_kelpie_browser_automation_ScriptNative_targetExpression(JNIEnv* env, jo
     return nullptr;
   }
 }
+JNIEXPORT jstring JNICALL
+Java_com_kelpie_browser_automation_ScriptNative_typingPlan(JNIEnv* env, jobject, jstring action) {
+  try {
+    const auto input = Input(env, action);
+    return Output(env, kelpie_browser_script_typing_plan(input.c_str()));
+  } catch (...) {
+    return nullptr;
+  }
+}
 JNIEXPORT jdoubleArray JNICALL
 Java_com_kelpie_browser_automation_ScriptNative_pointerPosition(
     JNIEnv* env, jobject, jdouble from_x, jdouble from_y, jdouble to_x, jdouble to_y,
