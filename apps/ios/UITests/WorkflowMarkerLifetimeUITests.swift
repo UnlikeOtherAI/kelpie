@@ -6,6 +6,7 @@ extension WorkflowCaptureUITests {
     @MainActor
     func testMarkerDwellOnlyForMoviesAndRetiresOnNextRun() async throws {
         let (fixture, tab) = try await ready()
+        continueAfterFailure = true
         defer { fixture.listener.cancel() }
         let port = try XCTUnwrap(fixture.listener.port?.rawValue)
         let navigation = try await probe.request("/v1/play-script", [
@@ -28,6 +29,12 @@ extension WorkflowCaptureUITests {
             let start = ProcessInfo.processInfo.systemUptime
             let result = try await probe.call("kelpie_play_script", script)
             let elapsed = ProcessInfo.processInfo.systemUptime - start
+            let timing = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+                "case": label, "elapsedSeconds": elapsed, "success": result["success"] as? Bool ?? false
+            ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
+            timing.name = "Marker response timing: " + label
+            timing.lifetime = .keepAlways
+            add(timing)
             XCTAssertEqual(result["success"] as? Bool, true, label)
             let movies = formats?.contains("gif") == true || formats?.contains("video") == true
             if movies {
