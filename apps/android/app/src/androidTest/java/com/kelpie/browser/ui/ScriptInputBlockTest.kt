@@ -1,5 +1,6 @@
 package com.kelpie.browser.ui
 
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
+import com.kelpie.browser.MainActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -30,7 +32,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalTestApi::class)
 class ScriptInputBlockTest {
-    @get:Rule val ui = createComposeRule()
+    @get:Rule val ui = createAndroidComposeRule<MainActivity>()
 
     @Test
     fun activePlaybackBlocksChromeAndLeavesSeparateStopAvailable() {
@@ -39,8 +41,9 @@ class ScriptInputBlockTest {
         var keyEvents = 0
         var chromeClicks = 0
         var stopClicks = 0
-        ui.setContent {
-            Column {
+        ui.runOnUiThread {
+            ui.activity.setContent {
+                Column {
                 Box(Modifier.size(100.dp).scriptInputBlock(active.value)) {
                     Box(
                         Modifier
@@ -54,6 +57,7 @@ class ScriptInputBlockTest {
                     ) { Text("Browser control") }
                 }
                 Box(Modifier.size(100.dp).clickable { stopClicks++ }) { Text("Stop") }
+                }
             }
         }
         ui.runOnIdle { requester.requestFocus() }

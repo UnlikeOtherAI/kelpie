@@ -178,6 +178,7 @@ abstract class ScriptPublicFixture {
             }
             val projection = JSONObject()
             val target = submitTargetBounds(owned, currentGeometry, projection)
+            val screenshotStartNs = System.nanoTime()
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
             val now = System.nanoTime()
@@ -186,6 +187,9 @@ abstract class ScriptPublicFixture {
                 observations.put(
                     JSONObject()
                         .put("elapsedMs", (now - started) / 1_000_000)
+                        .put("startedNs", started)
+                        .put("sampleNs", now)
+                        .put("screenshotStartNs", screenshotStartNs)
                         .put("actionIndex", status?.optInt("actionIndex", -1) ?: -1)
                         .put("playing", status?.optBoolean("playing") ?: false)
                         .put("targetVisible", target != null)
