@@ -133,10 +133,10 @@ final class IOSFrameSampler {
 
     // Pin dimensions, scale and zoom; scrolling may move the visible rectangle without resizing it.
     private func pinViewport(_ viewport: IOSWorkflowTab.Viewport, generation: String) throws {
-        if let initial {
-            let nativeResize = initial.bounds != viewport.bounds || initial.pixelRatio != viewport.pixelRatio
+        try requirePinnedNativeViewport(viewport)
+        if let initial, initialDocument == generation {
             let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
-            if nativeResize || (initialDocument == generation && documentResize) {
+            if documentResize {
                 Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
                 Self.geometryDiagnostic(before: initial, after: viewport)
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
@@ -145,6 +145,15 @@ final class IOSFrameSampler {
         if initialDocument != generation {
             initial = viewport
             initialDocument = generation
+        }
+    }
+
+    private func requirePinnedNativeViewport(_ viewport: IOSWorkflowTab.Viewport) throws {
+        guard let initial else { return }
+        guard initial.bounds == viewport.bounds, initial.pixelRatio == viewport.pixelRatio else {
+            Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
+            Self.geometryDiagnostic(before: initial, after: viewport)
+            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
         }
     }
 
@@ -178,6 +187,27 @@ final class IOSFrameSampler {
                       height: max(2, Int(raw.height * factor) / 2 * 2))
     }
 
+    private func viewportForSample(generation: String, expected: String?) async throws -> IOSWorkflowTab.Viewport? {
+        if initialDocument == generation { return try await tab.viewport() }
+        let viewport = try await IOSCaptureViewportStability.wait(
+            deadline: ProcessInfo.processInfo.systemUptime + 2,
+            check: { [self] in try await check(); try checkTime() },
+            read: { [self] in
+                guard generation == tab.document else { return nil }
+                let viewport = try await tab.viewport()
+                try requirePinnedNativeViewport(viewport)
+                guard generation == tab.document else { return nil }
+                return viewport
+            }
+        )
+        guard let viewport else {
+            if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
+            dropped += 1
+            return nil
+        }
+        return viewport
+    }
+
     private func sample(step: Int?, document expected: String?, prepare: (() -> Void)? = nil) async throws -> Bool {
         busy = true
         defer {
@@ -191,7 +221,7 @@ final class IOSFrameSampler {
         try tab.requireCurrent()
         let generation = tab.document
         if let expected, expected != generation { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
-        let viewport = try await tab.viewport()
+        guard let viewport = try await viewportForSample(generation: generation, expected: expected) else { return false }
         try pinViewport(viewport, generation: generation)
         guard generation == tab.document else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }

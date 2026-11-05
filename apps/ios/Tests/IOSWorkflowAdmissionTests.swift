@@ -54,6 +54,62 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
+    func testFirstCaptureWaitsForStableCompleteViewport() {
+        func viewport(height: CGFloat, scale: CGFloat = 1, offset: CGFloat = 0) -> IOSWorkflowTab.Viewport {
+            IOSWorkflowTab.Viewport(bounds: CGSize(width: 390, height: 800),
+                                    layout: CGSize(width: 390, height: height),
+                                    visible: CGRect(x: 0, y: offset, width: 390, height: height),
+                                    scale: scale, pixelRatio: 3)
+        }
+        var stability = IOSCaptureViewportStability()
+        XCTAssertFalse(stability.observe(viewport(height: 780), at: 0))
+        XCTAssertFalse(stability.observe(viewport(height: 780), at: 0.19))
+        XCTAssertFalse(stability.observe(viewport(height: 760), at: 0.20))
+        XCTAssertFalse(stability.observe(viewport(height: 760), at: 0.39))
+        XCTAssertTrue(stability.observe(viewport(height: 760), at: 0.41))
+        XCTAssertFalse(stability.observe(viewport(height: 760, offset: 10), at: 0.42))
+        XCTAssertFalse(stability.observe(viewport(height: 760, scale: 1.5, offset: 10), at: 0.70))
+        XCTAssertTrue(stability.observe(viewport(height: 760, scale: 1.5, offset: 10), at: 0.91))
+    }
+
+    @MainActor
+    func testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement() async throws {
+        let viewport = IOSWorkflowTab.Viewport(bounds: CGSize(width: 390, height: 800),
+                                               layout: CGSize(width: 390, height: 800),
+                                               visible: CGRect(x: 0, y: 0, width: 390, height: 800),
+                                               scale: 1, pixelRatio: 3)
+        var time = 0.0
+        do {
+            _ = try await IOSCaptureViewportStability.wait(
+                deadline: 0.1, check: {}, read: { viewport }, now: { time }, pause: { time += 0.02 }
+            )
+            XCTFail("Unsettled viewport must reach the existing deadline")
+        } catch {
+            XCTAssertEqual((error as? IOSWorkflowFailure)?.code, "CAPTURE_VIEWPORT_UNSTABLE")
+        }
+
+        var checks = 0
+        do {
+            _ = try await IOSCaptureViewportStability.wait(
+                deadline: 1, check: {
+                    checks += 1
+                    if checks > 2 { throw IOSWorkflowFailure("SCRIPT_ABORTED") }
+                }, read: { viewport }, now: { time }, pause: { time += 0.02 }
+            )
+            XCTFail("Stop must interrupt admission")
+        } catch {
+            XCTAssertEqual((error as? IOSWorkflowFailure)?.code, "SCRIPT_ABORTED")
+        }
+
+        var reads = 0
+        let replaced = try await IOSCaptureViewportStability.wait(
+            deadline: 1, check: {}, read: { reads += 1; return nil }, now: { time }, pause: { XCTFail("No retry after replacement") }
+        )
+        XCTAssertNil(replaced)
+        XCTAssertEqual(reads, 1)
+    }
+
+    @MainActor
     func testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed() async throws {
         let context = HandlerContext()
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
