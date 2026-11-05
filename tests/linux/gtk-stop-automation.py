@@ -44,8 +44,13 @@ def call(connection, destination, path, interface, method, parameters=None):
 
 
 pin()
-session = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-address = call(session, "org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus", "GetAddress")[0]
+if os.environ.get("KELPIE_PRIVATE_ATSPI_ACTION") == "1":
+    assert os.environ.get("KELPIE_ISOLATED_WAYLAND") == "1"
+    address = os.environ["AT_SPI_BUS_ADDRESS"]
+    assert address == os.environ["DBUS_SESSION_BUS_ADDRESS"] and "/run/user/" not in address
+else:
+    session = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    address = call(session, "org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus", "GetAddress")[0]
 connection = Gio.DBusConnection.new_for_address_sync(
     address, Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
 root = "/org/a11y/atspi/accessible/root"

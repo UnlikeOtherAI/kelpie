@@ -14,8 +14,9 @@ const execute = promisify(execFile);
 export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown }) {
   assert.equal(env.GDK_BACKEND, "wayland");
   const isolated = Boolean(captureShown);
+  const privateAction = isolated && env.KELPIE_PRIVATE_ATSPI_ACTION === "1";
   const fixture = await startCaptureFixture();
-  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: isolated ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
+  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: isolated && !privateAction ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
     display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim", artifacts: [] };
   let pending;
   const api = async (method, body = {}) => {
@@ -58,12 +59,12 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
     report.event = await wait(() => fixture.events.find(event => event.type === "click" && event.target === "unique"),
       "Trusted native click after encoded marker admission", 20000);
     assert.equal(report.event.trusted, true);
-    if (!isolated) report.button = await wait(() => automate("inspect"), "Native Stop button showing");
+    if (!isolated || privateAction) report.button = await wait(() => automate("inspect"), "Native Stop button showing");
     if (captureShown) report.nativeImage = await captureShown();
     const current = await readNativeIdentity(identity.pid); assert.equal(current?.startTicks, identity.startTicks);
     const running = await api("get-script-status");
     assert.equal(running.playing, true); assert.equal(running.state, "running");
-    if (isolated) {
+    if (isolated && !privateAction) {
       const aborted = await api("abort-script", { runId: running.runId }); assert.equal(aborted.success, true);
       report.action = { interface: "public HTTP abort-script", success: true };
     } else {
