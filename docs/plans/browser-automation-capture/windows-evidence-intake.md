@@ -130,3 +130,14 @@ dropped frames respectively. Reports and immutable media are under
 `D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/g08-5877-2` and
 `g08-oracle-5877.json`. This is exported-media evidence, not native overlay
 or overall Windows acceptance.
+
+A later 5877 Session1 diagnostic used the exact candidate with a pin that
+checks process path, start time and one visible owned `Kelpie` top-level HWND
+without traversing the CEF accessibility subtree. Stop inspection retains its
+subtree and exact-button guards. Under one CPU and a 2 GiB Job, the new pin
+took 175 ms, listener verification 70 ms and device-info 22 ms. Public stop
+completed and process, listener, readiness, running alias and scheduled task
+were absent. Receipt: `D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/start-probe-5877/report.json`.
+The earlier c9 failure was not recorded with sufficiently specific stages to
+prove that its cause was the prior subtree traversal. This is a capture-free
+startup result, not WGC or Stop-button evidence.
