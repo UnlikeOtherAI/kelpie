@@ -123,11 +123,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .cache/macos-ci
-          pump_flags=()
-          if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
-            pump_flags=('GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1')
-          fi
-          xcodebuild "${pump_flags[@]}" \
+          run_xcodebuild() {
+            if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
+              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
+            else
+              xcodebuild "$@"
+            fi
+          }
+          run_xcodebuild \
             -workspace apps/macos/Kelpie.xcworkspace \
             -scheme Kelpie \
             -configuration Debug \
@@ -185,11 +188,14 @@ jobs:
           set -euo pipefail
           node scripts/testing/macos-workflow-acceptance.mjs --preparation started 0
           trap 'prepare_exit=$?; node scripts/testing/macos-workflow-acceptance.mjs --preparation failed "$prepare_exit"; exit "$prepare_exit"' ERR
-          pump_flags=()
-          if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
-            pump_flags=('GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1')
-          fi
-          xcodebuild "${pump_flags[@]}" \
+          run_xcodebuild() {
+            if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
+              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
+            else
+              xcodebuild "$@"
+            fi
+          }
+          run_xcodebuild \
             -workspace apps/macos/Kelpie.xcworkspace \
             -scheme Kelpie \
             -configuration Debug \
