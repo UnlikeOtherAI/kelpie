@@ -5,7 +5,8 @@ const workflow = await readFile(new URL("../../.github/workflows/linux-native.ym
 const script = await readFile(new URL("../../scripts/ci/linux-installed-smoke.sh", import.meta.url), "utf8");
 test("installed smoke uses a separate bounded distro container and read-only source", () => {
   const smoke = workflow.slice(workflow.indexOf("      - name: Verify installed Linux candidate"));
-  assert.match(smoke, /docker run --rm --cpus=2 --memory=6g --pids-limit=512/);
+  assert.equal((smoke.match(/docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m/g) ?? []).length, 3);
+  assert.doesNotMatch(workflow.slice(0, workflow.indexOf("      - name: Verify installed Linux candidate")), /--shm-size/);
   assert.match(smoke, /no-new-privileges=true/);
   assert.match(smoke, /linux-test-seccomp\.mjs/);
   assert.match(smoke, /seccomp=\$\{RUNNER_TEMP\}\/kelpie-test-seccomp\.json/);
