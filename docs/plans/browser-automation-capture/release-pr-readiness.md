@@ -93,7 +93,13 @@ local UI claim. Existing unchanged navigation/settings screens need no new pair.
 Attachment upload can partially succeed while gh exits nonzero; inspect and
 reconcile the existing PR/body before retrying. Do not blindly create a second
 PR. Verify uploaded image URLs/rendering and every required table cell. No
-attachment was uploaded during this audit.
+attachment was uploaded during this audit. Root independently confirmed the same
+Maxis gh2.102.0 attachment help and owns a separate coordinator review worktree
+at D:/Worktrees/kelpie/capture-integration-review-20261105 (branch
+codex/capture-integration-review-20261105,initial canonical rootc71aeabd).
+Workers must not edit it. Final PR commands must explicitly use
+--repo UnlikeOtherAI/kelpie and --head codex/script-capture-integration-20261104,
+not infer the head from that review checkout. No PR exists from this audit.
 
 ## Finite final sequence,not executed
 
