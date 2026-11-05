@@ -183,3 +183,23 @@ GStreamer diagnostics showed that auto-linking an unconstrained appsrc selected
 mp4mux's audio_0 pad, which rejected actual AVC video caps. The fixed pipeline now
 constrains H.264 caps before pad selection. This preserves the real codec proof
 rather than bypassing negotiation. All-frame media success remains pending.
+## Linux sandbox boundary
+
+The prior shared Linux initialization explicitly set no_sandbox=true, so no CEF
+app acceptance was attempted under it. Root authorized a Linux-only correction;
+Windows bootstrap/false behavior and other platform branches are preserved.
+
+The pinned SDK actually includes Release/chrome-sandbox (0755, ondre-owned,
+752152 bytes), contrary to the stale source comment. SHA-256:
+35163229e509ebc8b471790203d9d5720842627bc56f18fa90b070c705bb7419.
+No helper permissions/ownership were changed and no privileged helper installed.
+Fedora's unprivileged user+PID+network namespace probe succeeded; SELinux stayed
+Enforcing, max_user_namespaces47584. No sysctl or security policy was changed.
+
+[Chromium120 sandbox documentation](https://raw.githubusercontent.com/chromium/chromium/120.0.6099.234/docs/linux/sandboxing.md)
+describes supported namespaces as the default modern alternative to a setuid
+helper. The SDK cef_types.h documents no_sandbox as the disabling setting.
+Linux now leaves that setting false and lets Chromium fail closed when no usable
+sandbox exists. This is source/kernel prerequisite evidence, not yet proof of a
+sandboxed renderer. Actual child namespace/seccomp/flags and native API flows
+remain pending.
