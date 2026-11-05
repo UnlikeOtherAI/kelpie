@@ -1,6 +1,6 @@
 # Browser automation and walkthrough capture
 
-This plan covers the full Lightpanda-inspired browser automation brief and the original walkthrough export request. The QA acceptance ledger records actual evidence by revision and platform.
+This plan covers the full Lightpanda-inspired browser automation brief and the original walkthrough export request. The QA acceptance ledger records actual evidence by revision and platform. Current common snapshot:6f10b31bb724db74042ae7a40841ce4762ffe089,with later owner reports explicitly labelled below and in outstanding-gates.md. Earlier bases/checkpoints remain historical.
 
 | IDs | Scope | Dependencies |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ This plan covers the full Lightpanda-inspired browser automation brief and the o
 2. Implement observation, extraction, status/readiness and diagnostics in the canonical gateway.
 3. Extend play-script with strict workflows and native capture across the five user-authorized per-platform workstreams in parallel. The earlier Windows-first gate remains historical evidence, not a current dependency.
 4. Keep iOS/Android contracts aligned and implement Windows/Linux/macOS bindings; advertise only implemented, verified capabilities.
-5. Exercise every capability through real supported HTTP, direct/generic MCP and CLI forwarding. Computer Use, VNC and desktop-input helpers are currently OFF; native UI/Stop evidence remains explicitly blocked until the user lifts that hold. Durable cross-platform conformance evals supplement real-device evidence.
+5. Exercise every capability through real supported HTTP, direct/generic MCP and CLI forwarding. Computer Use, VNC and arbitrary desktop-input helpers remain OFF. Root-authorized hosted XCUITest/Compose and scoped native accessibility instrumentation are permitted; Android phone Stop and Windows Session1 UIA Stop have actual subset evidence. Remaining native UI/runtime rows require their own results,not a new blanket user handoff. Durable cross-platform conformance evals supplement real-device evidence.
 6. Evaluate optional backend and WebMCP boundaries without weakening native browser guarantees.
 7. Audit every ID, docs, affected releases and installed published artifacts. Coordinator owns the integrated PR and release cycle.
 
@@ -28,7 +28,7 @@ This plan covers the full Lightpanda-inspired browser automation brief and the o
 
 The canonical gateway owns execution. Workflows reuse play-script. Strict v1 rejects arbitrary evaluation, ambiguous targets and unsupported steps before mutation. Semantic targets resolve to one visible hit-tested center and are rechecked after visual movement.
 
-The pointer is visual, independent of the OS cursor. Capture continuously samples rendered output and composites the overlay timeline; timed step screenshots alone are not video recording. Bound FPS, resolution, duration and retained bytes. Abort/failure finalizes valid partial artifacts. Retrieve authenticated bounded chunks rather than device-local paths.
+The pointer is visual, independent of the OS cursor. Capture continuously samples rendered output and composites the overlay timeline; timed step screenshots alone are not video recording. Bound FPS, resolution, duration and retained bytes. Ordinary abort/failure finalizes valid partial artifacts. Privacy refusal and output-redaction failure discard all run capture under an independent latch. Retrieve authenticated bounded chunks rather than device-local paths.
 
 Secret references resolve only on the authorized host. Secret values stay out of progress, manifests and error messages. Page content and declared page tools remain untrusted. Unsupported capabilities fail explicitly.
 
