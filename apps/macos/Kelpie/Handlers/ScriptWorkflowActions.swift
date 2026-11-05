@@ -240,9 +240,18 @@ final class ScriptWorkflowActions {
         }
     }
 
-    /// A completed scalar needs explicit classification before any continuation.
-    static func requireKnownPacedResult(_ result: Body) throws {
-        guard result["sensitivityKnown"] as? Bool == true else {
+    /// An acknowledged scalar still needs privacy classification before continuing.
+    static func requirePacedAckShape(_ result: Body) throws {
+        let validStatus = result["ok"] as? Bool == true ? result["error"] == nil : result["error"] is String
+        guard result["ok"] is Bool, validStatus, result["sensitive"] is Bool, result["sensitivityKnown"] is Bool,
+              result["mayHaveCompleted"] is Bool else {
+            throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        }
+    }
+
+    static func requirePacedClassification(_ result: Body, hasFurther: Bool, discardMedia: Bool) throws {
+        if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+        if hasFurther && result["sensitivityKnown"] as? Bool != true {
             throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
         }
     }
@@ -258,7 +267,8 @@ final class ScriptWorkflowActions {
     ) async throws {
         var completedInput = false
         do {
-            for operation in plan.operations {
+            let operations = plan.operations
+            for (index, operation) in operations.enumerated() {
                 if operation.delayBeforeMs > 0 { try await wait(milliseconds: operation.delayBeforeMs) }
                 try await check()
                 let current = try await tab.viewport()
@@ -270,13 +280,15 @@ final class ScriptWorkflowActions {
                     token: token,
                     edit: edit,
                     refuseSensitive: workflow.capture != nil,
+                    allowFinalMutationDocumentChange: index + 1 == operations.count,
                     consume: consume,
                     uncertain: uncertain
                 )
+                do { try Self.requirePacedAckShape(result) } catch { uncertain(); throw error }
                 if result["mayHaveCompleted"] as? Bool == true { completedInput = true }
                 try requireOK(result)
-                try Self.requireKnownPacedResult(result)
-                if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+                guard result["mayHaveCompleted"] as? Bool == true else { uncertain(); throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) }
+                try Self.requirePacedClassification(result, hasFurther: index + 1 < operations.count, discardMedia: discardMedia)
             }
             try await check()
         } catch let failure as ScriptWorkflowFailure {

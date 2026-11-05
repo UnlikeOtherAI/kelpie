@@ -88,7 +88,7 @@ test("viewport diagnostics accept only bounded fixed numeric fields",()=>{
 test("paced fixture logs only synthetic lengths and bounded fixed transitions",async()=>{
  const fixture=await startFixture();
  try{
-  for(const route of ["/paced","/paced-blur","/paced-replace","/paced-sensitive"]){
+  for(const route of ["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"]){
    const html=await (await fetch(fixture.url+route)).text();
    new vm.Script(html.match(/<script>([\s\S]*)<\/script>/)[1]);
    assert.ok(html.includes("pacedMode="+JSON.stringify(route)));

@@ -111,7 +111,8 @@ final class ScriptWorkflowTab {
         _ expression: String,
         mutates: Bool = false,
         consume: (@MainActor (Any?) -> Void)? = nil,
-        uncertain: (@MainActor () -> Void)? = nil
+        uncertain: (@MainActor () -> Void)? = nil,
+        acceptChangedDocument: (@MainActor (Any?) -> Bool)? = nil
     ) async throws -> Any? {
         try await check()
         guard !ScriptRendererDeadline.isRetiring(renderer) else { throw ScriptWorkflowFailure("BUSY") }
@@ -147,8 +148,12 @@ final class ScriptWorkflowTab {
         do { try await check() } catch {
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: mutates)
         }
-        guard before == document else {
-            throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
+        if before != document {
+            guard acceptChangedDocument?(value) == true else {
+                throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
+            }
+            // The old realm acknowledged input, but later classification in the new realm is unknown.
+            uncertain?()
         }
         return value
     }
@@ -180,6 +185,7 @@ final class ScriptWorkflowTab {
         dispatch: Bool = false,
         edit: Body? = nil,
         refuseSensitive: Bool = false,
+        allowFinalMutationDocumentChange: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         uncertain: (@MainActor () -> Void)? = nil
     ) async throws -> Body {
@@ -197,21 +203,34 @@ final class ScriptWorkflowTab {
         guard let result = try await fixed(
             expression,
             mutates: dispatch || edit != nil,
-            consume: { value in Self.consumeTargetResult(value, consume: consume, uncertain: uncertain) },
-            uncertain: uncertain
+            consume: { value in Self.consumeTargetResult(value, mutates: dispatch || edit != nil, consume: consume, uncertain: uncertain) },
+            uncertain: uncertain,
+            acceptChangedDocument: { value in allowFinalMutationDocumentChange && Self.isAcknowledgedMutation(value) }
         ) as? Body else {
             uncertain?()
-            throw ScriptWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
+            throw ScriptWorkflowFailure(dispatch || edit != nil ? "INPUT_UNCERTAIN" : "TARGET_FAILED",
+                                        mayHaveCompleted: dispatch || edit != nil)
         }
         return result
     }
 
+    static func isAcknowledgedMutation(_ value: Any?) -> Bool {
+        guard let body = value as? Body else { return false }
+        return body["ok"] as? Bool == true && body["error"] == nil && body["mayHaveCompleted"] as? Bool == true &&
+            body["sensitive"] is Bool && body["sensitivityKnown"] is Bool
+    }
+
     /// A malformed callback is uncertain before any subsequent authority or document guard.
     static func consumeTargetResult(
-        _ value: Any?, consume: (@MainActor (Body) -> Void)?, uncertain: (@MainActor () -> Void)?
+        _ value: Any?, mutates: Bool = false, consume: (@MainActor (Body) -> Void)?, uncertain: (@MainActor () -> Void)?
     ) {
         guard let body = value as? Body else { uncertain?(); return }
         consume?(body)
+        let invalidStatus = body["ok"] as? Bool == true ? body["error"] != nil : !(body["error"] is String)
+        if mutates && (!(body["ok"] is Bool) || invalidStatus || !(body["sensitive"] is Bool) ||
+                       !(body["sensitivityKnown"] is Bool) || !(body["mayHaveCompleted"] is Bool)) {
+            uncertain?()
+        }
     }
 
     func documentIdentity() async throws -> String {

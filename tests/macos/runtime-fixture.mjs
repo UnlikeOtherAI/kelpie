@@ -12,8 +12,8 @@ export async function startFixture() {
   }
   const mode=url.pathname;
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
-  const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive"].includes(mode)?mode:"";
-  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":"Hosted Mac fixture";
+  const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"].includes(mode)?mode:"";
+  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":mode==="/paced-final-delay"?"Delayed X fixture":"Hosted Mac fixture";
   const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
   const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
@@ -53,6 +53,8 @@ export async function startFixture() {
     if(id==='entry'&&pacedMode==='/paced-blur')value.blur();
     if(id==='entry'&&pacedMode==='/paced-replace')value.replaceWith(value.cloneNode(true));
     if(id==='focus-privacy'&&pacedMode==='/paced-sensitive')value.autocomplete='current-password';
+    if(id==='entry'&&pacedMode==='/paced-final-url')history.replaceState(null,'','/paced-final-url-changed');
+    if(id==='entry'&&pacedMode==='/paced-final-delay'){const end=performance.now()+5500;while(performance.now()<end){}}
    });
   }
   document.querySelector('#submit')?.addEventListener('pointerdown',()=>{if(privacyMode==='/known-url'){send({type:'known-mid-transition'},true);history.replaceState(null,'','/known-url-changed')}});
