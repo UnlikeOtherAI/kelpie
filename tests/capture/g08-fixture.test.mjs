@@ -5,14 +5,17 @@ test("neutral fixture serves blank named controls and bounded facts through actu
  const fixture=await startG08Fixture();
  try{
   const html=await(await fetch(fixture.url)).text();
+  assert.equal(fixture.pageRequests,1);
   assert.match(html,/aria-label="G08 Start"><\/button>/);
   assert.match(html,/aria-label="G08 Finish"><\/button>/);
   const endpoint=new URL("/events",fixture.url);
   const fact={target:"start",documentId:"synthetic",trusted:true,timeMs:1,center:{x:160,y:240},viewport:{width:640,height:480}};
   assert.equal((await fetch(endpoint,{method:"POST",body:JSON.stringify(fact)})).status,202);
   assert.equal((await(await fetch(endpoint)).json()).events.length,1);
+  assert.equal(fixture.pageRequests,1);
   assert.equal((await fetch(endpoint,{method:"POST",body:"x".repeat(8193)})).status,413);
   assert.equal((await(await fetch(endpoint)).json()).events.length,1);
+  assert.equal(fixture.pageRequests,1);
  }finally{await fixture.close();}
 });
 test("same bounded production request covers both curves without product eval",()=>{
