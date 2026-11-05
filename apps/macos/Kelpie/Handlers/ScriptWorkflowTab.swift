@@ -1,4 +1,13 @@
 import AppKit
+import CoreFoundation
+
+/// JSON numbers bridge to Bool in Swift; only CFBoolean is a Boolean receipt field.
+enum ScriptWorkflowBoolean {
+    static func value(_ raw: Any?) -> Bool? {
+        guard let number = raw as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+}
 
 /// An immutable native renderer/tab grant is shared by actions and frame sampling.
 @MainActor
@@ -111,7 +120,8 @@ final class ScriptWorkflowTab {
         _ expression: String,
         mutates: Bool = false,
         consume: (@MainActor (Any?) -> Void)? = nil,
-        uncertain: (@MainActor () -> Void)? = nil
+        uncertain: (@MainActor () -> Void)? = nil,
+        acceptChangedDocument: (@MainActor (Any?) -> Bool)? = nil
     ) async throws -> Any? {
         try await check()
         guard !ScriptRendererDeadline.isRetiring(renderer) else { throw ScriptWorkflowFailure("BUSY") }
@@ -124,6 +134,10 @@ final class ScriptWorkflowTab {
         let value: Any?
         var evaluationStarted = false
         var valueReturned = false
+        var documentAccepted = false
+        func observeDocumentChange(_ value: Any?) {
+            if before != document, !documentAccepted { documentAccepted = acceptChangedDocument?(value) == true }
+        }
         do {
             value = try await ScriptRendererDeadline.run(
                 renderer: renderer,
@@ -136,6 +150,7 @@ final class ScriptWorkflowTab {
                     evaluationStarted = true
                     let result = try await renderer.evaluateBrowserControlJS(expression)
                     consume?(result)
+                    observeDocumentChange(result)
                     valueReturned = true
                     return result
                 }
@@ -144,11 +159,16 @@ final class ScriptWorkflowTab {
             if evaluationStarted, !valueReturned { uncertain?() }
             throw error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates)
         }
+        observeDocumentChange(value)
         do { try await check() } catch {
+            observeDocumentChange(value)
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: mutates)
         }
-        guard before == document else {
-            throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
+        observeDocumentChange(value)
+        if before != document {
+            guard documentAccepted else {
+                throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
+            }
         }
         return value
     }
@@ -157,15 +177,17 @@ final class ScriptWorkflowTab {
         guard let values = try await fixed("""
         (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
         v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
-        v?.scale??1,devicePixelRatio,v?.pageLeft??scrollX,v?.pageTop??scrollY]})()
-        """) as? [NSNumber], values.count == 10 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+        v?.scale??1,devicePixelRatio,v?.pageLeft??scrollX,v?.pageTop??scrollY,
+        document.documentElement.clientWidth,document.documentElement.clientHeight]})()
+        """) as? [NSNumber], values.count == 12 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         let parts = values.map { CGFloat($0.doubleValue) }
         let bounds = renderer.scriptViewportRect.size
         guard parts.allSatisfy({ $0.isFinite }), parts[0] > 0, parts[1] > 0, parts[4] > 0, parts[5] > 0,
-              parts[6] > 0, parts[7] > 0, bounds.width > 0, bounds.height > 0 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+              parts[6] > 0, parts[7] > 0, parts[10] > 0, parts[11] > 0, bounds.width > 0, bounds.height > 0 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         return Viewport(
             bounds: bounds,
             layout: CGSize(width: parts[0], height: parts[1]),
+            client: CGSize(width: parts[10], height: parts[11]),
             visible: CGRect(x: parts[2], y: parts[3], width: parts[4], height: parts[5]),
             scale: parts[6],
             pixelRatio: parts[7],
@@ -180,6 +202,7 @@ final class ScriptWorkflowTab {
         dispatch: Bool = false,
         edit: Body? = nil,
         refuseSensitive: Bool = false,
+        allowFinalMutationDocumentChange: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         uncertain: (@MainActor () -> Void)? = nil
     ) async throws -> Body {
@@ -197,21 +220,78 @@ final class ScriptWorkflowTab {
         guard let result = try await fixed(
             expression,
             mutates: dispatch || edit != nil,
-            consume: { value in Self.consumeTargetResult(value, consume: consume, uncertain: uncertain) },
-            uncertain: uncertain
+            consume: { value in
+                Self.consumeTargetResult(
+                    value,
+                    mutates: dispatch || edit != nil,
+                    expectedToken: token,
+                    consume: consume,
+                    uncertain: uncertain
+                )
+            },
+            uncertain: uncertain,
+            acceptChangedDocument: { value in
+                guard allowFinalMutationDocumentChange, let token else { return false }
+                return Self.acceptAcknowledgedDocumentChange(value, token: token, editing: edit != nil, uncertain: uncertain)
+            }
         ) as? Body else {
             uncertain?()
-            throw ScriptWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
+            throw ScriptWorkflowFailure(dispatch || edit != nil ? "INPUT_UNCERTAIN" : "TARGET_FAILED",
+                                        mayHaveCompleted: dispatch || edit != nil)
+        }
+        if dispatch || edit != nil {
+            guard Self.hasValidMutationReceipt(result),
+                  let ok = ScriptWorkflowBoolean.value(result["ok"]),
+                  !ok || (token.map { Self.isAcknowledgedMutation(result, token: $0) } == true) else {
+                throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
         }
         return result
     }
 
+    static func acceptAcknowledgedDocumentChange(
+        _ value: Any?, token: String, editing: Bool, uncertain: (@MainActor () -> Void)?
+    ) -> Bool {
+        guard isAcknowledgedMutation(value, token: token) else { return false }
+        // A changed realm makes subsequent edit privacy classification unknown.
+        if editing { uncertain?() }
+        return true
+    }
+
+    static func isAcknowledgedMutation(_ value: Any?, token: String) -> Bool {
+        guard let body = value as? Body else { return false }
+        return !token.isEmpty && body["token"] as? String == token && hasValidMutationReceipt(body) &&
+            ScriptWorkflowBoolean.value(body["ok"]) == true && ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) == true
+    }
+
+    static func hasValidMutationReceipt(_ body: Body) -> Bool {
+        guard let ok = ScriptWorkflowBoolean.value(body["ok"]),
+              ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) != nil,
+              ScriptWorkflowBoolean.value(body["sensitive"]) != nil,
+              ScriptWorkflowBoolean.value(body["sensitivityKnown"]) != nil else { return false }
+        if ok {
+            return body["error"] == nil && ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) == true &&
+                body["inputGuarantee"] as? String == "synthetic-coordinate"
+        }
+        guard let error = body["error"] as? String else { return false }
+        return !error.isEmpty
+    }
+
     /// A malformed callback is uncertain before any subsequent authority or document guard.
     static func consumeTargetResult(
-        _ value: Any?, consume: (@MainActor (Body) -> Void)?, uncertain: (@MainActor () -> Void)?
+        _ value: Any?,
+        mutates: Bool = false,
+        expectedToken: String? = nil,
+        consume: (@MainActor (Body) -> Void)?,
+        uncertain: (@MainActor () -> Void)?
     ) {
         guard let body = value as? Body else { uncertain?(); return }
         consume?(body)
+        if mutates && (!hasValidMutationReceipt(body) ||
+            (ScriptWorkflowBoolean.value(body["ok"]) == true &&
+                (expectedToken.map { !isAcknowledgedMutation(body, token: $0) } ?? true))) {
+            uncertain?()
+        }
     }
 
     func documentIdentity() async throws -> String {
