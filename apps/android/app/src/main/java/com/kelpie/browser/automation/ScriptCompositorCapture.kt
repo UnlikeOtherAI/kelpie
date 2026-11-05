@@ -11,6 +11,7 @@ import android.os.Looper
 import android.view.PixelCopy
 import android.view.Window
 import android.webkit.WebView
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -70,6 +71,11 @@ internal class ScriptCompositorCapture(
      */
     suspend fun awaitCommittedFrame() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+        awaitCommittedFrameOnQ()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private suspend fun awaitCommittedFrameOnQ() {
         suspendCancellableCoroutine<Unit> { continuation ->
             view.postVisualStateCallback(
                 0,
