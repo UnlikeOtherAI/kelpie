@@ -21,3 +21,8 @@ test("retains only first mismatched bounded synthetic file",{skip:process.platfo
   assert.deepEqual(await readFile(join(output,"count-mismatch.gif")),bytes);
  } finally { await rm(root,{recursive:true,force:true}); }
 });
+
+test("rejects a missing directory before resolving paths",()=>{
+ const result=spawnSync(process.execPath,[script],{env:{...process.env,KELPIE_LINUX_RESOURCE_DIAGNOSTIC:"1"}});
+ assert.notEqual(result.status,0);assert.match(result.stderr.toString(),/DIAGNOSTIC_REQUIRED/);
+});

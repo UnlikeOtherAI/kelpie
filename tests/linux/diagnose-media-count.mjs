@@ -2,9 +2,10 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile, copyFile, realpath, stat } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
-const directory=resolve(process.argv[2] ?? "");
-if(!directory || process.env.KELPIE_LINUX_RESOURCE_DIAGNOSTIC!=="1") throw Error("DIAGNOSTIC_REQUIRED");
+import { join, resolve, sep } from "node:path";
+const rawDirectory=process.argv[2];
+if(!rawDirectory || process.env.KELPIE_LINUX_RESOURCE_DIAGNOSTIC!=="1") throw Error("DIAGNOSTIC_REQUIRED");
+const directory=resolve(rawDirectory);
 const report=JSON.parse(await readFile(join(directory,"combined-media-input.json"),"utf8"));
 const root=await realpath(directory); let mismatch=null;
 for(const item of report.artifacts) {
