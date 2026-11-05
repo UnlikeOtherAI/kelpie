@@ -24,6 +24,7 @@ export async function evaluateWgcFrames(stream,config){
  });
  assert.equal(count,samples.length);
  if(count===0)return {samples,analysis:null,oracleError:"INSUFFICIENT_EVIDENCE no frames",frameCount:0};
+ if(config.pointerMs<1000)return {samples,analysis:null,oracleError:"FAST_PROFILE_NOT_DENSE",frameCount:count};
  try{
   const analysis=evaluateG08(samples,{...config,scale:{x:Number(shape.split(":")[0])/config.viewport.width,y:Number(shape.split(":")[1])/config.viewport.height}});
   return {samples,analysis,oracleError:null,frameCount:count};

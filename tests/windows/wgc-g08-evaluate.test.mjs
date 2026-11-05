@@ -6,3 +6,11 @@ test("empty actual stream is insufficient, regardless of supplied pass claims",a
 });
 
 test("one valid sealed frame remains insufficient",async()=>{const meta=Buffer.from(JSON.stringify({sequence:0,tick100ns:100,receiptMs:1,width:320,height:180,sourceWidth:320,sourceHeight:180,sourceStride:1280,alphaMode:"straight"}));const head=Buffer.alloc(8);head.writeUInt32LE(meta.length);head.writeUInt32LE(320*180*4,4);const pixels=Buffer.alloc(320*180*4);const cfg={curve:"c",color:"#ff0000",pointerMs:2400,markerMs:3000,radius:24,from:{x:64,y:90},to:{x:256,y:90},viewport:{width:320,height:180}};const result=await evaluateWgcFrames(Readable.from([head,meta,pixels]),cfg);assert.equal(result.analysis,null);assert.match(result.oracleError,/INSUFFICIENT/);});
+
+test("350 ms profile retains observations without claiming dense oracle coverage",async()=>{
+ const meta=Buffer.from(JSON.stringify({sequence:0,tick100ns:100,receiptMs:1,width:320,height:180,sourceWidth:320,sourceHeight:180,sourceStride:1280,alphaMode:"straight"}));
+ const head=Buffer.alloc(8);head.writeUInt32LE(meta.length);head.writeUInt32LE(320*180*4,4);
+ const cfg={curve:"c",color:"#ff0000",pointerMs:350,markerMs:3000,radius:24,from:{x:64,y:90},to:{x:256,y:90},viewport:{width:320,height:180}};
+ const result=await evaluateWgcFrames(Readable.from([head,meta,Buffer.alloc(320*180*4)]),cfg);
+ assert.equal(result.frameCount,1);assert.equal(result.analysis,null);assert.equal(result.oracleError,"FAST_PROFILE_NOT_DENSE");
+});
