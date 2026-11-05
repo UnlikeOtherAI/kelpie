@@ -10,6 +10,7 @@ export interface ScriptTargetResult {
   width?: number;
   viewportWidth?: number;
   viewportHeight?: number;
+  visualViewport?: { offsetLeft: number; offsetTop: number; width: number; height: number; scale: number };
   height?: number;
   inputGuarantee?: "synthetic-coordinate";
   mayHaveCompleted?: boolean;
@@ -243,5 +244,5 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       hit.dispatchEvent(new MouseEvent("click", { ...options, buttons: 0 }));
     } catch { return { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true }; }
   }
-  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: entry.element instanceof HTMLInputElement && (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)), viewportWidth: innerWidth, viewportHeight: innerHeight, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
+  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: entry.element instanceof HTMLInputElement && (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)), viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
 }
