@@ -64,8 +64,8 @@ void DrawScriptOverlay(ScriptMediaFrame& frame,const nlohmann::json& shown) {
   const double elapsed=shown.value("elapsedMs",frame.elapsed_ms);
   if(shown.contains("marker")) {
     const auto& marker=shown["marker"];
-    const double t=(elapsed-marker.value("startedMs",elapsed))/std::max(1.0,marker.value("durationMs",700.0));
-    if(t>=0&&t<1) {
+    const double t=kelpie_script_progress(elapsed-marker.value("startedMs",elapsed),marker.value("durationMs",700.0));
+    if(t<1) {
       const auto state=kelpie_script_tap_presentation(t,marker.value("wobble",true),marker.value("fade",true));
       const float radius=static_cast<float>(marker.value("radius",20.0)*state.scale);
       unsigned long color=0x3B82F6; try { color=std::stoul(marker.value("color",std::string("#3B82F6")).substr(1),nullptr,16); } catch(...) {}
