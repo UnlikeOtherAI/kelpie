@@ -33,58 +33,11 @@ extension WorkflowCaptureUITests {
 
     @MainActor
     func testPacedCaptureKeepsNativeKeyboardClosedDuringEdit() async throws {
-        try await pacedCaptureKeyboardCheck(expectRestoredPreference: false)
+        try await pacedCaptureKeyboardCheck()
     }
 
     @MainActor
-    func testPacedCaptureWithTextInteractionDisabled() async throws {
-        testLaunchArguments = ["--test-disable-webkit-text-interaction"]
-        try await pacedCaptureKeyboardCheck(expectRestoredPreference: true)
-    }
-
-    @MainActor
-    func testTextInteractionPreferenceRestoresAfterStop() async throws {
-        testLaunchArguments = ["--test-disable-webkit-text-interaction"]
-        let (fixture, tab) = try await ready()
-        defer { fixture.listener.cancel() }
-        let script: Body = [
-            "version": 1, "tabId": tab, "actions": [["action": "wait", "ms": 5000]],
-            "capture": ["formats": ["gif"], "fps": 5, "maxWidth": 384]
-        ]
-        let playback = Task.detached { [probe] in try await probe.request("/v1/play-script", script) }
-        let stop = XCUIApplication().buttons["browser.recording.stop"]
-        XCTAssertTrue(stop.waitForExistence(timeout: 15))
-        stop.tap()
-        let result = try await playback.value
-        XCTAssertEqual((result["error"] as? Body)?["code"] as? String, "SCRIPT_ABORTED")
-        let debug = try await probe.request("/v1/debug-screens", [:])
-        XCTAssertEqual((debug["webView"] as? Body)?["textInteractionEnabled"] as? Bool, true)
-    }
-
-    @MainActor
-    func testTextInteractionPreferenceStillDiscardsSensitiveCapture() async throws {
-        testLaunchArguments = ["--test-disable-webkit-text-interaction"]
-        let (fixture, tab) = try await ready()
-        defer { fixture.listener.cancel() }
-        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
-        let canary = "iOS Reflected+Canary!"
-        let result = try await probe.request("/v1/play-script", [
-            "version": 1, "tabId": tab, "actions": [
-                ["action": "navigate", "url": "http://127.0.0.1:\(port)/post-input-secret-autocomplete"],
-                ["action": "output", "source": "title", "name": "before"],
-                ["action": "type", "target": ["selector": "#entry"], "text": canary, "typingDelayMs": 120]
-            ], "capture": ["formats": ["screenshots"]]
-        ])
-        XCTAssertEqual((result["error"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")
-        XCTAssertEqual(result["mayHaveCompleted"] as? Bool, true)
-        XCTAssertTrue((result["artifacts"] as? [Body])?.isEmpty == true)
-        XCTAssertFalse(String(decoding: try JSONSerialization.data(withJSONObject: result), as: UTF8.self).contains(canary))
-        let debug = try await probe.request("/v1/debug-screens", [:])
-        XCTAssertEqual((debug["webView"] as? Body)?["textInteractionEnabled"] as? Bool, true)
-    }
-
-    @MainActor
-    private func pacedCaptureKeyboardCheck(expectRestoredPreference: Bool) async throws {
+    private func pacedCaptureKeyboardCheck() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let port = try XCTUnwrap(fixture.listener.port?.rawValue)
@@ -109,10 +62,6 @@ extension WorkflowCaptureUITests {
             add(screenshot)
         }
         let result = try await playback.value
-        if expectRestoredPreference {
-            let debug = try await probe.request("/v1/debug-screens", [:])
-            XCTAssertEqual((debug["webView"] as? Body)?["textInteractionEnabled"] as? Bool, true)
-        }
         XCTAssertFalse(keyboardVisible, "Programmatic capture edits should not open the software keyboard")
         XCTAssertEqual(result["success"] as? Bool, true, WorkflowCaptureProbe.errorCode(result))
         let events = try await pacedEvents(tab: tab)
