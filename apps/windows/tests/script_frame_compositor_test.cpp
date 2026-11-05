@@ -26,6 +26,9 @@ int main() {
   auto frame=White(); DrawScriptOverlay(frame,shown);
   const auto center=50*frame.stride+50*4;
   assert(frame.bgra[center]<100 && frame.bgra[center+1]<100 && frame.bgra[center+2]==255 && frame.bgra[center+3]==255);
+  auto held=White(); auto future=shown; future["marker"]["startedMs"]=300101;
+  DrawScriptOverlay(held,future);
+  assert(held.bgra==frame.bgra); // Evidence hold is visibly identical to progress zero.
   const auto outside=10*frame.stride+10*4;
   assert(frame.bgra[outside]==255 && frame.bgra[outside+1]==255);
   auto faded=White(); auto end=shown; end["elapsedMs"]=800; DrawScriptOverlay(faded,end);

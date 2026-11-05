@@ -55,13 +55,37 @@ aaba23cccfef22d6db40729473a8aa5603fbaf90 overdc0648. Critical codec/service/
 sampler/action paths only were inspected; status/key drafts were outside scope.
 GIF count advances after complete source-image writes; H.264 count advances after
 retained compressed WriteSample, never raw ProcessInput. The minimum prefix drains
-a bounded18-entry FIFO of marker/action/document metadata. Held progress0 keeps
-post-request frames on the same marker; exact ACK plus10s/cancel/error gating
+a bounded18-entry FIFO of marker/action/document metadata. Held-marker metadata
+persists across post-request frames; exact ACK plus10s/cancel/error gating
 precedes animation reset and exact native target dispatch. Final video drain
 rejects leftover timings; finalization failures propagate and discard the failed
-format rather than becoming nominal success. No new source blocker was found.
+format rather than becoming nominal success. No new blocker was found within
+that codec/ACK scope; it did not establish compositor pixels.
 The source prefix/decode tests assert raw-first-pending and final decoded counts,
 but this reviewer did not run them. The earlier real fps1 movie marker omission
-remains open until final actual marker-pixel/document artifacts prove closure. Linux reuses desktop code but needs its own GTK/OSR outcomes and
+remains open until final actual marker-pixel/document artifacts prove closure.
+
+Actual owner/root all-frame decode at committed
+c852787f344f61dcc3b3ab798ba6a4c979c4fcd3 confirmed ACK metadata without marker
+pixels in the fps1 movies. Root cause: DrawScriptOverlay computed raw negative
+(elapsed-startedMs)/duration and required t>=0, while admission used shared
+clamped progress. The deliberate future-start hold therefore qualified in
+metadata but was skipped by the compositor. This reopens VIS/CAP; it is not a
+success. The Windows owner retains the failure artifacts and is fixing drawing
+with shared clamped progress plus a held-marker pixel regression (WIN-PIXEL-1).
+This reviewer confirmed the raw guard in source but did not independently view
+those newly decoded failure frames. Raw report/binary/protocol identities remain
+pending ingestion; the earlier source review stays conditional.
+
+Targeted hold parity at root78e049d6750ed34809ec6b73ff2a99ef28565ac8:
+iOS current() rewrites a held marker.started to exactly the same now placed in
+State.time; State.draw passes that immutable time, so the shared Apple now>=started
+guard sees equality/progress0. Android explicitly sets elapsed=0 for held markers
+before shared presentation and drawCircle. No equivalent negative-time suppression
+was found in those current paths. Shared Apple drawing still rejects future
+started values; no unreviewed Mac caller may assume future-start holding works.
+These are source conclusions, not actual pixel/UI passes.
+
+Linux reuses desktop code but needs its own GTK/OSR outcomes and
 sandbox proof; Mac requires its own renderer/codec path. No platform inherits a
 runtime or UI pass from another platform's source or codec result.
