@@ -6,7 +6,7 @@ import { runPacedCases } from "./capture-paced-cases.mjs";
 import { downloadArtifacts } from "./capture-artifact-download.mjs";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
 import { startArtifactProtocolFixture } from "../capture/artifact-protocol-fixture.mjs";
-import { scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
+import { scriptArtifactChunkSchema, scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
 
 const [readinessPath, outputPath] = process.argv.slice(2);
 if (!readinessPath || !outputPath) throw new Error("Provide private readiness path and fresh evidence directory");
