@@ -84,6 +84,17 @@ export async function clearRunningBrowser(name: string): Promise<void> {
   await saveBrowserStore(store);
 }
 
+/** Re-read and compare the launch identity before clearing a dead launch. */
+export async function clearRunningBrowserIfMatches(name: string, expected: RunningBrowser): Promise<boolean> {
+  const store = await loadBrowserStore();
+  const current = store.running[name];
+  if (!current || current.pendingLaunch || current.pid !== expected.pid || current.launchId !== expected.launchId ||
+      current.readinessFile !== expected.readinessFile) return false;
+  const { [name]: _removed, ...remaining } = store.running;
+  store.running = remaining;
+  await saveBrowserStore(store);
+  return true;
+}
 export async function getBrowserAlias(name: string): Promise<BrowserAlias | undefined> {
   const store = await loadBrowserStore();
   return store.aliases[name];

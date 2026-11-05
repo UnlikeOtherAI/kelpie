@@ -20,7 +20,7 @@ const readiness = { version: 1, launchId: "launch-a", deviceId: "device-a", port
 
 describe.each(["windows", "linux"] as const)("%s browser alias lifecycle", (platform) => {
   let currentReadiness: typeof readiness | undefined;
-  const running = { win: { port: 8420, lastLaunchedAt: "2026-09-15T00:00:00.000Z", pid: 1234,
+  const running = { win: { port: 8420, lastLaunchedAt: "2026-09-15T00:00:00.000Z", pid: process.pid,
     launchId: "launch-a", readinessFile: "C:/profile/readiness.json", deviceId: "device-a" } };
 
   beforeEach(() => {

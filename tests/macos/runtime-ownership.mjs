@@ -34,3 +34,9 @@ export function editFocusSignal(line){
 export function processCommandMatches(command,executable){
  return typeof command==="string"&&typeof executable==="string"&&command.trim()===executable+" --port 28420";
 }
+
+// Fixed numeric geometry differences only; no URLs, titles or page content.
+export function viewportSignal(line){
+ const match=/^\[WorkflowViewport\] bounds=([01]) layout=([01]) visible=([01]) scale=([01]) pixel=([01]) widths=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2}) heights=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2})$/.exec(line);
+ return match?{boundsSame:match[1]==="1",layoutSame:match[2]==="1",visibleSame:match[3]==="1",scaleSame:match[4]==="1",pixelSame:match[5]==="1",oldWidth:Number(match[6]),newWidth:Number(match[7]),oldHeight:Number(match[8]),newHeight:Number(match[9])}:null;
+}

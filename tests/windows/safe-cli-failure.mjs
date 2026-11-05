@@ -11,7 +11,9 @@ export function safeCliFailure(error){
  ]);
  const category=categories.get(message)??(/^Kelpie exited before publishing readiness \(exit -?\d+\)$/.test(message)?"exited-before-readiness":
   /^Kelpie failed to start:/.test(message)?"spawn-failed":data?.error?"other-cli-error":"no-cli-error-json");
- const codes=new Set(["BROWSER_LAUNCH_FAILED","BROWSER_STOP_FAILED","BROWSER_NOT_RUNNING","BROWSER_LAUNCH_MISMATCH","BROWSER_CONFIGURATION_INVALID","BROWSER_NOT_REGISTERED"]);
- return {code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false,
+ const codes=new Set(["BROWSER_LAUNCH_FAILED","BROWSER_STOP_FAILED","BROWSER_NOT_RUNNING","BROWSER_LAUNCH_MISMATCH","BROWSER_LAUNCH_PENDING","BROWSER_CONFIGURATION_INVALID","BROWSER_NOT_REGISTERED"]);
+ const retirement=data?.error?.retirement;const outcomes=new Set(["exited","kill-refused","kill-error","exit-wait-expired"]);
+ const retirementFact=outcomes.has(retirement?.outcome)&&Number.isInteger(retirement?.elapsedMs)&&retirement.elapsedMs>=0&&retirement.elapsedMs<=60000?{outcome:retirement.outcome,elapsedMs:retirement.elapsedMs}:null;
+ return {retirement:retirementFact,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false,
   cliErrorCode:codes.has(data?.error?.code)?data.error.code:null,category};
 }

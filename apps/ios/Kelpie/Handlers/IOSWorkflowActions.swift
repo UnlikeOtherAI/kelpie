@@ -129,9 +129,10 @@ final class IOSWorkflowActions {
 
     private func interact(_ step: Body, action: String, index: Int) async throws {
         let target = step["target"] as? Body ?? [:]
+        let editing = action == "type" || action == "fill"
+        let plan = workflow.pacedPlans[index]
         let document = tab.document
         let viewport = try await tab.viewport()
-        let editing = action == "type" || action == "fill"
         let text = editing ? step["text"] as? String : nil
         let consume = { [self] (result: Body) in
             consumeSensitivity(result, text: text)
@@ -146,6 +147,19 @@ final class IOSWorkflowActions {
             throw IOSWorkflowFailure("INVALID_TARGET")
         }
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if let plan, !plan.clearFirst, plan.scalars.isEmpty {
+            let preflight = try await tab.target(
+                target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
+            )
+            try requireOK(preflight)
+            guard preflight["editable"] as? Bool == true else { throw IOSWorkflowFailure("TARGET_NOT_EDITABLE") }
+            try await check()
+            guard tab.document == document, viewport == (try await tab.viewport()) else {
+                throw IOSWorkflowFailure("STALE_TARGET")
+            }
+            if workflow.stepScreenshots { _ = try await sampler?.step(index, document: document) }
+            return
+        }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await movePointer(to: point)
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
@@ -154,6 +168,13 @@ final class IOSWorkflowActions {
             target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
         ))
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if editing {
+            try tab.focusForEditing()
+            try await check()
+            guard tab.document == document, viewport == (try await tab.viewport()) else {
+                throw IOSWorkflowFailure("STALE_TARGET")
+            }
+        }
         let hold = sampler?.recordsMotion == true
         let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings, held: hold) }
         if let sampler {
@@ -163,19 +184,191 @@ final class IOSWorkflowActions {
         try await check()
         let current = try await tab.viewport()
         guard tab.document == document, viewport == current else { throw IOSWorkflowFailure("STALE_TARGET") }
-        let edit: Body? = editing ? ["action": action, "text": step["text"] ?? ""] : nil
+        if let plan {
+            let context = PacedTarget(
+                target: target,
+                token: token,
+                document: document,
+                viewport: viewport,
+                consume: consume,
+                missing: missing
+            )
+            try await pacedEdit(plan, context: context)
+            return
+        }
+        try await atomicMutation(
+            target: target,
+            token: token,
+            action: action,
+            text: text,
+            document: document,
+            consume: consume,
+            missing: missing
+        )
+    }
+
+    private func atomicMutation(
+        target: Body,
+        token: String,
+        action: String,
+        text: String?,
+        document: String,
+        consume: @MainActor (Body) -> Void,
+        missing: @MainActor () -> Void
+    ) async throws {
+        let editing = action == "type" || action == "fill"
+        let edit: Body? = editing ? ["action": action, "text": text ?? ""] : nil
         let result = try await tab.target(
             target,
             token: token,
             dispatch: !editing,
             edit: edit,
+            acceptFinalAcknowledgement: true,
+            unknownOnFinalNavigation: editing,
+            validateMutationAcknowledgement: true,
             refuseSensitive: workflow.capture != nil,
             consume: consume,
             missingResult: missing
         )
-        try requireOK(result)
+        try requireMutationAcknowledgement(result, token: token, missing: missing)
+        if editing && tab.document != document { missing() }
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
-        do { try await check() } catch { throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true) }
+        do { try await check() } catch {
+            if editing && tab.document != document { missing() }
+            throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+        }
+    }
+
+    private func requireMutationAcknowledgement(
+        _ result: Body, token: String, missing: () -> Void
+    ) throws {
+        if result["ok"] as? Bool == false {
+            guard result["error"] is String, result["mayHaveCompleted"] is Bool else {
+                missing()
+                throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
+            try requireOK(result)
+        }
+        guard IOSPacedTypingExecutor.isAcknowledgement(result, token: token) else {
+            missing()
+            throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        }
+    }
+
+    private struct PacedTarget {
+        let target: Body
+        let token: String
+        let document: String
+        let viewport: IOSWorkflowTab.Viewport
+        let consume: @MainActor (Body) -> Void
+        let missing: @MainActor () -> Void
+    }
+
+    private func pacedEdit(_ plan: IOSPacedTypingPlan, context: PacedTarget) async throws {
+        try await IOSPacedTypingExecutor.run(
+            clearFirst: plan.clearFirst,
+            scalars: plan.scalars,
+            delayMs: plan.delayMs,
+            apply: { [self] action, text, requireFocused, final in
+                try await pacedMutation(action: action, text: text, requireFocused: requireFocused, final: final, context: context)
+            },
+            wait: { [self] delay in try await wait(milliseconds: delay) }
+        )
+    }
+
+    private func pacedMutation(
+        action: String, text: String, requireFocused: Bool, final: Bool, context: PacedTarget
+    ) async throws {
+        try await check()
+        guard tab.document == context.document, context.viewport == (try await tab.viewport()) else {
+            throw IOSWorkflowFailure("STALE_TARGET")
+        }
+        let result: Body
+        do {
+            result = try await tab.target(
+                context.target,
+                token: context.token,
+                edit: ["action": action, "text": text, "requireFocused": requireFocused],
+                acceptFinalAcknowledgement: final,
+                validateMutationAcknowledgement: true,
+                refuseSensitive: workflow.capture != nil,
+                consume: context.consume,
+                missingResult: context.missing
+            )
+        } catch let failure as IOSWorkflowFailure {
+            if failure.mayHaveCompleted && ["TIMEOUT", "WEBVIEW_ERROR", "DOCUMENT_CHANGED", "TARGET_FAILED"].contains(failure.code) {
+                throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
+            throw failure
+        }
+        try requireMutationAcknowledgement(result, token: context.token, missing: context.missing)
+        do {
+            let known = IOSPacedTypingExecutor.hasKnownSensitivity(result)
+            if !known || tab.document != context.document { context.missing() }
+            if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            try IOSPacedTypingExecutor.requireKnownSensitivity(known, hasContinuation: !final)
+            try await check()
+            #if DEBUG
+            if final { try await waitForTestFinalNavigation(context: context) }
+            if tab.document != context.document { context.missing() }
+            if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            #endif
+            try await inspectPacedPrivacy(context: context, final: final)
+            try await check()
+        } catch let failure as IOSWorkflowFailure {
+            if tab.document != context.document { context.missing() }
+            throw IOSWorkflowFailure(failure.code, mayHaveCompleted: true)
+        } catch {
+            if tab.document != context.document { context.missing() }
+            throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+        }
+    }
+
+    #if DEBUG
+    private func waitForTestFinalNavigation(context: PacedTarget) async throws {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "--test-paced-final-navigation"), args.indices.contains(index + 1),
+              let url = URL(string: args[index + 1]) else { return }
+        _ = try await URLSession.shared.data(from: url)
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        let priorCommit = context.document.split(separator: ":").last
+        while tab.document.split(separator: ":").last == priorCommit, ProcessInfo.processInfo.systemUptime < deadline {
+            try await check()
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        guard tab.document.split(separator: ":").last != priorCommit else {
+            throw IOSWorkflowFailure("TEST_NAVIGATION_TIMEOUT")
+        }
+    }
+    #endif
+
+    private func inspectPacedPrivacy(context: PacedTarget, final: Bool) async throws {
+        let classification: Body
+        do {
+            classification = try await tab.target(
+                context.target,
+                token: context.token,
+                postMutation: true,
+                refuseSensitive: workflow.capture != nil,
+                consume: context.consume,
+                missingResult: context.missing
+            )
+        } catch let failure as IOSWorkflowFailure {
+            guard ["DOCUMENT_CHANGED", "WEBVIEW_ERROR", "TIMEOUT"].contains(failure.code) else { throw failure }
+            context.missing()
+            if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            try IOSPacedTypingExecutor.requireKnownSensitivity(false, hasContinuation: !final)
+            return
+        }
+        try requireOK(classification)
+        if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+        try IOSPacedTypingExecutor.requireKnownSensitivity(
+            IOSPacedTypingExecutor.hasKnownSensitivity(classification), hasContinuation: !final
+        )
+    }
+
+    private func registerEditLiteral(_ text: String) {
+        if !text.isEmpty, !secrets.contains(text) { secrets.append(text) }
     }
 
     private func consumeSensitivity(_ result: Body, text: String?) {
@@ -184,6 +377,9 @@ final class IOSWorkflowActions {
             let known = ["document-focus", "target-focus", "identity", "viewport", "eligibility",
                          "budget", "geometry", "hit", "sensitivity", "unknown"]
             if known.contains(reason) { IOSFrameSampler.diagnostic("focus-" + reason) }
+            if reason == "document-focus" {
+                IOSFrameSampler.diagnostic(tab.rendererContainsFirstResponder ? "responder-descendant" : "responder-outside")
+            }
         }
         #endif
         guard result["sensitive"] as? Bool == true else { return }
@@ -191,7 +387,7 @@ final class IOSWorkflowActions {
     }
 
     private func protectEditPrivacy(text: String?) {
-        if let text, !secrets.contains(text) { secrets.append(text) }
+        if let text { registerEditLiteral(text) }
         if workflow.capture != nil { discardMedia = true }
     }
 

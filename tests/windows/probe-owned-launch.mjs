@@ -2,17 +2,25 @@ import assert from "node:assert/strict";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {createHash} from "node:crypto";
-import {access,mkdir,readFile,writeFile} from "node:fs/promises";
+import {access,mkdir,readFile,readdir,writeFile} from "node:fs/promises";
 import {join,dirname,isAbsolute} from "node:path";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
+import {safeCliFailure} from "./safe-cli-failure.mjs";
 
-const [exe,cli,privateRoot,reportPath,manifestPath]=process.argv.slice(2);
-assert.ok([exe,cli,privateRoot,reportPath,manifestPath].every(p=>p&&isAbsolute(p)));
+const [exe,cli,privateRoot,reportPath,manifestPath,expectedRevision,expectedBundle,observer,expectedObserver]=process.argv.slice(2);
+assert.ok([exe,cli,privateRoot,reportPath,manifestPath,observer].every(p=>p&&isAbsolute(p)));
+assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);assert.match(expectedBundle??"",/^[a-f0-9]{64}$/);assert.match(expectedObserver??"",/^[a-f0-9]{64}$/);
 const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 const hash=async p=>createHash("sha256").update(await readFile(p)).digest("hex");
 assert.equal(await hash(exe),manifest.exeSha256);assert.equal(await hash(join(dirname(exe),"kelpie.dll")),manifest.dllSha256);
-assert.equal(await hash(cli),manifest.cliSha256);await mkdir(privateRoot,{recursive:false});
+assert.equal(await hash(cli),manifest.cliSha256);assert.equal(await hash(observer),expectedObserver);
+const files=(await readdir(dirname(cli))).filter(name=>name.endsWith(".js")).sort(),bundle=createHash("sha256");
+assert.ok(files.length>0);for(const name of files)bundle.update(name+":"+await hash(join(dirname(cli),name))+"\n");
+assert.equal(bundle.digest("hex"),expectedBundle);
 const exec=promisify(execFile);
+assert.equal((await exec("git.exe",["rev-parse","HEAD"])).stdout.trim(),expectedRevision);
+assert.equal((await exec("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");
+await mkdir(privateRoot,{recursive:false});
 const sidCommand="[Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
 const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCommand,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
 assert.match(sid,/^S-1-[0-9-]+$/);
@@ -20,21 +28,8 @@ await exec(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inherit
 const home=join(privateRoot,"cli-home"),profile=join(privateRoot,"profile");await mkdir(home);
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:home,NODE_OPTIONS:"--max-old-space-size=2048"};
 const alias="capture-launch-diagnostic-"+manifest.source.slice(0,8);
-const report={source:manifest.source,stage:"register",checks:[],cleanup:"not-started"};
-function summarize(error){
- let data;try{data=JSON.parse(String(error.stdout??""));}catch{}
- const message=String(data?.error?.message??"");
- const category=message==="Kelpie did not publish a valid local readiness file"?"readiness-timeout":
-  /^Kelpie exited before publishing readiness \(exit -?\d+\)$/.test(message)?"exited-before-readiness":
-  /^Kelpie failed to start:/.test(message)?"spawn-failed":
-  message==="A live browser already owns this profile; attach to its alias or stop it first"?"profile-owned":
-  message==="Kelpie did not accept orderly shutdown"?"shutdown-refused":
-  message==="Kelpie did not complete orderly shutdown before the deadline"?"shutdown-deadline":
-  message==="Refusing to clear state after a different browser launch replaced readiness"?"readiness-replaced":
-  data?.error?"other-cli-error":"no-cli-error-json";
- return {code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false,
-  cliErrorCode:typeof data?.error?.code==="string"&&/^[A-Z_]+$/.test(data.error.code)?data.error.code:null,category};
-}
+const report={source:manifest.source,testRevision:expectedRevision,cliBundleSha256:expectedBundle,stage:"register",checks:[],cleanup:"not-started"};
+const summarize = error => safeCliFailure(error);
 async function run(args,timeout){
  const started=Date.now();
  try{const result=await exec(process.execPath,[cli,...args],{env,windowsHide:true,timeout,maxBuffer:2097152});
@@ -44,7 +39,23 @@ async function run(args,timeout){
 try{
  let result=await run(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile],30000);
  report.checks.push({stage:"register",...result,value:undefined});assert.ok(result.ok);
- report.stage="launch";result=await run(["browser","launch",alias,"--hidden","--port","28420"],45000);
+ report.stage="launch";
+ let done=false, observation;const completion=reportPath+".done",observationPath=reportPath+".observation.json";
+ const launch=run(["browser","launch",alias,"--port","28420"],45000).finally(()=>{done=true;});
+ for(let attempt=0;attempt<90&&!done;attempt++){
+  try{const current=JSON.parse(await readFile(join(home,"browsers.json"),"utf8")).running[alias];
+   if(Number.isSafeInteger(current?.pid)&&current.pid>0){
+    observation=exec(observer,[String(current.pid),exe,"28420",join(profile,"readiness.json"),completion,observationPath],
+      {env,windowsHide:true,timeout:55000,maxBuffer:65536});
+    void observation.catch(()=>{});break;
+   }
+  }catch{}
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ result=await launch;await writeFile(completion,"done",{flag:"wx"});
+ if(observation){try{await observation;report.observation=JSON.parse(await readFile(observationPath,"utf8"));}
+  catch{report.observation={status:"observer-failed"};}}
+ else report.observation={status:"pending-pid-not-observed"};
  report.checks.push({stage:"launch",...result,value:undefined});
  if(result.ok){
   const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8")),running=store.running[alias];
@@ -71,6 +82,10 @@ try{
   report.processExit=await waitForOwnedExit({pid:info.pid,executable:exe,startTime:info.startTime});
   assert.equal(report.processExit.exited,true);report.cleanup="public-cli-closed";
   }
- }else{report.cleanup="launch-failed";process.exitCode=1;}
+ }else{
+  const stored=JSON.parse(await readFile(join(home,"browsers.json"),"utf8")),pending=stored.running[alias];
+  report.pending={present:Boolean(pending?.pendingLaunch),pid:Number.isSafeInteger(pending?.pid)?pending.pid:null};
+  report.cleanup="launch-failed";process.exitCode=1;
+ }
 }catch(error){report.failure={stage:report.stage,...summarize(error)};process.exitCode=1;}
 finally{await writeFile(reportPath,JSON.stringify(report,null,2),{flag:"wx"});}
