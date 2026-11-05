@@ -317,6 +317,23 @@ jobs:
             bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
             2>&1 | tee "${package_root}/candidate-installed-replay.log"
 
+      - name: Upload installed-candidate diagnostics
+        uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: ${{ inputs.artifact_prefix || 'linux-native-check' }}-${{ matrix.distro.name }}-diagnostics
+          path: |
+            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/
+            dist/release/${{ matrix.distro.name }}/installed-smoke/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke/*.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke/*.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.txt
+            dist/release/${{ matrix.distro.name }}/candidate-installed-*.log
+            dist/release/${{ matrix.distro.name }}/candidate-namespace-diagnostic.log
+          if-no-files-found: warn
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
