@@ -563,3 +563,21 @@ AndroidTest Kotlin compilation, and targeted gate/scene JVM tests4/4 passed
 in2m25s with one CPU and2GiB heap. Previous offline lint dependency and
 AndroidTest import failures remain recorded in scene-geometry-check.log and
 scene-geometry-online.log. Device cases remain authored, not executed.
+
+Hosted42007603401 at65fe4866ac7c4f0c4f43b240cfecb41471c0239f: build/lint
+passed; phone30/33 and tablet29/33 failed overall. Both focus-time privacy
+cases published three captures and returned raw, URI and form synthetic literals
+unredacted; this is a release-blocking leak. Both combined-marker tests failed
+initial CAPTURE_VIEW_UNAVAILABLE; tablet low-FPS navigation failed with
+SCRIPT_DOCUMENT_CHANGED. Phone low-FPS navigation passed. Both profiles
+reconstructed large nonblank PNGs and completed CLI baseline downloads;
+native Stop returned SCRIPT_ABORTED with partial GIF/MP4 on both. Phone G08
+exceeded its old18s capture deadline with316 dropped frames; tablet's G08
+reached download but the runner lacked ffprobe. Artifact13406619597 SHA-256
+0fec30a6a11a7b1658926a94cd81a46cd702b42ef0ae7d126a81d05662bf2cb1 remains
+retained with the original failures.
+
+Focus fixture follow-up records only focus/active-element booleans, event
+count, bounded type/autocomplete categories and a fixed JNI expression hash
+before existing assertions. It does not record input values. These authored
+diagnostics have not run on a device.

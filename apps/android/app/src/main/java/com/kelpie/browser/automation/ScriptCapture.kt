@@ -13,6 +13,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
@@ -50,6 +52,7 @@ class ScriptCapture(
     }
 
     private val compositor = ScriptCompositorCapture(view, scene)
+    private val snapshotMutex = Mutex()
     private val dispatcher = Executors.newSingleThreadExecutor { Thread(it, "KelpieCapture") }.asCoroutineDispatcher()
     private val channel = Channel<Command>(1)
     private val formats = (options["formats"] as? List<*>)?.filterIsInstance<String>().orEmpty()
@@ -116,8 +119,14 @@ class ScriptCapture(
                                 dropped.incrementAndGet()
                             }
                         } catch (failure: ScriptFailure) {
-                            run.stop(failure.code)
-                            break
+                            if (failure.code == "SCRIPT_DOCUMENT_CHANGED" && !run.stopped.get()) {
+                                // The fenced frame belongs to a retired document.
+                                // Drop it; a later sample captures the new one.
+                                dropped.incrementAndGet()
+                            } else {
+                                run.stop(failure.code)
+                                break
+                            }
                         } catch (_: Exception) {
                             run.stop("CAPTURE_FAILED")
                             break
@@ -186,59 +195,60 @@ class ScriptCapture(
         }
     }
 
-    private suspend fun snapshot(): Frame {
-        guard()
-        return withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-            try {
-                withTimeout(5_000) {
-                    guard()
-                    @Suppress("DEPRECATION")
-                    val scale = view.scale
-                    if (view.width != initialWidth || view.height != initialHeight || scale != initialScale) {
-                        throw ScriptFailure("VIEWPORT_CHANGED")
-                    }
-                    val before = document()
-                    val sceneGeneration = scene()
-                    val rect = compositor.rectangle()
-                    compositor.awaitCommittedFrame()
-                    guard()
-                    if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
-                    if (scene() != sceneGeneration) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
-                    @Suppress("DEPRECATION")
-                    val committedScale = view.scale
-                    if (view.width != initialWidth ||
-                        view.height != initialHeight ||
-                        committedScale != initialScale ||
-                        compositor.rectangle() != rect
-                    ) {
-                        throw ScriptFailure("VIEWPORT_CHANGED")
-                    }
-                    val bitmap = compositor.copy(rect, outputWidth, outputHeight)
-                    try {
-                        val now = System.nanoTime()
+    private suspend fun snapshot(): Frame =
+        snapshotMutex.withLock {
+            guard()
+            withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                try {
+                    withTimeout(5_000) {
                         guard()
                         @Suppress("DEPRECATION")
-                        val copiedScale = view.scale
+                        val scale = view.scale
+                        if (view.width != initialWidth || view.height != initialHeight || scale != initialScale) {
+                            throw ScriptFailure("VIEWPORT_CHANGED")
+                        }
+                        val before = document()
+                        val sceneGeneration = scene()
+                        val rect = compositor.rectangle()
+                        compositor.awaitCommittedFrame()
+                        guard()
                         if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
                         if (scene() != sceneGeneration) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+                        @Suppress("DEPRECATION")
+                        val committedScale = view.scale
                         if (view.width != initialWidth ||
                             view.height != initialHeight ||
-                            copiedScale != initialScale ||
+                            committedScale != initialScale ||
                             compositor.rectangle() != rect
                         ) {
                             throw ScriptFailure("VIEWPORT_CHANGED")
                         }
-                        Frame(bitmap, (now - run.startedNanos) / 1_000_000.0, before)
-                    } catch (error: Throwable) {
-                        bitmap.recycle()
-                        throw error
+                        val bitmap = compositor.copy(rect, outputWidth, outputHeight)
+                        try {
+                            val now = System.nanoTime()
+                            guard()
+                            @Suppress("DEPRECATION")
+                            val copiedScale = view.scale
+                            if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
+                            if (scene() != sceneGeneration) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+                            if (view.width != initialWidth ||
+                                view.height != initialHeight ||
+                                copiedScale != initialScale ||
+                                compositor.rectangle() != rect
+                            ) {
+                                throw ScriptFailure("VIEWPORT_CHANGED")
+                            }
+                            Frame(bitmap, (now - run.startedNanos) / 1_000_000.0, before)
+                        } catch (error: Throwable) {
+                            bitmap.recycle()
+                            throw error
+                        }
                     }
+                } catch (_: TimeoutCancellationException) {
+                    throw ScriptFailure("CAPTURE_FAILED")
                 }
-            } catch (_: TimeoutCancellationException) {
-                throw ScriptFailure("CAPTURE_FAILED")
             }
         }
-    }
 
     private fun encode() {
         var gif: ScriptGifEncoder? = null
