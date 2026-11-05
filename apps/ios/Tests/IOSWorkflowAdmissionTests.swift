@@ -193,6 +193,11 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         XCTAssertEqual(requested["easing"] as? String, "ease-in-out")
     }
 
+    func testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented() {
+        let delayed: Body = ["action": "fill", "target": ["label": "Entry"], "text": "abc", "typingDelayMs": 10]
+        assertRejected(workflow([tap, delayed]), "UNSUPPORTED_SCRIPT_ACTION")
+    }
+
     func testFullPreflightRejectsForeignSessionsAndUnsupportedKeyAfterTap() throws {
         XCTAssertEqual(try IOSBoundWorkflow(workflow([tap])).steps.count, 1)
         for session in ["unknown-session", "other-owner-session"] {
