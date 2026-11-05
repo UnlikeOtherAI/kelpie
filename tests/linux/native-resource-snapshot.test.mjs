@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { nativeProcessStartTicks, parseProcStat, snapshotNativeResources } from "./native-resource-snapshot.mjs";
 
 test("stat parser handles parentheses in process name", () => {
@@ -27,4 +29,19 @@ test("real Linux process yields only bounded fixed data", { skip: process.platfo
     "complete", "fds", "identityValid", "maxFds", "maxThreads", "monotonicNs", "processCount",
     "pid", "rootNofileHard", "rootNofileSoft", "startTicks", "sequence", "shmAvailableBytes", "shmBytes", "sockets", "threads", "vanishedOrUnreadable",
   ].sort());
+});
+
+test("snapshot includes a live owned descendant", { skip: process.platform !== "linux" }, async () => {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  try {
+    await once(child, "spawn");
+    const startTicks = await nativeProcessStartTicks(process.pid);
+    const result = await snapshotNativeResources({ pid: process.pid, startTicks, sequence: 8 });
+    assert.equal(result.identityValid, true);
+    assert.ok(result.processCount >= 2);
+    assert.ok(result.threads >= 2);
+  } finally {
+    child.kill();
+    await once(child, "exit");
+  }
 });
