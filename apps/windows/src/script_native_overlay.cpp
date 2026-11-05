@@ -74,6 +74,7 @@ bool ScriptNativeOverlay::RetireIfRevision(std::uint64_t revision) {
   RetireDetached(); return true;
 }
 void ScriptNativeOverlay::RetireDetached() {
+  liveGeometry_.Lose();
   shown_={{"playing",false}}; stop_={}; valid_={}; detachedAnchored_=false;
   KillTimer(stop_window_,1);
   if(canvas_) ShowWindow(canvas_,SW_HIDE);
