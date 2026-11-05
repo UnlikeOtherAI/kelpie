@@ -74,8 +74,9 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertEqual(fixed_capture_events([
             "prefix [WorkflowCapture] reason=observation-INVALID_ARGUMENTS",
             "[WorkflowCapture] reason=snapshot-visible-size",
-            "[WorkflowCapture] reason=private_value",
-        ]), {"observation-INVALID_ARGUMENTS": 1, "snapshot-visible-size": 1})
+            "[WorkflowCapture] reason=focus-viewport",
+            "[WorkflowCapture] reason=focus-private_value",
+        ]), {"focus-viewport": 1, "observation-INVALID_ARGUMENTS": 1, "snapshot-visible-size": 1})
 
     def test_capture_diagnostics_only_keep_fixed_reasons(self):
         with tempfile.TemporaryDirectory() as directory:

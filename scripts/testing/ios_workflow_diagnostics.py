@@ -14,6 +14,10 @@ STATES = frozenset({
 CAPTURE_REASONS = frozenset({
     "native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
     *(f"snapshot-{value}" for value in ("native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale")),
+    *(f"focus-{value}" for value in (
+        "document-focus", "target-focus", "identity", "viewport", "eligibility",
+        "budget", "geometry", "hit", "sensitivity", "unknown",
+    )),
     *(f"observation-{value}" for value in (
         "BUSY", "TAB_CHANGED", "WEBVIEW_ERROR", "UNAUTHORIZED", "RECORDING_IN_PROGRESS",
         "TIMEOUT", "INVALID_PARAM", "INVALID_VALUE", "UNSUPPORTED", "INVALID_ARGUMENTS",
