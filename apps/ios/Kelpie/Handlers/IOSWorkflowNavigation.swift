@@ -3,6 +3,12 @@ import Foundation
 /// An existing load must retire before reserving the next mutation's navigation token.
 @MainActor
 enum IOSWorkflowNavigation {
+    /// Once a load is issued, an acknowledged Stop leaves its navigation outcome uncertain.
+    static func interruption(_ error: Error) -> IOSWorkflowFailure {
+        let code = (error as? IOSWorkflowFailure)?.code == "SCRIPT_ABORTED" ? "SCRIPT_ABORTED" : "NAVIGATION_INTERRUPTED"
+        return IOSWorkflowFailure(code, mayHaveCompleted: true)
+    }
+
     static func issue(
         on view: AnyObject,
         deadline: ContinuousClock.Instant = .now.advanced(by: .seconds(10)),

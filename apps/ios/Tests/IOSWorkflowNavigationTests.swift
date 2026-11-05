@@ -51,6 +51,18 @@ final class IOSWorkflowNavigationTests: XCTestCase {
     }
 
     @MainActor
+    func testIssuedNavigationInterruptionPreservesStopAndUncertainty() {
+        let stopped = IOSWorkflowNavigation.interruption(IOSWorkflowFailure("SCRIPT_ABORTED"))
+        XCTAssertEqual(stopped.code, "SCRIPT_ABORTED")
+        XCTAssertTrue(stopped.mayHaveCompleted)
+        for code in ["AUTHORIZATION_REVOKED", "TAB_NOT_VISIBLE", "TIMEOUT"] {
+            let other = IOSWorkflowNavigation.interruption(IOSWorkflowFailure(code))
+            XCTAssertEqual(other.code, "NAVIGATION_INTERRUPTED")
+            XCTAssertTrue(other.mayHaveCompleted)
+        }
+    }
+
+    @MainActor
     func testRealWebKitHTTPNavigationUsesIssuedToken() async throws {
         try await navigate(priorURL: nil)
     }

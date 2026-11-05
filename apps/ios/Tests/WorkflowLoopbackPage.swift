@@ -133,8 +133,17 @@ final class WorkflowLoopbackPage {
             const rect=edge.getBoundingClientRect();
             const visibleWidth=Math.max(0,Math.min(v.x+v.width,rect.right)-Math.max(v.x,rect.left));
             const visibleHeight=Math.max(0,Math.min(v.y+v.height,rect.bottom)-Math.max(v.y,rect.top));
+            const centerX=(Math.max(v.x,rect.left)+Math.min(v.x+v.width,rect.right))/2;
+            const centerY=(Math.max(v.y,rect.top)+Math.min(v.y+v.height,rect.bottom))/2;
+            const describe=element=>{
+              const r=element.getBoundingClientRect(),style=getComputedStyle(element);
+              return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,
+                overflowX:style.overflowX,overflowY:style.overflowY};
+            };
+            const hit=visibleWidth>0&&visibleHeight>0?document.elementFromPoint(centerX,centerY):null;
             metrics.textContent=JSON.stringify({...v,clicks,edgeLeft:rect.left,edgeTop:rect.top,
-              edgeWidth:rect.width,edgeHeight:rect.height,visibleWidth,visibleHeight});
+              edgeWidth:rect.width,edgeHeight:rect.height,visibleWidth,visibleHeight,centerX,centerY,
+              hitEdge:hit===edge||edge.contains(hit),body:describe(document.body),root:describe(document.documentElement)});
           };
           visualViewport.addEventListener('resize',position);visualViewport.addEventListener('scroll',position);
           edge.onclick=e=>{
