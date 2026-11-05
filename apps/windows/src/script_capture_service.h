@@ -31,6 +31,7 @@ class WindowsScriptService : public std::enable_shared_from_this<WindowsScriptSe
     Json manifest;
     BY_HANDLE_FILE_INFORMATION identity{};
     std::chrono::steady_clock::time_point created;
+    bool revoked=false;
   };
   void Expire();
   std::mutex mutex_;

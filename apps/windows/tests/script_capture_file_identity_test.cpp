@@ -66,6 +66,20 @@ int main(int argc,char** argv) {
     assert(Read(store,b.at("id"),"other-run").value("success",false));
     assert(Read(store,c.at("id"),"run","foreign").value("success",false));
   }
+  {
+    WindowsScriptService store(nullptr,nullptr,{},{});
+    Write(owned,"owned");const auto item=Publish(store,owned);
+    const HANDLE blocker=CreateFileW(owned.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);
+    assert(blocker!=INVALID_HANDLE_VALUE);
+    bool deferred=false;try{store.Discard("run","owner");}catch(...){deferred=true;}
+    assert(deferred&&Exists(owned));
+    assert(Read(store,item.at("id"))["error"]["code"]=="ARTIFACT_NOT_FOUND");
+    CloseHandle(blocker);
+    const auto next=root/"next.png";Write(next,"other");
+    const auto next_item=Publish(store,next,"next-run"); // Natural checkpoint retries, no state edits.
+    assert(!Exists(owned));
+    assert(Read(store,next_item.at("id"),"next-run").value("success",false));
+  }
   assert(std::filesystem::remove(root));
   std::cout<<"Verified reads, same-length replacement, expiry, destructor and exact owner/run discard passed\n";
 }

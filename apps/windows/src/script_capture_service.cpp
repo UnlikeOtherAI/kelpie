@@ -110,6 +110,7 @@ class Capture final : public DesktopScriptCapture {
 void WindowsScriptService::Configure(DesktopApp::Config& config) {
   auto self=shared_from_this();
   config.scripts.capture=[self](const Json& options,const std::string& run,const std::string& owner) {
+    {std::lock_guard lock(self->mutex_);self->Expire();}
     return std::make_unique<Capture>(self,options,run,owner);
   };
   config.scripts.discard=[self](const std::string& run,const std::string& owner) { self->Discard(run,owner); };
