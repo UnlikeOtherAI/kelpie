@@ -173,3 +173,13 @@ presentation from GTK event registration. Full app/link/tests remain pending.
 Official signed dev dependency installation pulled matching Mesa GBM/EGL/GL
 updates transitively. DNF reported an existing offline transaction invalidated
 by its online transaction. No update queue was manually edited or rescheduled.
+The GTK app and both focused test executables then linked at7c959a0b.
+Private artifact tests passed:0700/0600 modes, foreign owner/run refusal,
+seven-byte chunks reconstruct the PNG, inode replacement refuses access, and
+the1024-byte PNG budget retained928 bytes across8 files without an excess file.
+
+The first media run refused in preflight before any browser action. Native
+GStreamer diagnostics showed that auto-linking an unconstrained appsrc selected
+mp4mux's audio_0 pad, which rejected actual AVC video caps. The fixed pipeline now
+constrains H.264 caps before pad selection. This preserves the real codec proof
+rather than bypassing negotiation. All-frame media success remains pending.

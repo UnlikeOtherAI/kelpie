@@ -138,6 +138,7 @@ class Video final : public Writer {
     MuxState state(limit);
     auto pipeline = std::make_unique<GstPipeline>(
         "appsrc name=input format=time is-live=false block=false max-bytes=268435456 ! "
+        "video/x-h264,stream-format=avc,alignment=au ! "
         "mp4mux fragment-duration=1 streamable=false trak-timescale=1000000 ! "
         "appsink name=output sync=false async=false max-buffers=2");
     gst_app_src_set_caps(pipeline->source(), caps_);
