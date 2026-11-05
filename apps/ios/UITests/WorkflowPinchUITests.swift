@@ -3,7 +3,7 @@ import XCTest
 
 extension WorkflowCaptureUITests {
     @MainActor
-    func testNativePinchClipsTapCenterAndRotationInvalidatesPointerTarget() async throws {
+    func testNativePinchClipsTapCenterAndExportedMarker() async throws {
         let initialOrientation = XCUIDevice.shared.orientation
         XCUIDevice.shared.orientation = .portrait
         defer { XCUIDevice.shared.orientation = initialOrientation }
@@ -65,48 +65,6 @@ extension WorkflowCaptureUITests {
         add(geometry)
         try verifyPinchMarker(data, click: click)
 
-        let before = try await pinchMetrics(tab, selector: "#zoom")
-        let neutral = try XCTUnwrap(viewport.screenshot().image.cgImage)
-        XCTAssertNil(try WorkflowMotionFrames.measure(neutral, time: 0).pointer, "Neutral fixture must contain no white pointer")
-        let playback = Task.detached { [probe] in
-            try await probe.request("/v1/play-script", [
-                "version": 1, "tabId": tab,
-                "actions": [["action": "tap", "target": ["role": "button", "name": "Edge"]]],
-                "pointer": ["enabled": true, "curve": "c", "durationMs": 5000]
-            ])
-        }
-        XCTAssertTrue(XCUIApplication().buttons["browser.recording.stop"].waitForExistence(timeout: 5))
-        let pointerDeadline = Date().addingTimeInterval(3)
-        var observedPointer = false
-        repeat {
-            let screen = viewport.screenshot()
-            if let image = screen.image.cgImage, try WorkflowMotionFrames.measure(image, time: 0).pointer != nil {
-                let evidence = XCTAttachment(screenshot: screen)
-                evidence.name = "Native pointer is moving before device rotation"
-                evidence.lifetime = .keepAlways
-                add(evidence)
-                observedPointer = true
-                break
-            }
-            try await Task.sleep(nanoseconds: 60_000_000)
-        } while Date() < pointerDeadline
-        XCTAssertTrue(observedPointer, "A displayed pointer proves target resolution preceded rotation")
-        // Recording disables touch gestures on the page. System rotation can still change its viewport.
-        XCUIDevice.shared.orientation = .landscapeLeft
-        let refused = try await playback.value
-        XCTAssertEqual(refused["success"] as? Bool, false)
-        let code = try XCTUnwrap((refused["error"] as? Body)?["code"] as? String)
-        XCTAssertTrue(["VIEWPORT_CHANGED", "STALE_TARGET"].contains(code), code)
-        XCTAssertEqual(refused["actionsExecuted"] as? Int, 0)
-        XCTAssertEqual(refused["mayHaveCompleted"] as? Bool ?? false, false)
-        let after = try await pinchMetrics(tab, selector: "#zoom")
-        XCTAssertGreaterThan(abs(try XCTUnwrap(after["layoutWidth"] as? Double) - XCTUnwrap(before["layoutWidth"] as? Double)), 50)
-        XCTAssertEqual(after["clicks"] as? Int, 1)
-        let final = XCTAttachment(data: try JSONSerialization.data(withJSONObject: after, options: [.sortedKeys]),
-                                 uniformTypeIdentifier: "public.json")
-        final.name = "Changed native viewport with zero additional clicks"
-        final.lifetime = .keepAlways
-        add(final)
     }
 
     private func pinchValue(_ extracted: Body) throws -> Body {

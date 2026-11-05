@@ -24,7 +24,7 @@ enum WorkflowMotionFrames {
         }
     }
 
-    static func measure(_ image: CGImage, time: Double) throws -> Sample {
+    private static func measure(_ image: CGImage, time: Double) throws -> Sample {
         let width = image.width, height = image.height
         var rgba = [UInt8](repeating: 0, count: 4 * width * height)
         return try rgba.withUnsafeMutableBytes { bytes in
