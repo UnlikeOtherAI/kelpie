@@ -96,9 +96,10 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
                      if (frame.valid() && GTK_IS_WINDOW(top) && gtk_window_is_active(GTK_WINDOW(top))) {
                        auto shown = self->app_.ScriptPresentation();
                        if (shown.contains("marker")) {
-                         int x=0,y=0;
+                         int x=0; int y=0;
                          const bool origin=gtk_widget_translate_coordinates(widget,top,0,0,&x,&y);
-                         const int width=gtk_widget_get_allocated_width(widget), height=gtk_widget_get_allocated_height(widget);
+                         const int width=gtk_widget_get_allocated_width(widget);
+                         const int height=gtk_widget_get_allocated_height(widget);
                          const int scale=gtk_widget_get_scale_factor(widget);
                          const auto& marker=shown.at("marker");
                          const bool valid_frame=frame.tab_id==shown.value("tabId",std::string()) &&
