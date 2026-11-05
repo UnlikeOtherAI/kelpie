@@ -58,10 +58,19 @@ if len(metadata) != len(packets):
     raise SystemExit("Unexpected demux packet count")
 out.mkdir(mode=0o700)
 (out / "codec.bin").write_bytes(codec)
+pts = [round(float(info["pts_time"]) * 1_000_000_000) for info in metadata]
+if any(b <= a for a, b in zip(pts, pts[1:])):
+    raise SystemExit("Invalid source packet timestamps")
+# The exact retained final trun stores its duration at the fixed 1 MHz track timescale.
+if data[34723:34727] != b"trun" or struct.unpack_from(">I", data, 34727)[0] != 0x300:
+    raise SystemExit("Unexpected final track run")
+last_duration_ns = struct.unpack_from(">I", data, 34735)[0] * 1000
+if last_duration_ns != 125718000:
+    raise SystemExit("Unexpected final duration")
 manifest = {"sourceSHA256": expected, "packets": []}
-for index, (packet, info) in enumerate(zip(packets, metadata)):
+for index, packet in enumerate(packets):
     (out / f"packet-{index}.bin").write_bytes(packet)
-    manifest["packets"].append({"ptsNs": round(float(info["pts_time"]) * 1_000_000_000),
-                                "durationNs": round(float(info["duration_time"]) * 1_000_000_000),
+    manifest["packets"].append({"ptsNs": pts[index],
+                                "durationNs": pts[index + 1] - pts[index] if index + 1 < len(pts) else last_duration_ns,
                                 "sha256": hashlib.sha256(packet).hexdigest()})
 (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

@@ -30,8 +30,9 @@ jobs:
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
-              apt-get install -y --no-install-recommends g++ pkg-config python3 ffmpeg nlohmann-json3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-tools gstreamer1.0-plugins-good
-              bash tests/linux/run-mux-comparison.sh /workspace/mux-input/installed-smoke/capture/count-mismatch.mp4 /work/result
+              apt-get install -y --no-install-recommends g++ pkg-config python3 ffmpeg nlohmann-json3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-tools gstreamer1.0-plugins-good util-linux
+              runner_uid="$(stat -c %u /work)"; runner_gid="$(stat -c %g /work)"
+              setpriv --reuid "$runner_uid" --regid "$runner_gid" --clear-groups bash tests/linux/run-mux-comparison.sh /workspace/mux-input/installed-smoke/capture/count-mismatch.mp4 /work/result
             '
       - name: Upload bounded comparison evidence
         if: always()
