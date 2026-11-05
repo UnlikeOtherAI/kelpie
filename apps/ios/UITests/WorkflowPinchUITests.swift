@@ -75,7 +75,7 @@ extension WorkflowCaptureUITests {
         geometry.name = "Actual visual viewport and clicked center"
         geometry.lifetime = .keepAlways
         add(geometry)
-        try verifyPinchMarker(data, click: click)
+        try verifyPinchMarker(data, click: click, manifest: manifest)
 
     }
 
@@ -147,13 +147,35 @@ extension WorkflowCaptureUITests {
         return try pinchValue(XCTUnwrap(response["value"] as? Body))
     }
 
-    private func verifyPinchMarker(_ png: Data, click: Body) throws {
+    private func verifyPinchMarker(_ png: Data, click: Body, manifest: Body) throws {
         let source = try XCTUnwrap(CGImageSourceCreateWithData(png as CFData, nil))
         let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        let x = (try XCTUnwrap(click["expectedX"] as? Double) - XCTUnwrap(click["x"] as? Double)) /
-            (try XCTUnwrap(click["width"] as? Double)) * Double(image.width)
-        let y = (try XCTUnwrap(click["expectedY"] as? Double) - XCTUnwrap(click["y"] as? Double)) /
-            (try XCTUnwrap(click["height"] as? Double)) * Double(image.height)
+        let projection = try XCTUnwrap(manifest["projection"] as? Body)
+        func number(_ key: String) throws -> Double {
+            let value = try XCTUnwrap(projection[key] as? Double)
+            XCTAssertTrue(value.isFinite)
+            return value
+        }
+        let nativeWidth = try number("nativeWidth"), nativeHeight = try number("nativeHeight")
+        let contentX = try number("contentX"), contentY = try number("contentY")
+        let contentWidth = try number("contentWidth"), contentHeight = try number("contentHeight")
+        let visualX = try number("visualX"), visualY = try number("visualY")
+        let visualWidth = try number("visualWidth"), visualHeight = try number("visualHeight")
+        XCTAssertGreaterThan(nativeWidth, 0)
+        XCTAssertGreaterThan(nativeHeight, 0)
+        XCTAssertGreaterThan(contentWidth, 0)
+        XCTAssertGreaterThan(contentHeight, 0)
+        XCTAssertGreaterThan(visualWidth, 0)
+        XCTAssertGreaterThan(visualHeight, 0)
+        XCTAssertEqual(visualX, try XCTUnwrap(click["x"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(visualY, try XCTUnwrap(click["y"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(visualWidth, try XCTUnwrap(click["width"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(visualHeight, try XCTUnwrap(click["height"] as? Double), accuracy: 0.01)
+        XCTAssertEqual(try number("scale"), try XCTUnwrap(click["scale"] as? Double), accuracy: 0.01)
+        let x = (contentX + (try XCTUnwrap(click["expectedX"] as? Double) - visualX) * contentWidth / visualWidth) *
+            Double(image.width) / nativeWidth
+        let y = (contentY + (try XCTUnwrap(click["expectedY"] as? Double) - visualY) * contentHeight / visualHeight) *
+            Double(image.height) / nativeHeight
         let center = try XCTUnwrap(image.cropping(to: CGRect(x: x - 6, y: y - 6, width: 12, height: 12).integral))
         XCTAssertTrue(WorkflowCaptureProbe.containsMarker(center, minimumCoverage: 0.12))
     }

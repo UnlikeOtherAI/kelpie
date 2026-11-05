@@ -69,7 +69,17 @@ final class IOSWorkflowMedia {
         #if DEBUG
         geometryEvidence.record(document: document, viewport: viewport)
         #endif
-        let stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
+        var stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
+        #if DEBUG
+        stamp["projection"] = [
+            "nativeWidth": viewport.bounds.width, "nativeHeight": viewport.bounds.height,
+            "contentX": viewport.content.minX, "contentY": viewport.content.minY,
+            "contentWidth": viewport.content.width, "contentHeight": viewport.content.height,
+            "visualX": viewport.visible.minX, "visualY": viewport.visible.minY,
+            "visualWidth": viewport.visible.width, "visualHeight": viewport.visible.height,
+            "scale": viewport.scale
+        ]
+        #endif
         if first.isEmpty { first = stamp; firstTime = seconds }
         let time = max(0, seconds - (firstTime ?? seconds))
         do {
