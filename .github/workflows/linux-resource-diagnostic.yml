@@ -69,6 +69,8 @@ jobs:
           done
           printf '%s\n' "${diagnostic_revision}" > "${package_root}/resource-test-revision.txt"
           pnpm install --frozen-lockfile
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          test -s packages/shared/dist/index.js
           pnpm --filter @unlikeotherai/kelpie build
       - name: Run original installed package with numeric snapshots
         timeout-minutes: 15
