@@ -167,6 +167,8 @@ class DesktopEngine final : public DesktopBrowserControl {
   BrowserControlResult Screenshot(TabLease lease,
                                   BrowserScreenshot* image,
                                   Timeout timeout) override;
+  BrowserControlResult CaptureScreenshot(TabLease lease, BrowserScreenshot* image,
+                                         NavigationState* after, Timeout timeout);
   BrowserControlResult DispatchScriptTarget(TabLease lease, const Json& options, const Json& action,
                                            Json* output, Timeout timeout, const std::function<bool()>& cancelled = {});
   BrowserControlResult GetCookies(TabLease lease,

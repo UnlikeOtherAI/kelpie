@@ -2,6 +2,7 @@
 #include "desktop_script_coordinates.h"
 #include "desktop_script_capture_state.h"
 #include "desktop_capture_stage_timing.h"
+#include "desktop_capture_receipt.h"
 #include <stdexcept>
 #include <algorithm>
 #include <cstdio>
@@ -104,12 +105,11 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
       const auto timing_pre=stage_timing.Now();
       BrowserScreenshot image;
-      result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
+      result = engine.CaptureScreenshot(lease, &image, &after, std::chrono::seconds(3));
       const auto timing_screenshot=stage_timing.Now();
-      if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
-      result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
-      const auto timing_post_nav=stage_timing.Now();
-      if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
+      const auto timing_post_nav=timing_screenshot;
+      if (!result.ok) throw std::runtime_error(result.error_code=="CAPTURE_DOCUMENT_UNAVAILABLE" ?
+          "CAPTURE_DOCUMENT_UNAVAILABLE" : "CAPTURE_FRAME_FAILED");
       if (before.tab.document_version != after.tab.document_version) {
         bool cleared=false;
         { std::lock_guard lock(mutex); cleared=ClearRetiredDesktopPresentation(presentation,sample_owner); }
@@ -118,7 +118,25 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         continue;
       }
       Json after_viewport;
-      result = engine.EvaluateBrowserControl(lease, viewport_expression, &after_viewport, std::chrono::seconds(2));
+      auto after_lease=lease;
+      after_lease.document_version=after.tab.document_version;
+      result = engine.EvaluateBrowserControl(after_lease, viewport_expression, &after_viewport, std::chrono::seconds(2));
+      if (!result.ok) {
+        // A navigation after the receipt is a torn sample, just as it was
+        // before the receipt optimization. Preserve the old drop/retry path.
+        BrowserNavigationState latest;
+        const auto observed=engine.GetNavigationState(lease,&latest,std::chrono::seconds(2));
+        const auto failure=ClassifyCaptureViewportFailure(observed.ok,after.tab.document_version,latest.tab.document_version);
+        if(failure==CaptureViewportFailure::DocumentUnavailable)
+          throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
+        if(failure==CaptureViewportFailure::TornFrame) {
+          bool cleared=false;
+          { std::lock_guard lock(mutex); cleared=ClearRetiredDesktopPresentation(presentation,sample_owner); }
+          ++dropped;
+          if(cleared) Present();
+          continue;
+        }
+      }
       if (!result.ok || after_viewport != viewport) {
         ViewportDiagnostic(result.ok ? "before-after" : "after-read-failed",viewport,after_viewport);
         throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
