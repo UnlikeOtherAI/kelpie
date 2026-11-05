@@ -14,8 +14,8 @@ test("hosted comparison defaults to identity preparation and explicit hashes gat
  const input=caller.match(/worker_comparison_mode:\s*\n([\s\S]*?)\n      worker_comparison_archive_sha256:/);
  assert.ok(input);
  const options=[...input[1].matchAll(/^\s*- (?:'([^']+)'|([^\s]+))\s*$/gm)].map(match=>match[1]??match[2]);
- assert.deepEqual(options,["off","probe","sandbox","prepare","execute"]);
- assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- prepare\s*\n {10}- execute/);
+ assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","prepare","execute"]);
+ assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- prepare\s*\n {10}- execute/);
  const [setup,build]=workflow.split("      - name: Build comparison CLI and shared packages");
  assert.ok(build);assert.doesNotMatch(setup,/pnpm --filter @unlikeotherai\/kelpie(?:-shared)? build/);
  assert.match(build,/^\s*if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.prepare_only == false/m);
@@ -50,4 +50,11 @@ test("sandbox smoke has a separate pinned and corpus-free dispatch",async()=>{
  assert.match(workflow,/name: Smoke test pinned Chromium sandbox[\s\S]*?inputs\.sandbox_only == true/);
  assert.ok(smoke.indexOf("assert.ok(ready")<smoke.indexOf("browser=spawn("));
  assert.doesNotMatch(smoke,/kelpie_worker_session|kelpie_browser_control/);
+});
+
+test("alternate runner is allowlisted for sandbox smoke only",async()=>{
+ const workflow=await readFile(new URL("../../.github/workflows/worker-comparison.yml",import.meta.url),"utf8");
+ const caller=await readFile(new URL("../../.github/workflows/lint.yml",import.meta.url),"utf8");
+ assert.ok(workflow.includes('ubuntu-22.04) [[ "$SANDBOX_ONLY" == true && "$ISOLATION_ONLY" == false ]] || exit 1 ;;'));
+ assert.ok(caller.includes("worker_comparison_mode == 'sandbox-2204'"));
 });
