@@ -12,6 +12,9 @@
 class CEFHostedStreamFence {
 public:
     enum class Decision { reject, ackDrop, ackDecode, ackStop };
+    // Fixed diagnostics only: stop cause is separate from the first invalidation cause.
+    enum class Cause { none, cap, identity, receipt, protocol, size, decodeIdentity, decodeOutput,
+                       external, sealPending, sealIdentity };
     struct Sample {
         double receiptMs;
         double protocolMs;
@@ -27,11 +30,16 @@ public:
         std::lock_guard<std::mutex> guard(lock_);
         if (!active_ || browserID != browserID_ || epoch != epoch_ || sessionID <= 0) { return Decision::reject; }
         if (stopRequested_) { return Decision::ackDrop; }
-        if (!identityCurrent || !std::isfinite(receiptMs) || !std::isfinite(protocolMs) ||
-            receiptMs < startMs_ || receiptMs < lastReceiptMs_ || protocolMs < lastProtocolMs_ ||
-            encodedBytes == 0 || encodedBytes > maximumFrameBytes_) {
-            valid_ = false;
+        Cause failure = Cause::none;
+        if (!identityCurrent) { failure = Cause::identity; }
+        else if (!std::isfinite(receiptMs) || receiptMs < startMs_ || receiptMs < lastReceiptMs_) {
+            failure = Cause::receipt;
+        } else if (!std::isfinite(protocolMs) || protocolMs < lastProtocolMs_) { failure = Cause::protocol; }
+        else if (encodedBytes == 0 || encodedBytes > maximumFrameBytes_) { failure = Cause::size; }
+        if (failure != Cause::none) {
+            invalidateLocked(failure);
             stopRequested_ = true;
+            stopCause_ = failure;
             return Decision::ackStop;
         }
         lastReceiptMs_ = receiptMs;
@@ -39,6 +47,7 @@ public:
         if (receiptMs - startMs_ > maximumDurationMs_ || observed_ >= maximumFrames_ ||
             encodedBytes > maximumTotalBytes_ - totalBytes_) {
             stopRequested_ = true;
+            stopCause_ = Cause::cap;
             return Decision::ackStop;
         }
         ++observed_;
@@ -57,7 +66,7 @@ public:
         if (epoch != epoch_ || !decodePending_ || decodeToken != pendingDecodeToken_) { return; }
         decodePending_ = false;
         if (!active_ || !identityCurrent || !decoded || x < 0 || y < 0 || x > 1920 || y > 1920) {
-            valid_ = false;
+            invalidateLocked(!identityCurrent ? Cause::decodeIdentity : Cause::decodeOutput);
             return;
         }
         samples_.push_back({pendingReceiptMs_, pendingProtocolMs_, x, y});
@@ -65,7 +74,7 @@ public:
 
     void invalidate() {
         std::lock_guard<std::mutex> guard(lock_);
-        valid_ = false;
+        invalidateLocked(Cause::external);
         active_ = false;
     }
 
@@ -74,9 +83,14 @@ public:
         std::lock_guard<std::mutex> guard(lock_);
         if (!active_) { return std::nullopt; }
         active_ = false;
-        if (!valid_ || !identityCurrent || decodePending_) { samples_.clear(); return std::nullopt; }
+        if (!identityCurrent) { invalidateLocked(Cause::sealIdentity); }
+        if (decodePending_) { invalidateLocked(Cause::sealPending); }
+        if (!valid_) { samples_.clear(); return std::nullopt; }
         return samples_;
     }
+
+    Cause stopCause() const { std::lock_guard<std::mutex> guard(lock_); return stopCause_; }
+    Cause failureCause() const { std::lock_guard<std::mutex> guard(lock_); return failureCause_; }
 
     size_t dropped() const {
         std::lock_guard<std::mutex> guard(lock_);
@@ -84,6 +98,10 @@ public:
     }
 
 private:
+    void invalidateLocked(Cause cause) {
+        valid_ = false;
+        if (failureCause_ == Cause::none) { failureCause_ = cause; }
+    }
     static constexpr size_t maximumFrames_ = 64;
     static constexpr size_t maximumFrameBytes_ = 2 * 1024 * 1024;
     static constexpr size_t maximumTotalBytes_ = 32 * 1024 * 1024;
@@ -92,6 +110,8 @@ private:
     const int browserID_;
     const uint64_t epoch_;
     const double startMs_;
+    Cause stopCause_ = Cause::none;
+    Cause failureCause_ = Cause::none;
     bool active_ = true;
     bool valid_ = true;
     bool decodePending_ = false;

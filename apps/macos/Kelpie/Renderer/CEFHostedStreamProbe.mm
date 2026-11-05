@@ -337,6 +337,9 @@ static BOOL StreamJSONNumber(id value) {
     NSCAssert(NSThread.isMainThread, @"Hosted stream audit must run on main thread");
     if (!_stopped || !_stopSucceeded || !_fence) { return nil; }
     auto samples = _fence->seal(authorized && _identity());
+    fprintf(stdout, "[WorkflowHostedStream] event=fence stop=%u failure=%u\n",
+        static_cast<unsigned>(_fence->stopCause()), static_cast<unsigned>(_fence->failureCause()));
+    fflush(stdout);
     if (!samples) { return nil; }
     NSMutableArray<NSDictionary *> *result = [NSMutableArray arrayWithCapacity:samples->size()];
     const double firstReceipt = samples->empty() ? 0 : samples->front().receiptMs;

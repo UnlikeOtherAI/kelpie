@@ -22,16 +22,27 @@ int main() {
     assert(stale.admit(10, 22, 1, 101, 1, 100, true, &token) == Fence::Decision::ackDecode);
     stale.complete(22, token, false, true, 1, 1);
     assert(!stale.seal(true));
+    assert(stale.failureCause() == Fence::Cause::decodeIdentity);
 
     Fence pending(10, 23, 100);
     assert(pending.admit(10, 23, 1, 101, 1, 100, true, &token) == Fence::Decision::ackDecode);
     assert(!pending.seal(true));
+    assert(pending.failureCause() == Fence::Cause::sealPending);
     pending.complete(23, token, true, true, 1, 1);
     assert(!pending.seal(true));
 
     Fence invalid(10, 24, 100);
     assert(invalid.admit(10, 24, 1, 101, std::numeric_limits<double>::quiet_NaN(), 100, true) == Fence::Decision::ackStop);
     assert(!invalid.seal(true));
+    assert(invalid.stopCause() == Fence::Cause::protocol && invalid.failureCause() == Fence::Cause::protocol);
+
+    Fence regress(10, 27, 100);
+    assert(regress.admit(10, 27, 1, 101, 10, 100, true, &token) == Fence::Decision::ackDecode);
+    regress.complete(27, token, true, true, 1, 1);
+    assert(regress.admit(10, 27, 1, 102, 9, 100, true) == Fence::Decision::ackStop);
+    assert(regress.failureCause() == Fence::Cause::protocol);
+    regress.invalidate(); // first cause is preserved
+    assert(regress.failureCause() == Fence::Cause::protocol);
 
     Fence repeatedSession(10, 26, 100);
     uint64_t first = 0, second = 0;
@@ -51,6 +62,7 @@ int main() {
     }
     assert(bounded.admit(10, 25, 65, 200, 100, 100, true) == Fence::Decision::ackStop);
     assert(bounded.admit(10, 25, 66, 201, 101, 100, true) == Fence::Decision::ackDrop);
+    assert(bounded.stopCause() == Fence::Cause::cap && bounded.failureCause() == Fence::Cause::none);
     assert(bounded.seal(true)->size() == 64);
     assert(!bounded.seal(true));
 }
