@@ -8,7 +8,8 @@ import {runG08} from "./runtime-g08.mjs";
 import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
-import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
+import {delay,requireTrue,waitFor,probeListeners} from "./runtime-client.mjs";
+import {waitForRendererTransition} from "./runtime-renderer-transition.mjs";
 import {inspectMedia,centerPixel,inspectCurve,inspectEdgeMarker,inspectDefaultMotion} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
@@ -29,9 +30,12 @@ export async function runEngine(client,fixture,engine,report) {
   client.nativeControlStage="more-tap";await client.tap("browser.action.more",more);
   client.nativeControlStage="engine-find";const id="browser.renderer."+engine,window=await waitFor(()=>client.find(id));
   client.nativeControlStage="engine-tap";await client.tap(id,window);
-  client.nativeControlStage="engine-confirm";await waitFor(async()=>{const value=await client.api("get-renderer");
-   if(["webkit","chromium"].includes(value.engine))client.lastEngine=value.engine;
-   return value.engine===engine;});
+  client.nativeControlStage="engine-confirm";
+  await waitForRendererTransition({pid:client.pid,probe:()=>probeListeners(28420),
+   verifyReveal:()=>client.verifyOwnedReveal(),
+   readEngine:async()=>(await client.request("/v1/get-renderer",{}, {timeout:3000})).value,
+   noteFailure:probe=>client.noteListenerFailure(28420,probe),lastFailure:()=>client.listenerFailure,
+   recordEngine:actual=>{client.lastEngine=actual;},delay,now:Date.now},engine);
   client.nativeControlStage=null;
   const resized=await client.api("resize-viewport",{width:900,height:700});
   requireTrue(resized.success,"NATIVE_VIEWPORT_RESIZE");

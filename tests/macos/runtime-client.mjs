@@ -22,19 +22,26 @@ export async function waitFor(run,ms=10000){
 }
 export class Client {
  constructor(pid,out,executable){this.pid=pid;this.out=out;this.executable=executable;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
+ noteListenerFailure(port,probe){
+  this.listenerFailure={port:port===28420?"api":"app-reveal",state:listenerState(probe.owners,this.pid),ownerCount:probe.owners.length,
+   probeOutcome:probe.outcome,probeCause:probe.cause,probeStderrPresent:probe.stderrPresent,
+   stage:this.nativeControlStage??"other",lastEngine:this.lastEngine??"unknown"};
+  if(this.nativeControlStage){
+   const fallback=probeListeners(8420);
+   this.listenerFailure.defaultPort={state:listenerState(fallback.owners,this.pid),ownerCount:fallback.owners.length,
+    probeOutcome:fallback.outcome,probeCause:fallback.cause};
+  }
+ }
  pin(port){
   const probe=probeListeners(port),state=listenerState(probe.owners,this.pid);
-  if(state!=="owned"){
-   this.listenerFailure={port:port===28420?"api":"app-reveal",state,ownerCount:probe.owners.length,
-    probeOutcome:probe.outcome,probeCause:probe.cause,probeStderrPresent:probe.stderrPresent,
-    stage:this.nativeControlStage??"other",lastEngine:this.lastEngine??"unknown"};
-   if(this.nativeControlStage){
-    const fallback=probeListeners(8420);
-    this.listenerFailure.defaultPort={state:listenerState(fallback.owners,this.pid),ownerCount:fallback.owners.length,
-     probeOutcome:fallback.outcome,probeCause:fallback.cause};
-   }
-  }
+  if(state!=="owned")this.noteListenerFailure(port,probe);
   requireTrue(state==="owned","LISTENER_IDENTITY");
+ }
+ verifyOwnedReveal(){
+  this.pin(8421);
+  const command=execFileSync("/bin/ps",["-p",String(this.pid),"-o","command="],{encoding:"utf8"});
+  requireTrue(processCommandMatches(command,this.executable),"OWNED_EXECUTABLE_IDENTITY");
+  this.pin(8421);
  }
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
   if(this.readiness.at(-1)?.states.join(",")!==states.join(",")&&this.readiness.length<16)this.readiness.push({elapsedMs:Date.now()-this.began,states});

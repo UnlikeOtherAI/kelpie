@@ -6,6 +6,7 @@ import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFo
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
+import {waitForRendererTransition} from "./runtime-renderer-transition.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
  try{
@@ -163,4 +164,45 @@ test("listener transition diagnostics retain only fixed labels and bounded error
  assert.deepEqual(listenerTransitionSignal("[WorkflowRenderer] event=service-update engine=chromium"),{event:"service-update",engine:"chromium"});
  assert.equal(listenerTransitionSignal("[WorkflowListener] event=failed domain=private code=48"),null);
  assert.equal(listenerTransitionSignal("[WorkflowListener] event=failed domain=dns code=1234567890"),null);
+});
+
+test("renderer confirmation waits only for a clean missing API under owned reveal",async()=>{
+ const owned={owners:[7],outcome:"success",stderrPresent:false},missing={owners:[],outcome:"no-match",stderrPresent:false};
+ let time=0,verifications=0,reads=0,confirmed=null;const sequence=[missing,owned];
+ const deps={pid:7,probe:()=>sequence.shift()??owned,verifyReveal:async()=>{verifications++;},
+  readEngine:async()=>{reads++;return {engine:"chromium"};},noteFailure:()=>{},lastFailure:()=>null,
+  recordEngine:engine=>{confirmed=engine;},delay:async ms=>{time+=ms;},now:()=>time};
+ await waitForRendererTransition(deps,"chromium",1000);
+ assert.equal(verifications,1);assert.equal(reads,1);assert.equal(confirmed,"chromium");
+});
+test("renderer confirmation rejects foreign owners, failed probes, and unverified reveal",async()=>{
+ for(const bad of [{owners:[8],outcome:"success",stderrPresent:false},{owners:[],outcome:"probe-error",stderrPresent:true}]){
+  let recorded=0,reads=0;const deps={pid:7,probe:()=>bad,verifyReveal:async()=>{},readEngine:async()=>{reads++;},
+   noteFailure:()=>{recorded++;},lastFailure:()=>null,recordEngine:()=>{},delay:async()=>{},now:()=>0};
+  await assert.rejects(waitForRendererTransition(deps,"chromium",1000),error=>error.code==="LISTENER_IDENTITY");
+  assert.equal(recorded,1);assert.equal(reads,0);
+ }
+ const missing={owners:[],outcome:"no-match",stderrPresent:false};let reads=0;
+ const deps={pid:7,probe:()=>missing,verifyReveal:async()=>{throw new Error("UNVERIFIED_REVEAL");},
+  readEngine:async()=>{reads++;},noteFailure:()=>{},lastFailure:()=>null,recordEngine:()=>{},delay:async()=>{},now:()=>0};
+ await assert.rejects(waitForRendererTransition(deps,"chromium",1000),/UNVERIFIED_REVEAL/);assert.equal(reads,0);
+});
+test("renderer confirmation never retries an observed foreign or failed pin",async()=>{
+ const owned={owners:[7],outcome:"success",stderrPresent:false};let probes=0;
+ const deps={pid:7,probe:()=>{probes++;return owned;},verifyReveal:async()=>{},
+  readEngine:async()=>{throw Object.assign(new Error("foreign"),{code:"LISTENER_IDENTITY"});},
+  noteFailure:()=>{},lastFailure:()=>({port:"api",state:"foreign",probeOutcome:"success"}),
+  recordEngine:()=>{},delay:async()=>{},now:()=>0};
+ await assert.rejects(waitForRendererTransition(deps,"chromium",1000),error=>error.code==="LISTENER_IDENTITY");
+ assert.equal(probes,1);
+});
+
+test("only a clean listener loss during a read-only confirmation is retried",async()=>{
+ const owned={owners:[7],outcome:"success",stderrPresent:false},missing={owners:[],outcome:"no-match",stderrPresent:false};
+ const sequence=[owned,missing,owned];let time=0,reads=0,verified=0;
+ const deps={pid:7,probe:()=>sequence.shift()??owned,verifyReveal:async()=>{verified++;},
+  readEngine:async()=>{if(++reads===1)throw new Error("connection lost");return {engine:"chromium"};},
+  noteFailure:()=>{},lastFailure:()=>null,recordEngine:()=>{},delay:async ms=>{time+=ms;},now:()=>time};
+ await waitForRendererTransition(deps,"chromium",1000);
+ assert.equal(reads,2);assert.equal(verified,1);
 });
