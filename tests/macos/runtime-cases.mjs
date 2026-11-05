@@ -39,6 +39,12 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(direct.supportedVersions?.includes(1)&&generic.supportedVersions?.includes(1),"STRICT_CAPABILITY_MISSING");
   return {direct:true,generic:true};
  });
+ await check("public-navigation-from-start-page",async()=>{
+  const result=await client.api("navigate",{tabId,url:fixture.url+"/"});
+  requireTrue(result.success,"PUBLIC_NAVIGATION");
+  await waitFor(()=>fixture.events.find(e=>e.type==="document"&&e.path==="/"));
+  return {success:true};
+ });
  await load();
  await check("semantic-label-export",async()=>{
   const begin=fixture.events.length;
