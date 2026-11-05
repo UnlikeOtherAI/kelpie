@@ -65,7 +65,20 @@ final class ScriptWorkflowTab {
         guard !isAborted else { throw ScriptWorkflowFailure("SCRIPT_ABORTED") }
         guard ProcessInfo.processInfo.systemUptime - started < 300 else { throw ScriptWorkflowFailure("TIMEOUT") }
         try requireCurrent()
-        guard view.window?.isVisible == true, !view.isHiddenOrHasHiddenAncestor else { throw ScriptWorkflowFailure("TAB_NOT_VISIBLE") }
+        guard view.window?.isVisible == true, !view.isHiddenOrHasHiddenAncestor else {
+            debugVisibility("check")
+            throw ScriptWorkflowFailure("TAB_NOT_VISIBLE")
+        }
+    }
+
+    private func debugVisibility(_ phase: String) {
+        #if DEBUG
+        func flag(_ value: Bool?) -> String { value.map { $0 ? "1" : "0" } ?? "u" }
+        let window = view.window
+        print("[WorkflowVisibility] phase=\(phase) visible=\(flag(window?.isVisible)) " +
+              "hidden=\(flag(view.isHiddenOrHasHiddenAncestor)) key=\(flag(window?.isKeyWindow)) " +
+              "sheet=\(flag(window.map { $0.attachedSheet != nil }))")
+        #endif
     }
 
     /// Focus only the admitted renderer inside its already-key browser window.
@@ -76,6 +89,7 @@ final class ScriptWorkflowTab {
         defer { router.browserLease.end() }
         try requireCurrent()
         guard let window = view.window, window.isKeyWindow, window.attachedSheet == nil else {
+            debugVisibility("focus")
             throw ScriptWorkflowFailure("TAB_NOT_VISIBLE")
         }
         guard Self.requestOwnedEditFocus(isKey: window.isKeyWindow, focus: { window.makeFirstResponder(view) }) else {

@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -129,9 +129,23 @@ test("a renderer failure is retained while an independent phase still runs",asyn
 
 test("CLI exit diagnostics retain fixed codes and structural facts only",()=>{
  const known=cliExitFacts(1,JSON.stringify({error:{code:"UNAUTHORIZED",message:"private-value"}}),"private-stderr");
- assert.deepEqual(known,{exitCode:1,stdoutJson:true,stderrPresent:true,errorCode:"UNAUTHORIZED"});
+ assert.deepEqual(known,{exitCode:1,stdoutJson:true,stderrPresent:true,errorCode:"UNAUTHORIZED",actionsExecuted:null,mayHaveCompleted:false});
  const unknown=cliExitFacts(2,JSON.stringify({error:{code:"private-value"}}),"");
  assert.equal(unknown.errorCode,"OTHER");
  assert.ok(!JSON.stringify([known,unknown]).includes("private-value"));
  assert.equal(cliExitFacts(1,"not-json","").stdoutJson,false);
+});
+
+test("visibility diagnostics accept only fixed guard phases and Boolean flags",()=>{
+ assert.deepEqual(workflowVisibilitySignal("[WorkflowVisibility] phase=focus visible=1 hidden=0 key=0 sheet=1"),
+  {phase:"focus",visible:"1",hidden:"0",key:"0",sheet:"1"});
+ assert.equal(workflowVisibilitySignal("[WorkflowVisibility] phase=focus visible=1 hidden=0 key=0 sheet=secret"),null);
+ assert.equal(workflowVisibilitySignal("[WorkflowVisibility] phase=private visible=1 hidden=0 key=0 sheet=1"),null);
+});
+
+test("listener diagnostics distinguish no match from failed lsof without raw stderr",()=>{
+ assert.deepEqual(listenerProbeFailure({status:1,stderr:""}),{outcome:"no-match",cause:"OTHER",stderrPresent:false});
+ assert.deepEqual(listenerProbeFailure({status:1,stderr:"private"}),{outcome:"probe-error",cause:"OTHER",stderrPresent:true});
+ assert.deepEqual(listenerProbeFailure({code:"EAGAIN"}),{outcome:"probe-error",cause:"EAGAIN",stderrPresent:false});
+ assert.ok(!JSON.stringify(listenerProbeFailure({stderr:"private"})).includes("private"));
 });
