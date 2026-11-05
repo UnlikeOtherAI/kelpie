@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.test.assertDoesNotExist
@@ -19,8 +19,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,7 +41,14 @@ class ScriptInputBlockTest {
             Column {
                 Box(Modifier.size(100.dp).scriptInputBlock(active.value)) {
                     Box(
-                        Modifier.size(100.dp).focusRequester(requester).onKeyEvent { keyEvents++; true }.focusable().clickable { chromeClicks++ },
+                        Modifier
+                            .size(100.dp)
+                            .focusRequester(requester)
+                            .onKeyEvent {
+                                keyEvents++
+                                true
+                            }.focusable()
+                            .clickable { chromeClicks++ },
                     ) { Text("Browser control") }
                 }
                 Box(Modifier.size(100.dp).clickable { stopClicks++ }) { Text("Stop") }

@@ -39,7 +39,11 @@ class ScriptRetiredMarkerFlowTest : ScriptPublicFixture() {
                     instrumentation.runOnMainSync {
                         val point = IntArray(2)
                         view.getLocationOnScreen(point)
-                        result.put("x", point[0]).put("y", point[1]).put("width", view.width).put("height", view.height)
+                        result
+                            .put("x", point[0])
+                            .put("y", point[1])
+                            .put("width", view.width)
+                            .put("height", view.height)
                     }
                     return result
                 }
@@ -63,7 +67,12 @@ class ScriptRetiredMarkerFlowTest : ScriptPublicFixture() {
                     val after = frame()
                     assertEquals(before.toString(), after.toString())
                     File(evidence, "retired-marker-stop-frame.json").writeText(
-                        JSONObject().put("before", before).put("during", during).put("after", after).put("result", stopped).toString(2),
+                        JSONObject()
+                            .put("before", before)
+                            .put("during", during)
+                            .put("after", after)
+                            .put("result", stopped)
+                            .toString(2),
                     )
                     assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
                 } finally {
@@ -72,6 +81,7 @@ class ScriptRetiredMarkerFlowTest : ScriptPublicFixture() {
             }
         }
     }
+
     private fun runScenario(png: Boolean) {
         MockWebServer().use { server ->
             server.start()

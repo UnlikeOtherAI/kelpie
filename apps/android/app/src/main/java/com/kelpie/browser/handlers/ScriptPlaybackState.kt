@@ -62,6 +62,7 @@ class ScriptPlaybackState {
     fun start(
         totalActions: Int,
         continueOnError: Boolean,
+        movieImmersive: Boolean = true,
     ): Boolean =
         lock.withLock {
             if (session != null) return false
