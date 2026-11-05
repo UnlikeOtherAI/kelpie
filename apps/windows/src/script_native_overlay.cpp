@@ -52,6 +52,7 @@ LRESULT CALLBACK ScriptNativeOverlay::StopProc(HWND hwnd,UINT message,WPARAM wpa
     SetWindowLongPtrW(hwnd,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));
   }
   if(message==WM_TIMER && self) {
+    const auto revision=self->shown_.value("_presentationRevision",std::uint64_t{});
     try {
       auto shown=self->shown_;
       if(!shown.value("playing",false) && !shown.value("detachedMarker",false)) return 0;
@@ -59,7 +60,7 @@ LRESULT CALLBACK ScriptNativeOverlay::StopProc(HWND hwnd,UINT message,WPARAM wpa
       self->Show(shown,self->stop_,self->valid_);
     } catch(...) {
       const auto stop=self->stop_;
-      self->RetireDetached();
+      self->RetireIfRevision(revision);
       try { if(stop) stop(); } catch(...) {}
     }
     return 0;
@@ -67,6 +68,9 @@ LRESULT CALLBACK ScriptNativeOverlay::StopProc(HWND hwnd,UINT message,WPARAM wpa
   if (message==WM_COMMAND && LOWORD(wparam)==1 && HIWORD(wparam)==BN_CLICKED && self && self->stop_) { self->stop_(); return 0; }
   if (message==WM_MOUSEACTIVATE) return MA_NOACTIVATE;
   return DefWindowProcW(hwnd,message,wparam,lparam);
+}
+void ScriptNativeOverlay::RetireIfRevision(std::uint64_t revision) {
+  if(shown_.value("_presentationRevision",std::uint64_t{})==revision) RetireDetached();
 }
 void ScriptNativeOverlay::RetireDetached() {
   shown_={{"playing",false}}; stop_={}; valid_={}; detachedAnchored_=false;
@@ -157,7 +161,13 @@ void ScriptNativeOverlay::Show(const nlohmann::json& presentation,std::function<
   BITMAPINFO info{}; info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER); info.bmiHeader.biWidth=width;
   info.bmiHeader.biHeight=-height; info.bmiHeader.biPlanes=1; info.bmiHeader.biBitCount=32; info.bmiHeader.biCompression=BI_RGB;
   HDC screen=GetDC(nullptr), memory=CreateCompatibleDC(screen); void* bits=nullptr;
-  HBITMAP bitmap=CreateDIBSection(screen,&info,DIB_RGB_COLORS,&bits,nullptr,0);
+  HBITMAP bitmap=screen && memory ? CreateDIBSection(screen,&info,DIB_RGB_COLORS,&bits,nullptr,0) : nullptr;
+  if(detached && (!screen || !memory || !bitmap || !bits)) {
+    if(bitmap) DeleteObject(bitmap);
+    if(memory) DeleteDC(memory);
+    if(screen) ReleaseDC(nullptr,screen);
+    throw std::runtime_error("CAPTURE_NATIVE_PRESENTATION_FAILED");
+  }
   if (bitmap && bits) {
     std::memcpy(bits,frame.bgra.data(),frame.bgra.size());
     HGDIOBJ previous=SelectObject(memory,bitmap);
@@ -168,7 +178,12 @@ void ScriptNativeOverlay::Show(const nlohmann::json& presentation,std::function<
       throw std::runtime_error("CAPTURE_NATIVE_PRESENTATION_FAILED");
     }
     SelectObject(memory,previous);
-    SetWindowPos(canvas_,HWND_TOP,origin.x,origin.y,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW|SWP_NOZORDER|SWP_NOOWNERZORDER);
+    const bool positioned=SetWindowPos(canvas_,HWND_TOP,origin.x,origin.y,width,height,
+      SWP_NOACTIVATE|SWP_SHOWWINDOW|SWP_NOZORDER|SWP_NOOWNERZORDER)!=FALSE;
+    if(detached && !positioned) {
+      DeleteObject(bitmap); DeleteDC(memory); ReleaseDC(nullptr,screen);
+      throw std::runtime_error("CAPTURE_NATIVE_PRESENTATION_FAILED");
+    }
     // Keep only the small native Stop control interactive above presentation.
     if(!detached) SetWindowPos(stop_window_,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOZORDER|SWP_NOOWNERZORDER);
   }
