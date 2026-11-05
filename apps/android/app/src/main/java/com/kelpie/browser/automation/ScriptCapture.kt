@@ -272,7 +272,7 @@ class ScriptCapture(
                 gif = ScriptGifEncoder(gifStream, outputWidth, outputHeight, budget, color)
             }
             if ("video" in formats) {
-                video = ScriptVideoEncoder(outputWidth, outputHeight, fps, budget) { run.artifacts.newFile("mp4") }
+                video = ScriptVideoEncoder(outputWidth, outputHeight, fps, budget, diagnostics) { run.artifacts.newFile("mp4") }
             }
         } catch (_: Exception) {
             failed = "CAPTURE_ENCODING_UNAVAILABLE"
