@@ -275,7 +275,7 @@ final class IOSWorkflowPresentation: NSObject {
         return visible ? "unknown" : "foreground"
     }
 
-    private func retirementDiagnostic(_ reason: String, deadline: TimeInterval) {
+    func retirementDiagnostic(_ reason: String, deadline: TimeInterval) {
         #if DEBUG
         let remaining = Int(max(-10000, min(10000, (deadline - ProcessInfo.processInfo.systemUptime) * 1000)))
         print("[WorkflowMarkerRetirement] reason=" + reason + " remainingMs=" + String(remaining))

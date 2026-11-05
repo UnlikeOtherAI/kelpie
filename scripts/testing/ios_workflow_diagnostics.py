@@ -29,7 +29,7 @@ CAPTURE_REASONS = frozenset({
         "READINESS_FAILED", "EXTRACT_FAILED", "BROWSER_FAILED", "BROWSER_BUSY", "PAGE_CHANGED", "OTHER",
     )),
 })
-RETIREMENT_EVENT = re.compile(r"\[WorkflowMarkerRetirement\] reason=(began|expired|document|window|geometry|tab|parent|foreground|unknown) remainingMs=(-?[0-9]+)(?:\s|$)")
+RETIREMENT_EVENT = re.compile(r"\[WorkflowMarkerRetirement\] reason=(began|expired|document|window|geometry|tab|parent|foreground|owner|grant|unknown) remainingMs=(-?[0-9]+)(?:\s|$)")
 KEYBOARD_EVENT = re.compile(r"\[WorkflowKeyboardGeometry\] phase=(will|did) values=([-0-9.,]+)(?:\s|$)")
 ADMISSION_EVENT = re.compile(r"\[WorkflowCaptureAdmission\] first=([-0-9.,]+) last=([-0-9.,]+) count=([0-9]+)(?:\s|$)")
 INSETS_EVENT = re.compile(r"\[WorkflowCaptureInsets\] before=([-0-9.,]+) after=([-0-9.,]+)(?:\s|$)")
