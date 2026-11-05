@@ -11,7 +11,7 @@ function redPixels(image){
  return count;
 }
 
-export async function runRetiree({client,engine,base,capture,check,load}){
+export async function runRetiree({client,engine,base,capture,check,load,report}){
  for(const mode of ["no-capture","png-only"]){
   await check("native-marker-retiree-"+mode,async()=>{
    await load("/motion");
@@ -24,6 +24,7 @@ export async function runRetiree({client,engine,base,capture,check,load}){
    requireTrue(responseMs<3500,"RETIREE_BLOCKED_RESPONSE");
    if(mode==="png-only")requireTrue(result.artifacts?.some(item=>item.mimeType==="image/png"),"RETIREE_PNG_MISSING");
    const visible=redPixels(await client.screenshot(engine+"-retiree-"+mode+"-visible"));
+   (report.retireeFacts??=[]).push({engine,mode,responseMs,visibleAtMs:Date.now()-start,baselineRedPixels:baseline,visibleRedPixels:visible});
    requireTrue(visible>baseline+100,"RETIREE_MARKER_NOT_VISIBLE");
    if(mode==="no-capture"){
     const next=await client.api("play-script",{...base,actions:[{action:"wait",ms:0}]});

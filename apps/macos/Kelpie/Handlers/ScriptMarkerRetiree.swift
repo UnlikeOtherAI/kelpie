@@ -48,6 +48,9 @@ final class ScriptMarkerRetiree {
         self.document = document
         self.end = end
         self.geometry = geometry
+        #if DEBUG
+        print("[WorkflowRetiree] event=start reason=none")
+        #endif
         let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.checkLocal() }
         }
@@ -65,15 +68,23 @@ final class ScriptMarkerRetiree {
 
     private func checkLocal() {
         guard presentation != nil else { return }
-        guard ProcessInfo.processInfo.systemUptime < end, let window, let view, let tab,
-              NSApplication.shared.isActive, tab.view === view, tab.renderer.makeView() === view,
-              view.window === window, window.isVisible, window.isKeyWindow,
-              !tab.view.isHiddenOrHasHiddenAncestor,
-              tab.document == document, (try? tab.requireCurrent()) != nil,
-              ScriptMarkerGeometry(tab: tab, window: window) == geometry else {
-            stop()
-            return
-        }
+        guard let reason = localFailure() else { return }
+        #if DEBUG
+        print("[WorkflowRetiree] event=retire reason=\(reason)")
+        #endif
+        stop()
+    }
+
+    private func localFailure() -> String? {
+        guard ProcessInfo.processInfo.systemUptime < end else { return "expired" }
+        guard let window, let view, let tab else { return "missing" }
+        guard NSApplication.shared.isActive else { return "inactive" }
+        guard tab.view === view, tab.renderer.makeView() === view, view.window === window else { return "identity" }
+        guard window.isVisible, window.isKeyWindow, !view.isHiddenOrHasHiddenAncestor else { return "visibility" }
+        guard tab.document == document else { return "document" }
+        guard (try? tab.requireCurrent()) != nil else { return "target" }
+        guard ScriptMarkerGeometry(tab: tab, window: window) == geometry else { return "geometry" }
+        return nil
     }
 
     func stop() {
