@@ -168,7 +168,7 @@ final class IOSFrameSampler {
         return "scale"
     }
 
-    private static func geometryDiagnostic(before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport) {
+    static func geometryDiagnostic(before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport) {
         #if DEBUG
         func values(_ viewport: IOSWorkflowTab.Viewport) -> [CGFloat] {
             [viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,

@@ -201,6 +201,7 @@ final class IOSWorkflowPresentation: NSObject {
         retirementDocument = document
         retirementDeadline = deadline
         retirementInvalidated = invalidated
+        retirementDiagnostic("began", deadline: deadline)
         refresh()
     }
 
@@ -264,6 +265,23 @@ final class IOSWorkflowPresentation: NSObject {
         return value
     }
 
+    private func retirementReason(deadline: TimeInterval, retirementValid: Bool, visible: Bool) -> String {
+        if ProcessInfo.processInfo.systemUptime >= deadline { return "expired" }
+        if retirementDocument != tab.document { return "document" }
+        guard let window = retirementWindow, markerWindow === window, tab.view.window === window else { return "window" }
+        if !retirementValid { return "geometry" }
+        if (try? tab.requireCurrent()) == nil { return "tab" }
+        if canvas.superview !== tab.view.superview { return "parent" }
+        return visible ? "unknown" : "foreground"
+    }
+
+    private func retirementDiagnostic(_ reason: String, deadline: TimeInterval) {
+        #if DEBUG
+        let remaining = Int(max(-10000, min(10000, (deadline - ProcessInfo.processInfo.systemUptime) * 1000)))
+        print("[WorkflowMarkerRetirement] reason=" + reason + " remainingMs=" + String(remaining))
+        #endif
+    }
+
     @objc private func refresh() {
         synchronize()
         let retirementValid = retirementDocument.map { document in
@@ -274,6 +292,8 @@ final class IOSWorkflowPresentation: NSObject {
         let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
             tab.view.window?.windowScene?.activationState == .foregroundActive
         if let deadline = retirementDeadline, !visible || ProcessInfo.processInfo.systemUptime >= deadline {
+            let reason = retirementReason(deadline: deadline, retirementValid: retirementValid, visible: visible)
+            retirementDiagnostic(reason, deadline: deadline)
             let invalidated = retirementInvalidated
             finish()
             invalidated?()

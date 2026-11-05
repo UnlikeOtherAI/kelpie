@@ -63,10 +63,15 @@ extension WorkflowCaptureUITests {
             }
             if label == "no capture" {
                 let application = XCUIApplication()
+                let image = application.screenshot()
+                let screenshotAt = ProcessInfo.processInfo.systemUptime
+                let observed = XCTAttachment(string: "responseElapsed=\(elapsed), screenshotElapsed=\(screenshotAt - start)")
+                observed.name = "Non-movie response and screenshot timing"
+                observed.lifetime = .keepAlways
+                add(observed)
                 XCTAssertFalse(application.buttons["browser.recording.stop"].exists)
                 let viewport = application.webViews.firstMatch
                 let target = viewport.buttons["Submit"].firstMatch.frame.intersection(viewport.frame)
-                let image = application.screenshot()
                 let attachment = XCTAttachment(screenshot: image)
                 attachment.name = "Non-movie marker after response"
                 attachment.lifetime = .keepAlways
@@ -99,10 +104,17 @@ extension WorkflowCaptureUITests {
             "tapIndicator": ["color": "#00FF00", "radius": 25, "durationMs": 5000, "fade": false]
         ])
         XCTAssertEqual(result["success"] as? Bool, true)
+        let responseAt = ProcessInfo.processInfo.systemUptime
         let application = XCUIApplication()
+        let image = application.screenshot()
+        let screenshotAt = ProcessInfo.processInfo.systemUptime
+        let timing = XCTAttachment(string: "postResponseScreenshotSeconds=\(screenshotAt - responseAt)")
+        timing.name = "Tab-retirement response and screenshot timing"
+        timing.lifetime = .keepAlways
+        add(timing)
         let viewport = application.webViews.firstMatch
         let target = viewport.buttons["Submit"].firstMatch.frame.intersection(viewport.frame)
-        XCTAssertTrue(WorkflowCaptureProbe.containsCenteredMarker(application.screenshot(), target: target, app: application.frame))
+        XCTAssertTrue(WorkflowCaptureProbe.containsCenteredMarker(image, target: target, app: application.frame))
         let start = ProcessInfo.processInfo.systemUptime
         let created = try await probe.request("/v1/new-tab", ["url": "about:blank", "name": "retirement control"])
         let other = try XCTUnwrap(created["tabId"] as? String)
