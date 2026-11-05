@@ -29,13 +29,46 @@ fails before handler registration; missing host routes remain unavailable even
 when a platform has a compiled catalogue profile. A hidden normal Windows app
 still uses windowed mode; it does not gain pure headless-backend playback.
 
-Focused tests are drafted for exact Mac WK/CEF and Linux GTK/OSR projections,
+Focused tests passed for exact Mac WK/CEF and Linux GTK/OSR projections,
 unknown mode, unchanged Windows/mobile flags, direct/generic MCP, body forgery
 and absent-route/noCEF refusal. Source-only Maxis attempt was stopped after its
 preflight gate failed (outstanding-gates.md); no pass from that attempt is claimed.
-The Minis mirror may run only noCEF/noLLM core/CAPI/stub targets,one compiler,
-using existing toolchain and ignored outputs. All shipping relinks and actual
-public protocol/capture/UI checks remain platform-owner gates.
+Root authorized local Minis fallback for the overloaded Maxis host. The exact
+086d607007efee9cdfb807147407f48c64546a8b mirror used existing VS18 Community,
+CMake4.4.3 and ignored .cache/native-contracts outputs,one compiler. No CEF,
+shipping app,inference,browser or desktop input ran. All shipping relinks and
+actual public protocol/capture/UI checks remain platform-owner gates.
+
+## Bounded portable verification, 5 November 2026
+
+Configure flags (PowerShell quotes preserve the policy version):
+
+```text
+cmake -S native -B .cache/native-contracts -G "Visual Studio 18 2026" -A x64
+  -DKELPIE_BUILD_DESKTOP_ENGINES=ON -DKELPIE_ENABLE_CHROMIUM_DESKTOP=OFF
+  -DKELPIE_LOCAL_LLM=OFF -DKELPIE_AI_USE_HTTPLIB=OFF -DBUILD_TESTING=ON
+  '-DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5'
+cmake --build .cache/native-contracts --config Debug --target test_mcp_registry
+  test_native_extensions test_browser_gateway test_desktop_mcp_server -j1
+  -- /p:CL_MPCount=1
+ctest --test-dir .cache/native-contracts -C Debug
+  -R '^(test_mcp_registry|test_native_extensions|test_browser_gateway|test_desktop_mcp_server)
+
+Owner evidence prerequisites: Mac217f29b69bd5d709d7587f97ea0441307303f1e4
+app/test compile; Linux90eb6830eab0e92ca224123f55748e97ed44dce1 actual sandboxed
+OSR six-action HTTP capture and8 downloaded/decoded artifacts. Those facts do not
+prove Mac runtime,GTK UI,direct/generic MCP/CLI or final release.
+
+  --output-on-failure -j1
+```
+
+Configure and build succeeded. CTest4/4 passed in2.13s: registry0.15s,gateway0.30s,
+extensions1.39s,desktop MCP0.26s. Build log is preserved under the mirror's
+.cache/native-contracts/build.log. Fresh terminating guards permitted configure
+at CPU29/49% free23,371,900KiB,build41/50% free23,267,912KiB,and tests53/33%
+free22,993,996KiB. Intermediate denied samples launched no child. TEMP/TMP were
+task-local for compilation. The mirror contains test outputs only; authoring
+remained in the assigned Maxis worktree.
 
 Owner evidence prerequisites: Mac217f29b69bd5d709d7587f97ea0441307303f1e4
 app/test compile; Linux90eb6830eab0e92ca224123f55748e97ed44dce1 actual sandboxed
