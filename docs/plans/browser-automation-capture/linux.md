@@ -236,3 +236,23 @@ renderers: NoNewPrivs1, Seccomp2, nested NSpid counts3. The smoke now recognizes
 that real process shape and waits for loaded fixture text plus actual PNG bytes,
 rather than treating a configured tab URL as navigation proof. Full namespace
 comparison, MCP/shutdown and script capture remain pending the revised corpus.
+
+## Movie frame admission candidate
+
+Root's78e049d6 integration includes the shared c852787f frame-ACK interface.
+The Linux adapter now tags sampled visible markers by their creator action and
+document, keeps at most18 pending tags, and acknowledges only the minimum
+actual retained source prefix of all requested movie writers. GIF counts a
+complete compressed image, not pending BGRA. H.264 counts a retained complete
+AVC access unit containing a VCL NAL, not raw input or SPS/PPS-only buffers.
+Final mux failure still fails the run and marks retained artifacts partial.
+The compositor uses the shared clamped progress helper so a marker deliberately
+held before its fade clock is visible at progress0. New pixel/prefix/MP4-budget
+tests are source-complete and await the bounded native run.
+
+Installed Fedora package provenance was captured separately from selected plugin
+license metadata. Runtime GStreamer plugins report LGPL/BSD; the Fedora
+gstreamer1-plugins-good RPM carries a mixed license expression including GPL
+components. No blanket LGPL claim is made for the package or machine. Selected
+factory binaries and installed RPM signatures/hashes are recorded in the
+private codec-provenance artifact; no codec binary is bundled or copied into source.

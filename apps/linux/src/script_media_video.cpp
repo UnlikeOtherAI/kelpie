@@ -36,6 +36,31 @@ GstFlowReturn Collect(GstAppSink* sink, gpointer raw) {
   }
   gst_buffer_unmap(buffer, &mapped); return result;
 }
+
+bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps) {
+  // AVC buffers can contain codec headers without a picture. Only a complete
+  // length-prefixed access unit with an actual VCL NAL is source-frame evidence.
+  const auto* value = gst_structure_get_value(gst_caps_get_structure(caps, 0), "codec_data");
+  if (!value || !GST_VALUE_HOLDS_BUFFER(value)) return false;
+  auto* description = gst_value_get_buffer(value);
+  GstMapInfo config{}, encoded{};
+  if (!description || !gst_buffer_map(description, &config, GST_MAP_READ)) return false;
+  if (!gst_buffer_map(packet, &encoded, GST_MAP_READ)) { gst_buffer_unmap(description, &config); return false; }
+  bool valid = config.size >= 7 && config.data[0] == 1, picture = false;
+  const std::size_t length_bytes = valid ? (config.data[4] & 3) + 1 : 0;
+  std::size_t offset = 0;
+  while (valid && offset < encoded.size) {
+    if (length_bytes > encoded.size - offset) { valid = false; break; }
+    std::size_t length = 0;
+    for (std::size_t index = 0; index < length_bytes; ++index) length = (length << 8) | encoded.data[offset++];
+    if (!length || length > encoded.size - offset || (encoded.data[offset] & 0x80)) { valid = false; break; }
+    const auto type = encoded.data[offset] & 31;
+    picture = picture || (type >= 1 && type <= 5);
+    offset += length;
+  }
+  gst_buffer_unmap(packet, &encoded); gst_buffer_unmap(description, &config);
+  return valid && picture && offset == encoded.size;
+}
 class Video final : public Writer {
  public:
   Video(std::filesystem::path path, Budget& budget, int fps) : budget_(budget), fps_(fps) {
@@ -88,6 +113,7 @@ class Video final : public Writer {
     if (packets_.size() >= 36000) { budget_.exceeded = true; stopped_ = true; ++output_.dropped_frames; return false; }
     packets_.push_back(std::move(packet)); return true;
   }
+  std::size_t CommittedSourceFrames() const override { return finished_ ? output_.frame_count : packets_.size(); }
   ScriptMediaOutput Finish() override {
     if (finished_) return output_;
     if (encoder_) {
@@ -127,7 +153,8 @@ class Video final : public Writer {
     Sample sample(encoder_->Pull());
     auto* sample_caps = gst_sample_get_caps(sample.get());
     auto* packet = gst_sample_get_buffer(sample.get());
-    if (!sample_caps || !packet) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps))
+      throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     if (!caps_) caps_ = gst_caps_ref(sample_caps);
     Buffer copied(gst_buffer_copy_deep(packet));
     if (!copied) throw std::runtime_error("CAPTURE_ENCODING_FAILED");

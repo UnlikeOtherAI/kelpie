@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <limits>
 #include <set>
 #include <stdexcept>
 
@@ -80,6 +81,12 @@ std::vector<ScriptMediaOutput> ScriptMediaEncoder::Finish(double terminal_elapse
     } catch (...) { state.failed = true; }
   }
   state.finished = true; return state.outputs;
+}
+std::size_t ScriptMediaEncoder::committed_movie_frames() const {
+  if (impl_->writers.empty()) return 0;
+  auto prefix = std::numeric_limits<std::size_t>::max();
+  for (const auto& writer : impl_->writers) prefix = std::min(prefix, writer->CommittedSourceFrames());
+  return prefix;
 }
 bool ScriptMediaEncoder::budget_exceeded() const { return impl_->budget.exceeded; }
 bool ScriptMediaEncoder::finalization_failed() const { return impl_->failed; }

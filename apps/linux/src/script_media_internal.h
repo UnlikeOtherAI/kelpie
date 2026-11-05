@@ -19,6 +19,7 @@ class Writer {
   virtual void Prepare(const ScriptFrame&) {}
   virtual bool Write(const ScriptFrame& frame, double start_ms, double end_ms) = 0;
   virtual ScriptMediaOutput Finish() = 0;
+  virtual std::size_t CommittedSourceFrames() const = 0;
 };
 std::unique_ptr<Writer> MakeGif(const std::filesystem::path& path, Budget& budget);
 std::unique_ptr<Writer> MakeVideo(const std::filesystem::path& path, Budget& budget, int fps);

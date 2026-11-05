@@ -78,6 +78,19 @@ std::size_t DecodeVideo(const ScriptMediaOutput& output) {
   assert(gst_app_sink_is_eos(pipeline.sink()));
   assert(count == output.frame_count && count > 0); return count;
 }
+
+void HeldMarker() {
+  ScriptFrame frame{64, 48, 256, 100, std::vector<std::uint8_t>(64 * 48 * 4, 255)};
+  nlohmann::json shown{{"elapsedMs", 100}, {"marker", {{"x", 32}, {"y", 24},
+      {"radius", 8}, {"color", "#FF0000"}, {"startedMs", 1000},
+      {"durationMs", 700}, {"wobble", false}, {"fade", false}}}};
+  DrawScriptOverlay(frame, shown);
+  const auto center = (24 * 64 + 32) * 4;
+  assert(frame.bgra[center + 2] > 200 && frame.bgra[center] < 120);
+  frame.bgra.assign(frame.bgra.size(), 255); shown["elapsedMs"] = 2000;
+  DrawScriptOverlay(frame, shown);
+  assert(frame.bgra[center] == 255 && frame.bgra[center + 2] == 255);
+}
 void PNG() {
   auto frame = Frame(0);
   const auto png = EncodeScriptPNG(frame);
@@ -93,11 +106,15 @@ void PNG() {
 }
 }
 int main() {
-  PNG();
+  PNG(); HeldMarker();
   const auto directory = CreatePrivateCaptureDirectory();
   const auto info = media::ScriptGstRuntimeInfo();
   auto encoder = ScriptMediaEncoder::Create(directory, {"gif", "mp4"}, 10, 1048576);
-  for (int index = 0; index < 5; ++index) assert(encoder->AddFrame(Frame(index)));
+  assert(encoder->committed_movie_frames() == 0);
+  for (int index = 0; index < 5; ++index) {
+    assert(encoder->AddFrame(Frame(index)));
+    assert(encoder->committed_movie_frames() == std::size_t(index));
+  }
   const auto outputs = encoder->Finish(500);
   assert(!encoder->budget_exceeded() && !encoder->finalization_failed() && outputs.size() == 2);
   std::uintmax_t total = 0;
@@ -109,7 +126,7 @@ int main() {
     report["outputs"].push_back({{"mime", output.mime_type}, {"decodedFrames", count},
         {"durationMs", output.duration_ms}, {"bytes", std::filesystem::file_size(output.path)}});
   }
-  assert(total <= 1048576);
+  assert(total <= 1048576 && encoder->committed_movie_frames() == 5);
   assert(encoder->Finish(500).size() == outputs.size());
   const auto limited_dir = CreatePrivateCaptureDirectory();
   auto limited = ScriptMediaEncoder::Create(limited_dir, {"gif"}, 10, 2200);
@@ -121,6 +138,20 @@ int main() {
   assert(std::filesystem::file_size(partial[0].path) <= 2200);
   report["budgetPrefix"] = {{"decodedFrames", DecodeGif(partial[0])}, {"limitBytes", 2200},
       {"actualBytes", std::filesystem::file_size(partial[0].path)}};
+
+  const auto video_dir = CreatePrivateCaptureDirectory();
+  auto video = ScriptMediaEncoder::Create(video_dir, {"mp4"}, 10, 90000);
+  stopped = false;
+  for (index = 0; index < 200; ++index) if (!video->AddFrame(Frame(index))) { stopped = true; break; }
+  assert(stopped && video->budget_exceeded());
+  const auto retained = video->committed_movie_frames();
+  const auto video_prefix = video->Finish((index + 1) * 100.0);
+  assert(video_prefix.size() == 1 && retained > 0 && video_prefix[0].frame_count == retained);
+  assert(!video->finalization_failed() && std::filesystem::file_size(video_prefix[0].path) <= 90000);
+  report["videoBudgetPrefix"] = {{"decodedFrames", DecodeVideo(video_prefix[0])}, {"limitBytes", 90000},
+      {"actualBytes", std::filesystem::file_size(video_prefix[0].path)}, {"committedPrefix", retained}};
+  for (const auto& output : video_prefix) std::filesystem::remove(output.path);
+  std::filesystem::remove(video_dir);
   for (const auto& output : outputs) std::filesystem::remove(output.path);
   for (const auto& output : partial) std::filesystem::remove(output.path);
   std::filesystem::remove(directory); std::filesystem::remove(limited_dir);

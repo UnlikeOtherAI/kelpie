@@ -21,6 +21,8 @@ class ScriptMediaEncoder {
   bool AddFrame(const ScriptFrame& frame);
   bool WriteStepPNG(const ScriptFrame& frame, const std::filesystem::path& path);
   std::vector<ScriptMediaOutput> Finish(double terminal_elapsed_ms);
+  // Minimum actual retained source prefix across every requested movie writer.
+  std::size_t committed_movie_frames() const;
   bool budget_exceeded() const;
   bool finalization_failed() const;
  private:

@@ -93,7 +93,8 @@ void DrawScriptOverlay(ScriptFrame& frame, const nlohmann::json& shown) {
   }
   if (shown.contains("marker")) {
     const auto& marker = shown["marker"];
-    const double progress = (elapsed - marker.value("startedMs", elapsed)) / std::max(1.0, marker.value("durationMs", 700.0));
+    const double progress = kelpie_script_progress(elapsed - marker.value("startedMs", elapsed),
+        marker.value("durationMs", 700.0));
     if (progress >= 0 && progress < 1) {
       const auto state = kelpie_script_tap_presentation(progress, marker.value("wobble", true), marker.value("fade", true));
       unsigned long color = 0x3B82F6;

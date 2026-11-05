@@ -71,8 +71,10 @@ class Gif final : public Writer {
       bytes_.insert(bytes_.end(), encoded.begin() + 781, encoded.end() - 1);
       ++output_.frame_count; remaining -= delay;
     }
+    ++committed_sources_;
     centiseconds_ = boundary; output_.duration_ms = boundary * 10.0; return true;
   }
+  std::size_t CommittedSourceFrames() const override { return committed_sources_; }
   ScriptMediaOutput Finish() override {
     if (!finished_ && output_.frame_count) {
       bytes_.push_back(0x3b); WriteCaptureFile(output_.path, bytes_);
@@ -85,6 +87,7 @@ class Gif final : public Writer {
   ScriptMediaOutput output_;
   std::vector<std::uint8_t> bytes_;
   std::uint64_t centiseconds_ = 0;
+  std::size_t committed_sources_ = 0;
   bool finished_ = false;
 };
 }

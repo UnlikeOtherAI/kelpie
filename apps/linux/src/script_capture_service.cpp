@@ -1,6 +1,8 @@
 #include "script_capture_service.h"
 #include "script_frame_compositor.h"
 #include "script_media_encoder.h"
+#include "kelpie/script_presentation.h"
+#include <deque>
 #include <algorithm>
 #include <set>
 #include <stdexcept>
@@ -18,6 +20,7 @@ class Capture final : public DesktopScriptCapture {
         const auto format = value.get<std::string>();
         if (format == "screenshots") screenshots_ = true; else formats.push_back(format == "video" ? "mp4" : format);
       }
+      movies_ = !formats.empty();
       encoder_ = ScriptMediaEncoder::Create(directory_, formats, options_.value("fps", 15), options_.value("maxBytes", std::size_t(67108864)));
     }
     catch (...) { std::error_code ignored; std::filesystem::remove(directory_, ignored); throw; }
@@ -28,14 +31,34 @@ class Capture final : public DesktopScriptCapture {
       if (!retained_.contains(entry.path())) std::filesystem::remove(entry.path(), ignored);
     std::filesystem::remove(directory_, ignored);
   }
-  void AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step) override {
+  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step) override {
     auto frame = DecodeScriptFrame(image.base64_data, options_.value("maxWidth", 1280), elapsed);
     if (width_ && (width_ != frame.width || height_ != frame.height)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_ = frame.width; height_ = frame.height; last_elapsed_ = elapsed;
     DrawScriptOverlay(frame, shown);
+    DesktopScriptFrameAdmission committed;
     // Step PNG requests share samples but must not increase movie frame rate.
     if (last_movie_frame_ < 0 || elapsed - last_movie_frame_ + .000001 >= 1000.0 / options_.value("fps", 15)) {
       if (!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      if (movies_) {
+        DesktopScriptFrameAdmission queued;
+        if (shown.contains("marker")) {
+          const auto& marker = shown.at("marker");
+          const double progress = kelpie_script_progress(elapsed - marker.value("startedMs", elapsed),
+              marker.value("durationMs", 700.0));
+          if (kelpie_script_tap_presentation(progress, marker.value("wobble", true), marker.value("fade", true)).alpha > 0) {
+            queued.committed_marker_action = marker.value("actionIndex", -1);
+            queued.committed_marker_document = shown.value("documentVersion", std::string());
+          }
+        }
+        movie_markers_.push_back(std::move(queued));
+        const auto prefix = encoder_->committed_movie_frames();
+        while (committed_marker_frames_ < prefix && !movie_markers_.empty()) {
+          committed = std::move(movie_markers_.front()); movie_markers_.pop_front();
+          ++committed_marker_frames_;
+        }
+        if (movie_markers_.size() > 18) throw std::runtime_error("CAPTURE_ENCODER_BACKPRESSURE");
+      }
       last_movie_frame_ = elapsed;
     }
     if (step && screenshots_) {
@@ -46,6 +69,7 @@ class Capture final : public DesktopScriptCapture {
            {"documentId", shown.value("documentVersion", std::string())}}, run_, owner_));
       retained_.insert(path);
     }
+    return committed;
   }
   Json Finish(bool partial, const std::string&, double terminal) override {
     if (finished_) return result_;
@@ -77,7 +101,9 @@ class Capture final : public DesktopScriptCapture {
   std::set<std::filesystem::path> retained_;
   int width_ = 0, height_ = 0;
   double last_elapsed_ = 0, last_movie_frame_ = -1;
-  bool screenshots_ = false, finished_ = false;
+  std::deque<DesktopScriptFrameAdmission> movie_markers_;
+  std::size_t committed_marker_frames_ = 0;
+  bool screenshots_ = false, movies_ = false, finished_ = false;
 };
 }
 LinuxScriptService::LinuxScriptService(DocumentGuard guard) : guard_(std::move(guard)) {}
