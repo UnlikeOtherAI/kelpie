@@ -25,13 +25,13 @@ export function verifyWgcProvenance(facts){
  assert.match(active.runId,/^[a-f0-9]{48}$/);assert.equal(active.playing,true);
  assert.ok(Array.isArray(facts.activeSamples)&&facts.activeSamples.length>0&&facts.activeSamples.length<=100);
  assert.ok(facts.activeSamples.every(sample=>sample.playing===true&&sample.runId===active.runId));
- assert.equal(terminal.runId,active.runId);assert.equal(terminal.success,true);
+ assert.equal(terminal.runId,active.runId);assert.equal(terminal.success,true);assert.equal(terminal.inputGuarantee,"trusted-coordinate");
  assert.ok(typeof before.tabId==="string"&&before.tabId.length>0);assert.equal(after.tabId,before.tabId);
  assert.equal(before.active,true);assert.equal(after.active,true);
  assert.ok(typeof before.url==="string"&&before.url.length>0);assert.equal(after.url,before.url);
  assert.equal(fixture.url,before.url);assert.equal(fixture.pageRequests,1);assert.equal(fixture.dropped,0);
  assert.equal(fixture.events.length,3);assert.deepEqual(fixture.events.map(event=>event.target),["finish","start","finish"]);
- assert.ok(fixture.events.every(event=>typeof event.trusted==="boolean"&&event.documentId===fixture.events[0].documentId));
+ assert.ok(fixture.events.every(event=>event.trusted===true&&event.documentId===fixture.events[0].documentId));
  assert.ok(fixture.events.every((event,index)=>index===0||event.timeMs>fixture.events[index-1].timeMs));
  assert.ok(fixture.events.every(event=>Number.isFinite(event.center?.x)&&Number.isFinite(event.center?.y)));
  assert.deepEqual(fixture.events[0].center,fixture.events[2].center);

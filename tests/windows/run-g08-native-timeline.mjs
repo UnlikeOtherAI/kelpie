@@ -127,7 +127,7 @@ try{
  report.phase="artifact-download";const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
  const trustedFacts={source:manifest.source,curve,frameCount:native.frameCount,
   identity:{pid:running.pid,sessionId:identity.sessionId,executable:identity.executable,startFileTime:identity.startFileTime,launchId:readiness.launchId,port:28420},
-  window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success},
+  window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success,inputGuarantee:terminal.inputGuarantee},
   before,after,fixture:{url:fixture.url,pageRequests:fixture.pageRequests,...fixtureFacts},artifacts,summary};
  report.phase="provenance";
  const factEvidence=Buffer.from(JSON.stringify(trustedFacts));assert.ok(factEvidence.length<=budget.remaining,"OUTPUT_BUDGET");
