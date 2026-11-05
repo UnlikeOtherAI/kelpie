@@ -469,3 +469,15 @@ grants. The checked private package is source2c4b0fb8, SHA-256
 ef4b2c77954ab4120331c88dc567b8c2b6b140dac67387ae7b26caf230e8a6b9;
 it is not a newly published release. Driver syntax passed; actual alias replay
 is the next bounded gate.
+
+The first packaged --headless alias replay passed all five public launch/MCP/
+recipe/secret cases and all ten observation cases (native3001, package2c4).
+Public stop removed readiness and its running record; service cost was16.626s
+wall/11.094s CPU/403.4MiB. It did not observe natural process/socket retirement
+before unit exit, so that stronger cleanup claim is deliberately unmade.
+The driver now waits up to8 seconds for the exact PID/start-ticks identity to
+disappear or recycle, checks the credential-free socket refuses connection, then
+checks readiness/running absence before exiting its unit. It also explicitly
+requires the offscreen catalogue to advertise the mutating play-script schema.
+Readiness format version1 is labelled separately from actual device app version
+and native MCP serverInfo. These strengthened assertions await their replay.
