@@ -241,8 +241,10 @@ void GtkBrowserView::Sync() {
   if (label_ == nullptr) {
     return;
   }
+  auto* top = gtk_widget_get_toplevel(frame_);
+  const bool foreground = GTK_IS_WINDOW(top) && gtk_widget_get_visible(top) && gtk_window_is_active(GTK_WINDOW(top));
+  const bool playing = app_.ScriptPresentation(foreground).value("playing", false);
   if (stop_) {
-    const bool playing = app_.ScriptPresentation().value("playing", false);
     if (playing) gtk_widget_show(stop_); else gtk_widget_hide(stop_);
   }
   if (app_.HasNativeBrowser()) {

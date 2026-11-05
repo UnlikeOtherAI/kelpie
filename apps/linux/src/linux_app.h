@@ -44,7 +44,7 @@ class LinuxApp {
   void CloseTab(const std::string& id);
   void CycleTab(int direction);
   OffscreenFrame ViewFrame() const;
-  json ScriptPresentation() const;
+  json ScriptPresentation(bool foreground = true) const;
   void StopScript();
   void InputModifiers(unsigned modifiers);
   bool Key(int key,int native_key,unsigned modifiers,bool released);

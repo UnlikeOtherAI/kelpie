@@ -4,9 +4,10 @@
 #include "script_capture_service.h"
 #endif
 namespace kelpie::linuxapp {
-LinuxApp::json LinuxApp::ScriptPresentation() const {
+LinuxApp::json LinuxApp::ScriptPresentation(bool foreground) const {
+  (void)foreground;
 #if KELPIE_LINUX_HAS_CEF
-  if (impl_->scripts) return impl_->scripts->Presentation();
+  if (impl_->scripts) return impl_->scripts->Presentation(foreground);
 #endif
   return json::object();
 }

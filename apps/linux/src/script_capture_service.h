@@ -13,7 +13,7 @@ class LinuxScriptService : public std::enable_shared_from_this<LinuxScriptServic
   using DocumentGuard = std::function<bool(const Json&)>;
   explicit LinuxScriptService(DocumentGuard guard);
   void Configure(DesktopApp::Config& config);
-  Json Presentation() const;
+  Json Presentation(bool foreground) const;
   void Stop();
   ScriptArtifactStore& artifacts() { return artifacts_; }
  private:
@@ -24,7 +24,7 @@ class LinuxScriptService : public std::enable_shared_from_this<LinuxScriptServic
   mutable std::mutex mutex_;
   mutable Json presentation_ = Json::object();
   std::function<void()> stop_;
-  std::function<bool()> valid_;
+  mutable std::function<bool()> valid_;
   std::chrono::steady_clock::time_point shown_at_{};
 };
 }

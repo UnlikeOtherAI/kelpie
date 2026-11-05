@@ -200,7 +200,7 @@ void LinuxScriptService::Show(const Json& presentation, std::function<void()> st
   presentation_ = presentation; stop_ = std::move(stop); valid_ = std::move(valid);
   shown_at_ = std::chrono::steady_clock::now();
 }
-LinuxScriptService::Json LinuxScriptService::Presentation() const {
+LinuxScriptService::Json LinuxScriptService::Presentation(bool foreground) const {
   Json shown;
   std::function<bool()> valid;
   {
@@ -213,7 +213,7 @@ LinuxScriptService::Json LinuxScriptService::Presentation() const {
   bool hide = false;
   if (detached) {
     const auto& marker = shown.at("marker");
-    hide = !valid || !valid() || shown.value("elapsedMs", 0.0) >=
+    hide = !foreground || !guard_ || !valid || !valid() || shown.value("elapsedMs", 0.0) >=
         marker.value("startedMs", 0.0) + marker.value("durationMs", 700.0);
   }
   if (!hide && (shown.value("playing", false) || detached) && guard_ && !guard_(shown)) hide = true;
@@ -221,7 +221,7 @@ LinuxScriptService::Json LinuxScriptService::Presentation() const {
     std::lock_guard lock(mutex_);
     if (presentation_.value("_presentationRevision",std::uint64_t{}) != shown.value("_presentationRevision",std::uint64_t{}))
       return Json{{"playing",false}};
-    if (hide && detached) presentation_ = Json{{"playing",false}};
+    if (hide && detached) { presentation_ = Json{{"playing",false}}; valid_ = {}; }
   }
   if (hide) { shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); }
   return shown;
