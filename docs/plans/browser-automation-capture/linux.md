@@ -499,3 +499,15 @@ observed trusted pointerdown, no click/navigation and recovery. The distinct
 pre-input requirement has its own whitebox critical-PNG/SSE supplement below;
 the two phases are not conflated. Node syntax/whitespace checks passed. Real
 replay of these corrected cases is still pending; earlier failures remain.
+
+The before-input replacement supplement uses whitebox coordination explicitly:
+only the new owned0700 capture directory and its complete step-0.png are read.
+That critical pre-input sample proves target resolution/presentation before a
+fixed SSE command clones the target. Renderer mutation events must precede any
+pointerdown; a lost race fails setup rather than being called a product defect.
+The saved native PNG is independently decoded for the requested red marker.
+The public result must refuse with no pointerdown/click/navigation, partial
+artifacts remain downloadable/hashed, and a fresh run must recover.
+No product API, arbitrary page command or longer timing guess is added.
+The fixture command/cleanup test passed on Maxis (1/1,178ms total); module syntax
+checks passed. Real native barrier execution is pending the next exact replay.

@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { control, waitFor } from "../windows/lib/http.mjs";
 import { runFinalizeFault } from "./finalize-fault.mjs";
 import { runAdversaryDiagnostics } from "./adversary-diagnostics.mjs";
+import { runPreinputReplacement } from "./preinput-replacement.mjs";
 import { runArtifactProtocolAcceptance } from "./artifact-protocol-acceptance.mjs";
 import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
 
@@ -94,6 +95,8 @@ try {
   await supplement("artifactProtocols", () => runArtifactProtocolAcceptance(readiness, output, cancellation.signal));
   if (process.env.KELPIE_LINUX_FINALIZE_FAULT === "1")
     await supplement("finalizeFault", () => runFinalizeFault(readiness, runtime, output));
+  if (process.env.KELPIE_LINUX_PREINPUT_REPLACEMENT === "1")
+    await supplement("preinputReplacement", () => runPreinputReplacement(readiness, runtime, output, cancellation.signal));
   if (process.env.KELPIE_LINUX_ADVERSARY_DIAGNOSTICS === "1")
     await supplement("adversaryDiagnostics", () => runAdversaryDiagnostics(readiness, output, cancellation.signal));
   assert.equal(result.code, 0, result.stderr || result.stdout);
