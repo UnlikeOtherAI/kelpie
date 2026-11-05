@@ -8,7 +8,17 @@ import {Client,Failure,requireTrue,listeners,waitFor,delay} from "../../tests/ma
 import {startFixture} from "../../tests/macos/runtime-fixture.mjs";
 import {publicCLI,inference} from "../../tests/macos/runtime-interfaces.mjs";
 import {runEngine} from "../../tests/macos/runtime-cases.mjs";
-requireTrue(process.env.GITHUB_ACTIONS==="true"&&process.env.RUNNER_OS==="macOS"&&process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
+requireTrue(process.env.GITHUB_ACTIONS==="true"&&process.env.RUNNER_OS==="macOS","DEDICATED_HOSTED_RUNNER_REQUIRED");
+if(process.argv[2]==="--preparation"){
+ const state=process.argv[3],exitCode=Number(process.argv[4]);
+ requireTrue(["started","ready","failed"].includes(state)&&Number.isInteger(exitCode)&&exitCode>=0&&exitCode<=255,"PREPARATION_ARGUMENTS");
+ const source=execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim();
+ requireTrue(source===process.env.GITHUB_SHA,"SOURCE_REVISION_MISMATCH");
+ const directory=path.resolve(".cache/macos-runtime/evidence");await mkdir(directory,{recursive:true});
+ await writeFile(path.join(directory,"preparation.json"),JSON.stringify({version:1,source,phase:"runtime-preparation",state,exitCode,utc:new Date().toISOString(),release:false},null,2));
+ process.exit(0);
+}
+requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
 const root=await realpath("."),app=await realpath("apps/macos/.build/Build/Products/Debug/Kelpie.app");
 requireTrue(app.startsWith(root+"/apps/macos/.build/"),"CANDIDATE_PATH");
 const out=path.join(root,".cache/macos-runtime/evidence"),privateDir=path.join(root,".cache/macos-runtime/private");
