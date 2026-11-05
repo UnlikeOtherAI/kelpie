@@ -13,7 +13,13 @@ function render(config,mode){
     const bytes=Buffer.alloc(width*height*3,255);
     const phase=Math.max(0,Math.min(1,(timeMs-2900)/config.pointerMs));
     let p=scriptPointerPosition(mode==="wrongcurve"?{...config,curve:"s"}:config,mode==="noease"?inverse(phase):phase);
-    if(timeMs<2500)p=config.to;
+    if(timeMs<2500){
+      if(["movingCalibration","noStableCalibration"].includes(mode)){
+        const initial={x:config.to.x-80,y:config.to.y-60};
+        p=scriptPointerPosition({from:initial,to:config.to,curve:config.curve},
+          timeMs/(mode==="movingCalibration"?1700:2000));
+      }else p=config.to;
+    }
     if(mode==="straight"&&timeMs>=2500)p={x:config.from.x+(config.to.x-config.from.x)*phase,y:config.from.y};
     p={x:p.x*scale.x,y:p.y*scale.y};
     const progress=timeMs>=2000&&timeMs<2150?.1:(timeMs-5500)/(mode==="wrongduration"?config.markerMs*.65:config.markerMs);
@@ -87,6 +93,13 @@ test("calibration requires an observed later dispatch marker and stable pre-disp
   const config={...base,curve:"c"};
   const missing=render(config);for(const sample of missing)if(sample.timeMs>=2000&&sample.timeMs<2150)sample.marker.alpha=0;
   assert.throws(()=>evaluateG08(missing,config),/INSUFFICIENT_EVIDENCE calibration dispatch marker/);
-  const unstable=render(config);unstable[1].marker.roi=Buffer.from(unstable[1].marker.roi);unstable[1].marker.roi[0]^=1;
+  const unstable=render(config);const candidate=unstable.find(sample=>sample.timeMs===1900);candidate.marker.roi=Buffer.from(candidate.marker.roi);candidate.marker.roi[0]^=1;
   assert.throws(()=>evaluateG08(unstable,config),/INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline/);
+});
+
+test("calibration allows an initial pointer movement but requires same-position pre-marker frames",()=>{
+  const config={...base,curve:"c"};
+  assert.equal(evaluateG08(render(config,"movingCalibration"),config).passed,true);
+  assert.throws(()=>evaluateG08(render(config,"noStableCalibration"),config),
+    /INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline/);
 });
