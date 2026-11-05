@@ -165,7 +165,11 @@ try{
   try{await uiaRun(["presentation",String(running.pid),exe,identity.startTime]);}
   catch(error){if(!presentationNotVisible(error))throw error;hidden=true;}
   const expiredStop=await uiaRun(["inspect",String(running.pid),exe,identity.startTime]);
-  report.expiry={presentationHidden:hidden,visibleInvokableButtons:expiredStop.visibleInvokableButtons};
+  assert.equal((await api("get-device-info")).success,true);
+  const afterExpiry=await tabFact(tabId);
+  assert.deepEqual(afterExpiry,before);
+  report.expiry={presentationHidden:hidden,visibleInvokableButtons:expiredStop.visibleInvokableButtons,
+    listenerAndTabStillActive:true};
   assert.ok(hidden,"MARKER_DID_NOT_EXPIRE");
   assert.equal(expiredStop.visibleInvokableButtons,0);
  }
