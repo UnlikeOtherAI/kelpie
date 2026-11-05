@@ -63,14 +63,14 @@ try {
  report.phase="cli-register";await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
  report.phase="cli-launch";const launchStarted=new Date().toISOString();
  const launch=await publicCli(["browser","launch",alias,"--port","28420"]);assert.equal(launch.success,true);launched=true;
- const store=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));running=store.running[alias];
+ report.phase="cli-running-store";const store=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));running=store.running[alias];
  assert.equal(running.port,28420);assert.equal(resolve(running.readinessFile),join(profile,"readiness.json"));
- readiness=JSON.parse(await readFile(running.readinessFile,"utf8"));assert.equal(readiness.launchId,running.launchId);
- const identity=await automation(["pin",String(running.pid),exe,launchStarted]);
- const sockets=(await child(join(process.env.WINDIR,"System32","netstat.exe"),["-ano","-p","tcp"])).stdout.split(/\r?\n/)
+ report.phase="readiness-match";readiness=JSON.parse(await readFile(running.readinessFile,"utf8"));assert.equal(readiness.launchId,running.launchId);
+ report.phase="uia-process-pin";const identity=await automation(["pin",String(running.pid),exe,launchStarted]);report.identity={...identity,launchId:readiness.launchId,port:28420};
+ report.phase="listener-identity";const sockets=(await child(join(process.env.WINDIR,"System32","netstat.exe"),["-ano","-p","tcp"])).stdout.split(/\r?\n/)
    .map(line=>line.trim().split(/\s+/)).filter(parts=>parts[1]==="127.0.0.1:28420"&&parts[3]==="LISTENING");
  assert.ok(sockets.length>0);assert.ok(sockets.every(parts=>Number(parts[4])===running.pid));
- assert.equal((await api("get-device-info")).value.success,true);
+ report.phase="device-info";assert.equal((await api("get-device-info")).value.success,true);
  report.identity={...identity,launchId:readiness.launchId,port:28420};
  report.phase="fixture-navigation";
  assert.equal((await api("navigate",{url:"about:blank"})).value.success,true,"FIXTURE_NAVIGATION_FAILED");
@@ -185,7 +185,7 @@ try {
    report.checks.push({name:mode==="wgc"?"owned WGC presentation marker and separate native Stop pixels":"owned PrintWindow Stop and marker pixels",passed,...(passed?{}:{error:report.wgcFailure?.error??report.terminalEvidenceFailure?.error??"NATIVE_SPATIAL_VALIDATION_FAILED"})});if(!passed)process.exitCode=1;
  }
 } catch(error) {
- report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.safeDetails?"CLI_FAILED":"INTERACTIVE_CHECK_FAILED",stage:report.phase??"setup",...error.safeDetails});process.exitCode=1;
+ report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.safeDetails?"CLI_FAILED":"INTERACTIVE_CHECK_FAILED",stage:report.phase??"setup",code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false,kind:error.name??"Error",...error.safeDetails});process.exitCode=1;
 } finally {
  if(launched){
    if(pending&&readiness){try{await api("abort-script",{},true);await awaitBounded(pending,5000);}catch(error){report.pendingCleanup=error.message;}}
