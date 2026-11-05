@@ -46,6 +46,14 @@ extension WorkflowCaptureUITests {
         // WebKit can report innerWidth equal to the zoomed visual width; compare the
         // same visual viewport before and after the actual gesture instead.
         XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(initial["width"] as? Double))
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["visibleWidth"] as? Double), 10)
+        XCTAssertLessThan(try XCTUnwrap(zoomed["visibleWidth"] as? Double), try XCTUnwrap(zoomed["edgeWidth"] as? Double) - 20)
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["visibleHeight"] as? Double), 10)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let settled = try await pinchMetrics(tab, selector: "#zoom")
+        for key in ["x", "y", "width", "height", "scale", "edgeLeft", "edgeTop", "edgeWidth", "edgeHeight", "visibleWidth", "visibleHeight"] {
+            XCTAssertEqual(try XCTUnwrap(settled[key] as? Double), try XCTUnwrap(zoomed[key] as? Double), accuracy: 0.1, key)
+        }
 
         let envelope = try await probe.toolEnvelope("kelpie_extension", ["name": "kelpie_play_script", "arguments": [
             "version": 1, "tabId": tab,

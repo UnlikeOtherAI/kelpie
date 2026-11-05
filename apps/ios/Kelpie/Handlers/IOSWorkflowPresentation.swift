@@ -44,6 +44,19 @@ final class IOSWorkflowPresentation: NSObject {
         }
     }
 
+    private struct MarkerGeometry: Equatable {
+        let bounds: CGRect
+        let frameInWindow: CGRect
+        let originInWindow: CGPoint
+        let xBasisInWindow: CGPoint
+        let yBasisInWindow: CGPoint
+        let contentOffset: CGPoint
+        let adjustedInsets: UIEdgeInsets
+        let zoomScale: CGFloat
+        let contentScale: CGFloat
+        let screenScale: CGFloat
+    }
+
     private final class Canvas: UIView {
         var state: State?
         override func draw(_ rect: CGRect) {
@@ -61,6 +74,12 @@ final class IOSWorkflowPresentation: NSObject {
     private var note: Note?
     private var generation: String
     private var latched: State?
+    private weak var retirementWindow: UIWindow?
+    private var retirementDocument: String?
+    private var retirementDeadline: TimeInterval?
+    private var retirementInvalidated: (() -> Void)?
+    private var markerGeometry: MarkerGeometry?
+    private weak var markerWindow: UIWindow?
 
     init(tab: IOSWorkflowTab) throws {
         self.tab = tab
@@ -86,7 +105,10 @@ final class IOSWorkflowPresentation: NSObject {
     }
 
     var lastPointer: CGPoint? { generation == tab.document ? pointer : nil }
-    var markerEnd: TimeInterval? { marker.map { $0.started + $0.duration } }
+    var markerEnd: TimeInterval? {
+        guard generation == tab.document else { return nil }
+        return marker.map { $0.started + $0.duration }
+    }
 
     func move(to point: CGPoint) {
         synchronize()
@@ -97,6 +119,8 @@ final class IOSWorkflowPresentation: NSObject {
     func mark(at point: CGPoint, radius: CGFloat, settings: [String: Any], held: Bool) {
         synchronize()
         markerHeld = held
+        markerWindow = tab.view.window
+        markerGeometry = markerWindow.flatMap { geometry(in: $0) }
         marker = ScriptOverlayMarker(
             point: point,
             started: ProcessInfo.processInfo.systemUptime,
@@ -168,7 +192,25 @@ final class IOSWorkflowPresentation: NSObject {
         refresh()
     }
 
+    func beginRetirement(window: UIWindow, document: String, deadline: TimeInterval, invalidated: @escaping () -> Void) {
+        pointer = nil
+        note = nil
+        latched = nil
+        markerHeld = false
+        retirementWindow = window
+        retirementDocument = document
+        retirementDeadline = deadline
+        retirementInvalidated = invalidated
+        refresh()
+    }
+
     func finish() {
+        retirementInvalidated = nil
+        retirementDeadline = nil
+        retirementDocument = nil
+        retirementWindow = nil
+        markerWindow = nil
+        markerGeometry = nil
         clock?.invalidate()
         clock = nil
         canvas.removeFromSuperview()
@@ -196,10 +238,47 @@ final class IOSWorkflowPresentation: NSObject {
         )
     }
 
+    private func geometry(in window: UIWindow) -> MarkerGeometry? {
+        guard let scene = window.windowScene else { return nil }
+        let view = tab.view
+        let value = MarkerGeometry(
+            bounds: view.bounds,
+            frameInWindow: view.convert(view.bounds, to: window),
+            originInWindow: view.convert(CGPoint.zero, to: window),
+            xBasisInWindow: view.convert(CGPoint(x: 1, y: 0), to: window),
+            yBasisInWindow: view.convert(CGPoint(x: 0, y: 1), to: window),
+            contentOffset: view.scrollView.contentOffset,
+            adjustedInsets: view.scrollView.adjustedContentInset,
+            zoomScale: view.scrollView.zoomScale,
+            contentScale: view.contentScaleFactor,
+            screenScale: scene.screen.scale
+        )
+        let values = [value.bounds.minX, value.bounds.minY, value.bounds.width, value.bounds.height,
+                      value.frameInWindow.minX, value.frameInWindow.minY, value.frameInWindow.width, value.frameInWindow.height,
+                      value.originInWindow.x, value.originInWindow.y, value.xBasisInWindow.x, value.xBasisInWindow.y,
+                      value.yBasisInWindow.x, value.yBasisInWindow.y, value.contentOffset.x, value.contentOffset.y, value.adjustedInsets.top, value.adjustedInsets.bottom,
+                      value.adjustedInsets.left, value.adjustedInsets.right, value.zoomScale, value.contentScale, value.screenScale]
+        guard values.allSatisfy({ $0.isFinite && abs($0) <= 100000 }),
+              value.bounds.width > 0, value.bounds.height > 0, value.zoomScale > 0,
+              value.contentScale > 0, value.screenScale > 0 else { return nil }
+        return value
+    }
+
     @objc private func refresh() {
         synchronize()
-        let visible = (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
+        let retirementValid = retirementDocument.map { document in
+            guard document == tab.document, let window = retirementWindow, markerWindow === window,
+                  tab.view.window === window, let pinned = markerGeometry, let current = geometry(in: window) else { return false }
+            return pinned == current
+        } ?? true
+        let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
             tab.view.window?.windowScene?.activationState == .foregroundActive
+        if let deadline = retirementDeadline, !visible || ProcessInfo.processInfo.systemUptime >= deadline {
+            let invalidated = retirementInvalidated
+            finish()
+            invalidated?()
+            return
+        }
         canvas.isHidden = !visible
         canvas.state = visible ? (latched ?? current()) : nil
         canvas.setNeedsDisplay()
