@@ -10,6 +10,9 @@ const execute = promisify(execFile);
 
 // Uses the same paired CLI and app-owned test bridge as the other hosted flow.
 export async function runG08({ command, folder, tabId, profile, revision, binarySHA256 }) {
+  // Fail before navigation or playback when required media tools are absent.
+  await execute("ffprobe", ["-version"], { timeout: 10000, maxBuffer: 1048576 });
+  await execute("ffmpeg", ["-version"], { timeout: 10000, maxBuffer: 1048576 });
   const cases = [];
   let eventsDropped = 0;
   for (const curve of ['c', 's']) {
