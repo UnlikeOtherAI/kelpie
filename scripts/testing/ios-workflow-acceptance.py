@@ -81,6 +81,7 @@ def selection(scope):
                 "testDefaultPointerMotionUsesShorterNativeTiming",
                 "testLivePointerMarkerAndStopAppearDuringCapture",
                 "testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
+                "testRetiredMarkerDoesNotReappearAfterTabChange",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testNativePinchScrollableControl",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",

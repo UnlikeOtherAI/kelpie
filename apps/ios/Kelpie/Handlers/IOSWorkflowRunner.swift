@@ -177,9 +177,9 @@ final class IOSWorkflowRunner {
             capture: media?.failure ?? sampler?.failure,
             stopRequested: host.playbackState.isAbortRequested()
         )
-        if issue != nil { clearRetiringPresentation() }
+        if issue != nil { clearRetiringPresentation(ifOwned: presentation) }
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
-        guard await grant.isCurrent() else { clearRetiringPresentation(); return denied() }
+        guard await grant.isCurrent() else { clearRetiringPresentation(ifOwned: presentation); return denied() }
         return response
     }
 
@@ -190,12 +190,20 @@ final class IOSWorkflowRunner {
         retiringPresentation = nil
     }
 
+    private func clearRetiringPresentation(ifOwned presentation: IOSWorkflowPresentation?) {
+        guard let presentation, retiringPresentation === presentation else { return }
+        clearRetiringPresentation()
+    }
+
     private func retirePresentation(_ presentation: IOSWorkflowPresentation, tab: IOSWorkflowTab, grant: IOSScriptGrant) {
         guard let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
               let window = tab.view.window else { presentation.finish(); return }
         let document = tab.document
-        presentation.beginRetirement(window: window, document: document)
         retiringPresentation = presentation
+        presentation.beginRetirement(window: window, document: document, deadline: end) { [weak self, weak presentation] in
+            self?.clearRetiringPresentation(ifOwned: presentation)
+        }
+        guard retiringPresentation === presentation else { return }
         retirementTask = Task { @MainActor [weak self, presentation, weak window] in
             while !Task.isCancelled && ProcessInfo.processInfo.systemUptime < end {
                 guard let window, tab.view.window === window, window.windowScene?.activationState == .foregroundActive,

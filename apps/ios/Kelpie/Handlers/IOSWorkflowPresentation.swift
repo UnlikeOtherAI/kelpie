@@ -63,6 +63,8 @@ final class IOSWorkflowPresentation: NSObject {
     private var latched: State?
     private weak var retirementWindow: UIWindow?
     private var retirementDocument: String?
+    private var retirementDeadline: TimeInterval?
+    private var retirementInvalidated: (() -> Void)?
 
     init(tab: IOSWorkflowTab) throws {
         self.tab = tab
@@ -173,13 +175,23 @@ final class IOSWorkflowPresentation: NSObject {
         refresh()
     }
 
-    func beginRetirement(window: UIWindow, document: String) {
+    func beginRetirement(window: UIWindow, document: String, deadline: TimeInterval, invalidated: @escaping () -> Void) {
+        pointer = nil
+        note = nil
+        latched = nil
+        markerHeld = false
         retirementWindow = window
         retirementDocument = document
+        retirementDeadline = deadline
+        retirementInvalidated = invalidated
         refresh()
     }
 
     func finish() {
+        retirementInvalidated = nil
+        retirementDeadline = nil
+        retirementDocument = nil
+        retirementWindow = nil
         clock?.invalidate()
         clock = nil
         canvas.removeFromSuperview()
@@ -214,6 +226,12 @@ final class IOSWorkflowPresentation: NSObject {
         } ?? true
         let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
             tab.view.window?.windowScene?.activationState == .foregroundActive
+        if let deadline = retirementDeadline, !visible || ProcessInfo.processInfo.systemUptime >= deadline {
+            let invalidated = retirementInvalidated
+            finish()
+            invalidated?()
+            return
+        }
         canvas.isHidden = !visible
         canvas.state = visible ? (latched ?? current()) : nil
         canvas.setNeedsDisplay()
