@@ -72,8 +72,11 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
             for value: Any? in [nil, "malformed", [1, 2], ["sensitivityKnown": true]] {
                 let privacy = ScriptWorkflowPrivacy(secrets: [], captures: captures)
                 do {
-                    ScriptWorkflowTab.consumeTargetResult(value, consume: { privacy.consume($0, text: "canary") },
-                                                          uncertain: { privacy.uncertain(text: "canary") })
+                    ScriptWorkflowTab.consumeTargetResult(
+                        value,
+                        consume: { privacy.consume($0, text: "canary") },
+                        uncertain: { privacy.uncertain(text: "canary") }
+                    )
                     await Task.yield()
                     throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: true)
                 } catch let failure as ScriptWorkflowFailure {
@@ -98,6 +101,17 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         sensitive.consume(["sensitive": true, "sensitivityKnown": false], text: "canary")
         XCTAssertEqual(sensitive.secrets, ["canary"])
         XCTAssertTrue(sensitive.discardMedia)
+    }
+
+    @MainActor
+    func testOwnedFocusNeverRunsForBackgroundWindow() {
+        var calls = 0
+        XCTAssertFalse(ScriptWorkflowTab.requestOwnedEditFocus(isKey: false) { calls += 1; return true })
+        XCTAssertEqual(calls, 0)
+        XCTAssertTrue(ScriptWorkflowTab.requestOwnedEditFocus(isKey: true) { calls += 1; return true })
+        XCTAssertEqual(calls, 1)
+        XCTAssertFalse(ScriptWorkflowTab.requestOwnedEditFocus(isKey: true) { calls += 1; return false })
+        XCTAssertEqual(calls, 2)
     }
 
     func testIndependentGrantsAndListenerIncarnationsCannotInheritRuns() {

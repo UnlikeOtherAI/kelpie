@@ -23,3 +23,9 @@ export function navigationSignal(line){
  const match=/^\[WorkflowNavigation\] failure=(BUSY|NAVIGATION_ERROR|TIMEOUT|NO_WEBVIEW|TAB_NOT_FOUND|INVALID_URL|RECORDING_IN_PROGRESS|UNCLASSIFIED)$/.exec(line);
  return match?.[1]??null;
 }
+
+// Fixed focus state only; never retain a page value or window identifier.
+export function editFocusSignal(line){
+ const match=/^\[WorkflowEditFocus\] phase=(before|after|result) key=([01u]) responder=([01u]) doc=([01u]) body=([01u]) target=([01u])$/.exec(line);
+ return match?{phase:match[1],key:match[2],responder:match[3],documentFocused:match[4],activeBody:match[5],targetFocused:match[6]}:null;
+}

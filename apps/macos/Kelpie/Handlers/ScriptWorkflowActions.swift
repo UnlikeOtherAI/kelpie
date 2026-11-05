@@ -174,13 +174,28 @@ final class ScriptWorkflowActions {
             throw ScriptWorkflowFailure("INVALID_TARGET")
         }
         if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if editing {
+            #if DEBUG
+            await tab.debugEditFocus("before", targetFocused: found["focused"] as? Bool)
+            #endif
+            do { try await tab.prepareEditFocus() } catch {
+                #if DEBUG
+                await tab.debugEditFocus("after", targetFocused: nil)
+                #endif
+                throw error
+            }
+        }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await presentation.move(to: point, options: workflow.settings["pointer"] as? Body ?? [:], check: check)
         var settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         settings["radius"] = Double(CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width)
-        try requireOK(try await tab.target(
+        let verified = try await tab.target(
             target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain
-        ))
+        )
+        try requireOK(verified)
+        #if DEBUG
+        if editing, !discardMedia { await tab.debugEditFocus("after", targetFocused: verified["focused"] as? Bool) }
+        #endif
         presentation.indicate(at: point, options: settings, hold: capture?.hasMovies == true)
         if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
         try await capture?.ensureMarkerAdmission()
