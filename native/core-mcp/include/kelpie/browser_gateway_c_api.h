@@ -14,11 +14,14 @@ char* kelpie_browser_selector_snapshot_expression(const char* options_json);
 // Strict generated v1 script schema validation; returns {valid,script?} with defaults.
 // Host-only input/secret binding resolution is not performed by this function.
 char* kelpie_browser_validate_script(const char* script_json);
-// Fully bound paced fill/type plan. Caller must keep returned scalar literals private.
+// Fully bound paced plan: project exactly {action,text,typingDelayMs}, not the full workflow step.
+// Caller must keep returned scalar literals private.
 // Returns {valid,clearFirst?,typingDelayMs?,scalars?,error?}; invalid errors contain no text.
 char* kelpie_browser_script_typing_plan(const char* action_json);
 // Validates {target,key,token?,dispatch?,edit?,observe?}; returns {expression} or null.
 // The fixed private-world reader supports resolution, preflight, observation, and synthetic activation.
+// proveNonInput is meaningful only in a trusted CEF isolated world, bound to the original token.
+// Only exact-hit native anchor/button brands can return non-input; other targets remain input/unknown.
 char* kelpie_browser_script_target_expression(const char* options_json);
 // Returned JSON: {kind:'authorize',request,mutates}, {kind:'dispatch',method,params,mutates},
 // or {kind:'complete',response}. Authorization completion is {success:true|false}.

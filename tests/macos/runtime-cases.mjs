@@ -5,6 +5,7 @@ import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
 import {runG08} from "./runtime-g08.mjs";
+import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
@@ -96,6 +97,8 @@ export async function runEngine(client,fixture,engine,report) {
   semanticStage="media-decode";
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
+ await runPaced({client,fixture,engine,base,capture,check,load,play});
+ await load();
  await check("observation-and-readiness-public-entry",async()=>{
   const results={};
   for(const [method,params] of [["tab.status",{}],["tab.ready",{state:"complete",selector:"#submit"}],["tab.snapshot",{}]]){
@@ -211,7 +214,14 @@ export async function runEngine(client,fixture,engine,report) {
     "TARGET_OUTSIDE_VIEWPORT","TARGET_QUERY_LIMIT","TIMEOUT","UNAUTHORIZED","VIEWPORT_CHANGED","WEBVIEW_ERROR",
     "WORKFLOW_FAILED"]);
    const events=fixture.events.slice(begin);
-   const failure={engine,formats:formats.length,code:codes.has(result.error?.code)?result.error.code:"OTHER",
+   const initial=fixture.events.slice(0,begin).filter(e=>e.type==="document"&&e.path==="/").at(-1);
+   const next=events.find(e=>e.type==="document"&&e.path==="/next");
+   const number=value=>typeof value==="number"&&Number.isFinite(value)&&value>=0&&value<=100000?value:null;
+   const geometry=event=>event?{innerWidth:number(event.viewport?.width),innerHeight:number(event.viewport?.height),
+    clientWidth:number(event.viewport?.clientWidth),clientHeight:number(event.viewport?.clientHeight),
+    pixelRatio:number(event.viewport?.pixelRatio),visualWidth:number(event.visual?.width),
+    visualHeight:number(event.visual?.height),visualScale:number(event.visual?.scale)}:null;
+   const failure={engine,formats:formats.length,initialGeometry:geometry(initial),nextGeometry:geometry(next),code:codes.has(result.error?.code)?result.error.code:"OTHER",
     mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:Number.isInteger(result.actionsExecuted)?result.actionsExecuted:null,
     clickObserved:events.some(e=>e.type==="click"&&e.target==="next"),
     nextDocumentObserved:events.some(e=>e.type==="document"&&e.path==="/next"),play:playFacts(result)};

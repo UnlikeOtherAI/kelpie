@@ -58,6 +58,10 @@ describe("strict authored workflows", () => {
     const post = { target: { selector: "#edit" }, key: "private", token: "t1", postMutation: true };
     expect(scriptTargetRequestSchema.safeParse(post).success).toBe(true);
     expect(scriptTargetRequestSchema.safeParse({ ...post, token: undefined }).success).toBe(false);
+    const brand = { target: { selector: "#link" }, key: "private", token: "t1", proveNonInput: true };
+    expect(scriptTargetRequestSchema.safeParse(brand).success).toBe(true);
+    expect(scriptTargetRequestSchema.safeParse({ ...brand, token: undefined }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...brand, dispatch: true }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ ...post, dispatch: true }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ ...post, observe: true }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ ...post, edit: { action: "fill", text: "x" } }).success).toBe(false);
@@ -102,7 +106,7 @@ describe("reusable workflow authoring", () => {
     ] })).toThrow("Duplicate workflow output name");
   });
   it("validates the shipped walkthrough and nested-extraction recipes", async () => {
-    for (const name of ["submit-walkthrough", "extract-products"]) {
+    for (const name of ["submit-walkthrough", "extract-products", "paced-fill"]) {
       const raw: unknown = JSON.parse(await readFile(new URL("../../../docs/examples/workflows/" + name + ".json", import.meta.url), "utf8"));
       const parsed = scriptV1Schema.parse(raw);
       expect(bindScriptInputs(parsed, parsed.inputs ? { name: "Ada" } : {}).version).toBe(1);

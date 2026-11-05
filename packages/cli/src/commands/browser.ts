@@ -14,6 +14,7 @@ import type { DiscoveredDevice } from "../types.js";
 import type { GlobalOptions } from "../types.js";
 import {
   clearRunningBrowser,
+  clearRunningBrowserIfMatches,
   getBrowserAlias,
   loadBrowserStore,
   readLocalReadiness,
@@ -78,21 +79,28 @@ export interface LaunchChild {
   removeListener(event: "error", listener: (error: Error) => void): unknown;
 }
 
-/** Retire only the original process handle; false means its identity stays pending. */
-export async function retireUnreadyChild(child: ChildProcess, timeoutMs = STOP_TIMEOUT_MS): Promise<boolean> {
-  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return true;
-  return new Promise<boolean>((resolve) => {
-    const onError = () => { cleanup(); resolve(false); };
-    const onExit = () => { cleanup(); resolve(true); };
-    const timer = setTimeout(onError, timeoutMs);
+type RetirementOutcome = "exited" | "kill-refused" | "kill-error" | "exit-wait-expired";
+export interface RetirementResult { outcome: RetirementOutcome; elapsedMs: number }
+
+/** Retire only the original process handle; other outcomes stay pending. */
+export async function retireUnreadyChild(child: ChildProcess, timeoutMs = STOP_TIMEOUT_MS): Promise<RetirementResult> {
+  const started = Date.now();
+  const result = (outcome: RetirementOutcome): RetirementResult => ({
+    outcome, elapsedMs: Math.min(60000, Math.max(0, Date.now() - started)),
+  });
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return result("exited");
+  return new Promise<RetirementResult>((resolve) => {
+    const finish = (outcome: RetirementOutcome) => { cleanup(); resolve(result(outcome)); };
+    const onError = () => { finish("kill-error"); };
+    const onExit = () => { finish("exited"); };
+    const timer = setTimeout(() => { finish("exit-wait-expired"); }, timeoutMs);
     const cleanup = () => { clearTimeout(timer); child.removeListener("error", onError); child.removeListener("exit", onExit); };
     child.once("exit", onExit);
     child.once("error", onError);
     if (child.exitCode !== null || child.signalCode !== null) { onExit(); return; }
-    try { if (!child.kill()) onError(); } catch { onError(); }
+    try { if (!child.kill()) finish("kill-refused"); } catch { onError(); }
   });
 }
-
 /** A recycled PID is conservatively treated as still present, never killed. */
 export function pendingProcessGone(pid: number): boolean {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
@@ -106,6 +114,12 @@ async function reconcilePendingLaunch(name: string): Promise<boolean> {
   if (!running.pid || !pendingProcessGone(running.pid)) return false;
   await clearRunningBrowser(name);
   return true;
+}
+async function deadReadinessMatches(file: string, launchId: string): Promise<boolean> {
+  const readiness = await readLocalReadiness(file);
+  if (readiness) return readiness.launchId === launchId;
+  try { await access(file); return false; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT"; }
 }
 export interface ReadinessWaitOptions {
   timeoutMs?: number;
@@ -315,7 +329,8 @@ export function registerBrowser(program: Command): void {
           child.unref();
           print({ success: true, name, platform: alias.platform, appPath, profileDir: alias.profileDir, port: readiness.port, deviceId: readiness.deviceId, launchId: readiness.launchId }, globals.format);
         } catch (error) {
-          const retired = !child || await retireUnreadyChild(child);
+          const retirement = child ? await retireUnreadyChild(child) : { outcome: "exited" as const, elapsedMs: 0 };
+          const retired = retirement.outcome === "exited";
           if (retired && pendingSaved) await clearRunningBrowser(name);
           if (!retired && !pendingSaved && child) {
             const owned = child;
@@ -325,10 +340,10 @@ export function registerBrowser(program: Command): void {
           }
           if (!retired && pendingSaved) {
             child?.unref();
-            print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "The launch process could not be retired; its pending record was preserved" } }, globals.format);
+            print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "The launch process could not be retired; its pending record was preserved", retirement } }, globals.format);
             process.exitCode = 6; return;
           }
-          print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser" } }, globals.format);
+          print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser", ...(child ? { retirement } : {}) } }, globals.format);
           process.exitCode = 6;
         }
         return;
@@ -384,6 +399,17 @@ export function registerBrowser(program: Command): void {
         return;
       }
       const readiness = await readLocalReadiness(running.readinessFile);
+      if (pendingProcessGone(running.pid)) {
+        if (!await deadReadinessMatches(running.readinessFile, running.launchId) ||
+            !pendingProcessGone(running.pid) ||
+            !await deadReadinessMatches(running.readinessFile, running.launchId) ||
+            !await clearRunningBrowserIfMatches(name, running)) {
+          print({ success: false, error: { code: "BROWSER_LAUNCH_MISMATCH", message: "Launch identity changed or readiness is unreadable during dead-process reconciliation" } }, globals.format);
+          process.exitCode = 5; return;
+        }
+        print({ success: true, name, alreadyExitedPid: running.pid }, globals.format);
+        return;
+      }
       if (readiness?.launchId !== running.launchId) {
         print({ success: false, error: { code: "BROWSER_LAUNCH_MISMATCH", message: "Refusing to stop a process whose readiness launch ID changed" } }, globals.format);
         process.exitCode = 5;

@@ -7,6 +7,7 @@
 #include "kelpie/response_helpers.h"
 #include "desktop_input_planner.h"
 #include "desktop_script_redaction.h"
+#include "desktop_script_result.h"
 #include <iomanip>
 #include <set>
 #include <algorithm>
@@ -155,11 +156,22 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   bool sensitive = false, screenshot = false;
   std::set<std::string> output_names;
   std::vector<std::string> redactions;
+  std::vector<Json> typing_plans(actions.size());
+  std::size_t plan_index = 0;
   for (const auto& action : actions) {
     const std::string name = action.at("action");
     if (name == "fill" || name == "type") {
-      if (action.contains("typingDelayMs")) return ErrorResponse("UNSUPPORTED_SCRIPT_ACTION", "Paced typing is not available in this native adapter");
       if (!action.at("text").is_string()) return ErrorResponse("UNRESOLVED_INPUT", "Bind inputs before native admission");
+      if (action.contains("typingDelayMs")) {
+        const Json request = {{"action",name},{"text",action.at("text")},{"typingDelayMs",action.at("typingDelayMs")}};
+        char* raw_plan = kelpie_browser_script_typing_plan(request.dump().c_str());
+        if (!raw_plan) return ErrorResponse("INVALID_PACED_TYPING", "Paced typing preflight failed");
+        Json plan = Json::parse(raw_plan, nullptr, false); kelpie_mcp_free_string(raw_plan);
+        if (!plan.is_object() || !plan.value("valid", false) || !plan.contains("scalars") || !plan["scalars"].is_array() ||
+            !plan.contains("typingDelayMs") || !plan["typingDelayMs"].is_number_integer())
+          return ErrorResponse("INVALID_PACED_TYPING", "Paced typing preflight failed");
+        typing_plans[plan_index] = std::move(plan);
+      }
       if (action.value("sensitive", false)) { sensitive = true; redactions.push_back(action.at("text")); }
     }
     if(name=="press-key") {
@@ -169,6 +181,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     screenshot = screenshot || name == "screenshot";
     if((name=="output" || name=="extract") && !output_names.insert(action.at("name").get<std::string>()).second)
       return ErrorResponse("DUPLICATE_OUTPUT","Named outputs must be unique");
+    ++plan_index;
   }
   if (sensitive && (script.contains("capture") || screenshot))
     return ErrorResponse("SENSITIVE_CAPTURE_REFUSED", "Secret-bearing workflows cannot capture media");
@@ -217,7 +230,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
         action_index = static_cast<int>(index); status["currentAction"] = index;
         status["currentActionName"] = actions[index].at("action");
       }
-      Json response = Perform(lease, actions[index], script, &outputs, &redactions);
+      Json response = Perform(lease, actions[index], script, typing_plans[index], &outputs, &redactions);
       if(outputs.dump().size()>262144) {
         response=ErrorResponse("OUTPUT_BUDGET_EXCEEDED","Named outputs exceed the 256 KiB run budget");
         outputs=Json::object();
@@ -269,10 +282,13 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     {std::lock_guard lock(mutex);artifacts=Json::array();}
   }
   if (!capture_error.empty()) {
-    if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") result=ErrorResponse(capture_error,"Capture ended at a native limit or failure");
-    else result["captureError"]=capture_error;
+    if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") {
+      result=ReplaceScriptErrorPreservingUncertainty(result,capture_error,"Capture ended at a native limit or failure");
+    } else result["captureError"]=capture_error;
   }
-  if(grant_revoked.load()) result=ErrorResponse("AUTHORIZATION_REVOKED","Local control grant ended before completion");
+  if(grant_revoked.load()) {
+    result=ReplaceScriptErrorPreservingUncertainty(result,"AUTHORIZATION_REVOKED","Local control grant ended before completion");
+  }
   if (abort->load()) { result["success"] = false; result["aborted"] = true; }
   result["runId"] = run_id; result["totalDurationMs"] = Elapsed();
   result["inputGuarantee"] = "trusted-coordinate";

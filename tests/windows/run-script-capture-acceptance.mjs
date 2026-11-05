@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { captureMcp } from "./capture-mcp.mjs";
+import { runPacedCases } from "./capture-paced-cases.mjs";
+import { runBrandReleaseCases } from "./capture-brand-release-cases.mjs";
 import { downloadArtifacts } from "./capture-artifact-download.mjs";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
 import { startArtifactProtocolFixture } from "../capture/artifact-protocol-fixture.mjs";
-import { scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
+import { scriptArtifactChunkSchema, scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
 
 const [readinessPath, outputPath] = process.argv.slice(2);
 if (!readinessPath || !outputPath) throw new Error("Provide private readiness path and fresh evidence directory");
@@ -136,6 +139,8 @@ try {
     assert.equal(result.success,true,JSON.stringify(result));
     assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#post-readonly').value"})).result,"safe");
   });
+  await runPacedCases({check,navigate,api,workflow,download,click,tabId,fixture});
+  await runBrandReleaseCases({check,navigate,api,workflow,tabId,fixture});
   for (const [name, code] of [["Duplicate action", "AMBIGUOUS_TARGET"], ["Disabled action", "TARGET_NOT_FOUND"],
     ["Covered action", "TARGET_OBSCURED"], ["Hidden action", "TARGET_NOT_FOUND"]]) {
     await check("safe refusal " + name, async () => {
@@ -408,7 +413,7 @@ try {
   });
   await check("security inferred sensitive refusal redacts earlier outputs",async()=>{
     await navigate();
-    const canary="Synthetic Aa b+! "+crypto.randomUUID();
+    const canary="Synthetic Aa b+! "+randomUUID();
     const encoded=encodeURIComponent(canary).replace(/%2B/g,"%2b");
     const form=new URLSearchParams({value:canary}).toString().slice(6).replace(/%2B/g,"%2b");
     assert.equal((await api("evaluate",{tabId,expression:"(()=>{document.title="+JSON.stringify(canary+" "+encoded+" "+form)+";document.body.innerHTML='<input id=password-target type=password aria-label=Password>';window.__sensitiveEdits=0;document.querySelector('input').oninput=()=>window.__sensitiveEdits++;return true;})()"})).success,true);

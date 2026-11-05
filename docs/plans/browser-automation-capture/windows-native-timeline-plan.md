@@ -169,3 +169,8 @@ does not establish orderly CLI cleanup. Correct this lifecycle invariant and
 verify recovery before treating further launch attempts as complete.
 Receipts are under D:/BuildArtifacts/kelpie/capture-windows-resume-20261105
 with prefixes core8-selftest, core8-register and g08c-a2e3-r7.
+
+The original r9 dead process record was reconciled through public stop without removing the old readiness file. The subsequent same-alias/profile relaunch returned BROWSER_LAUNCH_PENDING; the exact new PID exited later without manual intervention, and its pending record and old readiness remain preserved for supported recovery. The report SHA-256 is fbb7649ea0f27abaa574e8d33f83fc7eeaf99f4e13cdcee29216b76d9bad9436. This is a partial recovery result, not a successful relaunch or animation proof.
+
+
+A controlled startup observation used the same frozen 5877 candidate and current CLI bundle in sequential fresh profiles. The one-CPU run registered in 402 ms, reached public readiness in 8.609 s and stopped in 11.930 s; its last pre-readiness sample saw first-party and CEF DLLs and one visible owned window. The later two-CPU run registered in 331 ms, reached readiness in 775 ms and stopped in 2.546 s; its one sample already saw those DLLs, an owned window and listener. Both tasks, processes, listeners and running aliases were absent after public cleanup. The reports are startup-compare-one-r2-report.json (SHA-256 4605dc6f28eb93821fb3e8c6bafd1b45e1fd979580fddb674a7f0533ee46f126) and startup-compare-two-report.json (SHA-256 08fffa1e224834f2f2455980f588b81f370c536c3a73c639285dbe288b3bea0a) under the Windows resume artifact directory. The fixed run order, warm cache and different core load prevent attributing the timing difference or prior readiness failures to CPU count.
