@@ -152,6 +152,10 @@ final class WorkflowLoopbackPage {
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');
+        if(location.pathname==='/secret-guard'){
+          document.title='iOS Reflected+Canary! | iOS%20Reflected%2bCanary! | iOS+Reflected%2bCanary%21';
+          document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'}
+        }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
           document.body.innerHTML='<button id="bottom" style="position:absolute;bottom:12px;left:12px;margin:0">Bottom</button>'

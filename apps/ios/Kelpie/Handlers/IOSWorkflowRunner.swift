@@ -139,15 +139,21 @@ final class IOSWorkflowRunner {
         } catch { issue = error as? IOSWorkflowFailure ?? IOSWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
         await sampler?.stop()
+        var discardMedia = issue?.code == "SENSITIVE_CAPTURE_REFUSED"
         if let actions {
-            do { outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets) } catch { issue = IOSWorkflowFailure("OUTPUT_REDACTION_FAILED") }
+            do {
+                outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets)
+            } catch {
+                discardMedia = true
+                if issue == nil { issue = IOSWorkflowFailure("OUTPUT_REDACTION_FAILED") }
+            }
         }
         presentation?.finish()
         let artifacts = await media?.finish(
             elapsed: sampler?.elapsed ?? 0,
             dropped: sampler?.dropped ?? 0,
             partial: issue != nil,
-            discard: issue?.code == "SENSITIVE_CAPTURE_REFUSED",
+            discard: discardMedia,
             isAborted: { [state = host.playbackState] in state.isAbortRequested() }
         ) ?? []
         currentArtifacts = artifacts

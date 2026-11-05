@@ -2,6 +2,37 @@ import XCTest
 
 extension WorkflowCaptureUITests {
     @MainActor
+    func testInferredPasswordCaptureRefusalRedactsEarlierNamedOutputsAndDiscardsFrames() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
+        let canary = "iOS Reflected+Canary!"
+        let variants = [canary, "iOS%20Reflected%2bCanary!", "iOS+Reflected%2bCanary%21"]
+        let failed = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "capture": ["formats": ["screenshots"]],
+            "actions": [
+                ["action": "navigate", "url": origin + "/secret-guard"],
+                ["action": "output", "source": "title", "name": "before"],
+                ["action": "fill", "target": ["selector": "input[type=password]"], "text": canary]
+            ]
+        ])
+        XCTAssertEqual((failed["error"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")
+        XCTAssertEqual(failed["actionsExecuted"] as? Int, 2)
+        XCTAssertTrue((failed["artifacts"] as? [Body])?.isEmpty == true)
+        let scrubbed = try XCTUnwrap((failed["outputs"] as? Body)?["before"] as? String)
+        XCTAssertTrue(variants.allSatisfy { !scrubbed.contains($0) })
+        XCTAssertFalse(String(decoding: try JSONSerialization.data(withJSONObject: failed), as: UTF8.self).contains(canary))
+        let status = try await probe.call("kelpie_get_script_status", ["runId": try XCTUnwrap(failed["runId"] as? String)])
+        XCTAssertNil(status["outputs"])
+        XCTAssertTrue((status["artifacts"] as? [Body])?.isEmpty == true)
+        XCTAssertFalse(String(decoding: try JSONSerialization.data(withJSONObject: status), as: UTF8.self).contains(canary))
+        let untouched = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "output", "name": "page", "source": "title"]]
+        ])
+        XCTAssertEqual((untouched["outputs"] as? Body)?["page"] as? String, variants.joined(separator: " | "))
+    }
+
+    @MainActor
     func testWorkflowTapExpiresPriorBrowserReferenceWithoutReplayingIt() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }

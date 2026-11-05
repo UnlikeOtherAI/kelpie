@@ -129,8 +129,8 @@ final class IOSWorkflowActions {
         }
         let editing = action == "type" || action == "fill"
         let sensitive = found["sensitive"] as? Bool == true || step["sensitive"] as? Bool == true
-        if sensitive, workflow.capture != nil { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         if editing, sensitive, let text = step["text"] as? String { secrets.append(text) }
+        if sensitive, workflow.capture != nil { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await movePointer(to: point)
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
