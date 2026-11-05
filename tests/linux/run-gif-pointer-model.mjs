@@ -64,6 +64,7 @@ const output = resolve(outputPath);
 const generated = spawnSync(resolve(generatorPath), [resolve(configPath), output],
   {encoding:"utf8",timeout:120000,maxBuffer:1048576});
 assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+await writeFile(join(output,"generator-process.json"),JSON.stringify({pid:generated.pid,status:generated.status}),{flag:"wx"});
 const generatedReport = JSON.parse(await readFile(join(output, "generator.json"), "utf8"));
 assert.deepEqual(generatedReport.input, config);
 assert.equal(generatedReport.encoder.palette, "RGB332-floor");
@@ -135,7 +136,7 @@ for (const item of entries.slice(1,4))
 assert.ok(entries[4].frames.every(frame=>frame.roiSHA256===model),
   "Palette-collision control is distinguishable; no ambiguity claim can be made");
 const report={version:1,confidence:"insufficient",provenance:"loader binding closure unverified",source:evidence.source,
-  candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,
+  candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,generatorPID:generated.pid,
   candidateEvidenceSHA256:await fileHash(candidateEvidencePath),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
   encoder:generatedReport.encoder,roi,cases:entries};
 await writeFile(join(output,"model-manifest.json"),JSON.stringify(report,null,2),{flag:"wx"});
