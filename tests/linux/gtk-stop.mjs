@@ -11,7 +11,7 @@ import { readNativeIdentity } from "./native-lifecycle.mjs";
 const execute = promisify(execFile);
 
 /** Standard AT-SPI Stop on one pinned native GTK process; never focus or inject input. */
-export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal }) {
+export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown }) {
   assert.equal(env.GDK_BACKEND, "wayland");
   const fixture = await startCaptureFixture();
   const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: "standard AT-SPI Action.DoAction",
@@ -58,6 +58,7 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
       "Trusted native click after encoded marker admission", 20000);
     assert.equal(report.event.trusted, true);
     report.button = await wait(() => automate("inspect"), "Native Stop button showing");
+    if (captureShown) report.nativeImage = await captureShown();
     const current = await readNativeIdentity(identity.pid); assert.equal(current?.startTicks, identity.startTicks);
     const running = await api("get-script-status");
     assert.equal(running.playing, true); assert.equal(running.state, "running");
