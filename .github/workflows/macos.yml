@@ -136,9 +136,13 @@ jobs:
       - name: Prepare explicitly requested hosted runtime
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
         run: |
+          set -euo pipefail
+          node scripts/testing/macos-workflow-acceptance.mjs --preparation started 0
+          trap 'prepare_exit=$?; node scripts/testing/macos-workflow-acceptance.mjs --preparation failed "$prepare_exit"; exit "$prepare_exit"' ERR
           brew install ffmpeg
           pnpm --filter @unlikeotherai/kelpie build
           bash scripts/testing/macos-sign-test-app.sh
+          node scripts/testing/macos-workflow-acceptance.mjs --preparation ready 0
 
       - name: Exercise owned native app without global input
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
