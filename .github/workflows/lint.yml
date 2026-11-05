@@ -11,6 +11,10 @@ on:
         description: Build Linux ABI/package candidates for affected native source (no publication)
         type: boolean
         default: false
+      linux_mux_probe:
+        description: Compare the retained Ubuntu AVC fixture through bounded mux modes
+        type: boolean
+        default: false
       linux_resource_source_run:
         description: Prior Linux candidate run ID for numeric resource diagnosis
         type: string
@@ -20,6 +24,13 @@ permissions:
   contents: read
 
 jobs:
+  linux-mux-probe:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_mux_probe
+    uses: ./.github/workflows/linux-mux-probe.yml
+    permissions:
+      contents: read
+      actions: read
+
   linux-resource-diagnostic:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_resource_source_run != ''
     uses: ./.github/workflows/linux-resource-diagnostic.yml
