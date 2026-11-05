@@ -111,7 +111,9 @@ final class WorkflowLoopbackPage {
             const v=viewport();
             edge.style.left=Math.min(innerWidth-150,v.x+v.width-50)+'px';
             edge.style.top=(v.y+v.height/2-40)+'px';
-            metrics.textContent=JSON.stringify({...v,clicks});
+            const rect=edge.getBoundingClientRect();
+            metrics.textContent=JSON.stringify({...v,clicks,edgeLeft:rect.left,edgeTop:rect.top,
+              edgeWidth:rect.width,edgeHeight:rect.height});
           };
           visualViewport.addEventListener('resize',position);visualViewport.addEventListener('scroll',position);
           edge.onclick=e=>{

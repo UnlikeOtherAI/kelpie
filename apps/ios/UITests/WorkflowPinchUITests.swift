@@ -47,7 +47,7 @@ extension WorkflowCaptureUITests {
         // same visual viewport before and after the actual gesture instead.
         XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(initial["width"] as? Double))
 
-        let tapped = try await probe.call("kelpie_play_script", [
+        let envelope = try await probe.toolEnvelope("kelpie_extension", ["name": "kelpie_play_script", "arguments": [
             "version": 1, "tabId": tab,
             "actions": [
                 ["action": "tap", "target": ["role": "button", "name": "Edge"]],
@@ -57,7 +57,21 @@ extension WorkflowCaptureUITests {
             ],
             "tapIndicator": ["color": "#00FF00", "radius": 20, "durationMs": 300, "wobble": false],
             "capture": ["formats": ["screenshots"], "maxWidth": 384]
-        ])
+        ]])
+        if envelope["ok"] as? Bool != true {
+            let after = try await pinchMetrics(tab, selector: "#zoom")
+            let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+                "beforePlay": zoomed, "afterPlay": after
+            ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
+            attachment.name = "Pinch viewport immediately before and after rejected play"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            let status = try await probe.toolEnvelope("kelpie_get_script_status", [:])
+            let error = ((status["value"] as? Body)?["runError"] as? Body) ?? [:]
+            XCTFail("MCP play failed; terminal code: " + WorkflowCaptureProbe.errorCode(["error": error]))
+            return
+        }
+        let tapped = try XCTUnwrap(envelope["value"] as? Body)
         XCTAssertEqual(tapped["success"] as? Bool, true, "\(tapped["error"] ?? "")")
         let extracted = try XCTUnwrap((tapped["outputs"] as? Body)?["geometry"] as? Body)
         let click = try pinchValue(extracted)
