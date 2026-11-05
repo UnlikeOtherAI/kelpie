@@ -21,6 +21,8 @@ final class IOSPostEvaluationProbe: NSObject, WKScriptMessageHandlerWithReply {
     func evaluate(_ expression: String) async throws -> Any? {
         guard let view else { throw IOSWorkflowFailure("TAB_CHANGED") }
         let controller = view.configuration.userContentController
+        let terminationToken = observeTermination(view)
+        defer { IOSRendererDeadline.removeTerminationObserver(view, token: terminationToken) }
         let name = "kelpieProbe" + nonce
         controller.addScriptMessageHandler(self, contentWorld: BrowserControlWebKit.world, name: name)
         defer { controller.removeScriptMessageHandler(forName: name, contentWorld: BrowserControlWebKit.world) }
@@ -39,7 +41,7 @@ final class IOSPostEvaluationProbe: NSObject, WKScriptMessageHandlerWithReply {
             self.continuation = continuation
             Task { @MainActor [self] in
                 try? await Task.sleep(nanoseconds: 4_500_000_000)
-                if !authorized { finish(.failure(IOSWorkflowFailure("TIMEOUT"))) }
+                expireIfUnapproved()
             }
             Task { @MainActor [self] in
                 do {
@@ -91,6 +93,28 @@ final class IOSPostEvaluationProbe: NSObject, WKScriptMessageHandlerWithReply {
         default:
             replyHandler(nil, "Invalid probe phase")
         }
+    }
+
+    private func observeTermination(_ view: WKWebView) -> UUID {
+        IOSRendererDeadline.observeTermination(view) { [weak self] in
+            self?.finish(.failure(IOSWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: true)))
+        }
+    }
+
+    var testIsWaiting: Bool { continuation != nil }
+
+    func testAwaitReceipt(authorized: Bool) async throws {
+        guard let view else { throw IOSWorkflowFailure("TAB_CHANGED") }
+        self.authorized = authorized
+        let token = observeTermination(view)
+        defer { IOSRendererDeadline.removeTerminationObserver(view, token: token) }
+        _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
+            self.continuation = continuation
+        }
+    }
+
+    func expireIfUnapproved() {
+        if !authorized { finish(.failure(IOSWorkflowFailure("TIMEOUT"))) }
     }
 
     private func finish(_ result: Result<Any?, Error>) {

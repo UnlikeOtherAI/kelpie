@@ -25,7 +25,9 @@ NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
 def selection(scope):
     if scope == "postedit":
         name = "testPostEvaluationCallbackKeepsKeyboardClosed"
-        return ["KelpieUITests/WorkflowCaptureUITests/" + name], {name}
+        return ["KelpieTests/IOSPostEvaluationProbeTests", "KelpieUITests/WorkflowCaptureUITests/" + name], {
+            name, "testPreAuthorizationTimeoutAndExactViewTermination"
+        }
     if scope == "geometry":
         methods = [
             "testLiveMarkerProjectionMatchesSameSceneTarget",
