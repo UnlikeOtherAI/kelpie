@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState} from "./runtime-ownership.mjs";
+import {listenerState,startupSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
@@ -28,4 +28,12 @@ test("startup waits only for missing listeners, never foreign or ambiguous owner
  assert.equal(listenerState([123],123),"owned");
  assert.equal(listenerState([456],123),"foreign");
  assert.equal(listenerState([123,456],123),"foreign");
+});
+
+test("startup log classification retains fixed labels without raw diagnostics",()=>{
+ assert.equal(startupSignal("[KelpieApp] AppReveal start requested"),"APPREVEAL_START_REQUESTED");
+ assert.equal(startupSignal("[AppReveal] Server failed: DNS Error -65570 PolicyDenied"),"APPREVEAL_POLICY_DENIED");
+ assert.equal(startupSignal("[AppReveal] Server failed: EADDRINUSE"),"APPREVEAL_ADDRESS_IN_USE");
+ assert.equal(startupSignal("[AppReveal] Server failed: PRIVATE_LOG_CANARY"),"APPREVEAL_LISTENER_FAILED");
+ assert.equal(startupSignal("page says [AppReveal] Server failed: PRIVATE_LOG_CANARY"),null);
 });
