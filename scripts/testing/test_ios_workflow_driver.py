@@ -180,6 +180,9 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+            "testPacedCaptureWithTextInteractionDisabled",
+            "testTextInteractionPreferenceRestoresAfterStop",
+            "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
         })
         self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
         _, full_names = DRIVER.selection("full")
