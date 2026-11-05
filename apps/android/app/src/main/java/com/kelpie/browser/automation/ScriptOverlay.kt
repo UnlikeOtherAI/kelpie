@@ -73,7 +73,10 @@ class ScriptOverlay {
 
     @Synchronized
     fun attach(target: View) {
-        if (view.get() !== target && retainedOwner != null) { scriptMarkerTrace("view", "VIEW_REPLACED"); clear() }
+        if (view.get() !== target && retainedOwner != null) {
+            scriptMarkerTrace("view", "VIEW_REPLACED")
+            clear()
+        }
         view = WeakReference(target)
         changed()
     }
@@ -172,14 +175,37 @@ class ScriptOverlay {
         now: Long,
         guard: () -> Boolean,
     ): RetainedTap? {
-        if (activeOwner != owner) { scriptMarkerTrace("retain", "OWNER_CHANGED"); return null }
-        val current = tap ?: run { scriptMarkerTrace("retain", "NO_TAP"); return null }
-        val currentDocument = document ?: run { scriptMarkerTrace("retain", "NO_DOCUMENT"); return null }
-        if (markerFrame?.matches() != true) { scriptMarkerTrace("retain", "FRAME_INVALID"); return null }
-        if (!runCatching(guard).getOrDefault(false)) { scriptMarkerTrace("retain", "GUARD_FAILED"); return null }
-        if (current.held || !current.durationMs.isFinite() || current.durationMs <= 0.0) { scriptMarkerTrace("retain", "TAP_INVALID"); return null }
+        if (activeOwner != owner) {
+            scriptMarkerTrace("retain", "OWNER_CHANGED")
+            return null
+        }
+        val current =
+            tap ?: run {
+                scriptMarkerTrace("retain", "NO_TAP")
+                return null
+            }
+        val currentDocument =
+            document ?: run {
+                scriptMarkerTrace("retain", "NO_DOCUMENT")
+                return null
+            }
+        if (markerFrame?.matches() != true) {
+            scriptMarkerTrace("retain", "FRAME_INVALID")
+            return null
+        }
+        if (!runCatching(guard).getOrDefault(false)) {
+            scriptMarkerTrace("retain", "GUARD_FAILED")
+            return null
+        }
+        if (current.held || !current.durationMs.isFinite() || current.durationMs <= 0.0) {
+            scriptMarkerTrace("retain", "TAP_INVALID")
+            return null
+        }
         val deadline = current.start + (current.durationMs.coerceAtMost(5_000.0) * 1_000_000).toLong()
-        if (deadline <= now) { scriptMarkerTrace("retain", "EXPIRED"); return null }
+        if (deadline <= now) {
+            scriptMarkerTrace("retain", "EXPIRED")
+            return null
+        }
         pointer = null
         commentary = null
         retainedOwner = owner
@@ -188,7 +214,11 @@ class ScriptOverlay {
         scriptMarkerTrace("retain", "ACCEPTED")
         val retained = RetainedTap(generation, owner, currentDocument, deadline)
         val delayMs = ((deadline - now + 999_999) / 1_000_000).coerceAtLeast(1)
-        val timeout = Runnable { scriptMarkerTrace("timer", "EXPIRED"); clearRetained(retained) }
+        val timeout =
+            Runnable {
+                scriptMarkerTrace("timer", "EXPIRED")
+                clearRetained(retained)
+            }
         retirementTimeout = timeout
         main.postDelayed(timeout, delayMs)
         changed()

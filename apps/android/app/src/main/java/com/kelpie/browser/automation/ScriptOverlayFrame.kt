@@ -36,21 +36,33 @@ internal class ScriptOverlayFrame private constructor(
         }
         return reason == null
     }
+
     companion object {
         @Suppress("DEPRECATION")
         fun capture(
             renderer: WebView,
             overlay: View,
         ): ScriptOverlayFrame? {
-            val rendererFrame = ViewFrame.capture(renderer) ?: run { scriptMarkerTrace("bind", "RENDERER_UNAVAILABLE"); return null }
-            val overlayFrame = ViewFrame.capture(overlay) ?: run { scriptMarkerTrace("bind", "OVERLAY_UNAVAILABLE"); return null }
+            val rendererFrame =
+                ViewFrame.capture(renderer) ?: run {
+                    scriptMarkerTrace("bind", "RENDERER_UNAVAILABLE")
+                    return null
+                }
+            val overlayFrame =
+                ViewFrame.capture(overlay) ?: run {
+                    scriptMarkerTrace("bind", "OVERLAY_UNAVAILABLE")
+                    return null
+                }
             if (!rendererFrame.sameAs(overlayFrame)) {
                 scriptMarkerTrace("bind", "FRAME_PAIR_DIFFERENT")
                 rendererFrame.difference(overlayFrame)?.let { scriptMarkerTrace("pair", it) }
                 return null
             }
             val scale = renderer.scale
-            if (!scale.isFinite() || scale <= 0f) { scriptMarkerTrace("bind", "SCALE_INVALID"); return null }
+            if (!scale.isFinite() || scale <= 0f) {
+                scriptMarkerTrace("bind", "SCALE_INVALID")
+                return null
+            }
             return ScriptOverlayFrame(
                 renderer,
                 overlay,
@@ -84,6 +96,7 @@ private class ViewFrame(
             !matrix.contentEquals(other.matrix) -> "TRANSFORM"
             else -> null
         }
+
     companion object {
         fun capture(view: View): ViewFrame? {
             if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) return null

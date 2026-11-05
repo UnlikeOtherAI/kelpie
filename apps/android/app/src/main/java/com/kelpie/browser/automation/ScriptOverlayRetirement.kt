@@ -29,7 +29,10 @@ internal object ScriptOverlayRetirement {
                 try {
                     while (overlay.isRetained(retained)) {
                         val remaining = retained.deadlineNs - System.nanoTime()
-                        if (remaining <= 0) { scriptMarkerTrace("poll", "EXPIRED"); break }
+                        if (remaining <= 0) {
+                            scriptMarkerTrace("poll", "EXPIRED")
+                            break
+                        }
                         val timeoutMs = ((remaining + 999_999) / 1_000_000).coerceIn(1, 100)
                         val permitted = withTimeoutOrNull(timeoutMs) { authority.permits() }
                         if (permitted != true) {
@@ -57,7 +60,10 @@ internal object ScriptOverlayRetirement {
                                 if (reason != null) scriptMarkerTrace("pollGuard", reason)
                                 reason == null
                             }
-                        if (!valid) { scriptMarkerTrace("poll", "SYNC_GUARD_FAILED"); break }
+                        if (!valid) {
+                            scriptMarkerTrace("poll", "SYNC_GUARD_FAILED")
+                            break
+                        }
                         val delayMs = ((retained.deadlineNs - System.nanoTime()) / 1_000_000).coerceIn(1, 25)
                         delay(delayMs)
                     }
