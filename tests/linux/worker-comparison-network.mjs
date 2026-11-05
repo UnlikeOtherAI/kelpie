@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {createConnection,isIP} from "node:net";
+import {createConnection,createServer,isIP} from "node:net";
 import {networkInterfaces} from "node:os";
 
 export function validateProbe(mode,local,nonlocal){
@@ -35,4 +35,17 @@ export async function observeWorkerBoundary(host,port){
 export async function probeWorkerBoundary(host,port,mode){
  const observed=await observeWorkerBoundary(host,port);
  return validateProbe(mode,observed.local,observed.nonlocal);
+}
+export async function observePrivateBoundary(host,port){
+ assert.equal(isIP(host),4);assert.ok(!host.startsWith("127.")&&host!=="0.0.0.0");
+ assert.ok(Number.isSafeInteger(port)&&port>0&&port<=65535);
+ const server=createServer(socket=>socket.destroy());
+ await new Promise((ok,bad)=>{server.once("error",bad);server.listen(0,"127.0.0.1",ok);});
+ try{return {local:await connection("127.0.0.1",server.address().port),nonlocal:await connection(host,port)};}
+ finally{await new Promise(ok=>server.close(ok));}
+}
+export function validatePrivateProbe(local,nonlocal){
+ assert.equal(local,"connected","LOOPBACK_PROBE_FAILED");
+ assert.ok(["EACCES","EPERM","ENETUNREACH","EHOSTUNREACH"].includes(nonlocal),"NONLOOPBACK_NOT_DENIED");
+ return {local:"connected",nonlocal:"denied"};
 }
