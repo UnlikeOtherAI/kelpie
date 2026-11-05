@@ -13,12 +13,14 @@ const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
 const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
 // Profiles describe compiled route bindings, never authority or runtime grants.
-const ToolAvailability kScriptAvailability{{P::kWindows, P::kIos, P::kAndroid}, {"chromium", "webkit"}, true, false, {},
+const ToolAvailability kScriptAvailability{kAllPlatforms, {"chromium", "webkit"}, true, false, {},
   {{P::kWindows, {"chromium"}, false, true}, {P::kIos, {"webkit"}, true, false},
-   {P::kAndroid, {"chromium"}, true, false}}};
-const ToolAvailability kScriptPlaybackAvailability{{P::kWindows, P::kIos, P::kAndroid}, {"chromium", "webkit"}, true, false, {},
+   {P::kAndroid, {"chromium"}, true, false}, {P::kMacos, {"webkit", "chromium"}, true, false},
+   {P::kLinux, {"chromium"}, true, false}, {P::kLinux, {"chromium"}, false, true, "offscreen"}}};
+const ToolAvailability kScriptPlaybackAvailability{kAllPlatforms, {"chromium", "webkit"}, true, false, {},
   {{P::kWindows, {"chromium"}, true, false}, {P::kIos, {"webkit"}, true, false},
-   {P::kAndroid, {"chromium"}, true, false}}};
+   {P::kAndroid, {"chromium"}, true, false}, {P::kMacos, {"webkit", "chromium"}, true, false},
+   {P::kLinux, {"chromium"}, true, false}, {P::kLinux, {"chromium"}, false, true, "offscreen"}}};
 const std::vector<P> kRendererPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux,
                                            P::kWindows};
 
@@ -79,12 +81,16 @@ bool SupportsEngine(const ToolAvailability& availability, std::string_view engin
   return false;
 }
 
-ToolAvailability AvailabilityForPlatform(const ToolAvailability& availability, Platform platform) {
+ToolAvailability AvailabilityForPlatform(const ToolAvailability& availability, Platform platform,
+                                        std::string_view runtime_mode) {
+  if (runtime_mode != "windowed" && runtime_mode != "offscreen") {
+    ToolAvailability unavailable; unavailable.requires_ui = true; return unavailable;
+  }
   if (availability.runtime_profiles.empty()) return availability;
   ToolAvailability projected = availability;
   projected.platforms.clear(); projected.engines.clear(); projected.runtime_profiles.clear();
   projected.requires_ui = true; projected.allowed_headless = false;
-  for (const auto& profile : availability.runtime_profiles) if (profile.platform == platform) {
+  for (const auto& profile : availability.runtime_profiles) if (profile.platform == platform && profile.runtime_mode == runtime_mode) {
     projected.platforms = {platform}; projected.engines = profile.engines;
     projected.requires_ui = profile.requires_ui; projected.allowed_headless = profile.allowed_headless;
     break;
@@ -92,8 +98,9 @@ ToolAvailability AvailabilityForPlatform(const ToolAvailability& availability, P
   return projected;
 }
 
-bool SupportsRuntime(const ToolAvailability& availability, Platform platform, std::string_view engine) {
-  const auto projected = AvailabilityForPlatform(availability, platform);
+bool SupportsRuntime(const ToolAvailability& availability, Platform platform, std::string_view engine,
+                     std::string_view runtime_mode) {
+  const auto projected = AvailabilityForPlatform(availability, platform, runtime_mode);
   return SupportsPlatform(projected, platform) && SupportsEngine(projected, engine);
 }
 

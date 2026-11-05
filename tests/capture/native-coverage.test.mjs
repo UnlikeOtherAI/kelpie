@@ -67,3 +67,25 @@ test("artifact ingestion verifies bytes independently and refuses changed/missin
     await rm(directory, { recursive: true });
   }
 });
+
+test("standard native UI instrumentation stays distinct from exported media and protocol sets", () => {
+  const native = { ...base, kind: "native-ui", protocol: "native-ui", uiDriver: "xcuitest" };
+  const nativeRow = row({ version: 1, records: [native] });
+  assert.equal(nativeRow.uiRecords[0].kind, "native-ui");
+  assert.equal(nativeRow.uiRecords[0].uiDriver, "xcuitest");
+  assert.equal(nativeRow.machineEvidence.length, 0);
+  assert.equal(nativeRow.acceptance, "unreviewed");
+  for (const [platform, uiDriver, deviceClass] of [["windows", "uia", "desktop"], ["ios", "xcuitest", "phone"],
+    ["android", "compose", "phone"], ["linux", "at-spi", "desktop"]])
+    validateEvidence({ version: 1, records: [{ ...native, platform, uiDriver, deviceClass }] });
+  for (const changed of [{ uiDriver: undefined }, { uiDriver: "os-input" }, { uiDriver: "uia" }, { runtimeMode: "offscreen" }, { protocol: "http" },
+    { binarySha256: undefined }, { entryPoint: undefined }])
+    assert.throws(() => validateEvidence({ version: 1, records: [{ ...native, ...changed }] }));
+  const media = { ...base, kind: "manual-media", protocol: undefined, visualObservation: "Viewed exported marker pixels" };
+  const mediaRow = row({ version: 1, records: [media] });
+  assert.equal(mediaRow.uiRecords.length, 0);
+  assert.equal(mediaRow.mediaRecords.length, 1);
+  const source = { ...base, kind: "unit", protocol: undefined, uiDriver: "uia" };
+  assert.equal(row({ version: 1, records: [source] }).uiRecords.length, 0);
+  validateEvidence({ version: 1, records: [{ ...base, kind: "manual-ui", protocol: undefined }] });
+});

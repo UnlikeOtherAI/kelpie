@@ -174,7 +174,7 @@ class DesktopApp::Impl {
     runtime.capabilities_supplier = [this]() {
       McpCapabilities capabilities;
       for (const McpTool& tool : mcp_registry.all_tools()) {
-        if (SupportsRuntime(tool.availability, config.platform, config.engine_name) && router.IsCallable(tool.http_endpoint)) {
+        if (SupportsRuntime(tool.availability, config.platform, config.engine_name, config.runtime_mode) && router.IsCallable(tool.http_endpoint)) {
           capabilities.supported.push_back(tool.http_endpoint);
         } else {
           capabilities.unsupported.push_back(tool.http_endpoint);
@@ -318,6 +318,9 @@ bool DesktopApp::Start(const Config& config) {
   }
 
   impl_->last_error.clear();
+  if (config.runtime_mode != "windowed" && config.runtime_mode != "offscreen") {
+    impl_->last_error = "Unknown native runtime mode"; return false;
+  }
   impl_->config = config;
   impl_->engine.SetConsoleSink([this](const nlohmann::json& event) {
     AppendConsole(impl_->console_store, event);
@@ -363,7 +366,8 @@ bool DesktopApp::Start(const Config& config) {
     return EvaluateBrowserFixed(impl_->engine, params);
   });
   impl_->mcp_server.SetPendingCheck([this] { return impl_->engine.HasPendingBrowserControl(); });
-  const DesktopMcpServer::Config gateway_config{config.platform, config.engine_name, config.app_name, config.app_version};
+  DesktopMcpServer::Config gateway_config{config.platform, config.engine_name, config.app_name, config.app_version};
+  gateway_config.runtime_mode = config.runtime_mode;
   impl_->router.Register("browser-control", [this, gateway_config](const nlohmann::json& request) {
     return impl_->mcp_server.HandleBrowserRequest(request, gateway_config);
   });

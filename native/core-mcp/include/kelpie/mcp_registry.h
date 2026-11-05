@@ -20,10 +20,12 @@ class McpRegistry {
   explicit McpRegistry(std::vector<McpTool> tools);
 
   const std::vector<McpTool>& all_tools() const;
-  std::vector<McpTool> tools_for_platform(Platform platform) const;
+  std::vector<McpTool> tools_for_platform(Platform platform, std::string_view runtime_mode = "windowed") const;
   std::vector<McpTool> tools_for_engine(std::string_view engine) const;
-  bool is_tool_available(const std::string& name, Platform platform, std::string_view engine) const;
-  McpCapabilities get_capabilities(Platform platform, std::string_view engine) const;
+  bool is_tool_available(const std::string& name, Platform platform, std::string_view engine,
+                         std::string_view runtime_mode = "windowed") const;
+  McpCapabilities get_capabilities(Platform platform, std::string_view engine,
+                                   std::string_view runtime_mode = "windowed") const;
 
  private:
   std::vector<McpTool> tools_;
