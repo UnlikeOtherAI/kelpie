@@ -31,7 +31,7 @@ const download=async run=>{
   await writeFile(resolve(output,item.id+"."+ext),bytes);artifacts.push({runId:run.runId,...item});
  }
 };
-const navigate=async()=>{assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);await pause(200);};
+const navigate=async()=>{assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);};
 try {
  await navigate();
  await check("actual page viewport facts",async()=>({native:await api("get-viewport"),
@@ -44,6 +44,7 @@ try {
    capture:{formats:["gif","video","screenshots"],fps:15,maxWidth:640,maxBytes:8388608},
    tapIndicator:{color:"#00AAFF",radius:12,durationMs:400,wobble:false,fade:false}});
   await download(result);assert.equal(result.success,true,JSON.stringify(result.error));
+  await evaluate("window.captureFixture.flush().then(()=>true)");
   const event=fixture.events.slice(from).find(e=>e.type==="click"&&e.target==="partial");
   assert.ok(event?.trusted);assert.equal(event.hit,"partial");
   assert.ok(Math.abs(event.x-(event.visible.left+event.visible.right)/2)<=1);
@@ -61,6 +62,7 @@ try {
    pointer:{enabled:true,curve,durationMs:1500,easing:"ease-in-out"},
    tapIndicator:{color:curve==="c"?"#00AAFF":"#FF0000",radius:curve==="c"?12:30,durationMs:700,wobble:curve==="s",fade:curve==="s"}});
   assert.equal(result.success,true,JSON.stringify(result.error));await download(result);
+  await evaluate("window.captureFixture.flush().then(()=>true)");
   const events=fixture.events.slice(from),clicks=events.filter(e=>e.type==="click");assert.equal(clicks.length,2);
   const moves=events.filter(e=>e.type==="pointermove");
   assert.ok(moves.every(e=>e.time-scene.began>=1400),"Presentation sent hover before configured motion elapsed");
@@ -70,7 +72,7 @@ try {
   await navigate();
   const extract=()=>api("browser-control",{version:1,method:"tab.extract",tabId,params:{fields:[{name:"heading",selector:"h1",source:"text"}],metadata:true}});
   const first=await extract();assert.equal(first.ok,true);
-  assert.equal((await api("navigate",{tabId,url:fixture.url+"/next"})).success,true);await pause(100);
+  assert.equal((await api("navigate",{tabId,url:fixture.url+"/next"})).success,true);assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);
   const second=await extract();assert.equal(second.ok,true);
   assert.notEqual(first.value.url,second.value.url);assert.deepEqual(first.value.fields[0].values,["Capture acceptance fixture"]);
   assert.deepEqual(second.value.fields[0].values,["Next document"]);
@@ -82,6 +84,7 @@ try {
   const before=await api("get-viewport");
   const pending=api("play-script",{version:1,tabId,actions:[{action:"wait",ms:2000}],
     capture:{formats:["gif","video"],fps:15,maxWidth:640,maxBytes:8388608}});
+  pending.catch(()=>{}); // Observe early transport rejection while polling controls.
   let status;for(let i=0;i<50;i++){status=await api("get-script-status");if(status.playing)break;await pause(20);}
   assert.equal(status.playing,true);
   for(const method of ["resize-viewport","reset-viewport"]){
