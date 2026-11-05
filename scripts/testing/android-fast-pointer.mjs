@@ -9,7 +9,7 @@ import { startG08Fixture, g08Workflow, mapG08Scene } from '../../tests/capture/g
 const execute = promisify(execFile);
 
 /** Acquire a real default or explicit-control run; analysis must use actual pixels and PTS. */
-export async function runAndroidFastPointer({ command, folder, tabId, durationMs, capture }) {
+export async function runAndroidFastPointer({ command, folder, tabId, durationMs, capture, beforePlay = async () => {} }) {
   assert.ok(durationMs === undefined || durationMs === 500);
   assert.equal(typeof capture, 'boolean');
   await execute('ffprobe', ['-version'], { timeout: 10000, maxBuffer: 1048576 });
@@ -34,6 +34,7 @@ export async function runAndroidFastPointer({ command, folder, tabId, durationMs
     assert.equal(Object.hasOwn(script.pointer, 'durationMs'), durationMs !== undefined);
     const scriptFile = join(folder, 'fast-script.json');
     await writeFile(scriptFile, JSON.stringify(script, null, 2));
+    await beforePlay();
     const run = await command('fast-run', ['script', 'run', scriptFile]);
     assert.equal(run.success, true);
     let facts;
