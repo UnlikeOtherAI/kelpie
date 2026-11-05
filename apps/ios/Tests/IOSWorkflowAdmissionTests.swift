@@ -275,6 +275,15 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         unknown["sensitivityKnown"] = false
         XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(unknown, token: "t1"))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t2"))
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(valid, token: "t1"))
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(valid, token: "t2"))
+        var refusal = valid
+        refusal["ok"] = false
+        refusal["error"] = "TARGET_MOVED"
+        refusal["mayHaveCompleted"] = false
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
+        refusal["mayHaveCompleted"] = true
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: nil))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: ""))
         var contradiction = valid

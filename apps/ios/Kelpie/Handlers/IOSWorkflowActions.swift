@@ -244,6 +244,7 @@ final class IOSWorkflowActions {
                 token: context.token,
                 edit: ["action": action, "text": text, "requireFocused": requireFocused],
                 acceptFinalAcknowledgement: final,
+                validatePacedAcknowledgement: true,
                 refuseSensitive: workflow.capture != nil,
                 consume: context.consume,
                 missingResult: context.missing

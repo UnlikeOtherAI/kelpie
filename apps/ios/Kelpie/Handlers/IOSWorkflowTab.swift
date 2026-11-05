@@ -169,6 +169,7 @@ final class IOSWorkflowTab {
         edit: Body? = nil,
         postMutation: Bool = false,
         acceptFinalAcknowledgement: Bool = false,
+        validatePacedAcknowledgement: Bool = false,
         refuseSensitive: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
@@ -196,6 +197,9 @@ final class IOSWorkflowTab {
                     consume?(body)
                     if IOSPacedTypingExecutor.isAcknowledgement(body, token: token) {
                         acknowledgement = body
+                    }
+                    if validatePacedAcknowledgement && IOSPacedTypingExecutor.needsPrivacyLatch(body, token: token) {
+                        missingResult?()
                     }
                     if body["sensitive"] as? Bool != true, body["sensitivityKnown"] as? Bool != true { missingResult?() }
                 },
