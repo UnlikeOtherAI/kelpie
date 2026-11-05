@@ -10,12 +10,25 @@ struct IOSBoundWorkflow {
     static let capabilities: Body = [
         "success": true, "supportedVersions": [1], "inputGuarantee": "synthetic-coordinate"
     ]
+    static func deviceCapabilities(videoAvailable: Bool) -> Body {
+        [
+            "supportedVersions": [1],
+            "inputGuarantee": "synthetic-coordinate",
+            "supportedActions": actions.sorted(),
+            "captureFormats": ["gif", "screenshots"] + (videoAvailable ? ["video"] : []),
+            "nativeSessions": false,
+            "webMcp": ["available": false, "reason": "No registered real API and explicit host grant"],
+            "lightpanda": ["available": false, "reason": "Desktop orchestration backend"]
+        ]
+    }
+
     let settings: Body
     let steps: [Body]
     let tabID: String
     let capture: Body?
     let stepScreenshots: Bool
     let sensitiveValues: [String]
+    let pacedPlans: [Int: IOSPacedTypingPlan]
 
     init(_ body: Body) throws {
         guard let input = Self.json(body),
@@ -29,12 +42,14 @@ struct IOSBoundWorkflow {
         var secrets: [String] = []
         var names: Set<String> = []
         var hasScreenshot = false
-        for step in steps {
+        var pacedPlans: [Int: IOSPacedTypingPlan] = [:]
+        for (index, step) in steps.enumerated() {
             guard let action = step["action"] as? String, Self.actions.contains(action) else {
                 throw IOSWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION")
             }
             if action == "fill" || action == "type" {
-                guard let value = step["text"] as? String else { throw IOSWorkflowFailure("UNRESOLVED_INPUT") }
+                let value = try Self.editText(step)
+                pacedPlans[index] = try Self.pacedPlan(step, action: action, text: value)
                 if step["sensitive"] as? Bool == true { secrets.append(value) }
             }
             if action == "output" || action == "extract" {
@@ -52,6 +67,7 @@ struct IOSBoundWorkflow {
         self.steps = steps
         self.tabID = tabID
         self.sensitiveValues = secrets
+        self.pacedPlans = pacedPlans
         self.stepScreenshots = (requested?["formats"] as? [String])?.contains("screenshots") == true
         if var options = requested {
             if hasScreenshot, var formats = options["formats"] as? [String], !formats.contains("screenshots") {
@@ -65,6 +81,17 @@ struct IOSBoundWorkflow {
         } else {
             capture = nil
         }
+    }
+
+    private static func pacedPlan(_ step: Body, action: String, text: String) throws -> IOSPacedTypingPlan? {
+        guard let raw = step["typingDelayMs"] else { return nil }
+        guard let delay = raw as? Int else { throw IOSWorkflowFailure("INVALID_PACED_TYPING") }
+        return try IOSPacedTypingPlan(action: action, text: text, delay: delay)
+    }
+
+    private static func editText(_ step: Body) throws -> String {
+        guard let value = step["text"] as? String else { throw IOSWorkflowFailure("UNRESOLVED_INPUT") }
+        return value
     }
 
     static func json(_ body: Body) -> String? {

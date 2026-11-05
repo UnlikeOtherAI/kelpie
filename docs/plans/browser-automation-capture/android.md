@@ -597,3 +597,15 @@ synthetic literal in earlier output. Low-FPS navigation passed on both.
 The CLI baseline retrieved decoded multichunk PNGs, but G08 C hit the 26-second
 limit on both (phone 20 frames/471 dropped; tablet 38/456); G08 S did not run.
 These outcomes do not establish native privacy or dense motion acceptance.
+Local Maxis API 35 phone replay at `a05dd952c9901ebcb70f356f0227349059303445`
+passed all seven privacy cases, including both focus handlers and refusal before
+input; the installed APK SHA-256 was
+`6bd9430e7f97dec1bb0b96a9627e2882c611df032d09c88d1bf630d456aa16b4`.
+At diagnostic `e796ef343500123f3e5364cb7293c69505a20476`, G08 C returned
+`CAPTURE_FAILED` after all six actions, with 65 frames and 360 dropped. The
+encoder consumed 21.57 s over 65 samples; visual, commit and PixelCopy stages
+averaged approximately 85, 53 and 83 ms. The marker was published and drawn
+with matching document/viewport, but every native probe had a null accessibility
+target, so the pixel detector was not invoked. Neither result closes the motion
+or native visual acceptance gates. A sampler-finalization cancellation is a
+source-identified candidate for the failure and requires device replay.

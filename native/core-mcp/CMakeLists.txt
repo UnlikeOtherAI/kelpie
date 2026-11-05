@@ -7,6 +7,7 @@ add_library(kelpie_core_mcp STATIC
   src/browser_schema.cpp
   src/browser_gateway.cpp
   src/browser_gateway_c_api.cpp
+  src/script_typing_plan.cpp
   src/browser_mcp.cpp
   src/native_extension_schema.cpp
 )

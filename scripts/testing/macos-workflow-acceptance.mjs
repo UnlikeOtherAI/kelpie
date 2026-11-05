@@ -2,7 +2,7 @@
 import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
 import {StringDecoder} from "node:string_decoder";
-import {startupSignal,navigationSignal} from "../../tests/macos/runtime-ownership.mjs";
+import {startupSignal,navigationSignal,editFocusSignal,viewportSignal} from "../../tests/macos/runtime-ownership.mjs";
 import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
@@ -38,7 +38,7 @@ const report={source,platform:process.platform,
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
-const startupSignals=[],navigationSignals=[];
+const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[];
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],env:{...process.env,NSUnbufferedIO:"YES"}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
@@ -49,12 +49,14 @@ for(const stream of [child.stdout,child.stderr]){
   while((index=text.indexOf("\n"))>=0){const line=text.slice(0,index).trim();text=text.slice(index+1);
    if(["launch","listeners"].includes(phase)){const signal=startupSignal(line);if(signal&&!startupSignals.includes(signal))startupSignals.push(signal);}
    const navigation=navigationSignal(line);if(navigation&&navigationSignals.length<32)navigationSignals.push(navigation);
+   const focus=editFocusSignal(line);if(focus&&editFocusSignals.length<32)editFocusSignals.push(focus);
+   const viewport=viewportSignal(line);if(viewport&&viewportSignals.length<32)viewportSignals.push(viewport);
   }
  });
 }
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
- report.pid=child.pid;client=new Client(child.pid,out);phase="listeners";
+ report.pid=child.pid;client=new Client(child.pid,out,executable);phase="listeners";
  await waitFor(()=>client.ready(),30000);
  phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
  fixture=await startFixture();phase="webkit";
@@ -88,7 +90,7 @@ finally{
  child.stdout?.destroy();child.stderr?.destroy();child.unref();
  report.childExit=childExit;report.readiness=client?.readiness??[];
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
- report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;
+ report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;report.editFocusSignals=editFocusSignals;report.viewportSignals=viewportSignals;
  report.artifacts=client?.artifacts??[];
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
 }

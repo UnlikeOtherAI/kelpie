@@ -39,10 +39,16 @@ def selection(scope):
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
+                "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedUnknownPostMutationSensitivityStops",
+                "testPacedEditsArePlannedBeforeAnyEarlierAction",
+                "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
+                "testPacedExecutorStopsWithoutReplayAndPreservesUncertainty",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
+                "testDefaultPointerMotionUsesShorterNativeTiming",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
@@ -50,6 +56,11 @@ def selection(scope):
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
+                "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
+                "testPacedFocusLossStopsWithoutRetargeting",
+                "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
+                "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
+                "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",
             ])
         targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
@@ -62,6 +73,11 @@ def selection(scope):
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
+                "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedUnknownPostMutationSensitivityStops",
+                "testPacedEditsArePlannedBeforeAnyEarlierAction",
+                "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
+                "testPacedExecutorStopsWithoutReplayAndPreservesUncertainty",
             ])
     return targets, required
 

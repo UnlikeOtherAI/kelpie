@@ -5,6 +5,7 @@ import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
 import {runG08} from "./runtime-g08.mjs";
+import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
@@ -19,6 +20,7 @@ export async function runEngine(client,fixture,engine,report) {
    tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
   checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
+  const focus=await client.focusOwnedBrowser();
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");
   await client.tap("browser.action.more",more);
   const id="browser.renderer."+engine,window=await waitFor(()=>client.find(id));
@@ -26,7 +28,7 @@ export async function runEngine(client,fixture,engine,report) {
   await waitFor(async()=>{const value=await client.api("get-renderer");return value.engine===engine;});
   const resized=await client.api("resize-viewport",{width:900,height:700});
   requireTrue(resized.success,"NATIVE_VIEWPORT_RESIZE");
-  return await client.screenshot(engine+"-renderer");
+  return {...await client.screenshot(engine+"-renderer"),focus};
  });
  const tabs=await client.api("get-tabs");
  const entries=Array.isArray(tabs)?tabs:tabs.tabs;
@@ -62,6 +64,26 @@ export async function runEngine(client,fixture,engine,report) {
    {action:"extract",name:"catalogue",params:{scope:"#catalogue",fields:[{name:"tea",selector:"h3",source:"text",multiple:true}],metadata:true}}]});
   semanticPlay=playFacts(result);
   semanticStage="validate-output";
+  if(!result.success){
+   const codes=new Set(["INPUT_UNCERTAIN","INPUT_INTERRUPTED","SENSITIVE_CAPTURE_REFUSED","DOCUMENT_CHANGED",
+    "AUTHORIZATION_REVOKED","CAPTURE_DOCUMENT_CHANGED","CAPTURE_VIEWPORT_CHANGED","CAPTURE_FAILED",
+    "CAPTURE_DURATION_LIMIT","CAPTURE_ADMISSION_FAILED","TAB_CHANGED","TAB_NOT_VISIBLE","RENDERER_CHANGED",
+    "TARGET_FAILED","TARGET_MOVED","TARGET_NOT_FOUND","TARGET_NOT_EDITABLE","TARGET_NOT_INTERACTABLE",
+    "TIMEOUT","WEBVIEW_ERROR","WORKFLOW_FAILED","COMMAND_FAILED","BUSY","UNAUTHORIZED"]);
+   const classify=code=>codes.has(code)?code:"OTHER";
+   const evidence={engine,mcpCode:classify(result.error?.code)};
+   report.semanticFailure=evidence;
+   try{
+    const status=await client.api("get-script-status");
+    evidence.status={success:status.success===true,state:["idle","running","finalizing","completed","failed","aborted"].includes(status.state)?status.state:"OTHER",
+     hasRunId:typeof status.runId==="string",runSuccess:status.runSuccess===true?true:status.runSuccess===false?false:null,
+     runError:classify(status.runError?.code),mayHaveCompleted:status.mayHaveCompleted===true,
+     artifactCount:Array.isArray(status.artifacts)?status.artifacts.length:null};
+   }catch(error){evidence.statusException=errorFacts(error);}
+   const events=fixture.events.slice(begin);
+   evidence.entryInputObserved=events.some(event=>event.type==="input"&&event.target==="entry");
+   evidence.submitClickObserved=events.some(event=>event.type==="click"&&event.target==="submit");
+  }
   requireTrue(result.success,"SEMANTIC_WORKFLOW");
   const field=result.outputs?.catalogue?.fields?.[0];
   requireTrue(field?.status==="ok"&&field.values.join("|")==="Green tea|Black tea"&&field.provenance.selector==="h3","STRUCTURED_EXTRACTION_PROVENANCE");
@@ -75,6 +97,8 @@ export async function runEngine(client,fixture,engine,report) {
   semanticStage="media-decode";
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
+ await runPaced({client,fixture,engine,base,capture,check,load,play});
+ await load();
  await check("observation-and-readiness-public-entry",async()=>{
   const results={};
   for(const [method,params] of [["tab.status",{}],["tab.ready",{state:"complete",selector:"#submit"}],["tab.snapshot",{}]]){
@@ -190,7 +214,14 @@ export async function runEngine(client,fixture,engine,report) {
     "TARGET_OUTSIDE_VIEWPORT","TARGET_QUERY_LIMIT","TIMEOUT","UNAUTHORIZED","VIEWPORT_CHANGED","WEBVIEW_ERROR",
     "WORKFLOW_FAILED"]);
    const events=fixture.events.slice(begin);
-   const failure={engine,formats:formats.length,code:codes.has(result.error?.code)?result.error.code:"OTHER",
+   const initial=fixture.events.slice(0,begin).filter(e=>e.type==="document"&&e.path==="/").at(-1);
+   const next=events.find(e=>e.type==="document"&&e.path==="/next");
+   const number=value=>typeof value==="number"&&Number.isFinite(value)&&value>=0&&value<=100000?value:null;
+   const geometry=event=>event?{innerWidth:number(event.viewport?.width),innerHeight:number(event.viewport?.height),
+    clientWidth:number(event.viewport?.clientWidth),clientHeight:number(event.viewport?.clientHeight),
+    pixelRatio:number(event.viewport?.pixelRatio),visualWidth:number(event.visual?.width),
+    visualHeight:number(event.visual?.height),visualScale:number(event.visual?.scale)}:null;
+   const failure={engine,formats:formats.length,initialGeometry:geometry(initial),nextGeometry:geometry(next),code:codes.has(result.error?.code)?result.error.code:"OTHER",
     mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:Number.isInteger(result.actionsExecuted)?result.actionsExecuted:null,
     clickObserved:events.some(e=>e.type==="click"&&e.target==="next"),
     nextDocumentObserved:events.some(e=>e.type==="document"&&e.path==="/next"),play:playFacts(result)};

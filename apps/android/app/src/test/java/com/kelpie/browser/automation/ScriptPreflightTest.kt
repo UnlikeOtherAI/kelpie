@@ -51,6 +51,19 @@ class ScriptPreflightTest {
     }
 
     @Test
+    fun pacedEditsRefuseBeforeAnyActionUntilNativeAdapterSupportsThem() {
+        for (kind in listOf("fill", "type")) {
+            val edit = mapOf("action" to kind, "target" to mapOf("selector" to "input"), "text" to "text")
+            assertEquals(script(edit), ScriptPreflight.admit(script(edit)))
+            refuses(
+                "UNSUPPORTED_SCRIPT_ACTION",
+                script(mapOf("action" to "wait", "ms" to 1), edit + ("typingDelayMs" to 50)) +
+                    ("capture" to mapOf("formats" to listOf("gif"))),
+            )
+        }
+    }
+
+    @Test
     fun sensitiveCaptureAndDuplicateOutputsRefuseBeforeMutation() {
         val secret = mapOf("action" to "fill", "target" to mapOf("selector" to "input"), "text" to "private", "sensitive" to true)
         refuses("SENSITIVE_CAPTURE_REFUSED", script(secret) + ("capture" to mapOf("formats" to listOf("gif"))))

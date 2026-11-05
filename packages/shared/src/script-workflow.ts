@@ -44,8 +44,8 @@ export const scriptActionSchema = z.discriminatedUnion("action", [
   action({ action: z.literal("navigate"), url: z.string().regex(/^https?:\/\//).max(4096) }),
   action({ action: z.literal("click"), target }),
   action({ action: z.literal("tap"), target }),
-  action({ action: z.literal("fill"), target, text: workflowValueSchema, sensitive: z.boolean().optional() }),
-  action({ action: z.literal("type"), target, text: workflowValueSchema, sensitive: z.boolean().optional() }),
+  action({ action: z.literal("fill"), target, text: workflowValueSchema, sensitive: z.boolean().optional(), typingDelayMs: z.number().int().min(1).max(1000).optional() }),
+  action({ action: z.literal("type"), target, text: workflowValueSchema, sensitive: z.boolean().optional(), typingDelayMs: z.number().int().min(1).max(1000).optional() }),
   action({ action: z.literal("press-key"), key: z.string().min(1).max(64) }),
   action({ action: z.literal("scroll"), deltaX: z.number().default(0), deltaY: z.number() }),
   action({ action: z.literal("wait"), ms: z.number().int().min(0).max(120_000) }),
@@ -107,12 +107,14 @@ const targetRequestBase = {
   token: z.string().min(1).max(128).optional(),
 };
 export const scriptTargetRequestSchema = z.union([
+  z.object({ ...targetRequestBase, token: z.string().min(1).max(128), proveNonInput: z.literal(true),
+    dispatch: z.literal(false).optional(), observe: z.literal(false).optional() }).strict(),
   z.object({ ...targetRequestBase, token: z.string().min(1).max(128), postMutation: z.literal(true),
     dispatch: z.literal(false).optional(), observe: z.literal(false).optional() }).strict(),
   z.object({ ...targetRequestBase, dispatch: z.literal(true), observe: z.literal(false).optional() }).strict(),
   z.object({ ...targetRequestBase, dispatch: z.literal(false).optional(), observe: z.literal(true) }).strict(),
   z.object({ ...targetRequestBase, dispatch: z.literal(false).optional(), observe: z.literal(false).optional(),
-    edit: z.object({ action: z.enum(["fill", "type"]), text: z.string().max(16_000) }).strict() }).strict(),
+    edit: z.object({ action: z.enum(["fill", "type"]), text: z.string().max(16_000), requireFocused: z.boolean().optional() }).strict() }).strict(),
   z.object({ ...targetRequestBase, dispatch: z.literal(false).optional(), observe: z.literal(false).optional() }).strict(),
 ]);
 export const scriptArtifactChunkSchema = z.object({

@@ -160,6 +160,7 @@ final class IOSWorkflowTab {
         observe: Bool = false,
         dispatch: Bool = false,
         edit: Body? = nil,
+        postMutation: Bool = false,
         refuseSensitive: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
@@ -168,6 +169,7 @@ final class IOSWorkflowTab {
         if let token { options["token"] = token }
         if observe { options["observe"] = true }
         if let edit { options["edit"] = edit }
+        if postMutation { options["postMutation"] = true }
         if refuseSensitive { options["policy"] = ["refuseSensitive": true] }
         guard let input = IOSBoundWorkflow.json(options),
               let pointer = kelpie_browser_script_target_expression(input) else { throw IOSWorkflowFailure("INVALID_TARGET") }

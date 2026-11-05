@@ -24,8 +24,13 @@ class ScriptCliBridgeTest : ScriptPublicFixture() {
                         scriptNoiseFixture,
                     ),
                 )
-                val bridge = File(evidence, "cli-bridge.json")
-                val finish = File(evidence, "cli-finish.txt")
+                val bridgeId =
+                    androidx.test.platform.app.InstrumentationRegistry
+                        .getArguments()
+                        .getString("bridgeId")
+                require(bridgeId != null && bridgeId.matches(Regex("[A-Za-z0-9-]{1,64}"))) { "A unique bridgeId is required" }
+                val bridge = File(evidence, "cli-bridge-$bridgeId.json")
+                val finish = File(evidence, "cli-finish-$bridgeId.txt")
                 assertTrue(!finish.exists())
                 bridge.writeText(JSONObject().put("tabId", tab).put("url", server.url("/cli").toString()).toString())
                 ui.waitUntil(60_000) { ui.onAllNodesWithText("Always allow").fetchSemanticsNodes().isNotEmpty() }

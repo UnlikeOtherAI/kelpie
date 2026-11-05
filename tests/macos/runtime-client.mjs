@@ -2,7 +2,7 @@ import {execFileSync,spawn} from "node:child_process";
 import {writeFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import path from "node:path";
-import {listenerState} from "./runtime-ownership.mjs";
+import {listenerState,processCommandMatches} from "./runtime-ownership.mjs";
 import {artifactFacts,errorFacts,toolEnvelopeFacts} from "./runtime-diagnostics.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 export const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -18,7 +18,7 @@ export async function waitFor(run,ms=10000){
  throw last??new Failure("WAIT_TIMEOUT");
 }
 export class Client {
- constructor(pid,out){this.pid=pid;this.out=out;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
+ constructor(pid,out,executable){this.pid=pid;this.out=out;this.executable=executable;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
  pin(port){requireTrue(listenerState(listeners(port),this.pid)==="owned","LISTENER_IDENTITY");}
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
   if(this.readiness.at(-1)?.states.join(",")!==states.join(",")&&this.readiness.length<16)this.readiness.push({elapsedMs:Date.now()-this.began,states});
@@ -60,6 +60,21 @@ export class Client {
  }
  async tap(id,windowId){const value=await this.tool("tap_element",{element_id:id,...(windowId?{window_id:windowId}:{})},true);requireTrue(value.success,"NATIVE_CONTROL_UNAVAILABLE");}
  async windows(){return (await this.tool("list_windows",{},true)).windows;}
+ async focusOwnedBrowser(){
+  const verify=()=>{
+   this.pin(28420);this.pin(8421);
+   const command=execFileSync("/bin/ps",["-p",String(this.pid),"-o","command="],{encoding:"utf8"});
+   requireTrue(processCommandMatches(command,this.executable),"OWNED_EXECUTABLE_IDENTITY");
+  };
+  verify();
+  const window=await waitFor(()=>this.find("browser.action.more"));
+  verify();
+  const result=await this.tool("focus_window",{window_id:window},true);
+  requireTrue(result.success===true&&result.window_id===window,"OWNED_WINDOW_FOCUS");
+  await waitFor(async()=>((await this.windows()).find(item=>item.id===window)?.isKey===true));
+  verify();
+  return {candidatePathVerified:true,listenersOwned:true,keyWindow:true};
+ }
  async screenshot(name){
   const windows=await this.windows();const target=windows.find(w=>w.isKey)??windows[0];
   requireTrue(target,"NO_VISIBLE_WINDOW");

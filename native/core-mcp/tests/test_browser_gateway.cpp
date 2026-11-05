@@ -224,6 +224,13 @@ void ScriptAssets() {
   kelpie_mcp_free_string(encoded);
   assert(result["valid"] == true);
   assert(result["script"]["defaultWaitBetweenActions"] == 0);
+  script["actions"] = {{{"action","type"},{"target",{{"selector","#edit"}}},{"text","x"},{"typingDelayMs",50}}};
+  encoded = kelpie_browser_validate_script(script.dump().c_str());
+  assert(encoded && json::parse(encoded)["valid"] == true); kelpie_mcp_free_string(encoded);
+  script["actions"][0]["typingDelayMs"] = 0;
+  encoded = kelpie_browser_validate_script(script.dump().c_str());
+  assert(encoded && json::parse(encoded)["valid"] == false); kelpie_mcp_free_string(encoded);
+  script["actions"] = {{{"action","screenshot"}}};
   script["capture"] = {{"formats", {"gif", "gif"}}};
   encoded = kelpie_browser_validate_script(script.dump().c_str());
   assert(json::parse(encoded)["valid"] == false);
@@ -237,13 +244,17 @@ void ScriptAssets() {
   target["policy"] = {{"refuseSensitive", true}};
   encoded = kelpie_browser_script_target_expression(target.dump().c_str());
   assert(encoded);
-  assert(json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},false))json") != std::string::npos);
+  assert(json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},false,false))json") != std::string::npos);
   kelpie_mcp_free_string(encoded);
   target["token"] = "t1"; target["postMutation"] = true;
   encoded = kelpie_browser_script_target_expression(target.dump().c_str());
-  assert(encoded && json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},true))json") != std::string::npos);
+  assert(encoded && json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},true,false))json") != std::string::npos);
   kelpie_mcp_free_string(encoded);
   target.erase("postMutation");
+  target["proveNonInput"] = true;
+  encoded = kelpie_browser_script_target_expression(target.dump().c_str());
+  assert(encoded && json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},false,true))json") != std::string::npos);
+  kelpie_mcp_free_string(encoded); target.erase("proveNonInput");
   target["observe"] = true; target["dispatch"] = true;
   assert(kelpie_browser_script_target_expression(target.dump().c_str()) == nullptr);
   encoded = kelpie_browser_validate_script(nullptr);
@@ -274,4 +285,25 @@ void FixedObservations() {
   step = gateway.Begin(Request("tab.ready", {{"timeoutMs", 1000}}));
   assert(step["response"]["error"]["code"] == "INVALID_ARGUMENTS");
 }
-int main() { ScriptAssets(); FixedObservations(); ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+void PacedTypingPlan() {
+  const auto plan = [](const json& input) {
+    char* encoded = kelpie_browser_script_typing_plan(input.dump().c_str());
+    assert(encoded); const auto result = json::parse(encoded); kelpie_mcp_free_string(encoded);
+    return result;
+  };
+  const std::string text = std::string("A") + "\xF0\x9F\x98\x80" + "e" + "\xCC\x81";
+  auto result = plan({{"action","fill"},{"text",text},{"typingDelayMs",50}});
+  assert(result["valid"] == true && result["clearFirst"] == true);
+  assert(result["scalars"] == json::array({"A", "\xF0\x9F\x98\x80", "e", "\xCC\x81"}));
+  result = plan({{"action","type"},{"text",""},{"typingDelayMs",1000}});
+  assert(result["valid"] == true && result["clearFirst"] == false && result["scalars"].empty());
+  assert(plan({{"action","fill"},{"text",""},{"typingDelayMs",1}})["clearFirst"] == true);
+  for (int delay : {0,1001}) assert(plan({{"action","type"},{"text","x"},{"typingDelayMs",delay}})["valid"] == false);
+  assert(plan({{"action","type"},{"text",std::string(1001,'x')},{"typingDelayMs",1}})["valid"] == false);
+  assert(plan({{"action","type"},{"text",std::string(1000,'x')},{"typingDelayMs",60}})["valid"] == true);
+  assert(plan({{"action","type"},{"text",std::string(1000,'x')},{"typingDelayMs",61}})["valid"] == false);
+  char* invalid = kelpie_browser_script_typing_plan(R"json({"action":"type","text":"\ud800","typingDelayMs":1})json");
+  assert(invalid && json::parse(invalid)["valid"] == false);
+  assert(std::string(invalid).find("d800") == std::string::npos); kelpie_mcp_free_string(invalid);
+}
+int main() { PacedTypingPlan(); ScriptAssets(); FixedObservations(); ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

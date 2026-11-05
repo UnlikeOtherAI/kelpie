@@ -18,6 +18,8 @@ export interface ScriptTargetResult {
   enabled?: boolean;
   sensitive?: boolean;
   sensitivityKnown?: boolean;
+  sensitivityClass?: "input" | "non-input" | "unknown";
+  focusFailure?: "document-focus" | "target-focus" | "identity" | "viewport" | "eligibility" | "budget" | "geometry" | "hit" | "sensitivity" | "unknown";
   editable?: boolean;
   focused?: boolean;
 }
@@ -27,7 +29,7 @@ export interface ScriptTargetResult {
  * Resolution stores object identity; preflight never silently retargets after animation.
  * Optional dispatch is atomic synthetic coordinate input, never advertised as trusted input.
  */
-export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string }, observe = false, policy?: { refuseSensitive: boolean }, postMutation = false): ScriptTargetResult {
+export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string; requireFocused?: boolean }, observe = false, policy?: { refuseSensitive: boolean }, postMutation = false, proveNonInput = false): ScriptTargetResult {
   interface VisualViewportFrame { x: number; y: number; width: number; height: number; scale: number };
   interface Entry { sensitive?: boolean; visual: VisualViewportFrame; element: Element; document: Document; inputType?: string; readOnly?: boolean; rectX: number; rectY: number; rectWidth: number; rectHeight: number; x: number; y: number; width: number; height: number; coordinate: boolean; url: string; viewportWidth: number; viewportHeight: number };
   interface State { document: Document; documentId: string; next: number; entries: Record<string, Entry> };
@@ -38,13 +40,28 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     Object.defineProperty(window, key, { configurable: true, value: state });
   }
   let entry: Entry | undefined = token ? state.entries[token] : undefined;
+  const intrinsic = (prototype: object, property: string, element: Element): { kind: "match" | "other" | "unknown"; value?: unknown } => {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, property);
+    const getter: unknown = descriptor && Reflect.get(descriptor, "get");
+    if (typeof getter !== "function") return { kind: "unknown" };
+    try { return { kind: "match", value: Reflect.apply(getter, element, []) }; }
+    catch (error) { return { kind: error instanceof TypeError ? "other" : "unknown" }; }
+  };
   const sensitivity = (): boolean => {
     if (entry) entry.sensitive = entry.sensitive === true || (entry.element instanceof HTMLInputElement &&
       (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)));
+    if (entry && proveNonInput) {
+      const type = intrinsic(HTMLInputElement.prototype, "type", entry.element);
+      const autocomplete = intrinsic(HTMLInputElement.prototype, "autocomplete", entry.element);
+      if (type.kind === "match" && autocomplete.kind === "match")
+        entry.sensitive = entry.sensitive === true || type.value === "password" ||
+          (typeof autocomplete.value === "string" && /^(current|new)-password$/.test(autocomplete.value));
+    }
     return entry?.sensitive === true;
   };
   const fail = (error: string, mayHaveCompleted = false): ScriptTargetResult =>
     ({ ok: false, error, mayHaveCompleted, sensitive: sensitivity(), sensitivityKnown: entry !== undefined });
+  if (proveNonInput && (!token || dispatch || edit || observe || postMutation)) return fail("INVALID_TARGET_OPERATION");
   if (postMutation) {
     if (!token || dispatch || edit || observe) return fail("INVALID_TARGET_OPERATION", true);
     const sensitive = sensitivity();
@@ -225,6 +242,14 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   if (entry.x < viewport.left || entry.y < viewport.top || entry.x >= viewport.right || entry.y >= viewport.bottom) return fail("TARGET_OUTSIDE_VIEWPORT");
   const hit = document.elementFromPoint(entry.x, entry.y);
   if (!hit || (hit !== entry.element && !entry.element.contains(hit))) return fail("TARGET_OBSCURED");
+  let sensitivityClass: ScriptTargetResult["sensitivityClass"];
+  if (proveNonInput) {
+    const input = intrinsic(HTMLInputElement.prototype, "type", entry.element);
+    const button = intrinsic(HTMLButtonElement.prototype, "disabled", entry.element);
+    const anchor = intrinsic(HTMLAnchorElement.prototype, "href", entry.element);
+    sensitivityClass = input.kind === "match" ? "input" : input.kind === "other" && hit === entry.element &&
+      (button.kind === "match" || anchor.kind === "match") ? "non-input" : "unknown";
+  }
   const unchanged = (): boolean => entry.element.isConnected && hit.isConnected && entry.document === document &&
     entry.url === location.href && unchangedViewport() &&
     eligible(entry.element) && !isLimited() && unchangedGeometry() && document.elementFromPoint(entry.x, entry.y) === hit &&
@@ -234,10 +259,17 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     const el = entry.element;
     if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) || el.readOnly || el.disabled ||
         (el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type))) return fail("TARGET_NOT_EDITABLE");
-    el.focus();
-    if (document.activeElement !== el || !document.hasFocus()) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false };
+    if (!edit.requireFocused) el.focus();
+    if (!document.hasFocus()) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false, focusFailure: "document-focus" };
+    if (document.activeElement !== el) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false, focusFailure: "target-focus" };
     if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
-    if (!unchanged()) return fail("INPUT_UNCERTAIN", true);
+    if (!unchanged()) {
+      const reason = !entry.element.isConnected || !hit.isConnected || entry.document !== document || entry.url !== location.href ? "identity"
+        : !unchangedViewport() ? "viewport" : !eligible(entry.element) ? "eligibility" : isLimited() ? "budget"
+        : !unchangedGeometry() ? "geometry" : document.elementFromPoint(entry.x, entry.y) !== hit ? "hit"
+        : sensitivity() && policy?.refuseSensitive ? "sensitivity" : "unknown";
+      return { ...fail("INPUT_UNCERTAIN", true), focusFailure: reason };
+    }
     try {
       const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
       const descriptor = Object.getOwnPropertyDescriptor(proto, "value");
@@ -263,5 +295,5 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
     } catch { return fail("INPUT_UNCERTAIN", true); }
   }
-  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: sensitivity(), sensitivityKnown: true, viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
+  return { ok: true, ...(proveNonInput ? { sensitivityClass } : {}), token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: sensitivity(), sensitivityKnown: true, viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
 }

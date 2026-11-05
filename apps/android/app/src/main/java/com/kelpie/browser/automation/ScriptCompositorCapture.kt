@@ -28,6 +28,7 @@ import kotlin.math.round
 internal class ScriptCompositorCapture(
     private val view: WebView,
     private val scene: () -> Long,
+    private val diagnostics: ScriptCaptureDiagnostics = ScriptCaptureDiagnostics(),
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
@@ -112,16 +113,20 @@ internal class ScriptCompositorCapture(
     @RequiresApi(Build.VERSION_CODES.Q)
     private suspend fun awaitCommittedFrameOnQ() {
         suspendCancellableCoroutine<Unit> { continuation ->
+            val visualStarted = System.nanoTime()
             view.postVisualStateCallback(
                 0,
                 object : WebView.VisualStateCallback() {
                     override fun onComplete(requestId: Long) {
+                        diagnostics.record(ScriptCaptureDiagnostics.Phase.VISUAL, System.nanoTime() - visualStarted)
                         if (!continuation.isActive) return
                         if (!view.isAttachedToWindow) {
                             continuation.resumeWithException(ScriptFailure("CAPTURE_VIEW_UNAVAILABLE"))
                             return
                         }
+                        val commitStarted = System.nanoTime()
                         view.viewTreeObserver.registerFrameCommitCallback {
+                            diagnostics.record(ScriptCaptureDiagnostics.Phase.COMMIT, System.nanoTime() - commitStarted)
                             if (continuation.isActive) continuation.resume(Unit)
                         }
                         view.invalidate()
@@ -136,11 +141,15 @@ internal class ScriptCompositorCapture(
         width: Int,
         height: Int,
     ): Bitmap {
-        if (!ScriptPixelCopySlot.acquire()) throw ScriptFailure("CAPTURE_FAILED")
+        if (!ScriptPixelCopySlot.acquire()) {
+            diagnostics.failure(ScriptCaptureDiagnostics.Failure.SLOT_BUSY)
+            throw ScriptFailure("CAPTURE_FAILED")
+        }
         val bitmap =
             try {
                 Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             } catch (error: Throwable) {
+                diagnostics.failure(ScriptCaptureDiagnostics.Failure.BITMAP_CREATE)
                 ScriptPixelCopySlot.release()
                 throw error
             }
@@ -161,6 +170,7 @@ internal class ScriptCompositorCapture(
                 handler,
             )
         } catch (error: Throwable) {
+            diagnostics.failure(ScriptCaptureDiagnostics.Failure.PIXEL_REQUEST)
             // A synchronous refusal does not transfer the bitmap to PixelCopy.
             gate.complete()
             gate.abandon()
@@ -168,7 +178,14 @@ internal class ScriptCompositorCapture(
             throw ScriptFailure("CAPTURE_FAILED")
         }
         try {
-            if (completed.await() != PixelCopy.SUCCESS || !gate.claim()) throw ScriptFailure("CAPTURE_FAILED")
+            if (completed.await() != PixelCopy.SUCCESS) {
+                diagnostics.failure(ScriptCaptureDiagnostics.Failure.PIXEL_STATUS)
+                throw ScriptFailure("CAPTURE_FAILED")
+            }
+            if (!gate.claim()) {
+                diagnostics.failure(ScriptCaptureDiagnostics.Failure.GATE_CLAIM)
+                throw ScriptFailure("CAPTURE_FAILED")
+            }
             return bitmap
         } catch (error: Throwable) {
             // The bitmap remains private and occupied until any late callback.

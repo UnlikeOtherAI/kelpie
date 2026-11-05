@@ -23,3 +23,20 @@ export function navigationSignal(line){
  const match=/^\[WorkflowNavigation\] failure=(BUSY|NAVIGATION_ERROR|TIMEOUT|NO_WEBVIEW|TAB_NOT_FOUND|INVALID_URL|RECORDING_IN_PROGRESS|UNCLASSIFIED)$/.exec(line);
  return match?.[1]??null;
 }
+
+// Fixed focus state only; never retain a page value or window identifier.
+export function editFocusSignal(line){
+ const match=/^\[WorkflowEditFocus\] phase=(before|after|result) key=([01u]) responder=([01u]) doc=([01u]) body=([01u]) target=([01u])$/.exec(line);
+ return match?{phase:match[1],key:match[2],responder:match[3],documentFocused:match[4],activeBody:match[5],targetFocused:match[6]}:null;
+}
+
+// The hosted driver launches this exact executable with these exact arguments.
+export function processCommandMatches(command,executable){
+ return typeof command==="string"&&typeof executable==="string"&&command.trim()===executable+" --port 28420";
+}
+
+// Fixed numeric geometry differences only; no URLs, titles or page content.
+export function viewportSignal(line){
+ const match=/^\[WorkflowViewport\] bounds=([01]) layout=([01]) visible=([01]) scale=([01]) pixel=([01]) widths=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2}) heights=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2})$/.exec(line);
+ return match?{boundsSame:match[1]==="1",layoutSame:match[2]==="1",visibleSame:match[3]==="1",scaleSame:match[4]==="1",pixelSame:match[5]==="1",oldWidth:Number(match[6]),newWidth:Number(match[7]),oldHeight:Number(match[8]),newHeight:Number(match[9])}:null;
+}
