@@ -267,6 +267,12 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         }
         try ScriptWorkflowActions.requirePacedAckShape(known)
         try ScriptWorkflowActions.requirePacedAckShape(unknown)
+        var positiveUnknown = unknown
+        positiveUnknown["sensitive"] = true
+        try ScriptWorkflowActions.requirePacedClassification(positiveUnknown, hasFurther: true, discardMedia: false)
+        XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedClassification(positiveUnknown, hasFurther: true, discardMedia: true)) {
+            XCTAssertEqual(($0 as? ScriptWorkflowFailure)?.code, "SENSITIVE_CAPTURE_REFUSED")
+        }
         XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedAckShape(["ok": true, "sensitive": false])) {
             let failure = $0 as? ScriptWorkflowFailure
             XCTAssertEqual(failure?.code, "INPUT_UNCERTAIN")

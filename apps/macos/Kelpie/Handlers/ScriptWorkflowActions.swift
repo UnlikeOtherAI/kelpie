@@ -266,9 +266,9 @@ final class ScriptWorkflowActions {
 
     static func requirePacedClassification(_ result: Body, hasFurther: Bool, discardMedia: Bool) throws {
         if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
-        if hasFurther && ScriptWorkflowBoolean.value(result["sensitivityKnown"]) != true {
-            throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
-        }
+        let known = ScriptWorkflowBoolean.value(result["sensitive"]) == true ||
+            ScriptWorkflowBoolean.value(result["sensitivityKnown"]) == true
+        if hasFurther && !known { throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) }
     }
 
     private func performPaced(
