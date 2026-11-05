@@ -15,7 +15,7 @@ function fixture(){
  const manifest={version:1,source:"source",candidateBinarySHA256:"binary",candidateEvidenceSHA256:"evidence",
   mediaObjectSHA256:{gif:"object"},mediaArchiveSHA256:"archive",candidateLinkMapSHA256:"link",generatorDependencies:dependencies,
   encoder:{mimeType:"image/gif",palette:"RGB332-floor",sourcePixelFormat:"BGRA8-opaque"},
-  input:{width:640,height:450,fps:20,frameCount:30,viewportWidth:1280,viewportHeight:900,visualViewport:view,pointer:{x:960,y:450}},
+  input:{backingBGRA:Buffer.alloc(71*71*4,255).toString("base64"),width:640,height:450,fps:20,frameCount:30,viewportWidth:1280,viewportHeight:900,visualViewport:view,pointer:{x:960,y:450}},
   roi:{left:445,top:190,right:515,bottom:260},cases:[
    {name:"pointer",marker:null,frames:frames(pointer)},
    ...["small","faint","full"].map((name,i)=>({name,marker:{color:"#0000FF",radiusCss:i===0?4:48,ageMs:[0,650,0][i],durationMs:700,fade:true,wobble:false,baseAlpha:178/255},frames:frames(String(i+2).repeat(64))})),
@@ -37,7 +37,7 @@ for(const [name,change] of [
  ["capture hash",f=>f.backing.captureReportSHA256="other"],["artifact",f=>f.backing.gifSHA256="other"],
  ["run",f=>f.backing.run="other"],["document",f=>f.backing.documentId="other"],
  ["geometry",f=>f.item.scene.finish.center.x++],["ROI edge",f=>f.backing.roi[2]--],
- ["backing",f=>f.backing.frames[1].bgraSHA256="other"],["missing frame",f=>f.backing.frames.pop()],
+ ["backing",f=>f.backing.frames[1].bgraSHA256="other"],["model backing",f=>f.manifest.input.backingBGRA=Buffer.alloc(71*71*4,254).toString("base64")],["missing frame",f=>f.backing.frames.pop()],
  ["PTS",f=>f.backing.frames[1].ptsMs++],["unstable pointer",f=>f.manifest.cases[0].frames[1].roiSHA256="other"],
  ["small retained",f=>f.manifest.cases[1].frames[0].roiSHA256="1".repeat(64)],
  ["faint retained",f=>f.manifest.cases[2].frames[0].roiSHA256="1".repeat(64)],

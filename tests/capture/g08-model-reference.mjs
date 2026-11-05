@@ -48,6 +48,10 @@ function validateFacts({input,inputSHA256,item,artifact,actualPTS,manifest,backi
   const y=(finish.center.y-view.offsetTop)*view.scale*450/model.viewportHeight;
   check(x===480&&y===225,"mapped pointer");
   const white=digest(Buffer.alloc(71*71*4,255));
+  check(typeof model.backingBGRA==="string"&&model.backingBGRA.length===26888,"model backing encoding");
+  const modelBacking=Buffer.from(model.backingBGRA,"base64");
+  check(modelBacking.length===71*71*4&&modelBacking.toString("base64")===model.backingBGRA&&
+    modelBacking.every(value=>value===255)&&digest(modelBacking)===white,"model backing");
   check(backing.bgraSHA256===white&&backing.frameCount===actualPTS.length&&
     Array.isArray(backing.frames)&&backing.frames.length===actualPTS.length,"backing count");
   check(backing.frames.every((frame,i)=>frame.sequence===i&&frame.bgraSHA256===white&&
