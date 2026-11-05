@@ -94,6 +94,11 @@ class ScriptPrivacyFlowTest : ScriptPublicFixture() {
                 java.io.File(evidence, "$case-result.json").writeText(result.toString(2))
                 val status = client.call("get-script-status", JSONObject().put("runId", result.getString("runId")))
                 java.io.File(evidence, "$case-status.json").writeText(status.toString(2))
+                if (focus.isNotEmpty()) {
+                    assertTrue("Focus handler did not run in the foreground document", afterFacts.getBoolean("hasFocus"))
+                    assertTrue("Focus handler did not run", afterFacts.getInt("focusCount") > 0)
+                    assertTrue("Sensitive focus must refuse before the input event", afterFacts.isNull("edit"))
+                }
                 assertEquals(!capture, result.getBoolean("success"))
                 if (capture) {
                     assertEquals("SENSITIVE_CAPTURE_REFUSED", result.getJSONObject("error").getString("code"))

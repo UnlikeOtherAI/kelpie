@@ -586,3 +586,14 @@ diagnostics have not run on a device.
 The user approved Android 10 (API 29) as the minimum supported OS on 5 November
 2026. Earlier API 28 refusal records remain historical; final-source phone and
 tablet acceptance, including privacy and scene evidence, remains open.
+
+Hosted run `42015326445` at `ee22cb800fa1ccd2f2ff587d99fb26b41a24fa47`
+recorded three failures in each 39-case profile: two focus-sensitive privacy
+cases and the native Submit-marker probe. The focus facts show
+`document.hasFocus() == false` before and after the edit, zero focus events,
+and `activeElement` set to the input; the generated expression included the
+refusal policy. The edit proceeded without the focus handler and exposed the
+synthetic literal in earlier output. Low-FPS navigation passed on both.
+The CLI baseline retrieved decoded multichunk PNGs, but G08 C hit the 26-second
+limit on both (phone 20 frames/471 dropped; tablet 38/456); G08 S did not run.
+These outcomes do not establish native privacy or dense motion acceptance.
