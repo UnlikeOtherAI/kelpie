@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include <utility>
 
@@ -9,15 +10,24 @@ struct ScriptMarkerGeometry {
 };
 class ScriptMarkerAnchor {
  public:
-  void Observe(std::string identity, ScriptMarkerGeometry geometry) {
-    identity_ = std::move(identity); geometry_ = geometry;
+  void Observe(std::uint64_t revision, const std::string& identity, ScriptMarkerGeometry geometry) {
+    if (revision < revision_) return;
+    revision_ = revision;
+    if (identity_ != identity) { identity_ = identity; geometry_ = geometry; invalid_ = false; }
+    else if (!(geometry_ == geometry)) invalid_ = true;
   }
-  bool Matches(const std::string& identity, ScriptMarkerGeometry geometry) const {
-    return !identity_.empty() && identity_ == identity && geometry_ == geometry;
+  void Invalidate(std::uint64_t revision, const std::string& identity) {
+    if (revision < revision_) return;
+    revision_ = revision; identity_ = identity; invalid_ = true;
   }
-  void Clear() { identity_.clear(); }
+  bool Matches(std::uint64_t revision, const std::string& identity, ScriptMarkerGeometry geometry) const {
+    return revision >= revision_ && !identity_.empty() && !invalid_ && identity_ == identity && geometry_ == geometry;
+  }
+  void Clear() { identity_.clear(); invalid_ = true; }
  private:
+  std::uint64_t revision_ = 0;
   std::string identity_;
   ScriptMarkerGeometry geometry_{};
+  bool invalid_ = true;
 };
 }

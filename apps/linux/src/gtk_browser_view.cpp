@@ -107,14 +107,15 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
                            shown.value("generation",std::uint64_t{}),shown.value("documentVersion",std::string()),
                            marker.value("actionIndex",-1)}).dump();
                          const bool detached=shown.value("detachedMarker",false);
+                         const auto revision=shown.value("_presentationRevision",std::uint64_t{});
                          if (!detached && valid_frame && origin && width>0 && height>0 && scale>0) {
-                           self->marker_anchor_.Observe(identity,{x,y,width,height,scale,frame.width,frame.height});
+                           self->marker_anchor_.Observe(revision,identity,{x,y,width,height,scale,frame.width,frame.height});
                          } else if (!detached) {
-                           self->marker_anchor_.Clear();
+                           self->marker_anchor_.Invalidate(revision,identity);
                          } else if (detached && (!valid_frame || !origin ||
-                             !self->marker_anchor_.Matches(identity,{x,y,width,height,scale,frame.width,frame.height}))) {
+                             !self->marker_anchor_.Matches(revision,identity,{x,y,width,height,scale,frame.width,frame.height}))) {
                            self->app_.RetireDetachedScriptMarker(shown.value("_presentationRevision",std::uint64_t{}));
-                           shown.erase("marker"); self->marker_anchor_.Clear();
+                           shown.erase("marker"); self->marker_anchor_.Invalidate(identity);
                          }
                        }
                        CompositeScriptFrame(self->app_, frame, std::move(shown));
