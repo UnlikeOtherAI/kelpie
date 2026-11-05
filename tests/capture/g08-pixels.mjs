@@ -28,15 +28,19 @@ export function measureG08Frame(rgb, width, height, { center, radius, color }) {
   const threshold=Math.max(12,(channels[high]-channels[low])*.4);
   let minX=width,minY=height,maxX=-1,maxY=-1,count=0,chromaticCount=0;
   const span=Math.ceil(radius*1.3+3);
-  for(let y=Math.max(0,Math.floor(center.y-span));y<=Math.min(height-1,Math.ceil(center.y+span));y++)
-    for(let x=Math.max(0,Math.floor(center.x-span));x<=Math.min(width-1,Math.ceil(center.x+span));x++){
+  const left=Math.max(0,Math.floor(center.x-span)),top=Math.max(0,Math.floor(center.y-span));
+  const right=Math.min(width-1,Math.ceil(center.x+span)),bottom=Math.min(height-1,Math.ceil(center.y+span));
+  const roiWidth=right-left+1,roi=Buffer.alloc(roiWidth*(bottom-top+1)*3);
+  for(let y=top;y<=bottom;y++)
+    for(let x=left;x<=right;x++){
       const i=(y*width+x)*3;
+      rgb.copy(roi,((y-top)*roiWidth+x-left)*3,i,i+3);
       if(Math.max(rgb[i],rgb[i+1],rgb[i+2])-Math.min(rgb[i],rgb[i+1],rgb[i+2])>=16)chromaticCount++;
       if(rgb[i+high]-rgb[i+low]>=threshold){
         count++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
       }
     }
-  return {pointer,marker:{alpha,channels,count,chromaticCount,
+  return {pointer,marker:{alpha,channels,count,chromaticCount,roi,
     radius:count?((maxX-minX+1)+(maxY-minY+1))/4:null,
     center:count?{x:(minX+maxX)/2,y:(minY+maxY)/2}:null}};
 }

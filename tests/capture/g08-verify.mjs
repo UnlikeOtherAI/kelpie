@@ -23,10 +23,16 @@ const output={version:1,source:input.source,binarySHA256:input.binarySHA256,runt
 const seen=new Set();
 for(const item of input.cases){
   assert.ok(["c","s"].includes(item.curve)&&!seen.has(item.curve));seen.add(item.curve);
-  const {start,finish}=item.scene;
+  const {calibration,start,finish}=item.scene;
+  assert.equal(calibration.target,"finish");
+  assert.equal(calibration.documentId,start.documentId);
+  assert.deepEqual(calibration.viewport,start.viewport);
+  assert.ok(Number.isFinite(calibration.timeMs)&&calibration.timeMs<start.timeMs);
+  assert.equal(typeof calibration.trusted,"boolean");
   assert.equal(start.target,"start");assert.equal(finish.target,"finish");
   assert.equal(start.documentId,finish.documentId);
   assert.deepEqual(start.viewport,finish.viewport);
+  assert.deepEqual(calibration.center,finish.center);
   assert.ok(Number.isFinite(start.timeMs)&&Number.isFinite(finish.timeMs)&&finish.timeMs>start.timeMs);
   assert.equal(typeof start.trusted,"boolean");assert.equal(typeof finish.trusted,"boolean");
   assert.equal(item.artifacts.length,2);
@@ -63,11 +69,17 @@ for(const item of input.cases){
       let stderr="";child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
       const exited=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",code=>code===0?resolve():reject(Error("Decoder failed "+code+" "+stderr)));});
       void exited.catch(()=>{}); // A stream assertion can fail before the process-close await.
+      let calibrationStart;
       try{
         const count=await consumeG08Frames(child.stdout,artifact.width,artifact.height,(frame,index)=>{
           assert.ok(index<artifact.timestamps.length,"Decoder exceeded recorded PTS");
-          entry.samples.push({timeMs:actualPTS[index]*1000,
-            ...measureG08Frame(frame,artifact.width,artifact.height,marker)});
+          const sample={timeMs:actualPTS[index]*1000,
+            ...measureG08Frame(frame,artifact.width,artifact.height,marker)};
+          if(calibrationStart===undefined&&sample.pointer)calibrationStart=sample.timeMs;
+          sample.calibrationCandidate=calibrationStart!==undefined&&sample.timeMs<=calibrationStart+300;
+          entry.samples.push(sample);
+          const old=entry.samples[index-100];
+          if(old&&!old.calibrationCandidate)delete old.marker.roi;
         });
         await exited;assert.equal(count,artifact.timestamps.length);
       }finally{clearTimeout(timeout);if(child.exitCode===null)child.kill();await exited.catch(()=>{});}
@@ -75,6 +87,8 @@ for(const item of input.cases){
     }catch(error){
       entry.passed=false;entry.error=String(error.message).slice(0,1024);
       entry.confidence=entry.error.includes("INSUFFICIENT_EVIDENCE")?"insufficient":"failed";
+    }finally{
+      for(const sample of entry.samples){delete sample.marker.roi;delete sample.calibrationCandidate;}
     }
   }
 }

@@ -70,8 +70,12 @@ No row grants a whole-platform or 432-cell pass.
 - **Android:** full run `42006190219`, API 28 behavior and native scene proof
   remain gates; earlier partial phone/tablet results are not full acceptance.
 - **Shared and delivery:** five persistent-token CLI tests timed out in the
-  full run and again in a serial three-file retry. Exact-case investigation is
-  pending. Final component versions, the single PR, required checks, release
+  full run and again in an initial serial three-file retry. A later unchanged
+  serial rerun passed all 12 cases; instrumented copies also passed, so the
+  earlier timeouts remain unexplained. A clean full pnpm test at
+  d854c65a passed shared 143 tests and CLI 703 tests with one skipped;
+  the final integrated revision still needs its own required checks.
+  Final component versions, the single PR, required checks, release
   publication and installed-release verification remain open.
 
 Run identifiers identify evidence to inspect, not a claim that the run passed.

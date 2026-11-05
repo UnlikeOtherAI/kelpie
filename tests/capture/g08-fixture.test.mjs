@@ -19,7 +19,9 @@ test("same bounded production request covers both curves without product eval",(
  for(const curve of ["c","s"]){
   const workflow=g08Workflow("owned",curve);
   assert.equal(workflow.pointer.curve,curve);assert.equal(workflow.capture.maxWidth,640);
-  assert.equal(workflow.capture.fps,20);assert.equal(workflow.actions.length,4);
+  assert.equal(workflow.capture.fps,20);assert.equal(workflow.capture.maxDurationMs,26000);
+  assert.equal(workflow.actions.length,6);
+  assert.deepEqual(workflow.actions.filter(a=>a.action==="click").map(a=>a.target.name),["G08 Finish","G08 Start","G08 Finish"]);
  }
  assert.throws(()=>g08Workflow("owned","line"));
 });
