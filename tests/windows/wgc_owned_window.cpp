@@ -1,3 +1,6 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi.h>
@@ -10,6 +13,8 @@
 #include <mutex>
 #include <memory>
 #include <iostream>
+#include <thread>
+#include <atomic>
 #include "wgc_capture_files.h"
 
 namespace {
@@ -71,6 +76,8 @@ std::string AlphaName(BitmapAlphaMode mode) {
   if(mode==BitmapAlphaMode::Ignore)return "ignore";
   throw std::runtime_error("WGC_ALPHA_MODE");
 }
+#include "wgc_bounded_stream.h"
+#include "wgc_timeline.h"
 Json Run(Owner const& owner,std::filesystem::path const& output) {
   owner.Verify();
   Stage="capture-capability";
@@ -213,6 +220,12 @@ int wmain(int argc,wchar_t** argv) {
   try {
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     if(argc==2&&std::wstring(argv[1])==L"self-test-buffer"){std::cout<<BufferSelfTest().dump()<<std::endl;return 0;}
+    if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-stream"){std::cout<<TimelineStreamSelfTest().dump()<<std::endl;return 0;}
+    if(argc==7&&std::wstring(argv[1])==L"timeline"){
+      Owner owner{static_cast<DWORD>(std::stoul(argv[2])),argv[3],std::stoull(argv[4]),
+        reinterpret_cast<HWND>(static_cast<std::uintptr_t>(std::stoull(argv[5])))};
+      (void)RunTimeline(owner,argv[6]);return 0;
+    }
     if(argc!=6)throw std::runtime_error("EXPECTED_PID_EXE_STARTFILETIME_HWND_FRESH_OUTPUT");
     Owner owner{static_cast<DWORD>(std::stoul(argv[1])),argv[2],std::stoull(argv[3]),
       reinterpret_cast<HWND>(static_cast<std::uintptr_t>(std::stoull(argv[4])))};

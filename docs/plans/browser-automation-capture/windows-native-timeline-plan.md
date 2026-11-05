@@ -23,11 +23,9 @@ the existing one-frame mode and its 8-second internal/10-second parent bounds
 stay unchanged. Timeline mode uses a single `CreateForWindow` item and
 free-threaded two-frame pool, cursor capture disabled, secondary windows
 excluded, standard OS border retained. Recheck PID, executable, creation time,
-HWND class and visibility before item creation, each accepted frame and any
-persistence. Item close, ownership change, dimension change, deadline or
-cancellation fails closed and closes the frame, pool, session and device.
+HWND class and visibility before item creation and before and after each deep-copy acquisition. A frame is sealed only after both checks; if identity changes during copy it is discarded. After session/pool closure, persist only sealed buffers within the 35-second parent bound, without reacquiring the hidden or destroyed HWND. Natural item closure ends collection and is recorded; it never proves missing phases. Ownership change, dimension change, deadline or cancellation fails closed and closes the frame, pool, session and device.
 
-The caller starts the timeline helper as soon as the owned presentation HWND is visible in the same recording. Timeline mode runs at most 26 seconds, 20 frames/s maximum and 520 accepted frames maximum, with a separate parent bound of at most 35 seconds including teardown. The old one-frame 8-second internal and 10-second parent bounds remain unchanged. The helper must begin early enough to capture the first Finish pre-dispatch pointer baseline, or report insufficient evidence. Do not synthesize duplicate frames.
+The test request prepends one supported 1.5-second wait to the canonical action list, without changing its three clicks, pointer, marker or 26-second capture limit. The caller starts the timeline helper as soon as the owned presentation HWND is visible in that same recording; if that window is not visible during the lead-in or the helper still misses calibration, report insufficient. Timeline mode runs at most 26 seconds, 20 frames/s maximum and 520 accepted frames maximum, with a separate parent bound of at most 35 seconds including teardown. The old one-frame 8-second internal and 10-second parent bounds remain unchanged. The helper must begin early enough to capture the first Finish pre-dispatch pointer baseline, or report insufficient evidence. Do not synthesize duplicate frames.
 Record WGC `SystemRelativeTime` and callback receipt monotonic time for each
 frame, acquisition count and dropped/late frames. A two-frame queue replaces
 rather than accumulates frames under load. A stalled callback, missing clock,
@@ -124,3 +122,17 @@ bias. Require at least 15 real-bracketed samples in each comparison; otherwise
 report insufficient evidence. These proposed cross-stream thresholds are
 additional to the stricter independent canonical checks and require root
 review. They do not assert same-clock simultaneity or latency.
+
+## Identity provenance
+
+The fixture event's JavaScript-generated document ID is only a consistency
+fact within that fixture. It is not the native document authority and is not
+equal to the native artifact document ID. The harness must bind the owned HWND
+to the exact process, launch and listener; poll public active status for the
+same run ID while sampling; and match the terminal result and both artifacts
+to that run. Both artifacts must agree on their native document ID, viewport
+and size, and trusted tab/provenance facts must show the same intended
+document before and after the run. A fixture event ID cannot establish this
+binding by itself. If the public contract cannot exclude intervening navigation
+or bind the active run to native document provenance, report insufficient
+evidence rather than assigning the page-supplied ID as authority.
