@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import os from "node:os";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CLI_MCP_PORT } from "@unlikeotherai/kelpie-shared";
 
@@ -34,6 +35,7 @@ function launchChild(): EventEmitter & { exitCode: null; pid: number; unref: () 
 describe("browser launch --port on Windows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(os, "platform").mockReturnValue("win32");
     vi.mocked(getBrowserAlias).mockResolvedValue({ platform: "windows", appPath: process.execPath, profileDir: "C:/profile" });
     vi.mocked(readinessPath).mockReturnValue("C:/profile/readiness.json");
     vi.mocked(spawn).mockImplementation(() => launchChild() as never);
@@ -49,10 +51,34 @@ describe("browser launch --port on Windows", () => {
 
   const spawnedArgs = () => vi.mocked(spawn).mock.calls[0]?.[1];
 
+  it("hides only an explicitly requested Windows launch and retains verified readiness", async () => {
+    await run("browser", "launch", "x", "--hidden", "--port", "8467");
+    expect(vi.mocked(spawn).mock.calls[0]?.[2]).toEqual({ detached: true, stdio: "ignore", windowsHide: true });
+    expect(spawnedArgs()).toEqual(["--port", "8467", "--profile-dir", "C:/profile"]);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("refuses hidden launches on a non-Windows host before port allocation or spawn", async () => {
+    vi.spyOn(os, "platform").mockReturnValue("linux");
+    await run("browser", "launch", "x", "--hidden");
+    expect(spawn).not.toHaveBeenCalled();
+    expect(allocateBrowserPort).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(5);
+  });
+
+  it("refuses hidden launches for other alias platforms before spawn", async () => {
+    vi.mocked(getBrowserAlias).mockResolvedValue({ platform: "linux", appPath: process.execPath, profileDir: "/profile" });
+    await run("browser", "launch", "x", "--hidden");
+    expect(spawn).not.toHaveBeenCalled();
+    expect(allocateBrowserPort).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(5);
+  });
+
   it("spawns the app on the port given after the subcommand", async () => {
     await run("browser", "launch", "x", "--port", "8467");
     expect(spawnedArgs()).toEqual(["--port", "8467", "--profile-dir", "C:/profile"]);
     expect(process.exitCode).toBeUndefined();
+    expect(vi.mocked(spawn).mock.calls[0]?.[2]).toEqual({ detached: true, stdio: "ignore" });
   });
 
   it("spawns the app on the port given before the subcommand", async () => {

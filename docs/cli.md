@@ -202,6 +202,8 @@ Launch a new local Kelpie app instance for a registered alias. If `--port` is om
 
 If the requested port is already held by a stale instance, the macOS app falls back to the next free port. After launching, the CLI polls the fallback range and records the port the new instance actually bound, so the saved alias stays reachable.
 
+`--hidden` starts a Windows alias without showing its window, using the normal native app and authenticated readiness/PID/profile/launch-ID flow. It requires a Windows host and Windows alias; other combinations refuse before spawning. It does not enable a headless browser backend or change script capabilities. The default launch remains visible.
+
 `--port` may come before or after `launch`: both start the app on that port. A value that is not an integer from 1 to 65535 is rejected with `INVALID_PORT` rather than launching on the default.
 
 ```bash

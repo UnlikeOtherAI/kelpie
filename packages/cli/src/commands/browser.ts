@@ -212,6 +212,7 @@ export function registerBrowser(program: Command): void {
   browser
     .command("launch <name>")
     .option("--port <port>", "Port to use for the launched browser")
+    .option("--hidden", "Start a Windows alias without showing its window (Windows host only)")
     .action(async (name: string, _opts: unknown, command: Command) => {
       const globals = program.opts<GlobalOptions>();
       const alias = await getBrowserAlias(name);
@@ -221,6 +222,12 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
+      const hidden = command.opts<{ hidden?: boolean }>().hidden === true;
+      if (hidden && (alias.platform !== "windows" || os.platform() !== "win32")) {
+        print({ success: false, error: { code: "PLATFORM_NOT_SUPPORTED", message: "--hidden requires a Windows alias on a Windows host" } }, globals.format);
+        process.exitCode = 5;
+        return;
+      }
       const requestedPort = subcommandPort(command);
       let port: number;
       try { port = requestedPort ? parseLaunchPort(requestedPort) : await allocateBrowserPort(); } catch (error) {
@@ -244,7 +251,7 @@ export function registerBrowser(program: Command): void {
           if (previous && await isReachable(previous.port)) {
             throw new Error("A live browser already owns this profile; attach to its alias or stop it first");
           }
-          const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir], { detached: true, stdio: "ignore" });
+          const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir], { detached: true, stdio: "ignore", ...(hidden ? { windowsHide: true } : {}) });
           launched = true;
           child.unref();
           const readiness = await waitForReadiness(readinessFile, previous?.launchId, child);

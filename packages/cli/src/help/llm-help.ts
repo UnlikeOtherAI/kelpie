@@ -67,11 +67,12 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
   },
   "browser launch": {
     command: "browser launch",
-    purpose: "Launch a named local macOS browser instance",
-    when: "You want a fresh local Kelpie.app process for a saved alias",
-    platforms: ["macos"],
+    purpose: "Launch a named local browser instance",
+    when: "You want a fresh local Kelpie process for a saved alias",
+    platforms: ["macos", "windows", "linux"],
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
+      { name: "hidden", type: "boolean", required: false, description: "Windows host and Windows alias only: launch without showing its window; not a headless backend" },
       { name: "port", type: "number", required: false, description: "Optional explicit HTTP port, used exactly; --port may come before or after the command. Omitted, the first free port from 8420 upward, skipping 8421" },
     ],
     errors: describeErrors(["BROWSER_NOT_REGISTERED", "APP_NOT_INSTALLED", "BROWSER_LAUNCH_FAILED"]),

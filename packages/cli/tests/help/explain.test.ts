@@ -38,6 +38,8 @@ describe("explainCommand", () => {
     const output = explainCommand("browser launch");
     expect(output).toContain("browser launch");
     expect(output).toContain("Platforms: macos");
-    expect(output).toContain("launches a new macOS app instance");
+    expect(output).toContain("--hidden");
+    expect(output).toContain("Windows aliases on Windows");
+    expect(output).toContain("Other hosts or alias platforms refuse");
   });
 });
