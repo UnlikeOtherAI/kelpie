@@ -61,6 +61,7 @@ final class ScriptWorkflowTab {
 
     /// Focus only the admitted renderer inside its already-key browser window.
     func prepareEditFocus() async throws {
+        guard renderer is WKWebViewRenderer else { return }
         try await check()
         guard router.browserLease.begin() else { throw ScriptWorkflowFailure("BUSY") }
         defer { router.browserLease.end() }
@@ -68,10 +69,8 @@ final class ScriptWorkflowTab {
         guard let window = view.window, window.isKeyWindow, window.attachedSheet == nil else {
             throw ScriptWorkflowFailure("TAB_NOT_VISIBLE")
         }
-        if renderer is WKWebViewRenderer {
-            guard Self.requestOwnedEditFocus(isKey: window.isKeyWindow, focus: { window.makeFirstResponder(view) }) else {
-                throw ScriptWorkflowFailure("INPUT_UNCERTAIN")
-            }
+        guard Self.requestOwnedEditFocus(isKey: window.isKeyWindow, focus: { window.makeFirstResponder(view) }) else {
+            throw ScriptWorkflowFailure("INPUT_UNCERTAIN")
         }
         try requireCurrent()
     }
