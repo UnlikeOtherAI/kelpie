@@ -229,18 +229,18 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
 
     private func frame(sample: String) async throws -> (CGImage, ScriptWorkflowTab.Viewport, String) {
         #if DEBUG
-        var timing = ScriptCaptureTiming()
+        var timing: ScriptCaptureTiming? = fps == 30 && timingSamples < 32 ? ScriptCaptureTiming() : nil
         #endif
         try await tab.check()
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
         #if DEBUG
-        timing.mark()
+        timing?.mark()
         #endif
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         let document = try await tab.documentIdentity()
         #if DEBUG
-        timing.mark()
+        timing?.mark()
         #endif
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         let documentChanged = ScriptCaptureViewport.confirmedDocumentChange(previous: previousDocument, current: document)
@@ -259,12 +259,12 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         let maximumWidth = options["maxWidth"] as? Int ?? 1280
         let source = try await tab.snapshot(maximumPixels: CGSize(width: maximumWidth, height: 1920), viewport: viewport)
         #if DEBUG
-        timing.mark()
+        timing?.mark()
         #endif
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         let finalDocument = try await tab.documentIdentity()
         #if DEBUG
-        timing.mark()
+        timing?.mark()
         #endif
         guard finalDocument == document else {
             #if DEBUG
@@ -274,7 +274,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         }
         let finalViewport = try await tab.viewport()
         #if DEBUG
-        timing.mark()
+        timing?.mark()
         #endif
         guard finalViewport == viewport else {
             #if DEBUG
@@ -284,7 +284,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         }
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         #if DEBUG
-        if fps == 30, timingSamples < 32 {
+        if let timing {
             timingSamples += 1
             timing.emit(sample: sample, engine: tab.renderer.engineName)
         }
