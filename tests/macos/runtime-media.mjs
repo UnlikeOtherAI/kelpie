@@ -5,7 +5,7 @@ export function inspectMedia(item,{marker=false,preNavigation=false}={}) {
  const stream=meta.streams[0];requireTrue(stream?.width===item.width&&stream?.height===item.height,"MEDIA_DIMENSIONS");
  const frames=meta.frames??[];requireTrue(frames.length>0,"MEDIA_EMPTY");
  requireTrue(stream.width*stream.height*3*frames.length<=256*1024*1024,"DECODE_LIMIT");
- const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
  const stride=stream.width*stream.height*3;requireTrue(rgb.length===stride*frames.length,"MEDIA_FULL_DECODE");
  let previous=-Infinity,marked=0,markedWhite=0,yellowFrames=0;
  const times=frames.map(frame=>{const value=Number(frame.best_effort_timestamp_time??frame.pts_time??0);requireTrue(value>=previous,"MEDIA_TIMESTAMPS");previous=value;return value;});
@@ -29,7 +29,7 @@ export function centerPixel(item) {
 }
 
 export function inspectCurve(item,curve,scene){
- const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
  const stride=item.width*item.height*3,tracks=[],colors=[];
  for(let start=0;start<rgb.length;start+=stride){let minX=item.width,minY=item.height,maxX=-1,maxY=-1,count=0,colored=0;
   for(let y=0;y<item.height;y++)for(let x=0;x<item.width;x++){
