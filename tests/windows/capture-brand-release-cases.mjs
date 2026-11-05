@@ -13,6 +13,29 @@ export async function runBrandReleaseCases({check,navigate,api,workflow,tabId}) 
     assert.equal(result.mayHaveCompleted,true);
     assert.deepEqual(result.artifacts,[]);
   });
+  await check("brand proof does not consume a late release acknowledgement", async () => {
+    await navigate();
+    const setup="(()=>{document.body.innerHTML='<button id=slow-release>Slow release</button>';window.__slowClicks=0;" +
+      "const e=document.querySelector('#slow-release');e.onmouseup=()=>{const end=performance.now()+11000;while(performance.now()<end){}};" +
+      "e.onclick=()=>window.__slowClicks++;return true})()";
+    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
+    const result=await api("play-script",{...workflow([{action:"click",target:{selector:"#slow-release"}}]),
+      capture:{formats:["screenshots"],maxWidth:640,maxDurationMs:30000}});
+    assert.equal(result.success,false);
+    assert.equal(result.mayHaveCompleted,true);
+    assert.deepEqual(result.artifacts,[]);
+    let observed;
+    const end=Date.now()+15000;
+    while(Date.now()<end){
+      observed=await api("evaluate",{tabId,expression:"window.__slowClicks"});
+      if(observed.success)break;
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    assert.equal(observed?.success,true,"late operation did not retire");
+    assert.ok(observed.result<=1,"late release was replayed");
+    assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
+    return {code:result.error?.code,clicks:observed.result};
+  });
   await check("brand proof does not retarget after pointerup replacement", async () => {
     await navigate();
     const setup = "(()=>{document.body.innerHTML='<button id=old style=\\\"position:absolute;left:80px;top:80px;width:120px;height:60px\\\">Old</button>';" +
