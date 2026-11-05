@@ -32,6 +32,18 @@ async function runDefaultMotion({client,fixture,engine,base,capture,check,load})
   return {formats,media:artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}))};
  },{continueOnFailure:true});
 }
+async function runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure=false}) {
+ await check("scrollbar-right-edge-marker",async()=>{
+  await load("/edge");const begin=fixture.events.length;
+  const result=await client.api("play-script",{...base,tapIndicator:{color:"#F54242",radius:18,durationMs:700,wobble:false,fade:false},
+   capture:{...capture,formats:["screenshots"]},actions:[{action:"click",target:{role:"button",name:"Edge"}}]});
+  requireTrue(result.success,"EDGE_WORKFLOW");
+  const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="edge"));
+  const artifacts=await client.download(result,engine+"-edge");
+  const image=artifacts.find(a=>a.mimeType==="image/png");requireTrue(image,"EDGE_SCREENSHOT");
+  return inspectEdgeMarker(image,event);
+ },{continueOnFailure});
+}
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report,scope="full") {
  let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
@@ -93,6 +105,7 @@ export async function runEngine(client,fixture,engine,report,scope="full") {
  if(scope==="cef-timing"){
   requireTrue(engine==="chromium","FOCUSED_RENDERER");
   await runRetiree({client,engine,base,capture,check,load});
+  await runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure:true});
   await runDefaultMotion({client,fixture,engine,base,capture,check,load});
   const failed=checks.find(item=>!item.passed);
   if(failed)throw new Failure(failed.code);
@@ -266,16 +279,7 @@ export async function runEngine(client,fixture,engine,report,scope="full") {
   requireTrue(actual.every((v,i)=>Math.abs(v-expected[i])<20),"SCROLLED_SOURCE_DESTINATION_PIXEL");
   return {sourceY,expected,actual,viewport:event.viewport,visual:event.visual,artifact:item};
  });
- await check("scrollbar-right-edge-marker",async()=>{
-  await load("/edge");const begin=fixture.events.length;
-  const result=await client.api("play-script",{...base,tapIndicator:{color:"#F54242",radius:18,durationMs:700,wobble:false,fade:false},
-   capture:{...capture,formats:["screenshots"]},actions:[{action:"click",target:{role:"button",name:"Edge"}}]});
-  requireTrue(result.success,"EDGE_WORKFLOW");
-  const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="edge"));
-  const artifacts=await client.download(result,engine+"-edge");
-  const image=artifacts.find(a=>a.mimeType==="image/png");requireTrue(image,"EDGE_SCREENSHOT");
-  return inspectEdgeMarker(image,event);
- });
+ await runEdge({client,fixture,engine,base,capture,check,load});
  for(const formats of [["gif","video"],["gif","video","screenshots"]])await check("low-fps-navigation-marker-"+formats.length,async()=>{
   await load();
   const begin=fixture.events.length;

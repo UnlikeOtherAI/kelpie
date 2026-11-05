@@ -130,7 +130,7 @@ finally{
   }
   const end=Date.now()+10000;
   while(Date.now()<end&&(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
-  if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
+  if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;report.focusedScopePassed=false;process.exitCode=1;}
   else {report.ownedListenersReleased=true;report.ownedChildExited=true;}
  }else report.cleanup="NO_CHILD_SPAWNED";
  child.stdout?.destroy();child.stderr?.destroy();child.unref();
