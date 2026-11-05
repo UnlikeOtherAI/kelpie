@@ -243,7 +243,9 @@ final class ScriptWorkflowActions {
 
     /// An acknowledged scalar still needs privacy classification before continuing.
     static func requirePacedAckShape(_ result: Body) throws {
-        let validStatus = result["ok"] as? Bool == true ? result["error"] == nil : result["error"] is String
+        let validStatus = result["ok"] as? Bool == true
+            ? result["error"] == nil && result["inputGuarantee"] as? String == "synthetic-coordinate"
+            : result["error"] is String
         guard result["ok"] is Bool, validStatus, result["sensitive"] is Bool, result["sensitivityKnown"] is Bool,
               result["mayHaveCompleted"] is Bool else {
             throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)

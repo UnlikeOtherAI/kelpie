@@ -231,7 +231,7 @@ final class ScriptWorkflowTab {
                                         mayHaveCompleted: dispatch || edit != nil)
         }
         if dispatch || edit != nil, result["ok"] as? Bool == true,
-           let token, result["token"] as? String != token {
+           let token, !Self.isAcknowledgedMutation(result, token: token) {
             throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
         }
         return result
@@ -249,7 +249,7 @@ final class ScriptWorkflowTab {
     static func isAcknowledgedMutation(_ value: Any?, token: String) -> Bool {
         guard let body = value as? Body else { return false }
         return body["token"] as? String == token && body["ok"] as? Bool == true && body["error"] == nil &&
-            body["mayHaveCompleted"] as? Bool == true &&
+            body["mayHaveCompleted"] as? Bool == true && body["inputGuarantee"] as? String == "synthetic-coordinate" &&
             body["sensitive"] is Bool && body["sensitivityKnown"] is Bool
     }
 
@@ -267,7 +267,8 @@ final class ScriptWorkflowTab {
             uncertain?()
         }
         let invalidStatus = body["ok"] as? Bool == true
-            ? body["error"] != nil || body["mayHaveCompleted"] as? Bool != true
+            ? body["error"] != nil || body["mayHaveCompleted"] as? Bool != true ||
+                body["inputGuarantee"] as? String != "synthetic-coordinate"
             : !(body["error"] is String)
         if mutates && (!(body["ok"] is Bool) || invalidStatus || !(body["sensitive"] is Bool) ||
                        !(body["sensitivityKnown"] is Bool) || !(body["mayHaveCompleted"] is Bool)) {
