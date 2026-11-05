@@ -72,3 +72,5 @@ public command used synthetic unit evidence and independently hashed abc bytes:
 ingestion-interface evidence, not an iOS or native runtime pass. Artifacts:
 D:/BuildArtifacts/kelpie/capture-observations-20261104/dif-ingestion-fixture/.
 No app,browser,desktop input or Computer Use ran for this check.
+
+Actual Windows9333 report intake is documented in [windows-evidence-intake.md](windows-evidence-intake.md). Its22 records retain source/binary/protocol identities and standard UIA evidence separately from exported pixels; all432 rows remain unreviewed.
