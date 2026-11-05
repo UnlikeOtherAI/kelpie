@@ -71,13 +71,18 @@ export function createScriptMcpBody(raw?: string, env: NodeJS.ProcessEnv = proce
 export function redactScriptResult(value: unknown, body: Record<string, unknown>): unknown {
   const secrets = boundSecrets.get(body) ?? [];
   if (!secrets.length) return value;
-  const patterns = [...new Set(secrets.flatMap(secret => {
-    try { return [secret, encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)]; }
-    catch { return [secret]; }
-  }))];
+  const variants = new Map<string, boolean>();
+  for (const secret of secrets) {
+    if (!variants.has(secret)) variants.set(secret, false);
+    try {
+      for (const encoded of [encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)])
+        variants.set(encoded, true);
+    } catch { /* Raw text remains covered when an invalid surrogate cannot be encoded. */ }
+  }
+  const patterns = [...variants].map(([text, encoded]) => ({ text, encoded }));
   const limit = new Error("OUTPUT_REDACTION_LIMIT");
   const collision = new Error("OUTPUT_REDACTION_COLLISION");
-  patterns.sort((a, b) => b.length - a.length);
+  patterns.sort((a, b) => b.text.length - a.text.length);
   let comparisons = 0, bytes = 0;
   const mask = (text: string): string => {
     if (Buffer.byteLength(text) > 262144) throw limit;
@@ -91,13 +96,15 @@ export function redactScriptResult(value: unknown, body: Record<string, unknown>
         let matched = false;
         for (const pattern of patterns) {
           if (++comparisons > 8000000) throw limit;
-          if (!pattern.length || pattern.length > text.length - index) continue;
+          if (!pattern.text.length || pattern.text.length > text.length - index) continue;
           let same = true;
-          for (let offset = 0; offset < pattern.length; offset++) {
+          for (let offset = 0; offset < pattern.text.length; offset++) {
             if (++comparisons > 8000000) throw limit;
-            if (text[index + offset] !== pattern[offset]) { same = false; break; }
+            const expected = pattern.text.charAt(offset), actual = text.charAt(index + offset);
+            const hexDigit = pattern.encoded && (pattern.text[offset - 1] === "%" || pattern.text[offset - 2] === "%");
+            if (actual !== expected && (!hexDigit || actual.toUpperCase() !== expected.toUpperCase())) { same = false; break; }
           }
-          if (same) { chunks.push("[REDACTED]"); length += 10; index += pattern.length; matched = true; break; }
+          if (same) { chunks.push("[REDACTED]"); length += 10; index += pattern.text.length; matched = true; break; }
         }
         if (!matched) { chunks.push(text[index] ?? ""); length++; index++; }
       }

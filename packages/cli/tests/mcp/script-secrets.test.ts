@@ -144,3 +144,19 @@ it("refuses oversized sensitive output with a fixed post-execution error", () =>
     error: { code: "OUTPUT_REDACTION_LIMIT", message: "Workflow output cannot be returned safely" },
   });
 });
+
+
+it("redacts mixed-case percent hex without folding ordinary secret text", () => {
+  const body = createScriptMcpBody('{"allowed":"WORKFLOW_ALLOWED_ENV"}', { WORKFLOW_ALLOWED_ENV: "Aa b+!" })(request("allowed"));
+  expect(redactScriptResult({ outputs: {
+    lowerUri: "Aa%20b%2b!", mixedForm: "Aa+b%2b%21", upperUri: "Aa%20b%2B!",
+    differentPlainCase: "aa b+!", differentEncodedPlainCase: "Aa%20B%2b!",
+  } }, body)).toMatchObject({ outputs: {
+    lowerUri: "[REDACTED]", mixedForm: "[REDACTED]", upperUri: "[REDACTED]",
+    differentPlainCase: "aa b+!", differentEncodedPlainCase: "Aa%20B%2b!",
+  } });
+  const literal = createScriptMcpBody('{"allowed":"WORKFLOW_ALLOWED_ENV"}', { WORKFLOW_ALLOWED_ENV: "token%2FValue" })(request("allowed"));
+  expect(redactScriptResult({ outputs: { raw: "token%2FValue", different: "token%2fValue", encoded: "token%252FValue" } }, literal)).toMatchObject({
+    outputs: { raw: "[REDACTED]", different: "token%2fValue", encoded: "[REDACTED]" },
+  });
+});
