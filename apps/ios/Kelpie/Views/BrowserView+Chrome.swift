@@ -19,6 +19,7 @@ extension BrowserView {
             },
             isCollapsed: $bottomBarCollapsed,
             isEditing: $addressEditing,
+            interactionDisabled: serverState.isScriptRecording,
             moreContent: { browserMoreMenu }
         )
     }

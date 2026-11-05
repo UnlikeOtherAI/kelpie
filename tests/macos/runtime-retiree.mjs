@@ -15,6 +15,7 @@ export async function runRetiree({client,engine,base,capture,check,load,report})
  for(const mode of ["no-capture","png-only"]){
   await check("native-marker-retiree-"+mode,async()=>{
    await load("/motion");
+   await client.activateOwnedBrowser();
    const baseline=redPixels(await client.screenshot(engine+"-retiree-"+mode+"-before"));
    const request={...base,tapIndicator:{color:"#F54242",radius:65,durationMs:5000,wobble:false,fade:false},
     actions:[{action:"click",target:{role:"button",name:"First"}}]};

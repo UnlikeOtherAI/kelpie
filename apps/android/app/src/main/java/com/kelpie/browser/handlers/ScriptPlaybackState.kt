@@ -56,10 +56,13 @@ class ScriptPlaybackState {
     private var session: Session? = null
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+    private val _isMovieImmersive = MutableStateFlow(false)
+    val isMovieImmersive: StateFlow<Boolean> = _isMovieImmersive.asStateFlow()
 
     fun start(
         totalActions: Int,
         continueOnError: Boolean,
+        movieImmersive: Boolean = true,
     ): Boolean =
         lock.withLock {
             if (session != null) return false
@@ -69,6 +72,7 @@ class ScriptPlaybackState {
                     continueOnError = continueOnError,
                     startedAtMs = System.currentTimeMillis(),
                 )
+            _isMovieImmersive.value = movieImmersive
             _isRecording.value = true
             true
         }
@@ -132,6 +136,7 @@ class ScriptPlaybackState {
             val active = session ?: return mapOf("success" to true)
             session = null
             _isRecording.value = false
+            _isMovieImmersive.value = false
             if (active.issues.isNotEmpty()) {
                 val count = active.issues.size
                 return buildResult(
@@ -152,6 +157,7 @@ class ScriptPlaybackState {
             val active = session ?: return@withLock errorResponse(code, message)
             session = null
             _isRecording.value = false
+            _isMovieImmersive.value = false
             buildResult(
                 success = false,
                 aborted = false,
@@ -165,6 +171,7 @@ class ScriptPlaybackState {
             val active = session ?: return mapOf("success" to false, "aborted" to true)
             session = null
             _isRecording.value = false
+            _isMovieImmersive.value = false
             buildResult(success = false, aborted = true, session = active, topLevelError = null)
         }
 

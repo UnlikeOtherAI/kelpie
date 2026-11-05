@@ -92,7 +92,7 @@ final class IOSWorkflowRunner {
             totalActions = workflow.steps.count
             finalizing = false
             await host.context.exit3DInspectorIfNeeded(notify: true)
-            await host.setRecordingMode(true)
+            await host.setRecordingMode(true, workflow.requiresMovieImmersion)
             return await run(workflow, tab: tab, grant: grant, id: id)
         } catch { return (error as? IOSWorkflowFailure ?? IOSWorkflowFailure("INVALID_SCRIPT")).response }
     }
@@ -171,7 +171,7 @@ final class IOSWorkflowRunner {
         ) ?? []
         await tab.resetTargets()
         await IOSRendererDeadline.waitForRetirement(tab.view)
-        await host.setRecordingMode(false)
+        await host.setRecordingMode(false, false)
         issue = IOSWorkflowFailure.terminal(
             action: issue,
             capture: media?.failure ?? sampler?.failure,

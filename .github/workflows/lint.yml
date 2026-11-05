@@ -40,10 +40,43 @@ on:
         type: string
         default: ""
 
+      worker_comparison_mode:
+        description: Probe isolation, prepare Chromium identity, or execute reviewed comparison
+        type: choice
+        options:
+          - 'off'
+          - probe
+          - sandbox
+          - sandbox-2204
+          - execute-2204
+          - prepare
+          - execute
+        default: 'off'
+      worker_comparison_archive_sha256:
+        description: Reviewed pinned Chromium archive SHA-256 for an opt-in comparison
+        type: string
+        default: ""
+      worker_comparison_binary_sha256:
+        description: Reviewed pinned Chromium executable SHA-256 for an opt-in comparison
+        type: string
+        default: ""
 permissions:
   contents: read
 
 jobs:
+  worker-comparison:
+    if: github.event_name == 'workflow_dispatch' && inputs.worker_comparison_mode != 'off'
+    uses: ./.github/workflows/worker-comparison.yml
+    permissions:
+      contents: read
+    with:
+      prepare_only: ${{ inputs.worker_comparison_mode != 'execute' && inputs.worker_comparison_mode != 'execute-2204' }}
+      isolation_only: ${{ inputs.worker_comparison_mode == 'probe' }}
+      sandbox_only: ${{ inputs.worker_comparison_mode == 'sandbox' || inputs.worker_comparison_mode == 'sandbox-2204' }}
+      runner_label: ${{ (inputs.worker_comparison_mode == 'sandbox-2204' || inputs.worker_comparison_mode == 'execute-2204') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+      chromium_archive_sha256: ${{ inputs.worker_comparison_archive_sha256 }}
+      chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
+
   linux-mux-probe:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_mux_probe
     uses: ./.github/workflows/linux-mux-probe.yml

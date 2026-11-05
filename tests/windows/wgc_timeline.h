@@ -154,9 +154,9 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
     Deadline(captureEnd);if(!owner.VerifyWindow()){frame.Close();windowHidden=true;break;}
     const auto content=frame.ContentSize();
     if(content.Width!=size.Width||content.Height!=size.Height)throw std::runtime_error("WGC_SIZE_CHANGED");
-    const auto signedTick=frame.SystemRelativeTime().count();if(signedTick<=0)throw std::runtime_error("WGC_CLOCK");
+    const auto signedTick=frame.SystemRelativeTime().count();if(signedTick<=0)throw std::runtime_error("WGC_CLOCK_NONPOSITIVE");
     const auto tick=static_cast<std::uint64_t>(signedTick);
-    if(tick<=lastTick){frame.Close();throw std::runtime_error("WGC_CLOCK");}
+    if(tick<=lastTick){frame.Close();throw std::runtime_error("WGC_CLOCK_NONINCREASING");}
     if(lastTick&&tick-lastTick<500000){++rateSkipped;frame.Close();continue;}lastTick=tick;
     auto bitmap=Wait(SoftwareBitmap::CreateCopyFromSurfaceAsync(frame.Surface()),captureEnd);frame.Close();
     if(bitmap.PixelWidth()!=size.Width||bitmap.PixelHeight()!=size.Height||bitmap.BitmapPixelFormat()!=BitmapPixelFormat::Bgra8)throw std::runtime_error("WGC_SURFACE_FORMAT_CHANGED");

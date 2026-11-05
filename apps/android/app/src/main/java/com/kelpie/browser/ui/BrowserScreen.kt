@@ -21,6 +21,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -90,6 +91,9 @@ fun BrowserScreen(
     var availableTabletViewportPresets by remember { mutableStateOf(TABLET_VIEWPORT_PRESETS) }
     val isIn3DInspector by handlerContext.isIn3DInspectorFlow.collectAsState()
     val isScriptRecording by scriptPlaybackState.isRecording.collectAsState()
+    val isMovieImmersive by scriptPlaybackState.isMovieImmersive.collectAsState()
+    var visibleProgress by remember { mutableStateOf(isLoading) }
+    if (!isScriptRecording) SideEffect { visibleProgress = isLoading }
     RecordingOrientationEffect(activity, isScriptRecording)
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
@@ -121,7 +125,7 @@ fun BrowserScreen(
     DisposableEffect(sampler) { onDispose { sampler.cancel() } }
     var bottomBarCollapsed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(activeTabId) { bottomBarCollapsed = false }
+    LaunchedEffect(activeTabId) { if (!isScriptRecording) bottomBarCollapsed = false }
 
     fun showTabs() {
         tabStore.captureActivePreview()
@@ -200,9 +204,10 @@ fun BrowserScreen(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .imePadding(),
+                    .imePadding()
+                    .scriptInputBlock(isScriptRecording),
         ) {
-            if (isTablet && !isScriptRecording) {
+            if (isTablet && !isMovieImmersive) {
                 TabletTabStrip(tabs, activeTabId, pageColor, { tabStore.addTab() }, tabStore::selectTab, tabStore::closeTab)
                 Box(
                     Modifier.fillMaxWidth().height(1.dp).background(
@@ -214,7 +219,7 @@ fun BrowserScreen(
                 )
             }
 
-            if (isLoading && !isScriptRecording) {
+            if (visibleProgress && !isMovieImmersive) {
                 LinearProgressIndicator(
                     progress = { progress / 100f },
                     modifier = Modifier.fillMaxWidth(),
@@ -230,7 +235,7 @@ fun BrowserScreen(
                 tabletMobileStagePresetId,
                 isScriptRecording,
                 onAvailablePresets = { availableTabletViewportPresets = it },
-                onScrollDirectionChange = { bottomBarCollapsed = it == ScrollDirection.DOWN },
+                onScrollDirectionChange = { if (!isScriptRecording) bottomBarCollapsed = it == ScrollDirection.DOWN },
                 onScrolled = { activeTab?.let(sampler::request) },
                 onWebViewReady = {
                     webView = it
@@ -240,7 +245,7 @@ fun BrowserScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
-            if (!isScriptRecording) {
+            if (!isMovieImmersive) {
                 BottomBar(
                     activity = activity,
                     currentUrl = currentUrl,
@@ -270,6 +275,7 @@ fun BrowserScreen(
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
                     onTransientUiChanged = { chromeTransient = it },
+                    scriptActive = isScriptRecording,
                     moreContent = { dismiss ->
                         BrowserMoreMenu(
                             onDismiss = dismiss,

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct FavouritesBarView: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var store = BookmarkStore.shared
     let onNavigate: (String) -> Void
@@ -9,12 +10,16 @@ struct FavouritesBarView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> FavouritesBar { FavouritesBar() }
     func updateNSView(_ view: FavouritesBar, context: Context) {
+        view.isInteractionEnabled = isEnabled
         view.configure(store: store, tint: appearance.palette.foreground.color, navigate: onNavigate, edit: onEdit)
     }
 }
 
 /// Native buttons stay clickable after either web renderer becomes first responder.
 final class FavouritesBar: NSScrollView {
+    var isInteractionEnabled = true {
+        didSet { if !isInteractionEnabled { activeMenu?.cancelTracking() } }
+    }
     private let strip = NSView()
     private var store = BookmarkStore.shared
     private var navigate: (String) -> Void = { _ in }
@@ -71,19 +76,22 @@ final class FavouritesBar: NSScrollView {
             strip.setFrameSize(NSSize(width: x, height: 29))
             if strip.subviews.isEmpty { strip.setFrameSize(NSSize(width: 40, height: 29)) }
         }
-        for case let button as NSButton in strip.subviews { button.contentTintColor = tint }
+        for case let button as NSButton in strip.subviews {
+            button.contentTintColor = tint
+            button.isEnabled = isInteractionEnabled
+        }
     }
 
     private var screenRect: NSRect { window?.convertToScreen(convert(bounds, to: nil)) ?? .zero }
 
     private func open(_ id: UUID) {
-        guard let node = store.nodes.first(where: { $0.id == id }), !node.isFolder,
+        guard isInteractionEnabled, let node = store.nodes.first(where: { $0.id == id }), !node.isFolder,
               (try? BookmarkTree.validate(node)) != nil else { return }
         navigate(node.url)
     }
 
     private func openFolder(_ id: UUID, from button: NSButton) {
-        guard activeMenu == nil, store.nodes.contains(where: { $0.id == id && $0.isFolder }) else { return }
+        guard isInteractionEnabled, activeMenu == nil, store.nodes.contains(where: { $0.id == id && $0.isFolder }) else { return }
         let menu = folderMenu(id)
         activeMenu = menu
         let bottom = button.isFlipped ? button.bounds.maxY + 4 : button.bounds.minY - 4
@@ -123,13 +131,13 @@ final class FavouritesBar: NSScrollView {
     }
 
     @objc private func openItem(_ sender: NSMenuItem) { if let id = sender.representedObject as? UUID { open(id) } }
-    @objc private func editItems() { edit() }
+    @objc private func editItems() { if isInteractionEnabled { edit() } }
     @objc private func removeItem(_ sender: NSMenuItem) {
-        if let id = sender.representedObject as? UUID { FavouriteRemoval.remove(id, from: store, undo: window?.undoManager) }
+        if isInteractionEnabled, let id = sender.representedObject as? UUID { FavouriteRemoval.remove(id, from: store, undo: window?.undoManager) }
     }
 
     private func drop(_ id: UUID, at screenPoint: NSPoint, generation: UUID) {
-        guard generation == store.generation else { return }
+        guard isInteractionEnabled, generation == store.generation else { return }
         if screenRect.contains(screenPoint) {
             let point = strip.convert(window?.convertPoint(fromScreen: screenPoint) ?? .zero, from: nil)
             let target = strip.subviews.compactMap { $0 as? FavouriteButton }.first { $0.frame.maxX > point.x }
@@ -151,8 +159,12 @@ final class FavouriteButton: NSButton {
     var dragRect: () -> NSRect = { .zero }
     private var hover: DispatchWorkItem?
     private var tracking: NSTrackingArea?
-    override func accessibilityPerformPress() -> Bool { activate(); return true }
-    override var acceptsFirstResponder: Bool { true }
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled else { return false }
+        activate()
+        return true
+    }
+    override var acceptsFirstResponder: Bool { isEnabled }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func updateTrackingAreas() {
@@ -163,9 +175,9 @@ final class FavouriteButton: NSButton {
         tracking = area
     }
     override func mouseEntered(with event: NSEvent) {
-        guard isFolder, NSEvent.pressedMouseButtons == 0 else { return }
+        guard isEnabled, isFolder, NSEvent.pressedMouseButtons == 0 else { return }
         let work = DispatchWorkItem { [weak self] in
-            guard let self, self.window?.isKeyWindow == true, NSEvent.pressedMouseButtons == 0 else { return }
+            guard let self, self.isEnabled, self.window?.isKeyWindow == true, NSEvent.pressedMouseButtons == 0 else { return }
             self.activate()
         }
         hover?.cancel()
@@ -175,9 +187,11 @@ final class FavouriteButton: NSButton {
     override func mouseExited(with event: NSEvent) { hover?.cancel() }
     override func viewWillMove(toWindow newWindow: NSWindow?) { super.viewWillMove(toWindow: newWindow); hover?.cancel() }
     override func keyDown(with event: NSEvent) {
+        guard isEnabled else { return }
         if [36, 49, 125].contains(event.keyCode) { activate() } else { super.keyDown(with: event) }
     }
     override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
         hover?.cancel()
         let generation = sourceGeneration()
         let start = event.locationInWindow
@@ -185,6 +199,7 @@ final class FavouriteButton: NSButton {
         highlight(true)
         defer { highlight(false); alphaValue = 1; NSCursor.arrow.set() }
         while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .keyDown]) {
+            guard isEnabled else { return }
             if next.type == .keyDown { if next.keyCode == 53 { return }; continue }
             let distance = hypot(next.locationInWindow.x - start.x, next.locationInWindow.y - start.y)
             dragged = dragged || distance > 5

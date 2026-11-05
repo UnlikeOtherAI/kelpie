@@ -98,6 +98,22 @@ export class Client {
   this.nativeControlStage="focus-after";verify();
   return {candidatePathVerified:true,listenersOwned:true,keyWindow:true};
  }
+ async activateOwnedBrowser(){
+  this.verifyOwnedReveal();this.pin(28420);
+  const helper=path.resolve("scripts/testing/macos-owned-activation.swift");
+  const invoke=mode=>{
+   try{
+    const result=execFileSync("/usr/bin/xcrun",["swift",helper,mode,String(this.pid),this.executable],{encoding:"utf8",timeout:15000});
+    requireTrue(result.trim()==="active","OWNED_ACTIVATION_INACTIVE");
+   }catch{throw new Failure("OWNED_ACTIVATION_FAILED");}
+  };
+  invoke("activate");
+  const focused=await this.focusOwnedBrowser();
+  this.verifyOwnedReveal();this.pin(28420);
+  invoke("check");
+  this.verifyOwnedReveal();this.pin(28420);
+  return {...focused,active:true};
+ }
  async screenshot(name){
   const windows=await this.windows();const target=windows.find(w=>w.isKey)??windows[0];
   requireTrue(target,"NO_VISIBLE_WINDOW");

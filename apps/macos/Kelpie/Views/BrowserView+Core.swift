@@ -97,8 +97,8 @@ extension BrowserView {
     /// Cmd+T handler. Routed per-window by `BrowserCommandRouter` so only the
     /// active window opens a new tab, never every window simultaneously.
     func handleNewTabCommand() {
-        isChromeCollapsed = false
         guard !serverState.isScriptRecording else { return }
+        isChromeCollapsed = false
         guard rendererState.activeEngine != .chromium else { return }
         let tab = tabStore.addTab()
         connectNewTab(tab)
@@ -119,6 +119,7 @@ extension BrowserView {
     }
 
     func navigate(_ urlString: String) {
+        guard !serverState.isScriptRecording else { return }
         isChromeCollapsed = false
         guard let url = URL(string: urlString) else { return }
         if url.scheme == "http" && !skipInsecureWarning {
@@ -196,7 +197,7 @@ extension BrowserView {
             viewportState: viewportState,
             stageScale: rendererState.activeEngine == .chromium ? 1.0 : viewportState.scale,
             contentUnderlap: chromeUnderlap,
-            showsStageChrome: !serverState.isScriptRecording && viewportState.showsViewportStageChrome
+            showsStageChrome: !serverState.isScriptImmersive && viewportState.showsViewportStageChrome
         ) {
             ZStack {
                 RendererContainerView(
@@ -235,7 +236,8 @@ extension BrowserView {
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
-            .allowsHitTesting(!serverState.isScriptRecording)
         }
+        .disabled(serverState.isScriptRecording)
+        .allowsHitTesting(!serverState.isScriptRecording)
     }
 }

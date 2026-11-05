@@ -365,7 +365,7 @@ final class IOSWorkflowTab {
             }
             do { try await check(); try requireCurrent() } catch {
                 view.stopLoading()
-                throw IOSWorkflowFailure("NAVIGATION_INTERRUPTED", mayHaveCompleted: true)
+                throw IOSWorkflowNavigation.interruption(error)
             }
             if context.lastNavigationError != nil { throw IOSWorkflowFailure("NAVIGATION_FAILED", mayHaveCompleted: true) }
             if navigationLease.allowsRead(version: version, loading: view.isLoading, authorized: true) { return }

@@ -26,6 +26,8 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+internal class WebViewGuardRejected : IllegalStateException("Tab document changed or job stopped")
+
 private val json =
     Json {
         ignoreUnknownKeys = true
@@ -172,7 +174,7 @@ class HandlerContext(
             mainHandler.post {
                 if (cont.isActive) {
                     try {
-                        check(guard?.invoke() != false) { "Tab document changed or job stopped" }
+                        if (guard?.invoke() == false) throw WebViewGuardRejected()
                         started()
                         wv.evaluateJavascript(script) { result ->
                             // Classify even a cancelled result before releasing retirement.
@@ -191,7 +193,7 @@ class HandlerContext(
                                 if (failure != null) {
                                     cont.resumeWithException(failure)
                                 } else if (guard?.invoke() == false) {
-                                    cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
+                                    cont.resumeWithException(WebViewGuardRejected())
                                 } else {
                                     cont.resume(raw)
                                 }

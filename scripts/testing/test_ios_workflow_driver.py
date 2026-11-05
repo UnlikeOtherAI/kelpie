@@ -166,6 +166,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         targets, names = DRIVER.selection("navigation")
         self.assertEqual(len(targets), 3)
         self.assertEqual(names, {
+            "testIssuedNavigationInterruptionPreservesStopAndUncertainty",
             "testRealWebKitHTTPNavigationUsesIssuedToken",
             "testRealWebKitHTTPNavigationAfterPriorBlankUsesIssuedToken",
             "testRealWebKitDelayedPriorHTTPCallbackRetiresBeforeNewLease",
@@ -225,9 +226,15 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
 
     def test_marker_selection_includes_both_lifetime_controls(self):
         targets, names = DRIVER.selection("marker")
-        self.assertEqual(names, {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
-                                 "testRetiredMarkerDoesNotReappearAfterTabChange"})
-        self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
+        ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun", "testRetiredMarkerDoesNotReappearAfterTabChange",
+              "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+              "testNonMovieTabletStageRetainsRendererFrame", "testNonMovieScriptClearsAddressFocus",
+              "testNonMovieLoadingAndScrollKeepChromeGeometry"}
+        self.assertEqual(names, ui | {"testOnlyMovieFormatsSelectImmersiveLayout",
+                                       "testIssuedNavigationInterruptionPreservesStopAndUncertainty"})
+        self.assertEqual(set(targets), {"KelpieTests/IOSWorkflowPresentationModeTests",
+                                        "KelpieTests/IOSWorkflowNavigationTests/testIssuedNavigationInterruptionPreservesStopAndUncertainty"} |
+                         {"KelpieUITests/WorkflowCaptureUITests/" + name for name in ui})
 
     def test_retirement_facts_are_fixed_and_bounded(self):
         from ios_workflow_diagnostics import fixed_retirement
@@ -243,7 +250,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         marker_targets, marker_names = DRIVER.selection("marker")
         self.assertEqual(targets, geometry_targets + marker_targets)
         self.assertEqual(names, geometry_names | marker_names)
-        self.assertEqual(len(names), 9)
+        self.assertEqual(len(names), 15)
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:

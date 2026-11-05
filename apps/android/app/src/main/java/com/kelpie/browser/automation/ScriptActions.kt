@@ -262,8 +262,15 @@ class ScriptActions(
             try {
                 mutationInFlight = true
                 val result =
-                    withTimeout(30_000) {
-                        router.handle("navigate", mapOf("url" to action["url"]), bypassRecordingGate = true, fromGateway = true).second
+                    recheckNavigationGuard(
+                        stopRequested = {
+                            ctx.scriptPlaybackState?.isAbortRequested() == true || run.stopReason.get() == "SCRIPT_ABORTED"
+                        },
+                        guard = ::guard,
+                    ) {
+                        withTimeout(30_000) {
+                            router.handle("navigate", mapOf("url" to action["url"]), bypassRecordingGate = true, fromGateway = true).second
+                        }
                     }
                 if (result["success"] != true) throw ScriptFailure("SCRIPT_NAVIGATION_FAILED", true)
                 guard()
@@ -438,7 +445,7 @@ class ScriptActions(
 
     private fun stop(code: String): Nothing {
         run.stop(code)
-        throw ScriptFailure(code, mutationInFlight)
+        throw ScriptFailure(run.stopReason.get() ?: code, mutationInFlight)
     }
 
     private fun number(

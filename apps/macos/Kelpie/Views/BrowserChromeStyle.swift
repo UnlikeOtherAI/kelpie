@@ -37,6 +37,7 @@ enum BrowserChromeLayout {
 }
 
 struct PageShareButton: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     let url: URL?
     var tintColor: NSColor?
 
@@ -53,7 +54,7 @@ struct PageShareButton: NSViewRepresentable {
 
     func updateNSView(_ button: ToolbarButtonView, context: Context) {
         context.coordinator.url = url
-        button.isEnabled = url != nil
+        button.isEnabled = url != nil && isEnabled
         button.chromeTintColor = tintColor
     }
 
@@ -64,7 +65,7 @@ struct PageShareButton: NSViewRepresentable {
     final class Coordinator: NSObject {
         var url: URL?
         @objc func share(_ sender: NSButton) {
-            guard let url else { return }
+            guard sender.isEnabled, let url else { return }
             NSSharingServicePicker(items: [url]).show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
         }
     }

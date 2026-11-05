@@ -656,3 +656,43 @@ navigation before playback and remains unverified. Its emulator became
 unresponsive to normal shutdown and exited at the original 30-minute Job
 watchdog (code 124); the captured runs were pulled before that failure.
 These are scoped test results, not a short-motion acceptance pass.
+The API 35 phone no-capture navigation and final tap completed with app SHA-256
+64b9f02f525ff096f891daeb5c692940472a376f2a9c92443b7b95012c594de4 and test
+SHA-256 ba7fc658b7b63bf4954a09993198a594d430c4871a8dc9e4ed7c1cce8bfa9b43.
+The native blue marker was not found. The first poll reported a visible target
+116 ms after polling began; the final marker first-draw log measured an overlay
+height of 1794 px, while the post-response WebView measured 1631 px. This
+supports investigating layout change but does not identify the exact retirement
+branch. Phone PNG/next-run and all tablet retirement cases remain open.
+
+With the active/immersive layout split, API 35 phone no-capture and
+screenshots-only public final-marker tests passed. The screenshots-only marker
+was centered at (418.69, 508.21) in target [262,430,577,588]; its retained PNG
+SHA-256 is 7e872eafe75b6e3851be8d1e29d6414843f276772653399ebb8f557e2d88abb1.
+The native Stop test passed with WebView frame (0,63,1080,1631) before, during
+and after. The no-capture screenshot was overwritten by the next case; its
+instrumentation assertion remains, but its image is not retained. The separate
+input test failed before execution because its generic test Activity was not
+declared. Phone explicit-PNG and movie controls remain unrun.
+
+The tablet no-capture public workflow succeeded but its final native marker was
+not detected. First poll was 239 ms after polling began; the final first-draw
+log and post-response WebView both reported 2560 by 1266 pixels. The final
+rejected image SHA-256 is 17506523d5156337cce349e9c36fc3ac859064c8673f2ff7b0ee2cedb6e99400.
+This does not establish the reason for retirement. Tablet PNG, Stop and movie
+cases remain open. Both runs used app SHA-256
+4c412fc82eadfe8daf8246235f8456e6b4735b76c689a5bc375dd93d8985f84e and test
+SHA-256 7169e038d25de9f3c73fcbc67c3c7ac3e97642e839c181ba3b75a32329b62cec.
+
+A separate instrumented API 35 tablet run passed the same no-capture native
+marker assertion. The diagnostic app SHA-256 was
+f6d497acf57a35aceba298400f5987176f4206296654925aa5176462067c5c12 and test
+SHA-256 187f108a1675d865872ec4777c9f5eafbfb60da8860f39c81a856dca55edc41a.
+The retained screenshot SHA-256 is
+01fa285a1e135cb7d00b885eb65dc003393c37ec721b9854f7f6e163dae7e553.
+The marker was centered at (319.5,485.5) in target [200,426,440,546], with
+center coverage 1. The debug trace recorded retention accepted 332 ms after
+marker publication; the first screenshot was acquired 1.62–1.97 s after
+publication and the marker expired at its original five-second deadline.
+This diagnostic adds instrumentation and does not explain the earlier 2d8
+tablet failure. Tablet PNG, Stop and movie checks remain open.

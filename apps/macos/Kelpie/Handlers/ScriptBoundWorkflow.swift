@@ -17,6 +17,10 @@ struct ScriptBoundWorkflow {
     let stepScreenshots: Bool
     let sensitiveValues: [String]
     let pacedPlans: [Int: ScriptPacedTyping]
+    var isImmersive: Bool {
+        let formats = Set(capture?["formats"] as? [String] ?? [])
+        return !formats.isDisjoint(with: ["gif", "video"])
+    }
 
     init(_ body: Body) throws {
         guard let input = Self.json(body),

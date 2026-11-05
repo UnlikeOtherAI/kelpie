@@ -310,3 +310,95 @@ d7ca0d84efe7f232bb508443af655790cd0d6447b56a275e47f85261c7f63267.
 An initial artifact-copy wildcard encountered the synthetic empty-home directory;
 explicit report-file transfer then succeeded with the same verified report hash.
 No corpus result was changed. No ongoing worker service remains.
+
+## Prepared same-host comparison
+
+The permanent `tests/linux/worker-comparison.mjs` corpus is prepared for
+review, not yet executed. It uses the same production worker stdio interface,
+one owned isolated session/tab and the same navigation and four fixed-reader
+assertions for both engines. It records the cold corpus and five warm samples,
+tool-call and response-byte counts, unit CPU and memory peak, and sampled
+process-tree RSS. The RSS sum is sampled every 250 ms and may double-count
+shared pages; read failures make the comparison ineligible. Startup is engine
+spawn through isolated-session readiness; fixture setup, binary hashing and
+version checks precede it. Unit memory peak includes hashing and version checks;
+the CPU delta covers the engine run and teardown. The peak is whole-unit memory, not browser
+RSS. One cold sample and five warm samples are a small distribution; nearest-
+rank p95 is the maximum of those five, not a stable population estimate.
+
+The pinned Lightpanda 1.0.2 Linux x86_64 asset must hash to
+`ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e`.
+Playwright 1.62.1's installed `browsers.json` specifies Chromium revision
+1234 and browser version 151.0.7922.34. Fedora's existing caches contained
+revisions 1208, 1223 and 1228 at preparation time, not 1234. Do not substitute
+one of those revisions. In a separate network-enabled setup stage, obtain the
+Playwright-pinned Linux Chromium archive from its registry, retain the archive
+and record its source URL and SHA-256, extract it in owned scratch, and record
+the actual executable SHA-256. The comparison rehashes both files and checks
+the executable version. An isolated hosted Linux runner may perform both arms
+on one exact host if Fedora cannot supply the pinned pair.
+
+The opt-in `.github/workflows/worker-comparison.yml` is prepared for review,
+not dispatched. Its default `prepare_only` mode downloads the pinned Linux
+Chromium archive from both the Playwright registry and Google Chrome for
+Testing, records both SHA-256 values and requires byte equality, then safely
+extracts and records the executable hash and version. Playwright's pinned
+registry metadata does not provide a publisher SHA-256; agreement between
+distribution endpoints is provenance evidence, not a publisher signature.
+The setup records the source revision, both URLs and this limitation. It does
+not start benchmark units. An explicitly enabled measurement requires the
+previously reviewed archive and executable hashes and rejects a mismatch.
+
+The existing dispatchable `lint.yml` can call the reusable workflow on the
+reviewed integration ref. Set `worker_comparison_mode` to `prepare` for
+identity preparation; the default `off` does nothing. A later reviewed
+measurement sets the mode to `execute` and supplies both
+`worker_comparison_*_sha256` inputs. The new workflow can also be dispatched
+directly once present on the default branch. Downloads and package setup occur
+before measured units; CLI and shared bundles are built only for execution.
+After a reviewed dispatch, `scripts/testing/run-worker-comparison-hosted.sh`
+runs the arms sequentially as the same non-root user in separate systemd units
+on one host: one CPU, 2 GiB, 256 tasks, 120 seconds,
+`NoNewPrivileges=yes`, `IPAddressDeny=any` and
+`IPAddressAllow=localhost`. The launcher retains active unit properties,
+exit and cgroup teardown receipts and binds the policy's main PID to each
+report. An owned host canary must be reachable over both loopback and the
+host's non-loopback address before either unit; inside each measured process,
+loopback must work and the same non-loopback connection must fail with
+permission denial. Missing or inconclusive policy/probe evidence fails closed.
+The browser is never launched with `--no-sandbox`. If the hosted systemd,
+cgroup, BPF or sandbox setup cannot enforce these conditions, preserve the
+failure; do not weaken the boundary or infer a comparison.
+
+The Lightpanda arm checks the pinned hash and version; the Chromium arm also
+requires the independently recorded archive hash. Both hash the fixture, CLI
+and shared bundle and require the exact clean source revision. The report
+matcher requires matching host binding, source, fixture, build, limits, ordered
+correctness checks and warm call counts. The matcher itself does not validate the external
+systemd policy receipt and never emits a speed ratio. Compare costs only after both
+corpora, unit policy and teardown succeed. Save all failures and refusals in
+the denominator. The four explicit Lightpanda method refusals are reported;
+shared sessions and concurrent contexts are labelled untested by this corpus
+and remain separately refused by the tested Lightpanda profile. No result
+establishes rendered pixels, input, native UI or automatic backend fallback.
+
+
+The measured hosted run 42121378935 stopped before starting either browser: the in-unit non-loopback probe did not establish denial. Its raw failure is retained in artifact 13460155244; the original probe did not record whether the connection succeeded, timed out, or returned a specific error. The probe-only workflow mode records a fixed connection classification, independently captured unit configuration and, when available, effective BPF attachment information. It runs no browser or cost measurement. Only an explicit in-unit EACCES or EPERM denial with a reachable outside control can pass the existing boundary check; other outcomes require investigation. The probe configuration and its execution require review before dispatch.
+
+The next probe uses a fresh systemd private network namespace and keeps the packet filter as defense in depth. It verifies a distinct live unit namespace, the sole loopback interface, IPv4 and IPv6 routes, an internal loopback connection, and an explicit non-loopback routing or permission failure against a host-positive canary. Timeouts remain insufficient. The measured workflow is disabled until this probe and Chromium sandbox evidence are reviewed; no comparison result follows from the probe.
+
+The measured-arm candidate requires a per-unit live namespace handoff bound to its process and run nonce before starting an engine. Chromium additionally requires an owned renderer with an extra seccomp filter and a distinct user or PID namespace, with sandbox-disabling flags rejected. The observed sandbox-check time and CPU are reported separately; unit peak memory still includes that work. These checks are source-only until an actual Chromium run supplies evidence. Measured dispatch remains disabled pending review.
+
+A separate opt-in sandbox smoke prepares only the reviewed pinned Chromium archive and executable, then runs Chromium in a fresh independently verified private namespace without a corpus or cost comparison. It records fixed sandbox refusal categories and a separate whole-cgroup retirement receipt. The comparison candidate rechecks every identifiable owned renderer after creating its isolated session. If process inspection is unavailable, the smoke fails closed; a bounded host-side read-only audit requires separate review. Neither smoke nor comparison has been dispatched at this revision.
+
+Sandbox-only run 42126773189 at 9fdce9b1 passed the private-network gate but failed with category identity before any corpus. Artifact 13461048058 retains that failure and verified cgroup retirement. The following diagnostic records the single spawn event, fixed error or exit classification, available PID/start ticks, and bounded stderr categories; it never retains raw stderr. It requires review before dispatch.
+
+Sandbox diagnostic 42127326184 at c0fc7dd retained a naturally aborted Chromium process with fixed stderr categories sandbox-unavailable and apparmor; the exact AppArmor policy and cause were not established. The explicit sandbox-2204 option selects GitHub-hosted ubuntu-22.04 for this smoke only, retaining the same pinned browser hashes, private namespace, cgroup limits, sandbox checks, and retirement requirement. Ubuntu 24.04 remains the default. No alternate-runner result or measured comparison is claimed.
+
+Ubuntu 22.04 smoke 42127882613 launched the pinned browser but failed closed with proc-unreadable; the affected process and read were not identified. The proposed smoke-only host audit binds the browser to the active unit, start ticks and nonce, checks cgroup membership and process identities before and after inspection, and reads only fixed process fields. It falls back to bounded sudo cat or readlink on those owned numeric PIDs when same-user access is denied, retains fixed categories, and never records command lines. This source requires review and does not establish a sandbox pass.
+
+The host-audit smoke 42128920370 found no identifiable renderer and used no privileged fallback reads; it did not prove why the renderer was absent. The next source candidate uses one static loopback page as the Chromium initial tab. Its nonce-bound JavaScript canary and unchanged browser identity must be observed before host sandbox inspection. It retains the same private-network, renderer and retirement gates and requires review before dispatch.
+
+Single-page smoke 42130179098 executed the nonce-bound page canary but the host audit still found no identifiable renderer. The reason is unproven. The next source candidate reads the fresh DevToolsActivePort file, verifies the exact browser owns the loopback listener, and requests only browser-level SystemInfo.getProcessInfo. It binds the bounded renderer PID set to the same browser and unit identity and uses those PIDs only as candidates: each must appear in stable owned cgroup snapshots with a readable nonempty command line, correct ancestry and the existing kernel sandbox checks. Any host-labeled renderer omitted from the candidate set fails the audit. No raw protocol response or additional tab is retained. Review is required before dispatch.
+
+Ubuntu 22.04 smoke 42131574170 passed the nonce page canary, private-network proof, five DevTools-nominated renderer checks, and whole-cgroup retirement. This is smoke evidence only. The measured-pair candidate runs the same public CLI preflight navigation in each isolated owned tab, then requires a fresh stage-nonce-bound host audit of all Chromium DevTools renderer candidates before corpus checks. Startup includes that common preflight and excludes separately recorded Chromium audit time and CPU; whole-unit peak memory includes the audit. Arms run serially and no ratio is emitted. The candidate requires review before any measured dispatch.

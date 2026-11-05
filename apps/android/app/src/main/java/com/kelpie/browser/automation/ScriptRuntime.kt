@@ -85,7 +85,7 @@ class ScriptRuntime(
             }
             val started =
                 withContext(Dispatchers.Main.immediate) {
-                    if (playback.start(ScriptPreflight.actions(script).size, false)) {
+                    if (playback.start(ScriptPreflight.actions(script).size, false, scriptUsesMovieLayout(capture))) {
                         ctx.scriptOverlay.clear()
                         true
                     } else {

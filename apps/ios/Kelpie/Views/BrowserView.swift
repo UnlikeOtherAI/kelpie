@@ -24,6 +24,7 @@ struct BrowserView: View {
     @State var isIn3DInspector = false
     @State var inspectorMode = "rotate"
     @State var bottomBarCollapsed = false
+    @State var layoutLoading = false
     @State var addressEditing = false
     @State var keyboardBottomInset: CGFloat = 0
     @State var bottomSafeArea: CGFloat = 0
@@ -68,11 +69,14 @@ struct BrowserView: View {
         ZStack {
             VStack(spacing: 0) {
                 ConnectControls(compact: true)
-                if isPad && !serverState.isScriptRecording {
+                if isPad && !serverState.isScriptImmersive {
                     TabletTabStrip(tabStore: tabStore, appearance: chromeAppearance)
+                        .disabled(serverState.isScriptRecording)
+                        .allowsHitTesting(!serverState.isScriptRecording)
+                        .accessibilityHidden(serverState.isScriptRecording)
                 }
 
-                if browserState.isLoading && !serverState.isScriptRecording {
+                if layoutLoading && !serverState.isScriptImmersive {
                     ProgressView(value: browserState.progress)
                         .progressViewStyle(.linear)
                 }
@@ -159,8 +163,11 @@ struct BrowserView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if !serverState.isScriptRecording && !showTabOverview {
+            if !serverState.isScriptImmersive && !showTabOverview {
                 bottomChrome
+                    .disabled(serverState.isScriptRecording)
+                    .allowsHitTesting(!serverState.isScriptRecording)
+                    .accessibilityHidden(serverState.isScriptRecording)
                     .padding(.bottom, keyboardBottomInset)
                     .offset(y: keyboardBottomInset > 0 ? 0 : bottomBarSink)
                     .animation(.easeOut(duration: 0.2), value: keyboardBottomInset)
@@ -179,10 +186,16 @@ struct BrowserView: View {
         .fullScreenCover(isPresented: $showTabOverview) {
             BrowserTabOverview(tabStore: tabStore) { showTabOverview = false }
         }
-        .onChange(of: tabStore.activeBrowserTabID) { _ in bottomBarCollapsed = false }
+        .onChange(of: tabStore.activeBrowserTabID) { _ in
+            if !serverState.isScriptRecording { bottomBarCollapsed = false }
+        }
         .onChange(of: browserState.webView) { _ in updateChromeSample() }
         .onChange(of: browserState.isLoading) { loading in
-            if loading { chromeSampler.navigationStarted(); bottomBarCollapsed = false } else { updateChromeSample(); tabStore.captureActivePreview() }
+            if !serverState.isScriptRecording { layoutLoading = loading }
+            if loading {
+                chromeSampler.navigationStarted()
+                if !serverState.isScriptRecording { bottomBarCollapsed = false }
+            } else { updateChromeSample(); tabStore.captureActivePreview() }
         }
         .overlay(alignment: .bottomLeading) {
             if debugOverlayEnabled {
@@ -197,9 +210,12 @@ struct BrowserView: View {
         }
         .onReceive(debugTimer) { _ in if debugOverlayEnabled { updateDebug() } }
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
-        .onAppear { migrateLegacyTabletViewportSelectionIfNeeded() }
-        .ignoresSafeArea(.container, edges: serverState.isScriptRecording ? [.top, .bottom] : [])
-        .statusBarHidden(serverState.isScriptRecording)
+        .onAppear {
+            migrateLegacyTabletViewportSelectionIfNeeded()
+            layoutLoading = browserState.isLoading
+        }
+        .ignoresSafeArea(.container, edges: serverState.isScriptImmersive ? [.top, .bottom] : [])
+        .statusBarHidden(serverState.isScriptImmersive)
         .onChange(of: browserState.currentURL) { _ in
             externalDisplayManager.triggerSyncPass()
             updateChromeSample()
@@ -265,7 +281,7 @@ struct BrowserView: View {
             setTabletViewportPreset(presetID)
         }
         .onChange(of: serverState.isScriptRecording) { isRecording in
-            guard isRecording else { return }
+            guard isRecording else { layoutLoading = browserState.isLoading; return }
             showSettings = false
             showBookmarks = false
             showHistory = false
