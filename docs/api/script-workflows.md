@@ -1,6 +1,6 @@
 # Typed workflows and walkthrough exports
 
-Where the selected browser advertises script v1, HTTP `POST /v1/play-script`, CLI `script run`, and MCP `kelpie_play_script` accept the same strict workflow. Check device capabilities before recording; unsupported actions and encoders must be refused before input. Unversioned legacy scripts keep their separate behavior.
+Where the selected browser advertises script v1, HTTP `POST /v1/play-script`, CLI `script run`, and MCP `kelpie_play_script` accept the same strict workflow. Consult the platform action matrix below before recording; unsupported actions and encoders are refused before input. Unversioned legacy scripts keep their separate behavior.
 
 ```json
 {
@@ -21,7 +21,14 @@ Targets are exactly one of role/name/exact, label/exact, CSS selector or explici
 
 When enabled, pointer motion defaults to 350 ms; set pointer.durationMs to choose another duration, including zero for immediate positioning. The tap indicator uses 70% base opacity, multiplied by its animation fade. The pointer is presentation only and does not cause hover. Native platforms report actual input guarantees; synthetic coordinate events are never described as trusted input. A mutation with uncertain completion is never retried. Before the final click or input event, target changes refuse remaining input. An acknowledged final event may navigate or replace its target; a lost callback remains uncertain and is never retried. Sensitivity discovered by a handler remains latched for redaction and capture disposal; an unavailable privacy classification is treated conservatively.
 
-Typed actions include navigation, click/tap, fill/type, press-key, scroll, timed wait, bounded wait-ready, assertions, screenshots, commentary, named output and bounded extraction. The platform may support only a subset. Version1 rejects unknown actions, arbitrary JavaScript and continue-on-error.
+Typed actions include navigation, click/tap, fill/type, press-key, scroll, timed wait, bounded wait-ready, assertions, screenshots, commentary, named output and bounded extraction. Version 1 rejects unknown actions, arbitrary JavaScript and continue-on-error.
+
+| Strict action | Windows and Linux | macOS, iOS and Android |
+| --- | --- | --- |
+| `press-key` | Supported trusted key plans | Refused in full preflight with `UNSUPPORTED_SCRIPT_ACTION` |
+| `fill` and `type` | Supported | Supported using the platform input guarantee |
+
+The original recording action catalogue requires text entry but does not specify a standalone key action. Mobile platforms mirror the same strict subset. Availability of other actions and encoders is runtime-specific; unsupported requests refuse before any action. Not every native capability response enumerates individual workflow actions.
 
 Capture continuously samples rendered frames and composites the same markers/pointer used in the live presentation. Defaults are15 FPS, width1280, duration60000ms and retained bytes67108864; maxima are30 FPS, width1920, duration300000ms and bytes268435456. Encoder backpressure drops frames, preserves elapsed timing and reports counts. Resize stops recording with partial output. Abort, ordinary failure and resource limits finalize valid partial artifacts. Privacy refusals are an exception: when a sensitive DOM target is recognized during capture, all capture artifacts from that run are discarded, including earlier frames. Output-redaction failure also discards capture. The privacy-discard decision is latched independently of later error replacement; it cannot be undone by finalization, abort or a redaction error.
 

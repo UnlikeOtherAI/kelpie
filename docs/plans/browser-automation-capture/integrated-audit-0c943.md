@@ -21,14 +21,16 @@ neither an owner report nor this document converts unreviewed evidence to a pass
   API 29+ also needs real scene, overlay, clipping and lifecycle replay; a
   successful compile or a fail-closed response does not prove captured content.
   See [Android compositor record](android.md).
-- **Strict keyboard action scope is narrower than the schema.** The shared
+- **Historical finding, resolved scope: strict keyboard action is narrower than the schema.** The shared
   v1 schema accepts `press-key`; desktop Windows/Linux preflight implements
   supported trusted-key plans. Android, iOS and macOS preflight reject this
   action. Android/iOS remain mirrored on this limitation. The public workflow
   documentation says action subsets vary, and Android's API reference names
-  the refusal. Reconcile this against the original requested feature scope:
-  if keyboard playback is required on those native renderers, this is missing
-  implementation, not an acceptance test to waive.
+  the refusal. The original recording catalogue requires text entry but does
+  not list standalone press-key; the combined contract permits preflight
+  refusal for platform subsets. Android and iOS mirror that limitation.
+  Standalone press-key is therefore an intentional subset; required fill/type
+  behavior and native refusal evidence remain separate runtime gates.
 - **Linux cadence and codec evidence remain functional gates.** The one-CPU
   pump candidate passed S/MP4 dense export analysis, but C/GIF and C/MP4 had
   insufficient phases and S/GIF's old oracle reported a stuck marker. The
@@ -84,7 +86,7 @@ frozen reviewed cell remains accepted only for its named source and scope.
 | EXT-01, EXT-02, EXT-03, EXT-04 | Actual scalar/missing/ambiguous and nested extraction, allowlisted metadata/JSON-LD, source/document provenance and truncation after navigation. |
 | RDY-01, RDY-02 | Final native status distinguishes DOM completion from unavailable diagnostics; delayed, hidden, duplicate and failed readiness predicates refuse or resolve correctly. |
 | OWN-01, OWN-02 | Multi-owner worker isolation beyond the tested Lightpanda single-session profile; native grants, pins, listener generations, stale refs and late callbacks across real HTTP/MCP/CLI. |
-| WFL-01, WFL-02, WFL-03, WFL-04, WFL-05 | Strict admission and typed inputs/secrets, ordered extract/assert/readiness, legacy recovery, and single-dispatch uncertain completion/next-run recovery. Resolve the keyboard subset against requested scope. |
+| WFL-01, WFL-02, WFL-03, WFL-04, WFL-05 | Strict admission and typed inputs/secrets, ordered extract/assert/readiness, legacy recovery, and single-dispatch uncertain completion/next-run recovery. Standalone press-key is an intentional subset; verify required fill/type and native refusals. |
 | TGT-01, TGT-02, TGT-03, TGT-04, TGT-05 | Unique visible semantic target, hit testing, clipped/pinched/scrolled geometry and document/element recheck; record each renderer's actual trusted or synthetic event guarantee. |
 | PTR-01, PTR-02 | Dense actual-PTS C/S path, endpoint and easing for each native presentation and export, with independently fitted native/export correspondence and bounded gaps. Do not infer animation from stills or held admission phase. |
 | VIS-01, VIS-02 | Configured color, radius, base opacity, wobble and fade over sufficient phases and visible clean end on native and exported scenes. Same-recording calibration cannot prove an overlay wholly occluded by the pointer. |
@@ -95,7 +97,7 @@ frozen reviewed cell remains accepted only for its named source and scope.
 | DIF-01 | Review normalized same-fixture public observations across final native renderers and admitted worker paths; justify typed input and capability differences rather than erasing them. |
 | LP-01, LP-02 | Restricted frozen public profile accepted as above; revalidate any enlarged inventory, owner crossover or new binary separately. |
 | WEB-01, WEB-02 | Verify truthful unsupported native/Lightpanda responses; managed positive API/grant/origin/encoding and hostile page tool cases remain distinct from native support. |
-| DOC-01, UI-01 | Final capability/schema/help/example truth and keyboard/API 28 scope; only materially changed native screens/states receive matched base/final evidence. |
+| DOC-01, UI-01 | Final capability/schema/help/example truth and recorded keyboard/API scope; only materially changed native screens/states receive matched base/final evidence. |
 | REL-01, REL-02 | Integrate every branch, bump affected versions and run final source checks before one PR; merge when required checks pass, then sign/publish exact artifacts, install and exercise those published artifacts. |
 
 ## Changed screens and delivery
