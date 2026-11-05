@@ -50,6 +50,8 @@ cp /etc/os-release "$output/os-release.txt"
 source_revision="$(cat "$package_root/source-revision.txt")"
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ ]]
 printf '%s\n' "$source_revision" > "$output/source-revision.txt"
+[[ "$(cat /opt/kelpie/source-revision.txt)" == "$source_revision" ]]
+sha256sum /opt/kelpie/source-revision.txt > "$output/embedded-source-sha256.txt"
 
 stage=client
 # A test runtime, never part of the native package. Verify the upstream archive.
