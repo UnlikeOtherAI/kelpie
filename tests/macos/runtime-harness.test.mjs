@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
+import {runIndependentPhase} from "./runtime-orchestration.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
  try{
@@ -96,4 +97,15 @@ test("paced fixture logs only synthetic lengths and bounded fixed transitions",a
    assert.ok(!html.includes("value:value.value"));
   }
  }finally{await fixture.close();}
+});
+
+test("a renderer failure is retained while an independent phase still runs",async()=>{
+ const failures=[],seen=[];
+ const childState=()=>({childExitAtFailure:null,childAliveAtFailure:true});
+ await runIndependentPhase("webkit",async()=>{seen.push("webkit");throw Object.assign(new Error(),{code:"MOTION_WORKFLOW"});},failures,childState);
+ await runIndependentPhase("chromium",async()=>{seen.push("chromium");},failures,childState);
+ assert.deepEqual(seen,["webkit","chromium"]);
+ assert.deepEqual(failures,[{phase:"webkit",code:"MOTION_WORKFLOW",childExitAtFailure:null,childAliveAtFailure:true}]);
+ await runIndependentPhase("inference",async()=>{throw Object.assign(new Error(),{code:"unsafe value"});},failures,childState);
+ assert.equal(failures[1].code,"HOSTED_RUNTIME_FAILED");
 });
