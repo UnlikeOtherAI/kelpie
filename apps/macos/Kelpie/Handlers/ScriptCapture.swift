@@ -174,10 +174,7 @@ final class ScriptCapture {
             } catch { failure = "CAPTURE_ARTIFACT_FAILED"; try? FileManager.default.removeItem(at: url) }
         }
         try? FileManager.default.removeItem(at: rawDirectory)
-        let retained = Set(candidates.map { $0.0 })
-        for url in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] where !retained.contains(url) {
-            try? FileManager.default.removeItem(at: url)
-        }
+        ScriptCaptureOutputCleanup.prune(directory: directory, retaining: candidates.map { $0.0 })
         if manifests.isEmpty { try? FileManager.default.removeItem(at: directory) }
         return manifests
     }
