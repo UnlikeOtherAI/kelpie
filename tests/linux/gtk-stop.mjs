@@ -50,6 +50,23 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
     const tabId = (await api("get-tabs")).tabs.find(tab => tab.active)?.id;
     assert.equal((await api("navigate", { tabId, url: fixture.url })).success, true);
     assert.equal((await api("play-script", { version: 1, tabId, actions: [{ action: "wait-ready", state: "complete" }] })).success, true);
+    if (env.KELPIE_GTK_DETACHED === "1") {
+      assert.ok(captureShown, "Detached transition requires owned isolated Weston");
+      const started=process.hrtime.bigint();
+      const result=await api("play-script",{version:1,tabId,
+        actions:[{action:"click",target:{role:"button",name:"Confirm order",exact:true}}],
+        capture:{formats:["screenshots"],fps:15,maxWidth:640,maxBytes:8388608,maxDurationMs:30000},
+        pointer:{enabled:false},tapIndicator:{color:"#FF0000",radius:24,durationMs:5000,wobble:true,fade:true}});
+      report.responseNs=process.hrtime.bigint().toString();
+      assert.equal(result.success,true,JSON.stringify(result.error));
+      assert.ok(result.totalDurationMs<4500,"PNG-only transition exceeded marker dwell bound");
+      report.elapsedMs=Number(BigInt(report.responseNs)-started)/1e6;
+      report.event=await wait(()=>fixture.events.find(event=>event.type==="click"&&event.target==="unique"),"trusted click",3000);
+      assert.equal(report.event.trusted,true);
+      report.nativeImage=await captureShown();
+      report.result={runId:result.runId,actionsExecuted:result.actionsExecuted};
+      return report;
+    }
     timeline = captureTimeline?.();
     if (timeline) void timeline.catch(() => {});
     pending = observeInFlight(api("play-script", { version: 1, tabId, actions: [
