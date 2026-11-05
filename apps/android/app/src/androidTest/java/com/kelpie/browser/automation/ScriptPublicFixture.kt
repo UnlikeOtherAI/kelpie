@@ -148,7 +148,7 @@ abstract class ScriptPublicFixture {
         }
     }
 
-    protected fun captureBlueMarker(client: ScriptHttpFixture): Bitmap {
+    protected fun captureBlueMarker(client: ScriptHttpFixture, geometry: JSONObject): Bitmap {
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
@@ -164,11 +164,13 @@ abstract class ScriptPublicFixture {
             // here would defer the screenshot until the marker has disappeared.
             val viewport = android.graphics.Rect()
             instrumentation.runOnMainSync {
-                val location = IntArray(2)
-                owned.getLocationOnScreen(location)
-                viewport.set(location[0], location[1], location[0] + owned.width, location[1] + owned.height)
+                if (owned.getGlobalVisibleRect(viewport)) {
+                    val rootLocation = IntArray(2)
+                    owned.rootView.getLocationOnScreen(rootLocation)
+                    viewport.offset(rootLocation[0], rootLocation[1])
+                }
             }
-            val target = submitTargetBounds(viewport)
+            val target = submitTargetBounds(owned, geometry)
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
             val now = System.nanoTime()
@@ -269,24 +271,65 @@ abstract class ScriptPublicFixture {
         return JSONObject().put("activeRootPresent", activePresent).put("windows", windows)
     }
 
-    @Suppress("DEPRECATION")
-    private fun submitTargetBounds(viewport: android.graphics.Rect): android.graphics.Rect? {
-        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return null
-        try {
-            val nodes = root.findAccessibilityNodeInfosByText("Submit")
-            try {
-                for (node in nodes) {
-                    if (!node.isVisibleToUser || !node.isClickable || node.text?.toString() != "Submit") continue
-                    val rect = android.graphics.Rect()
-                    node.getBoundsInScreen(rect)
-                    if (rect.intersect(viewport) && !rect.isEmpty) return rect
-                }
-            } finally {
-                nodes.forEach { it.recycle() }
-            }
-        } finally {
-            root.recycle()
+    /** Resolve the single fixture button independently of the marker renderer. */
+    protected fun readSubmitGeometry(client: ScriptHttpFixture): JSONObject {
+        val expression =
+            """(()=>{const b=[...document.querySelectorAll('button')],v=visualViewport;
+            if(b.length!==1||b[0].textContent!=='Submit'||!v)return null;
+            const r=b[0].getBoundingClientRect();
+            return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,
+            offsetLeft:v.offsetLeft,offsetTop:v.offsetTop,width:v.width,height:v.height,href:location.href};})()"""
+        val geometry = client.call("evaluate", JSONObject().put("expression", expression)).getJSONObject("result")
+        assertTrue(geometry.getString("href").contains("/fixture"))
+        assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
+        assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
+        return geometry
+    }
+
+    /** Project DOM CSS coordinates through the exact owned WebView's native transform. */
+    private fun submitTargetBounds(view: android.webkit.WebView, geometry: JSONObject): android.graphics.Rect? {
+        var target: android.graphics.Rect? = null
+        instrumentation.runOnMainSync {
+            if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) return@runOnMainSync
+            val width = geometry.getDouble("width")
+            val height = geometry.getDouble("height")
+            if (!width.isFinite() || !height.isFinite() || width <= 0 || height <= 0) return@runOnMainSync
+            val scaleX = view.width / width
+            val scaleY = view.height / height
+            if (kotlin.math.abs(scaleX / scaleY - 1.0) > 0.02) return@runOnMainSync
+            val left = (geometry.getDouble("left") - geometry.getDouble("offsetLeft")) * scaleX
+            val top = (geometry.getDouble("top") - geometry.getDouble("offsetTop")) * scaleY
+            val right = (geometry.getDouble("right") - geometry.getDouble("offsetLeft")) * scaleX
+            val bottom = (geometry.getDouble("bottom") - geometry.getDouble("offsetTop")) * scaleY
+            if (left < 0 || top < 0 || right > view.width || bottom > view.height) return@runOnMainSync
+            val rect = android.graphics.RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
+            val matrix = android.graphics.Matrix()
+            view.transformMatrixToGlobal(matrix)
+            val values = FloatArray(9)
+            matrix.getValues(values)
+            val sx = values[android.graphics.Matrix.MSCALE_X]
+            val sy = values[android.graphics.Matrix.MSCALE_Y]
+            if (!matrix.isAffine || sx <= 0f || sy <= 0f || kotlin.math.abs(sx / sy - 1f) > 0.02f ||
+                kotlin.math.abs(values[android.graphics.Matrix.MSKEW_X]) > 0.0001f ||
+                kotlin.math.abs(values[android.graphics.Matrix.MSKEW_Y]) > 0.0001f
+            ) return@runOnMainSync
+            val origin = floatArrayOf(0f, 0f)
+            matrix.mapPoints(origin)
+            matrix.mapRect(rect)
+            val screen = IntArray(2)
+            view.getLocationOnScreen(screen)
+            rect.offset(screen[0] - origin[0], screen[1] - origin[1])
+            val visible = android.graphics.Rect()
+            if (!view.getGlobalVisibleRect(visible)) return@runOnMainSync
+            val rootLocation = IntArray(2)
+            view.rootView.getLocationOnScreen(rootLocation)
+            visible.offset(rootLocation[0], rootLocation[1])
+            val projected = android.graphics.Rect(
+                kotlin.math.floor(rect.left.toDouble()).toInt(), kotlin.math.floor(rect.top.toDouble()).toInt(),
+                kotlin.math.ceil(rect.right.toDouble()).toInt(), kotlin.math.ceil(rect.bottom.toDouble()).toInt(),
+            )
+            if (visible.contains(projected)) target = projected
         }
-        return null
+        return target
     }
 }
