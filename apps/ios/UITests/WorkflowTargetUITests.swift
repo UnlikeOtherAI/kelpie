@@ -49,6 +49,50 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testDefaultPointerMotionUsesShorterNativeTiming() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let navigation = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/motion"]]
+        ])
+        XCTAssertEqual(navigation["success"] as? Bool, true)
+        let result = try await probe.call("kelpie_play_script", [
+            "version": 1, "tabId": tab,
+            "actions": [["action": "tap", "target": ["role": "button", "name": "Track"]],
+                        ["action": "output", "source": "title", "name": "clicked"]],
+            "pointer": ["enabled": true],
+            "tapIndicator": ["color": "#F000AA", "radius": 32, "durationMs": 700],
+            "capture": ["formats": ["gif"], "fps": 30, "maxWidth": 512]
+        ])
+        XCTAssertEqual(result["success"] as? Bool, true)
+        XCTAssertEqual((result["outputs"] as? Body)?["clicked"] as? String, "Track clicked")
+        let manifest = try XCTUnwrap((result["artifacts"] as? [Body])?.first)
+        let bytes = try await probe.bytes(manifest, run: try XCTUnwrap(result["runId"] as? String))
+        let frames = try WorkflowMotionFrames.decode(bytes)
+        let marker = try XCTUnwrap(frames.firstIndex { $0.indicatorWidth > 0 })
+        let travel = frames[..<marker].filter { $0.pointer != nil }
+        let evidence = XCTAttachment(data: bytes, uniformTypeIdentifier: "com.compuserve.gif")
+        evidence.name = "Default pointer timing GIF"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        let trace = XCTAttachment(string: frames.map {
+            "\($0.time)\t\($0.pointer?.x ?? -1)\t\($0.pointer?.y ?? -1)\t\($0.indicatorWidth)"
+        }.joined(separator: "\n"))
+        trace.name = "Default pointer decoded frame timing"
+        trace.lifetime = .keepAlways
+        add(trace)
+        XCTAssertGreaterThanOrEqual(travel.count, 3, "Need multiple decoded in-motion frames")
+        let first = try XCTUnwrap(travel.first)
+        let start = try XCTUnwrap(first.pointer)
+        let end = try XCTUnwrap(travel.last?.pointer)
+        XCTAssertGreaterThan(hypot(end.x - start.x, end.y - start.y), 10)
+        let elapsed = frames[marker].time - first.time
+        XCTAssertGreaterThan(elapsed, 0.12)
+        XCTAssertLessThan(elapsed, 0.5, "Default pointer movement should finish in under half a second")
+    }
+
+    @MainActor
     func testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }

@@ -45,6 +45,7 @@ def selection(scope):
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
+                "testDefaultPointerMotionUsesShorterNativeTiming",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
