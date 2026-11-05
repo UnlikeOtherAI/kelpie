@@ -40,7 +40,7 @@ export function evaluateG08(samples,config){
   const corrected=pointers.map(s=>({...s,p:{x:s.pointer.x+offset.x,y:s.pointer.y+offset.y}}));
   const lastStart=corrected.filter(s=>s.timeMs<settled.at(-1).timeMs&&distance(s.p,from)<=2).at(-1);
   demand(lastStart,"INSUFFICIENT_EVIDENCE final motion start");
-  demand(samples.some(s=>s.timeMs>initial.timeMs+300&&s.timeMs<lastStart.timeMs&&s.marker.alpha>.2),
+  demand(samples.some(s=>s.timeMs>=initial.timeMs+pointerMs*.65&&s.timeMs<lastStart.timeMs&&s.marker.alpha>.2),
     "INSUFFICIENT_EVIDENCE calibration dispatch marker");
   const finalSamples=samples.filter(s=>s.timeMs>=lastStart.timeMs);
   const path=corrected.filter(s=>s.timeMs>=lastStart.timeMs)

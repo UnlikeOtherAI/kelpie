@@ -9,14 +9,14 @@ const inverse=t=>{let lo=0,hi=1;for(let n=0;n<24;n++){const m=(lo+hi)/2;if(m*m*(
 function render(config,mode){
   const samples=[],scale=config.scale??{x:1,y:1};
   const center={x:config.to.x*scale.x,y:config.to.y*scale.y};
-  for(let timeMs=0;timeMs<=6900;timeMs+=50){
+  for(let timeMs=0;timeMs<=9100;timeMs+=50){
     const bytes=Buffer.alloc(width*height*3,255);
-    const phase=Math.max(0,Math.min(1,(timeMs-700)/config.pointerMs));
+    const phase=Math.max(0,Math.min(1,(timeMs-2900)/config.pointerMs));
     let p=scriptPointerPosition(mode==="wrongcurve"?{...config,curve:"s"}:config,mode==="noease"?inverse(phase):phase);
-    if(timeMs<500)p=config.to;
-    if(mode==="straight"&&timeMs>=500)p={x:config.from.x+(config.to.x-config.from.x)*phase,y:config.from.y};
+    if(timeMs<2500)p=config.to;
+    if(mode==="straight"&&timeMs>=2500)p={x:config.from.x+(config.to.x-config.from.x)*phase,y:config.from.y};
     p={x:p.x*scale.x,y:p.y*scale.y};
-    const progress=timeMs>=350&&timeMs<500?.1:(timeMs-3300)/(mode==="wrongduration"?config.markerMs*.65:config.markerMs);
+    const progress=timeMs>=2000&&timeMs<2150?.1:(timeMs-5500)/(mode==="wrongduration"?config.markerMs*.65:config.markerMs);
     if(progress>=0&&(progress<1||mode==="stuck")){
       const tap=scriptTapPresentation(progress,mode!=="nowobble",true);
       const alpha=(["stuck","nofade"].includes(mode)?1:tap.alpha)*(mode==="opaque"?1:mode==="wrongopacity"?.85:(config.baseAlpha??0.7)),radius=config.radius*scale.x*tap.scale;
@@ -33,7 +33,7 @@ function render(config,mode){
       for(let y=anchor.y+2;y<anchor.y+5;y++)for(let x=anchor.x+3;x<anchor.x+6;x++){
         const i=(y*width+x)*3;bytes[i]=bytes[i+1]=72;bytes[i+2]=96;
       }
-      if(timeMs>=6500&&mode!=="overlapClean"){
+      if(timeMs>=8700&&mode!=="overlapClean"){
         const r=mode==="overlapSmall"?2:config.radius*scale.x;
         for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(Math.hypot(x-center.x,y-center.y)<=r){
           const i=(y*width+x)*3;
@@ -85,7 +85,7 @@ test("pointer palette baseline accepts clear tail but rejects small and faint ov
 
 test("calibration requires an observed later dispatch marker and stable pre-dispatch pixels",()=>{
   const config={...base,curve:"c"};
-  const missing=render(config);for(const sample of missing)if(sample.timeMs>=350&&sample.timeMs<500)sample.marker.alpha=0;
+  const missing=render(config);for(const sample of missing)if(sample.timeMs>=2000&&sample.timeMs<2150)sample.marker.alpha=0;
   assert.throws(()=>evaluateG08(missing,config),/INSUFFICIENT_EVIDENCE calibration dispatch marker/);
   const unstable=render(config);unstable[1].marker.roi=Buffer.from(unstable[1].marker.roi);unstable[1].marker.roi[0]^=1;
   assert.throws(()=>evaluateG08(unstable,config),/INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline/);
