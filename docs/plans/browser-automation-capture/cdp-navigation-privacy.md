@@ -72,3 +72,13 @@ target replacement, stale replies, crash and no-release cases. A BFCache
 entry, failed or cancelled navigation, and a missing callback cannot be
 treated as a non-sensitive classification. Do not introduce a persistent
 page script or relax capture discard in lieu of that evidence.
+
+A second otherwise matched probe intercepted the Document response stage. It
+also received the mouse-release acknowledgement, but the original isolated
+world evaluation did not return within five seconds. The response was
+continued successfully; no classification case completed. The bounded
+JobObject receipt SHA-256 is
+`0fad4ea25835d2359436e9bd97ec7ee5b028724ec0fd66ebe166e4ad1da1c0ec`;
+the log SHA-256 is
+`6546a80127170dddf9d4c67f30ebd5071c9447d2d6bab90a2f11d83e47ceb63d`.
+This does not establish all possible response-stage or CEF behavior.
