@@ -27,7 +27,7 @@ export class Client {
   if(!options.reveal&&(options.token??this.token))headers.authorization="Bearer "+(options.token??this.token);
   const response=await fetch("http://127.0.0.1:"+port+route,{method:options.method??"POST",headers,
    body:options.method==="GET"?undefined:JSON.stringify(body),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(options.timeout??365000)]):AbortSignal.timeout(options.timeout??365000),redirect:"error"});
-  const pieces=[];let size=0;for await(const bytes of response.body){size+=bytes.length;if(size>32*1024*1024)throw new Failure("RESPONSE_LIMIT");pieces.push(Buffer.from(bytes));}
+  const pieces=[];let size=0;for await(const bytes of response.body){size+=bytes.length;if(size>32*1024*1024)throw new Failure("RESPONSE_LIMIT");pieces.push(Buffer.from(bytes));options.onChunk?.(size);}
   let text=Buffer.concat(pieces).toString("utf8");
   this.pin(port);
   if(text.startsWith("event:")||text.startsWith("data:"))text=text.split("\n").filter(x=>x.startsWith("data:")).map(x=>x.slice(5).trim()).at(-1);
