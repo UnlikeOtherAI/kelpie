@@ -511,3 +511,31 @@ artifacts remain downloadable/hashed, and a fresh run must recover.
 No product API, arbitrary page command or longer timing guess is added.
 The fixture command/cleanup test passed on Maxis (1/1,178ms total); module syntax
 checks passed. Real native barrier execution is pending the next exact replay.
+
+The corrected full replay passed all36 canonical cases plus protocol and
+finalization supplements on native3001/test9a69c8dc. The whitebox pre-input
+barrier also passed: native critical PNG had439 red pixels, SHA-256
+bee3f065ba3e60b2a429d3dc6461ce915d5e68631c6f1831ba7686cec70bf633;
+SSE replacement acknowledged at863.8ms, then STALE_TARGET with definite
+noncompletion, zero pointerdown/click, no navigation, three partial formats and
+recovery. App/readiness cleanup completed. Unit totals:90.485s wall/19.885s CPU/
+361.4MiB peak. All prior failing attempts remain retained.
+
+The stronger packaged alias replay (driverbd431f62) passed5 public cases and
+10 observations, positively advertised play-script in the actual offscreen
+catalogue, and observed natural exact-process absence before unit exit
+(0.51ms probe), socket refusal and readiness/running absence. Device app version
+was0.1.15; readiness format1 and native MCP serverInfo version1 are distinct.
+Unit totals:16.267s wall/10.704s CPU/407MiB. No manual kill or state editing
+established those results.
+
+A durable independent verifier now combines canonical, finalization, pre-input
+and large-PNG artifacts, decodes every frame and checks dimensions/counts/times,
+then checks the completed continuous run's marker center and fade. Its source
+syntax passed; this combined decoding/pixel pass is next, not yet claimed.
+
+## GTK Stop acceptance entry point
+
+`tests/linux/run-native-alias-acceptance.mjs <binary> <packaged-cli> <new-output-directory> windowed` uses the regular CLI registration, launch, MCP/recipe and stop flows. It additionally invokes the existing native `Stop script` GTK button through standard AT-SPI `Action.DoAction`. The helper pins the executable hash, process owner and `/proc` start ticks, selects only accessibility connections owned by that exact PID, and excludes embedded document subtrees. It requires one visible, showing and enabled native button before invoking its single standard action. It sends no focus, keyboard or pointer input and does not inspect another application's UI.
+
+The runtime gate requires the existing unlocked GNOME Wayland session, successful abort/partial artifacts and recovery, followed by public CLI stop and natural process/socket/readiness retirement before the resource unit exits. Accessibility metadata is not compositor or displayed-pixel proof. At this source checkpoint the new GTK gate has only JavaScript syntax/self-review checks; actual GTK results are pending the bounded Fedora run.
