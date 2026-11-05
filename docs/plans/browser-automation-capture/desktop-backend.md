@@ -291,3 +291,39 @@ Linux codecs/GTK/headless/no-CEF/package verification and the integrated publish
 release remain separate requirements. Linux source now has its own assigned
 D:/Worktrees/kelpie/capture-linux-20261104 branch at8423d7df; its adapters are
 unbuilt drafts and do not inherit the portable worker acceptance result.
+
+## Lightpanda shared-isolation guard checkpoint (5 November 2026)
+
+The exact 1.0.2 diagnostic limits are recorded in lightpanda-analysis.md and
+lightpanda-verification.md. They do not authorize shared storage or a public
+reader profile. Both SDK allocation and the production worker factory now refuse
+Lightpanda shared sessions with ISOLATION_UNAVAILABLE before allocating or using
+a shared context. Tests assert zero borrowed-context access/allocation and
+preserve explicit Playwright shared storage and Lightpanda isolated allocation.
+
+Validation on Maxis, based on 635d88ace7f2a7c3f722b4c572fa1e2d3f285945 plus this
+scoped draft: cached workspace lint and build passed; all 143 shared tests passed;
+CLI: 697 passed and one existing test skipped (58 files). The new allocation
+file's three tests passed. Commands used workspace concurrency 1 and test
+maxWorkers/minWorkers 1, NODE_OPTIONS=--max-old-space-size=2048, task-owned D:
+scratch/caches, with no dependency install, browser, CEF or native app phase.
+
+The busy-host run first found three draft lint errors, which were corrected.
+An outer console launcher confinement mismatch was stopped before useful work.
+BelowNormal affinity 1 then received only 2.7 CPU seconds in 84 wall seconds.
+The coordinator authorized Normal priority while retaining affinity 1 on the
+entire workload tree. A harmless five-process parent/direct/cmd/nested/console
+probe passed; actual descendant metadata remained affinity 1/Normal. Normal
+lint passed in 26.8 seconds and build in 19.3 seconds. The first test attempt was
+interrupted when the external metadata monitor raced an exited process; its
+logs remain. The repaired monitor allowed the complete full test rerun to finish
+at 03:22:09 UTC, with one harmless exited-process metadata race counted.
+Free memory was 13.99 GiB at the Normal start and 19.08 GiB after completion.
+
+Evidence is under D:/BuildArtifacts/kelpie/capture-desktop-20261104:
+lp-normal-affinity-proof.json; lp-guard-normal-{lint,build}.log;
+lp-guard-normal-tests-test.log; lp-guard-normal-tests-phases.jsonl; and
+lp-guard-normal-tests-process-proof.json. Earlier lp-guard-* attempts are
+retained. No own check process remains. Actual production stdio on Lightpanda,
+the corrected diagnostic snapshot assertions, Linux native relink/MCP/CLI,
+GTK/Wayland and installed package verification remain unclaimed gates.
