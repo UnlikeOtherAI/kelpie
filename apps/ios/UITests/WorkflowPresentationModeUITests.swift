@@ -21,6 +21,10 @@ extension WorkflowCaptureUITests {
         for (name, formats, explicit, movie) in modes {
             let viewport = application.webViews.firstMatch
             let initial = viewport.frame
+            let beforeImage = XCTAttachment(screenshot: application.screenshot())
+            beforeImage.name = name + " before script"
+            beforeImage.lifetime = .keepAlways
+            add(beforeImage)
             var actions: [Body] = [["action": "wait", "ms": 5000]]
             if explicit { actions.append(["action": "screenshot", "name": "still"]) }
             var script: Body = ["version": 1, "tabId": tab, "actions": actions]
@@ -52,6 +56,10 @@ extension WorkflowCaptureUITests {
             }
             XCTAssertFalse(stop.exists, name)
             XCTAssertTrue(chrome.waitForExistence(timeout: 5), name)
+            let afterImage = XCTAttachment(screenshot: application.screenshot())
+            afterImage.name = name + " after script"
+            afterImage.lifetime = .keepAlways
+            add(afterImage)
             if !movie {
                 let after = viewport.frame
                 XCTAssertEqual(after.minX, initial.minX, accuracy: 0.5, name)
@@ -98,6 +106,10 @@ extension WorkflowCaptureUITests {
         let result = try await playback.value
         XCTAssertEqual((result["error"] as? Body)?["code"] as? String, "SCRIPT_ABORTED")
         XCTAssertTrue(stage.waitForExistence(timeout: 5))
+        let afterImage = XCTAttachment(screenshot: application.screenshot())
+        afterImage.name = "Tablet stage after non-movie script"
+        afterImage.lifetime = .keepAlways
+        add(afterImage)
         let after = viewport.frame
         XCTAssertEqual(after.minX, before.minX, accuracy: 0.5)
         XCTAssertEqual(after.minY, before.minY, accuracy: 0.5)
