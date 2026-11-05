@@ -174,7 +174,7 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                             assertEquals("SCRIPT_NOT_FOUND", refusal.second.getJSONObject("error").getString("code"))
                         }
                         val denied = second.request("/v1/get-script-artifact", JSONObject().put("runId", runId).put("artifactId", "foreign"))
-                        assertEquals("SCRIPT_NOT_FOUND", denied.second.getJSONObject("error").getString("code"))
+                        assertEquals("ARTIFACT_NOT_FOUND", denied.second.getJSONObject("error").getString("code"))
                         assertTrue(first.call("get-script-status").getBoolean("playing"))
                         assertEquals(200, first.request("/v1/pair", method = "DELETE").first)
                         val original = pending.get(15, TimeUnit.SECONDS)

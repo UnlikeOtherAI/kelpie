@@ -128,6 +128,14 @@ class ScriptRun(
     @Synchronized
     fun prepareOutputs(): Map<String, Any?> = redactor.redact(outputs.toMap(), extractionNames)
 
+    /** Publication waits for renderer retirement, redaction, and the discard decision. */
+    @Synchronized
+    fun readArtifact(body: Map<String, Any?>): Map<String, Any?> {
+        artifacts.validateRead(body)
+        if (active()) throw ScriptFailure("ARTIFACT_NOT_READY")
+        return artifacts.read(id, body)
+    }
+
     /** Metadata-only queries never materialize or retain page-derived output bodies. */
     @Synchronized
     fun status(
@@ -146,7 +154,7 @@ class ScriptRun(
             put("elapsedMs", endedMs ?: elapsedMs())
             endedMs?.let { put("totalDurationMs", it) }
             put("abortRequested", stopped.get())
-            put("artifacts", artifacts.manifests(phase != "completed"))
+            put("artifacts", if (active()) emptyList() else artifacts.manifests(phase != "completed"))
             if (!active()) put("runSuccess", phase == "completed")
             if (error != null) put(if (includeOutputs) "error" else "runError", mapOf("code" to error, "message" to "Script stopped"))
             if (uncertain) put("mayHaveCompleted", true)

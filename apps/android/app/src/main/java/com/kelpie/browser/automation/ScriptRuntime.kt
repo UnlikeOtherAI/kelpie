@@ -135,8 +135,14 @@ class ScriptRuntime(
         safe {
             val authority = currentScriptAuthority()
             val id = body["runId"] as? String ?: throw ScriptFailure("INVALID_PARAMS")
-            val run = store.owned(authority.owner, id) ?: throw ScriptFailure("SCRIPT_NOT_FOUND")
-            val result = withContext(Dispatchers.IO) { run.artifacts.read(run.id, body) }
+            val run =
+                try {
+                    store.owned(authority.owner, id) ?: throw ScriptFailure("ARTIFACT_NOT_FOUND")
+                } catch (failure: ScriptFailure) {
+                    if (failure.code == "SCRIPT_NOT_FOUND") throw ScriptFailure("ARTIFACT_NOT_FOUND")
+                    throw failure
+                }
+            val result = withContext(Dispatchers.IO) { run.readArtifact(body) }
             authority.requireCurrent()
             result
         }

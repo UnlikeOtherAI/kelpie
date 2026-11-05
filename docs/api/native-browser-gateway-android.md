@@ -174,3 +174,8 @@ termination additionally checks the actual AVD identity. Seven-day reports retai
 failed test counts as well as passes. Original fixture HTTP errors and tiny
 negative capture images are retained before assertions; no pairing replies or
 credential stores are collected.
+Strict v1 script artifact manifests and downloads become available only after
+renderer retirement, final output redaction, and capture privacy classification.
+Active owned runs return empty artifact lists and ARTIFACT_NOT_READY on valid
+chunk requests; unknown or foreign runs return ARTIFACT_NOT_FOUND. Safe terminal
+artifacts from earlier runs remain downloadable during a later active run.

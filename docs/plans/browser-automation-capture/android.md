@@ -442,3 +442,29 @@ Critical separate gate: common review reproduced focus-time sensitivity changes
 Android needs the common private policy and pre-guard result-consumer adapter;
 the initial-password case does not cover or close that gate. Next hosted run must
 include that common fix and native focus-time cases.
+## Late classification and publication follow-up (source only)
+
+The Android fixed-target callback now consumes token-latched sensitivity before
+current-document checks and before releasing its existing renderer-retirement
+ticket. Capture uses the shared private refuseSensitive policy. Missing or
+uncertain classification after attempted editing registers the current editing
+literal even without capture; capture additionally latches discard independently
+of the first concrete failure. Final outputs still wait for renderer retirement.
+
+Running/finalizing status returns no artifact manifests. Owned active-run
+downloads return ARTIFACT_NOT_READY after parameter validation; unknown/foreign
+runs return ARTIFACT_NOT_FOUND. Prior safe terminal downloads remain available.
+The publication transition and read share the run monitor.
+
+Authored regressions add focus-time autocomplete/password changes with earlier
+raw/URI/form output, plus public HTTP/direct/generic MCP early-download refusal
+and a prior terminal download during a new run. JVM ownership cases exercise a
+known current artifact ID in both active phases and privacy discard afterward.
+These additions have not been compiled or run on a device in this checkpoint.
+The c71 hosted failure denominators above remain unchanged.
+The classification fallback is scoped to an actually started fixed evaluation
+without explicit Boolean metadata. A decoded sensitive:false followed by a
+document/abort guard failure preserves ordinary partial capture and does not
+register the editing literal. A pre-evaluation refusal also leaves provenance
+unchanged. New JVM vectors and a real-WebView callback guard regression cover
+these boundaries; they are authored but not yet compiled/run.
