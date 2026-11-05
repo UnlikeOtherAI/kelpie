@@ -11,11 +11,24 @@ on:
         description: Build Linux ABI/package candidates for affected native source (no publication)
         type: boolean
         default: false
+      linux_resource_source_run:
+        description: Prior Linux candidate run ID for numeric resource diagnosis
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
+  linux-resource-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_resource_source_run != ''
+    uses: ./.github/workflows/linux-resource-diagnostic.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      source_run: ${{ inputs.linux_resource_source_run }}
+
   linux-native-candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_native_candidate
     uses: ./.github/workflows/linux-native.yml

@@ -1,0 +1,105 @@
+name: Installed Linux resource diagnostic
+
+on:
+  workflow_call:
+    inputs:
+      source_run:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    name: Installed resource snapshot (${{ matrix.distro.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        distro:
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+          - name: fedora-44
+            image: fedora:44
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate source run
+        env:
+          SOURCE_RUN: ${{ inputs.source_run }}
+        run: |
+          set -euo pipefail
+          [[ "${SOURCE_RUN}" =~ ^[0-9]+$ ]]
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: linux-native-candidate-${{ matrix.distro.name }}
+          path: dist/release/${{ matrix.distro.name }}
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+      - uses: pnpm/action-setup@v6.0.8
+        with:
+          version: 10
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22.14.0
+      - name: Prepare original corpus and diagnostic hooks
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          diagnostic_revision="$(git rev-parse HEAD)"
+          package_revision="$(cat "${package_root}/source-revision.txt")"
+          [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
+          git cat-file -e "${package_revision}^{commit}"
+          git checkout --detach "${package_revision}"
+          for path in scripts/ci/linux-installed-smoke.sh tests/linux/native-resource-snapshot.mjs \
+            tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs; do
+            git show "${diagnostic_revision}:${path}" > "${path}"
+          done
+          printf '%s\n' "${diagnostic_revision}" > "${package_root}/resource-test-revision.txt"
+          pnpm install --frozen-lockfile
+          pnpm --filter @unlikeotherai/kelpie build
+      - name: Run original installed package with numeric snapshots
+        timeout-minutes: 15
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          curl -fsSL https://raw.githubusercontent.com/moby/profiles/4b8214fc4971e06172938a1f1554ccff6647ee80/seccomp/default.json -o "${RUNNER_TEMP}/kelpie-moby-default.json"
+          KELPIE_SECCOMP_BASELINE="${RUNNER_TEMP}/kelpie-moby-default.json" node --test tests/linux/seccomp-profile.test.mjs
+          node scripts/ci/linux-test-seccomp.mjs "${RUNNER_TEMP}/kelpie-moby-default.json" "${RUNNER_TEMP}/kelpie-test-seccomp.json"
+          expected="$(awk 'NR==2 {print $1}' "${package_root}/test-seccomp-sha256.txt")"
+          test "$(sha256sum "${RUNNER_TEMP}/kelpie-test-seccomp.json" | cut -d' ' -f1)" = "${expected}"
+          test_revision="$(cat "${package_root}/resource-test-revision.txt")"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
+            --security-opt no-new-privileges=true \
+            --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
+            -e KELPIE_LINUX_RESOURCE_DIAGNOSTIC=1 -e KELPIE_INSTALLED_SMOKE_DIAGNOSTIC=1 \
+            -e KELPIE_RESOURCE_TEST_REVISION="${test_revision}" \
+            -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
+            -w /workspace "${DISTRO_IMAGE}" \
+            bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
+            2>&1 | tee "${package_root}/resource-diagnostic.log"
+      - name: Upload bounded resource evidence
+        uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: linux-resource-diagnostic-${{ matrix.distro.name }}
+          path: |
+            dist/release/${{ matrix.distro.name }}/resource-test-revision.txt
+            dist/release/${{ matrix.distro.name }}/resource-diagnostic.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/*.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/capture/*.json
+          if-no-files-found: warn
