@@ -129,3 +129,15 @@ and independent hashes. Owner ledgers are [Windows](windows-evidence-intake.md),
 Keep raw reports and media in owned ignored artifact directories, with the
 historical failed runs intact. The full portable test at d854c65a passed
 shared 143 and CLI 703 with one skipped; final integrated checks are still open.
+
+
+## Later restricted worker evidence
+
+A later public stdio corpus at test source `0b81b975` and candidate build
+`e94b059e` passed all 16 checks for the pinned Lightpanda 1.0.2 profile,
+including explicitly selected fixed snapshot/extract/status/ready readers.
+The default remains empty and the eight-method navigation-only profile above
+describes the earlier frozen proof, not the current candidate inventory.
+See [public intake](lightpanda-public-intake.md) for exact hashes, resource
+limits, positive/refusal coverage and teardown. No native, geometry, input,
+pixel or WebMCP support follows.

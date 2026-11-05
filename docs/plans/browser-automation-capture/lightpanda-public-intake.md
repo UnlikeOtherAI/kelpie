@@ -69,3 +69,45 @@ reader corpus**. Its report's historical hard-coded `cliBundleSource` field
 does not identify a CLI used by this run; no CLI was invoked. Public candidate
 admission and real stdio proof remain separate, as do native capabilities,
 geometry, input, pixels and WebMCP.
+
+
+## Operator-selected public reader proof
+
+A separate public stdio run tested committed candidate build
+`e94b059e301f9f8d453da84daec7ae03d2ed9966` with corpus source
+`0b81b975eafc474bb86273aa1b318f30afa74ff3`, using the same pinned 1.0.2
+binary. The operator explicitly selected `tab.snapshot`, `tab.extract`,
+`tab.status` and `tab.ready` in addition to the eight previously verified
+navigation/lifecycle methods. The default list remained empty. All 16 named
+checks passed, including the fixed-reader privacy, bounds, scoped observations,
+nested/missing/ambiguous extraction, metadata provenance and readiness corpus.
+The public host supplied snapshot ref prefix was checked; callers did not supply
+a private prefix. Foreign tabs, screenshot, page.scroll, locator.click, WebMCP discovery, a
+second session and shared isolation refused. Close, TTL, fresh storage and borrowed
+endpoint preservation passed. The run made 52 tool calls and returned 11,256
+response bytes.
+
+The public report SHA-256 is
+`91ae5a3f430a47808dbf20bf7bee01b9daff7503a47155168b5cb2d23181b097`.
+The exact CLI dist SHA-256 is
+`6266c58abb3098b2e2637fe4c966a5d1f9951c82e53c17f76013e0203f04496c`;
+the shared Lightpanda adapter dist SHA-256 is
+`2893a58c51df989e9984b9b82c2d229b4f8f84ae26e52d181adac9dcefff99b7`.
+The separately hashed source and dist transfer bundles and report-copy/teardown
+receipt are retained on Maxis at
+`D:/Worktrees/kelpie/capture-common-resume-20261105/tmp/lp-evidence-20261105/`.
+The direct and public report copies were independently rehashed there; no
+unfiltered journal was copied.
+
+The public unit used the same one-CPU, 2-GiB, 64-task, 120-second, no-new-
+privileges and loopback-only boundary. It exited successfully in 5.297 s, used
+2.131 s CPU and peaked at 303.3 MiB. After collection the unit was not found/
+inactive, MainPID zero and cgroup empty; the owned process had exited and no
+Lightpanda process remained. These absolute figures are not a comparison with
+another engine.
+
+This is proof for the pinned binary, fixture and explicitly selected profile.
+It does not grant `tabs.new`, shared/concurrent sessions, input, real layout or
+geometry, pixels, media, WebMCP or any native renderer. The previous navigation
+stage and all earlier failures remain historical evidence; this later proof does
+not rewrite them. A different binary or method list needs separate verification.
