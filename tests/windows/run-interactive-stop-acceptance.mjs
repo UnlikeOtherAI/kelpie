@@ -5,6 +5,7 @@ import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {fileURLToPath} from "node:url";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
+import {nativeMarkerVerified} from "./native-window-evidence.mjs";
 import {dirname,join,resolve,isAbsolute} from "node:path";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 const [exe,cli,uia,outputRoot,privateRoot,mode="stop"]=process.argv.slice(2);
@@ -78,7 +79,7 @@ try {
  if(mode==="capture"){
    report.nativeWindowCapture=await automation(["capture",String(running.pid),exe,identity.startTime,join(output,"native-window-capture")]);
    const images=report.nativeWindowCapture.captured;
-   report.nativeWindowPixels={stop:images.some(image=>image.className==="KelpieScriptStop"&&image.status==="pixels-captured"),marker:images.some(image=>image.status==="pixels-captured"&&image.redPixels>20)};
+   report.nativeWindowPixels={stop:images.some(image=>image.className==="KelpieScriptStop"&&image.status==="pixels-captured"),marker:nativeMarkerVerified(images)};
    await save();
  }
  report.invoked=await automation(["invoke",String(running.pid),exe,identity.startTime]);
