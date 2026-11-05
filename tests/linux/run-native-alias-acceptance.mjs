@@ -85,7 +85,8 @@ try {
       : undefined;
     report.gtkStop = await runGtkStop({ readiness: ready, identity, binary, hash: report.binarySHA256,
       output, env, signal: deadline.signal, captureShown });
-    report.checks.push({ name: captureShown ? "isolated GTK recording image and public HTTP abort"
+    report.checks.push({ name: captureShown ? (env.KELPIE_PRIVATE_ATSPI_ACTION === "1"
+      ? "isolated GTK recording image and exact-process AT-SPI Stop" : "isolated GTK recording image and public HTTP abort")
       : "native GTK Stop via exact-process AT-SPI Action", passed: true, runId: report.gtkStop.result.runId });
   }
   const root = fileURLToPath(new URL("../../", import.meta.url));

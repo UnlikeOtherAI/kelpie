@@ -203,6 +203,13 @@ jobs:
               bash scripts/download-cef.sh linux
               bash scripts/check-linux-script-codecs.sh > "${package_root}/factory-provenance.txt"
               make linux
+              {
+                for cache in native/.build-linux/CMakeCache.txt apps/linux/build/CMakeCache.txt; do
+                  test -f "$cache"
+                  printf '%s\n' "--- $cache ---"
+                  awk '/^(CEF_ROOT|KELPIE_LOCAL_LLM|KELPIE_LINUX_HEADLESS_ONLY|KELPIE_LINUX_G08_TEST_OBSERVATION):/ { print }' "$cache"
+                done
+              } > "${package_root}/build-options.txt"
               pnpm --filter @unlikeotherai/kelpie build
               (cd packages/cli && npm pack --ignore-scripts --pack-destination "/workspace/${package_root}")
               ctest --test-dir apps/linux/build --verbose --output-log "${package_root}/native-checks.log" -R "^linux_script_(media|artifact)_test$"
@@ -325,9 +332,13 @@ jobs:
           path: |
             dist/release/${{ matrix.distro.name }}/namespace-diagnostic/
             dist/release/${{ matrix.distro.name }}/installed-smoke/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/*.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/capture/report.json
             dist/release/${{ matrix.distro.name }}/installed-smoke/*.log
             dist/release/${{ matrix.distro.name }}/installed-smoke/*.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/*.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/capture/report.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.log
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.txt
             dist/release/${{ matrix.distro.name }}/candidate-installed-*.log
