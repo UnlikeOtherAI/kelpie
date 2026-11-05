@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scriptPointerPosition,scriptTapPresentation } from "../../packages/shared/src/script-presentation.ts";
+import { scriptPointerPosition,scriptTapPresentation } from "../../packages/shared/dist/index.js";
 import { measureG08Frame } from "./g08-pixels.mjs";
 import { evaluateG08 } from "./g08-timeline.mjs";
 const width=320,height=180;

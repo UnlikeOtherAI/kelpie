@@ -124,7 +124,7 @@ The example shows one case only: the actual report must have both `c` and
 `s`, each with exactly one GIF and one MP4, and the complete fixture facts
 and timestamps. Supported runtime identifiers are listed in `g08-verify.mjs`.
 Run `node tests/capture/g08-verify.mjs input.json fresh-output.json` with
-Node 24, ffmpeg and ffprobe. The verifier checks file hashes, probes dimensions
+Node 20 or newer, the built shared package, ffmpeg and ffprobe. The verifier checks file hashes, probes dimensions
 and actual PTS, streams one RGB frame at a time, and emits per-frame measurements,
 bounded onset-fit diagnostics and failure/insufficient-evidence outcomes. It
 uses the shared presentation model and a 0.7 marker opacity baseline. Retain

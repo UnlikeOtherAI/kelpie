@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { scriptPointerPosition, scriptTapPresentation } from "../../packages/shared/src/script-presentation.ts";
+import { scriptPointerPosition, scriptTapPresentation } from "../../packages/shared/dist/index.js";
 import { median } from "./g08-pixels.mjs";
 const rms=values=>Math.sqrt(values.reduce((sum,value)=>sum+value*value,0)/values.length);
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
