@@ -11,7 +11,7 @@ import { readNativeIdentity } from "./native-lifecycle.mjs";
 const execute = promisify(execFile);
 
 /** Standard AT-SPI Stop on one pinned native GTK process; never focus or inject input. */
-export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown, captureTimeline }) {
+export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown, captureTimeline, sanitizeFailure = false }) {
   assert.equal(env.GDK_BACKEND, "wayland");
   const isolated = Boolean(captureShown);
   const privateAction = isolated && env.KELPIE_PRIVATE_ATSPI_ACTION === "1";
@@ -119,7 +119,7 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
     assert.equal((await api("play-script", { version: 1, tabId, actions: [{ action: "wait", ms: 0 }] })).success, true);
     report.recovered = true;
     return report;
-  } catch (error) { report.failure = error.message; throw error; }
+  } catch (error) { report.failure = sanitizeFailure ? "GTK_STOP_FAILED" : error.message; throw error; }
   finally {
     if (pending) await awaitBounded(pending, 5000).catch(() => {});
     if (timeline) await timeline.catch(() => {});
