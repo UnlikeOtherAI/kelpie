@@ -9,6 +9,7 @@ final class ServerState: ObservableObject {
     @Published var isMDNSAdvertising = false
     @Published var ipAddress: String = "0.0.0.0"
     @Published var isScriptRecording = false
+    @Published var isScriptImmersive = false
     /// Set by the `show-panel` debug endpoint to open a UI panel programmatically.
     @Published var activePanel: String?
 
@@ -120,8 +121,8 @@ final class ServerState: ObservableObject {
             context: ctx,
             router: router,
             playbackState: scriptPlaybackState,
-            setRecordingMode: { [weak self] isRecording in
-                await self?.setScriptRecording(isRecording)
+            setRecordingMode: { [weak self] isRecording, immersive in
+                await self?.setScriptRecording(isRecording, immersive: immersive)
             }
         ).register(on: router)
     }
@@ -181,8 +182,9 @@ final class ServerState: ObservableObject {
     }
 
     @MainActor
-    func setScriptRecording(_ isRecording: Bool) {
+    func setScriptRecording(_ isRecording: Bool, immersive: Bool) {
         guard self.isScriptRecording != isRecording else { return }
+        self.isScriptImmersive = isRecording && immersive
         self.isScriptRecording = isRecording
 
         let manager = OrientationManager.shared

@@ -79,6 +79,24 @@ The build ran `xcodebuild build-for-testing -project apps/ios/Kelpie.xcodeproj -
 
 At integration base `419bc2cad3a5b72d1e25a032bfb4e5a4aaaf209f`, the app rebuilt the current contract and native registry from source with the shared Apple gateway policy. Strict SwiftLint found zero violations across 311 files. Tuist generated the project without opening it and the incremental generic arm64 build-for-testing passed. The app minimum is iOS 16. The test targets use iOS 17, the minimum supported by the pinned SDK's XCTest and XCUIAutomation frameworks. The two test bundles reported skipped AppIntents metadata extraction. This incremental build emitted no compiler or linker warnings. The pre-evidence tree was `57c682eed839fea57e0e75a43fd1b5a3daa89aa4`. The executable SHA-256 was `e1bf76dbde60f93025c18027f62cabf181d8495167ed143966fb305d39f3b0b7`; the debug implementation SHA-256 was `46e1c5fdd02c89177bff47cac421ce6bafb88ba2cb11fc851c2c16d1d8c5a1ad`. Simulator execution and inspection of the exported app media are pending.
 
+## Active scripts and viewport layout
+
+An active script retains the existing Stop control, input blocking, orientation
+lock and lifecycle checks. GIF or video capture and legacy playback use the existing immersive
+viewport. No-capture workflows, automatic screenshots and explicit PNG actions
+keep the normal browser viewport and chrome while the existing Stop control
+is visible. Normal chrome is disabled and hidden from accessibility during the
+run, and existing address focus is retired. Loading and scroll-driven chrome
+changes cannot resize an active non-movie viewport. A staged iPad view stays in
+the same hierarchy while its active clip is square.
+
+The hosted presentation-mode test checks native Stop, disabled chrome and the
+WebView frame before, during and after each non-movie mode, and checks that GIF
+and video still use the immersive state. Additional controls cover address focus,
+real delayed loading, scroll, and the iPad staged viewport. It retains screenshots
+for both device families. Device results are pending; source checks alone do not establish these
+behaviors or the keyboard transition policy.
+
 ## Release prerequisites
 
 On 5 November 2026 the project declared `com.unlikeotherai.kelpie`, team `59S95D279D`, and app version 0.1.21. The iOS CI job builds an unsigned generic simulator app. The repository release workflow has no iOS device archive or TestFlight publication job. The Mac's local signing inventory contained two valid development identities and one valid Apple Distribution identity across teams. The distribution certificate's team did not match the project team. Of 43 installed provisioning profiles, one current wildcard development profile matched the bundle and team. There was no matching local ad-hoc or distribution profile. The audit inspected certificate and profile metadata only.

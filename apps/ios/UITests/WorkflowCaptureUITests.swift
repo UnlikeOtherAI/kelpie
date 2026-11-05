@@ -40,13 +40,16 @@ final class WorkflowCaptureUITests: XCTestCase {
             let ready = try await probe.request("/v1/browser-control", [
                 "version": 1, "tabId": tab, "method": "tab.ready", "params": ["state": "complete"]
             ])
-            let url = try await probe.request("/v1/browser-control", [
-                "version": 1, "tabId": tab, "method": "tab.url", "params": [:]
+            let status = try await probe.request("/v1/browser-control", [
+                "version": 1, "tabId": tab, "method": "tab.status", "params": [:]
             ])
             let complete = ready["ok"] as? Bool == true && (ready["value"] as? Body)?["ready"] as? Bool == true
-            let blank = url["ok"] as? Bool == true && url["value"] as? String == "about:blank"
+            let statusValue = status["value"] as? Body
+            let observedURL = statusValue?["url"] as? String
+            let statusOK = status["ok"] as? Bool == true
+            let blank = statusOK && observedURL == "about:blank" && statusValue?["documentState"] as? String == "complete"
             last = ["active": active, "loadingKnown": loading != nil, "loading": loading ?? true,
-                    "complete": complete, "blank": blank]
+                    "complete": complete, "statusOK": statusOK, "urlKnown": observedURL != nil, "blank": blank]
             let now = ProcessInfo.processInfo.systemUptime
             if active && loading == false && complete && blank {
                 if let stableSince, now - stableSince >= 0.2 { return }

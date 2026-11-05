@@ -83,6 +83,10 @@ struct IOSBoundWorkflow {
         }
     }
 
+    var requiresMovieImmersion: Bool {
+        (capture?["formats"] as? [String] ?? []).contains { $0 == "gif" || $0 == "video" }
+    }
+
     private static func pacedPlan(_ step: Body, action: String, text: String) throws -> IOSPacedTypingPlan? {
         guard let raw = step["typingDelayMs"] else { return nil }
         guard let delay = raw as? Int else { throw IOSWorkflowFailure("INVALID_PACED_TYPING") }
