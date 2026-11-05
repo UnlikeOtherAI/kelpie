@@ -31,13 +31,13 @@ struct IOSCaptureViewportStability {
     static func matchesInsets(
         _ viewport: IOSWorkflowTab.Viewport, top: CGFloat, bottom: CGFloat, left: CGFloat = 0, right: CGFloat = 0
     ) -> Bool {
-        guard bottom.isFinite, bottom >= 0, bottom < viewport.bounds.height,
+        guard top.isFinite, bottom.isFinite, top >= 0, bottom >= 0, top + bottom < viewport.bounds.height,
               let content = IOSWorkflowTab.contentRect(
                   bounds: viewport.bounds,
                   insets: UIEdgeInsets(top: top, left: left, bottom: bottom, right: right),
                   visible: viewport.visible.size
               ) else { return false }
-        let pixelAllowance = max(1, content.width / viewport.visible.width)
+        let pixelAllowance = content.width / viewport.visible.width
         return content.maxY >= viewport.bounds.height - bottom - pixelAllowance
     }
 
