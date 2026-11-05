@@ -19,6 +19,7 @@ class ScriptNativeContractTest {
         assertTrue(valid.getBoolean("valid"))
         assertEquals(0, valid.getJSONObject("script").getInt("defaultWaitBetweenActions"))
         for (invalid in listOf(
+            """{"version":1,"tabId":"tab","actions":[{"action":"click","target":{"selector":"button","token":"old-run-token"}}]}""",
             """{"version":2,"tabId":"tab","actions":[{"action":"wait","ms":1}]}""",
             """{"version":1,"tabId":"tab","actions":[{"action":"evaluate","script":"alert(1)"}]}""",
             """{"version":1,"tabId":"tab","actions":[{"action":"wait","ms":1}],"capture":{"formats":["gif"],"maxBytes":1023}}""",
