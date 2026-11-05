@@ -77,11 +77,14 @@ run_arm() {
   --property=ControlGroup --property=Result --property=ExecMainStatus >"$dir/unit-final.txt" 2>&1 || true
  grep -Eq '^ActiveState=(inactive|failed)$' "$dir/unit-final.txt" || return 1
  [[ "$group" == "/system.slice/${unit}.service" ]] || return 1
- local procs="" cgpath="/sys/fs/cgroup$group"
+ local procs="" events="" cgpath="/sys/fs/cgroup$group"
  if [[ -d "$cgpath" ]]; then
   [[ -r "$cgpath/cgroup.procs" ]] || return 1
   procs="$(cat "$cgpath/cgroup.procs")" || return 1
   [[ -z "$procs" ]] || return 1
+  [[ -r "$cgpath/cgroup.events" ]] || return 1
+  events="$(cat "$cgpath/cgroup.events")" || return 1
+  [[ "$(printf '%s\n' "$events" | grep -cx 'populated 0')" == 1 ]] || return 1
  fi
  arm_retired=1
  local observation_status=1

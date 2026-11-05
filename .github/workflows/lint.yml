@@ -41,6 +41,7 @@ on:
         type: choice
         options:
           - 'off'
+            - probe
           - prepare
           - execute
         default: 'off'
