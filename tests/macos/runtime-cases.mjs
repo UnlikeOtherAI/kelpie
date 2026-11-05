@@ -8,18 +8,23 @@ import {runG08} from "./runtime-g08.mjs";
 import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
-import {delay,requireTrue,waitFor,probeListeners} from "./runtime-client.mjs";
+import {Failure,delay,requireTrue,waitFor,probeListeners} from "./runtime-client.mjs";
 import {waitForRendererTransition} from "./runtime-renderer-transition.mjs";
 import {inspectMedia,centerPixel,inspectCurve,inspectEdgeMarker,inspectDefaultMotion} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
  let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
  const checks=[];report.engines.push({engine,checks});
- async function check(name,run){try{const detail=await run();checks.push({name,passed:true,detail});}
+ async function check(name,run,{continueOnFailure=false}={}){try{const detail=await run();checks.push({name,passed:true,detail});}
  catch(error){
   const diagnostic=name==="semantic-label-export"?{stage:semanticStage,...errorFacts(error),
    tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
-  checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
+  checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});
+  if(!continueOnFailure){
+   const first=checks.find(item=>!item.passed);
+   if(first?.name!==name)throw new Failure(first.code);
+   throw error;
+  }}}
  await check("native-renderer-control",async()=>{
   client.nativeControlStage="engine-before";
   const before=await client.api("get-renderer");
@@ -180,15 +185,38 @@ export async function runEngine(client,fixture,engine,report) {
   return {code:value.error.code,priorOutputScrubbed:true,noInput:true,artifactsDiscarded:true};
  });
  await runPrivacy({client,fixture,base,capture,check,load,authorityRun,foreignToken});
- await check("gif-native-stop-partial-recovery",async()=>{
+ await check("gif-native-stop-early",async()=>{
   await load();
+  const pending=client.api("play-script",{...base,capture:{...capture,formats:["gif"]},actions:[{action:"wait",ms:8000}]});
+  void pending.catch(()=>{});
+  const status=await waitFor(async()=>{const value=await client.api("get-script-status");return value.playing&&value.runId?value:null;});
+  const window=await waitFor(()=>client.find("browser.recording.stop"));
+  await client.tap("browser.recording.stop",window);
+  const result=await pending;requireTrue(!result.success&&result.state==="aborted","NATIVE_EARLY_STOP_FAILED");
+  const artifacts=await client.download(result,engine+"-early-abort");
+  requireTrue(artifacts.every(a=>a.partial),"NATIVE_EARLY_STOP_NONPARTIAL");
+  const decoded=artifacts.map(a=>inspectMedia(a));
+  const recovery=await play([{action:"click",target:{role:"button",name:"Submit"}}]);
+  requireTrue(recovery.success,"EARLY_ABORT_RECOVERY_FAILED");
+  return {observedActionIndex:status.actionIndex,partialCount:artifacts.length,decoded,recovered:true};
+ });
+ await check("gif-native-stop-partial-recovery",async()=>{
+  await load();const begin=fixture.events.length;
   const pending=client.api("play-script",{...base,capture:{...capture,formats:["gif"]},actions:[
    {action:"click",target:{role:"button",name:"Submit"}},{action:"wait",ms:8000}]});
-  const status=await waitFor(async()=>{const value=await client.api("get-script-status");return value.playing&&value.runId?value:null;});
-  await delay(700);const window=await waitFor(()=>client.find("browser.recording.stop"));
+  void pending.catch(()=>{});
+  // Action 1 starts only after capture.start and the clicked marker's critical frame are admitted.
+  const status=await waitFor(async()=>{const value=await client.api("get-script-status");
+   return value.playing&&value.runId&&value.actionIndex>=1?value:null;});
+  const window=await waitFor(()=>client.find("browser.recording.stop"));
   await client.screenshot(engine+"-native-stop");await client.tap("browser.recording.stop",window);
-  const result=await pending;requireTrue(!result.success&&result.state==="aborted","NATIVE_STOP_FAILED");
+  const result=await pending;
+  const facts={engine,actionIndex:status.actionIndex,clickObserved:fixture.events.slice(begin).some(e=>e.type==="click"&&e.target==="submit"),
+   state:["aborted","failed","completed"].includes(result.state)?result.state:"OTHER",play:playFacts(result)};
+  (report.stopFacts??=[]).push(facts);
+  requireTrue(!result.success&&result.state==="aborted","NATIVE_STOP_FAILED");
   const artifacts=await client.download(result,engine+"-abort");
+  facts.downloaded=artifacts.map(a=>({mimeType:a.mimeType,partial:a.partial,byteLength:a.byteLength,sha256:a.sha256}));
   requireTrue(artifacts.some(a=>a.mimeType==="image/gif"&&a.partial),"ABORT_GIF_PREFIX_MISSING");
   const decoded=artifacts.map(a=>inspectMedia(a));
   const recovery=await play([{action:"click",target:{role:"button",name:"Submit"}}]);
@@ -273,7 +301,7 @@ export async function runEngine(client,fixture,engine,report) {
   const artifacts=await client.download(result,engine+"-default-motion");
   requireTrue(artifacts.length===2,"DEFAULT_MOTION_FORMATS");
   return artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}));
- });
+ },{continueOnFailure:true});
  for(const curve of ["s","c"])await check("movie-pointer-curve-"+curve,async()=>{
   await load("/motion");const begin=fixture.events.length;
   const result=await client.api("play-script",{...base,pointer:{enabled:true,curve,durationMs:2000,easing:"ease-in-out"},
@@ -311,4 +339,6 @@ export async function runEngine(client,fixture,engine,report) {
  await runSafety({client,fixture,engine,base,capture,check,play,load});
  await check("dense-animation",()=>runG08(client,tabId,engine,report));
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
+ const failed=checks.find(item=>!item.passed);
+ if(failed)throw new Failure(failed.code);
 }
