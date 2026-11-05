@@ -24,6 +24,31 @@ final class IOSWorkflowReceiptTests: XCTestCase {
             XCTAssertEqual(receipt, item["expectedReceipt"] as? String, name)
             XCTAssertEqual(privacy, item["expectedPrivacy"] as? String, name)
             XCTAssertEqual(latch, privacy != "known-negative", name)
+            var callbackLatched = false
+            _ = IOSPacedTypingExecutor.consumeCallback(
+                item["result"],
+                token: token,
+                validateMutation: true,
+                consume: { if IOSPacedTypingExecutor.jsonBoolean($0["sensitive"]) == true { callbackLatched = true } },
+                missing: { callbackLatched = true }
+            )
+            XCTAssertEqual(callbackLatched, privacy != "known-negative", name)
+        }
+    }
+
+    @MainActor
+    func testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard() {
+        let result: [String: Any] = [
+            "ok": true, "token": "wrong", "mayHaveCompleted": true, "inputGuarantee": "synthetic-coordinate",
+            "sensitive": false, "sensitivityKnown": true
+        ]
+        for guardError in ["DOCUMENT_CHANGED", "AUTHORIZATION_REVOKED"] {
+            var latched = false
+            let acknowledged = IOSPacedTypingExecutor.consumeCallback(
+                result, token: "expected", validateMutation: true, consume: { _ in }, missing: { latched = true }
+            )
+            XCTAssertNil(acknowledged)
+            XCTAssertTrue(latched, "Privacy must latch before the \(guardError) guard")
         }
     }
 }

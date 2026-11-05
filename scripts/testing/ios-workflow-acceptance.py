@@ -36,6 +36,7 @@ def selection(scope):
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
             targets.append("KelpieTests/IOSWorkflowReceiptTests/testCanonicalMutationReceiptMatrix")
+            targets.append("KelpieTests/IOSWorkflowReceiptTests/testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard")
             targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
@@ -78,6 +79,7 @@ def selection(scope):
         if scope == "diagnostics":
             required.update([
                 "testCanonicalMutationReceiptMatrix",
+                "testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard",
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
                 "testFirstCaptureWaitsForStableCompleteViewport",

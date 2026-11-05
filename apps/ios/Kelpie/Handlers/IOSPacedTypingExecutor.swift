@@ -34,6 +34,23 @@ enum IOSPacedTypingExecutor {
             (jsonBoolean(body["sensitive"]) == false && jsonBoolean(body["sensitivityKnown"]) == true)
     }
 
+    static func consumeCallback(
+        _ result: Any?,
+        token: String?,
+        validateMutation: Bool,
+        consume: (@MainActor ([String: Any]) -> Void)?,
+        missing: (@MainActor () -> Void)?
+    ) -> [String: Any]? {
+        guard let body = result as? [String: Any], jsonBoolean(body["sensitive"]) != nil else {
+            missing?()
+            return nil
+        }
+        consume?(body)
+        if validateMutation && needsPrivacyLatch(body, token: token) { missing?() }
+        if jsonBoolean(body["sensitive"]) != true, jsonBoolean(body["sensitivityKnown"]) != true { missing?() }
+        return isAcknowledgement(body, token: token) ? body : nil
+    }
+
     static func requireKnownSensitivity(_ known: Bool?, hasContinuation: Bool) throws {
         guard known == true || !hasContinuation else { throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) }
     }

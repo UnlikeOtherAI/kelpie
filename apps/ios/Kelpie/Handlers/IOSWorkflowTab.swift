@@ -205,16 +205,13 @@ final class IOSWorkflowTab {
                 expression,
                 mutates: dispatch || edit != nil,
                 consume: { result in
-                    guard let body = result as? Body, IOSPacedTypingExecutor.jsonBoolean(body["sensitive"]) != nil else { missingResult?(); return }
-                    consume?(body)
-                    if IOSPacedTypingExecutor.isAcknowledgement(body, token: token) {
-                        acknowledgement = body
-                    }
-                    if validateMutationAcknowledgement && IOSPacedTypingExecutor.needsPrivacyLatch(body, token: token) {
-                        missingResult?()
-                    }
-                    if IOSPacedTypingExecutor.jsonBoolean(body["sensitive"]) != true,
-                       IOSPacedTypingExecutor.jsonBoolean(body["sensitivityKnown"]) != true { missingResult?() }
+                    acknowledgement = IOSPacedTypingExecutor.consumeCallback(
+                        result,
+                        token: token,
+                        validateMutation: validateMutationAcknowledgement,
+                        consume: consume,
+                        missing: missingResult
+                    )
                 },
                 missingResult: missingResult
             )
