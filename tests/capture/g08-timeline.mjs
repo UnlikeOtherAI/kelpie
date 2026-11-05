@@ -6,7 +6,7 @@ import { sameG08Pixels } from "./g08-calibration.mjs";
 const rms=values=>Math.sqrt(values.reduce((sum,value)=>sum+value*value,0)/values.length);
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function demand(value,message){assert.ok(value,message);}
-export function evaluateG08(samples,config){
+export function evaluateG08(samples,config,modelReference){
   const {curve,pointerMs,markerMs,color}=config;
   demand(["c","s"].includes(curve)&&/^#[a-f0-9]{6}$/i.test(color),"Invalid G08 configuration");
   demand(Number.isFinite(pointerMs)&&pointerMs>=1000&&pointerMs<=5000,"Invalid pointer duration");
@@ -39,10 +39,16 @@ export function evaluateG08(samples,config){
   const calibration=pointers.filter(s=>s.timeMs<calibrationMarker.timeMs&&
     s.timeMs>=calibrationMarker.timeMs-1000&&s.pointer.x===endpoint.x&&s.pointer.y===endpoint.y&&
     s.marker.alpha<=.03&&Buffer.isBuffer(s.marker.roi));
-  demand(calibration.length>=2,"INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline");
-  const reference=calibration[0].marker.roi;
-  demand(calibration.every(s=>sameG08Pixels(reference,s.marker.roi)),
-    "INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline");
+  let reference;
+  if(modelReference!==undefined){
+    demand(Buffer.isBuffer(modelReference)&&modelReference.length>0,"INSUFFICIENT_EVIDENCE invalid model reference");
+    reference=modelReference;
+  }else{
+    demand(calibration.length>=2,"INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline");
+    reference=calibration[0].marker.roi;
+    demand(calibration.every(s=>sameG08Pixels(reference,s.marker.roi)),
+      "INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline");
+  }
   const finalSamples=samples.filter(s=>s.timeMs>=lastStart.timeMs);
   const path=corrected.filter(s=>s.timeMs>=lastStart.timeMs)
     .filter(s=>project(s.p)>.025&&project(s.p)<.975);
@@ -109,11 +115,13 @@ export function evaluateG08(samples,config){
   demand(tail.length>=3,"INSUFFICIENT_EVIDENCE clean end");
   demand(tail.every(s=>s.pointer&&s.pointer.x===endpoint.x&&s.pointer.y===endpoint.y&&Buffer.isBuffer(s.marker.roi)&&sameG08Pixels(reference,s.marker.roi)),
     "INSUFFICIENT_EVIDENCE tail differs from calibrated pointer-only baseline");
-  return {passed:true,confidence:"dense decoded pixels with bounded onset fit",baseAlpha,pointerStartMs:best.start,
+  return {passed:true,confidence:modelReference===undefined?"dense decoded pixels with bounded onset fit":
+    "dense decoded pixels with bounded onset fit; model tail is ENCODED-VISIBLE only",baseAlpha,pointerStartMs:best.start,
     pointerRmsPx:best.error,uneasedRmsPx:noEaseError,endpointOffset:offset,motionSamples:path.length,
     maxMotionGapMs:Math.max(...gaps),markerStartMs:markerStart,
     dwellAfterMotionMs:markerStart-(best.start+pointerMs),alphaRms:alphaError,
     radiusBiasPx:bias,wobbleRmsPx:wobbleError,staticRadiusRmsPx:staticError,markerSamples:marker.length,
-    calibrationFrames:calibration.length,calibrationStartMs:calibration[0].timeMs,
+    calibrationFrames:calibration.length,calibrationStartMs:calibration[0]?.timeMs??null,
+    referenceKind:modelReference===undefined?"same-run-calibration":"production-model-gif",
     baselineRGBSha256:createHash("sha256").update(reference).digest("hex"),finalClearFrames:tail.length};
 }
