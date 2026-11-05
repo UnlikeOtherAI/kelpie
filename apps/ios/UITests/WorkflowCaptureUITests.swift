@@ -108,7 +108,7 @@ final class WorkflowCaptureUITests: XCTestCase {
                             "capture": ["formats": ["gif", "video", "screenshots"], "fps": 8, "maxWidth": 384],
                             "tapIndicator": ["color": "#00FF00", "radius": 25, "durationMs": 2500],
                             "pointer": ["enabled": true, "curve": "s", "durationMs": 400]]
-        let playback = Task.detached { [probe] in try await probe.call("kelpie_play_script", script) }
+        let playback = Task.detached { [probe] in try await probe.toolEnvelope("kelpie_play_script", script) }
         let stop = app.buttons["browser.recording.stop"]
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
         let deadline = Date().addingTimeInterval(10)
@@ -154,7 +154,17 @@ final class WorkflowCaptureUITests: XCTestCase {
             geometry.lifetime = .keepAlways
             add(geometry)
         }
-        let result = try await playback.value
+        let envelope = try await playback.value
+        if envelope["ok"] as? Bool != true {
+            // The click may have completed before later capture failed. Read the
+            // synthetic fixture's geometry without repeating or mutating input.
+            await attachFixtureGeometry(tab: tab)
+            let status = try await probe.call("kelpie_get_script_status", [:])
+            let error = status["runError"] as? Body ?? [:]
+            XCTFail("MCP play failed; terminal code: " + WorkflowCaptureProbe.errorCode(["error": error]))
+            return
+        }
+        let result = try XCTUnwrap(envelope["value"] as? Body)
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
         let geometry = try XCTUnwrap((result["outputs"] as? Body)?["tapGeometry"] as? Body)
@@ -172,6 +182,23 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: run) }
         XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
+    }
+
+    @MainActor
+    private func attachFixtureGeometry(tab: String) async {
+        let response = try? await probe.request("/v1/browser-control", [
+            "version": 1, "tabId": tab, "method": "tab.extract",
+            "params": ["fields": [["name": "geometry", "selector": "#geometry", "source": "text"]]]
+        ])
+        guard let value = response?["value"] as? Body,
+              let fields = value["fields"] as? [Body],
+              let text = (fields.first?["values"] as? [String])?.first,
+              let data = text.data(using: .utf8),
+              (try? JSONSerialization.jsonObject(with: data)) is Body else { return }
+        let evidence = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        evidence.name = "Fixture click geometry after failed capture"
+        evidence.lifetime = .keepAlways
+        add(evidence)
     }
 
     @MainActor
