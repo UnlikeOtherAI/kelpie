@@ -18,9 +18,11 @@ void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlo
   std::fprintf(stderr,"KELPIE_CAPTURE_VIEWPORT_DIAGNOSTIC %s\n",facts.dump().c_str());
 }
 }
-void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document) {
+void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document, DesktopScriptFramePurpose purpose) {
   std::unique_lock lock(mutex);
-  requested_step = index; requested_step_png=png; requested_step_document=document;
+  if (purpose==DesktopScriptFramePurpose::TerminalClear) purpose=DesktopTerminalTicketPurpose(presentation);
+  requested_step = index; requested_step_png=png; requested_step_document=document; requested_purpose=purpose;
+  requested_terminal_identity=purpose==DesktopScriptFramePurpose::TerminalClear ? DesktopTerminalMarkerIdentity(presentation) : Json(nullptr);
   const auto ticket=++requested_ticket;
   changed.notify_all();
   changed.wait_for(lock, std::chrono::seconds(10), [this, ticket] {
@@ -85,12 +87,14 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       // The encoder receives this snapshot while live presentation continues.
       Json shown;
       int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
+      DesktopScriptFramePurpose purpose=DesktopScriptFramePurpose::Ordinary; Json terminal_identity;
       {
         std::lock_guard lock(mutex);
         shown=SnapshotDesktopPresentation(presentation,sample_owner);
         shown["elapsedMs"] = Elapsed(); shown["playing"]=true;
         shown["viewportWidth"] = width; shown["viewportHeight"] = height;
         step = requested_step; index = action_index; png=requested_step_png; expected_document=requested_step_document; ticket=requested_ticket;
+        purpose=requested_purpose; terminal_identity=requested_terminal_identity;
       }
       if(step>=0 && !expected_document.empty() && expected_document!=before.tab.document_version)
         throw std::runtime_error("CAPTURE_TARGET_DOCUMENT_CHANGED");
@@ -120,14 +124,32 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       }
       const auto timing_post=stage_timing.Now();
-      const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
+      const bool terminal=step>=0 && purpose==DesktopScriptFramePurpose::TerminalClear && encoder->SupportsTerminalClear();
+      if (terminal) {
+        if (!config.revalidate || !config.revalidate(owner)) {
+          grant_revoked.store(true); abort->store(true); throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+        }
+        std::lock_guard lock(mutex);
+        if (abort->load() || requested_ticket!=ticket || terminal_identity.is_null() ||
+            DesktopTerminalMarkerIdentity(presentation)!=terminal_identity ||
+            DesktopTerminalMarkerIdentity(shown)!=terminal_identity)
+          throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
+      }
+      const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png,
+          terminal ? purpose : DesktopScriptFramePurpose::Ordinary);
       stage_timing.Add(frame_time,timing_start,timing_pre_nav,timing_pre,timing_screenshot,timing_post_nav,timing_post,stage_timing.Now());
+      if (terminal && (!config.revalidate || !config.revalidate(owner))) {
+        grant_revoked.store(true); abort->store(true); throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+      }
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
       Present();
       { std::lock_guard lock(mutex); if(!sampler_ready) { sampler_ready=true; changed.notify_all(); } }
       if (step >= 0) {
         std::lock_guard lock(mutex);
+        if (terminal && (abort->load() || requested_ticket!=ticket ||
+            DesktopTerminalMarkerIdentity(presentation)!=terminal_identity))
+          throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
         if(requested_ticket==ticket) requested_step_png=false; // Exclusive PNG path is written once.
         if(proof) {
           completed_step = step; completed_ticket=std::max(completed_ticket,ticket);
@@ -135,6 +157,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         }
         changed.notify_all();
       }
+      if (terminal) break;
       // An early milestone request does not consume a future cadence slot.
       if(acquisition>=next) next += interval;
       const auto now=Clock::now();

@@ -29,6 +29,8 @@ class DesktopScriptHandler::Impl {
   Clock::time_point began, deadline;
   int action_index = -1, requested_step = -1, completed_step = -1;
   std::string requested_step_document;
+  DesktopScriptFramePurpose requested_purpose=DesktopScriptFramePurpose::Ordinary;
+  Json requested_terminal_identity;
   std::uint64_t requested_ticket=0, completed_ticket=0;
   Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {
     presentation_validity = std::make_shared<DesktopPresentationValidity>(config.revalidate);
@@ -42,7 +44,8 @@ class DesktopScriptHandler::Impl {
   Json Target(TabLease lease, const Json& target, const std::string& token = "", bool observe = false, bool refuse_sensitive = false);
   Json Perform(TabLease lease, const Json& action, const Json& script, const Json& typing_plan, Json* outputs, std::vector<std::string>* redactions);
   void Sample(TabLease lease, Json options);
-  void StepScreenshot(int index, bool png, const std::string& document = "");
+  void StepScreenshot(int index, bool png, const std::string& document = "",
+      DesktopScriptFramePurpose purpose = DesktopScriptFramePurpose::Ordinary);
   double Elapsed() const;
   void Present();
 };

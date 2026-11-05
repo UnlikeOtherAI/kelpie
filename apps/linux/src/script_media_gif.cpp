@@ -45,7 +45,7 @@ class Gif final : public Writer {
   Gif(std::filesystem::path path, Budget& budget) : budget_(budget) {
     output_.path = std::move(path); output_.mime_type = "image/gif";
   }
-  bool Write(const ScriptFrame& frame, double, double end_ms) override {
+  bool Write(const ScriptFrame& frame, double, double end_ms, ScriptMediaFramePurpose) override {
     if (finished_) throw std::runtime_error("CAPTURE_ALREADY_FINISHED");
     const auto boundary = std::uint64_t(std::llround(end_ms / 10.0));
     if (boundary <= centiseconds_) { ++output_.dropped_frames; return true; }

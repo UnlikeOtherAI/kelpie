@@ -1,6 +1,8 @@
 #pragma once
 #include <nlohmann/json.hpp>
+#include "kelpie/desktop_script_capture.h"
 #include <cstdint>
+#include <cmath>
 #include <string>
 
 namespace kelpie {
@@ -36,6 +38,24 @@ inline nlohmann::json DetachedDesktopMarker(const nlohmann::json& state, double 
   detached.erase("pointer"); detached.erase("commentary");
   detached["playing"] = false; detached["detachedMarker"] = true; detached["elapsedMs"] = elapsed;
   return detached;
+}
+inline DesktopScriptFramePurpose DesktopTerminalTicketPurpose(const nlohmann::json& state) {
+  return state.contains("marker") ? DesktopScriptFramePurpose::TerminalClear : DesktopScriptFramePurpose::Ordinary;
+}
+inline nlohmann::json DesktopTerminalMarkerIdentity(const nlohmann::json& state) {
+  if (!state.contains("runId") || !state["runId"].is_string() || state["runId"].get<std::string>().empty() ||
+      !state.contains("tabId") || !state["tabId"].is_string() || state["tabId"].get<std::string>().empty() ||
+      !state.contains("generation") || !state["generation"].is_number_unsigned() ||
+      !state.contains("documentVersion") || !state["documentVersion"].is_string() ||
+      state["documentVersion"].get<std::string>().empty() || !state.contains("marker") || !state["marker"].is_object())
+    return nullptr;
+  const auto& marker=state["marker"];
+  if (!marker.contains("actionIndex") || !marker["actionIndex"].is_number_integer() ||
+      !marker.contains("startedMs") || !marker["startedMs"].is_number() ||
+      !marker.contains("durationMs") || !marker["durationMs"].is_number()) return nullptr;
+  const double start=marker["startedMs"], duration=marker["durationMs"];
+  if (marker["actionIndex"].get<int>()<0 || !std::isfinite(start) || !std::isfinite(duration) || duration<=0) return nullptr;
+  return nlohmann::json::array({state["runId"],state["tabId"],state["generation"],state["documentVersion"],marker});
 }
 // Call with the presentation mutex held. The returned frame is independent.
 inline nlohmann::json SnapshotDesktopPresentation(const nlohmann::json& live, const DesktopPresentationOwner& owner) {

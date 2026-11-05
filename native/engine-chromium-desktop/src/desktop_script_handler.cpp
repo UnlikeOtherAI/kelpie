@@ -208,7 +208,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     began = Clock::now(); deadline = began + std::chrono::milliseconds(300000);
     capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json{{"runId",run_id}};
     sampler_ready = false; sampler_done = false; requested_step = completed_step = -1;
-    requested_ticket=completed_ticket=0; requested_step_document.clear(); grant_revoked.store(false); privacy_discard.store(false);
+    requested_ticket=completed_ticket=0; requested_step_document.clear(); requested_purpose=DesktopScriptFramePurpose::Ordinary; requested_terminal_identity=nullptr; grant_revoked.store(false); privacy_discard.store(false);
     status = {{"success", true}, {"playing", true}, {"runId", run_id}, {"totalActions", actions.size()}};
   }
   if(config.invalidate) config.invalidate();
@@ -264,7 +264,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
       if(remaining>0) Pause(static_cast<int>(std::ceil(remaining)));
       // Admit a fully faded movie endpoint without exceeding configured FPS.
       Pause(static_cast<int>(std::ceil(1000.0/script.value("capture",Json::object()).value("fps",15))));
-      StepScreenshot(action_index,false);
+      StepScreenshot(action_index,false,"",DesktopScriptFramePurpose::TerminalClear);
     }
     // Only explicitly requested terminal outputs are returned. Sensitive values never enter status.
     try { RedactScriptOutputs(outputs,actions,redactions); }

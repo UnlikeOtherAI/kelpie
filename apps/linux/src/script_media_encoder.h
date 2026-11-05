@@ -6,6 +6,7 @@
 #include <vector>
 
 namespace kelpie::linuxapp {
+enum class ScriptMediaFramePurpose { Ordinary, TerminalClear };
 struct ScriptMediaOutput {
   std::filesystem::path path;
   std::string mime_type;
@@ -19,6 +20,8 @@ class ScriptMediaEncoder {
       const std::vector<std::string>& formats, int fps, std::size_t max_bytes);
   ~ScriptMediaEncoder();
   bool AddFrame(const ScriptFrame& frame);
+  bool MarkTerminalClear(const ScriptFrame& observed);
+  void ClearTerminalClear();
   bool WriteStepPNG(const ScriptFrame& frame, const std::filesystem::path& path);
   std::vector<ScriptMediaOutput> Finish(double terminal_elapsed_ms);
   // Minimum actual retained source prefix across every requested movie writer.

@@ -916,3 +916,58 @@ This is separate from the failed Fedora independent-media gate; it does not
 mark the complete installed package or a published release as accepted.
 An earlier CLI-only dispatch, 42115481155, failed before runtime because the
 selector helper was absent from that owner ref, and remains preserved.
+
+## Test-only terminal keyframe control
+
+A separate test-only media target at source 18c9f152d106e3ac36d95b322427ef0471b0fcdb
+sent a GStreamer upstream force-key-unit event after the preceding packet was
+pulled and immediately before the final raw frame of the paired codec-history
+stimulus. The normal production target did not enable this instrumentation.
+Four events were accepted in 12–15 microseconds. The complete four-scenario
+producer took 0.64 s elapsed, 0.47 s user and 0.11 s system; the earlier
+baseline did not retain comparable CPU timing.
+
+All four outputs retained 15 aligned PTS and byte-identical complete final
+raw BGRA frames against their respective baseline. The final sample had the
+MP4 packet key flag and an AVC IDR NAL, parsed using the four-byte length size
+in its avcC configuration. Both red-history final ROIs decoded with zero red
+pixels, compared with three each in the preceding unforced control; clear
+controls also remained at zero. Each history MP4 was 7,531 bytes, 2,131 bytes
+larger than its baseline; each clear control grew by 2,153 bytes. Packet
+analysis SHA-256:
+b9c8397820ff659c500d246bbe5e0a114641d3263d60f6862e548061f9c54d5b.
+Producer log SHA-256:
+537aadfe6edd82acf9b8bfee7a89a40e364265556a40ac560f86dc558b16e0e0.
+
+The initial independent verifier failed because Fedora ffprobe reported
+unknown decoded frame types and key_frame=0 even for the first sample.
+The retained output was then checked directly using packet offsets, flags,
+avcC and AVC NALs; no stimulus was repeated. This is a synthetic control,
+not proof of the original installed failure's cause, and no shipping encoder
+or pixel threshold was changed.
+
+## Fedora terminal-clear candidate
+
+The normal GTK/CEF candidate at source c42fc68d7fdfa01fae0cbe9cda82dc39bd8c4dc2,
+ELF SHA-256 6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c,
+was built on Fedora 44 with admission and G08 observations OFF. Focused
+terminal identity, frame proof and media tests passed. A test-only injected
+force failure retained the earlier GIF and MP4 prefixes, reported failure
+and partial manifests, allowed owner-scoped retrieval and refused retrieval
+after explicit discard. This explicit discard does not prove a sensitive
+workflow automatically triggered privacy disposal.
+
+One real offscreen HTTP fixture completed a trusted click and produced six
+PNGs, one GIF and one MP4. All eight artifacts decoded; the strict marker
+center/fade/final-clear check passed. The MP4 contained 17 frames, with a
+final key-flagged AVC IDR at PTS 2.125327 s. MP4 SHA-256:
+1bee642448638c94f01cceed1ff81206d179ebfd6ca733836f4273e8a3fe9afe.
+The independent IDR, all-frame and marker receipts had SHA-256 values
+34749dbc85a338aeb3ee04646a12c756c698fc05f500301cede8eb556048a1c8,
+9c8667b9e96b36adb65784a4dfe1e380a8a47c637ed1ee0799a47921507bd2d9 and
+767476d676d153dfe4296bce372ac3b5c7109c7b57ecc17042b814d0ff882705,
+respectively. The owned app/unit retired and the unrelated Fedora process
+remained present.
+
+This is a single Fedora candidate path, not final installed Fedora or Ubuntu
+package verification. The previously failed 421022 media receipts are retained.

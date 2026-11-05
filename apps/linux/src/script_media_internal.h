@@ -17,7 +17,7 @@ class Writer {
  public:
   virtual ~Writer() = default;
   virtual void Prepare(const ScriptFrame&) {}
-  virtual bool Write(const ScriptFrame& frame, double start_ms, double end_ms) = 0;
+  virtual bool Write(const ScriptFrame& frame, double start_ms, double end_ms, ScriptMediaFramePurpose purpose) = 0;
   virtual ScriptMediaOutput Finish() = 0;
   virtual std::size_t CommittedSourceFrames() const = 0;
 };
