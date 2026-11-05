@@ -1,5 +1,6 @@
 package com.kelpie.browser.automation
 
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -36,6 +37,16 @@ class ScriptCliBridgeTest : ScriptPublicFixture() {
                 ui.waitUntil(60_000) { ui.onAllNodesWithText("Always allow").fetchSemanticsNodes().isNotEmpty() }
                 ui.onNodeWithText("Always allow").performClick()
                 ui.waitForIdle()
+                if (
+                    androidx.test.platform.app.InstrumentationRegistry
+                        .getArguments()
+                        .getString("fastGeometry") == "true"
+                ) {
+                    ui.waitUntil(60_000) { ui.onAllNodesWithContentDescription("Stop recording").fetchSemanticsNodes().isNotEmpty() }
+                    val view = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
+                    val receipt = FastPointerGeometry.capture(view)
+                    File(evidence, "fast-geometry-$bridgeId.json").writeText(receipt.toString(2))
+                }
                 ui.waitUntil(840_000) { finish.exists() }
                 assertTrue(finish.readText().trim() == "complete:0")
             }
