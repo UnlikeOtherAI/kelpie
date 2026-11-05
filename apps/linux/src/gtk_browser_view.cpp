@@ -1,6 +1,9 @@
 #include "gtk_browser_view.h"
 
 #include "linux_app.h"
+#if KELPIE_LINUX_HAS_CEF
+#include "script_frame_compositor.h"
+#endif
 
 #if KELPIE_LINUX_HAS_GTK
 #include <cairo.h>
@@ -17,6 +20,15 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
   label_ = gtk_label_new("");
   gtk_container_add(GTK_CONTAINER(frame_), canvas_);
   gtk_overlay_add_overlay(GTK_OVERLAY(frame_), label_);
+  stop_ = gtk_button_new_with_label("Stop script");
+  gtk_widget_set_no_show_all(stop_, TRUE);
+  gtk_widget_set_halign(stop_, GTK_ALIGN_END); gtk_widget_set_valign(stop_, GTK_ALIGN_START);
+  gtk_widget_set_margin_top(stop_, 8); gtk_widget_set_margin_end(stop_, 8);
+  gtk_widget_set_tooltip_text(stop_, "Stop the running browser script");
+  gtk_overlay_add_overlay(GTK_OVERLAY(frame_), stop_);
+  g_signal_connect(stop_, "clicked", G_CALLBACK(+[](GtkButton*, gpointer raw) {
+    static_cast<GtkBrowserView*>(raw)->app_.StopScript();
+  }), this);
   gtk_widget_set_halign(label_, GTK_ALIGN_START);
   gtk_widget_set_valign(label_, GTK_ALIGN_START);
   gtk_widget_set_margin_top(label_, 12);
@@ -65,7 +77,20 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
 
   g_signal_connect(canvas_, "draw", G_CALLBACK(+[](GtkWidget* widget, cairo_t* cr, gpointer user_data) {
                      auto* self = static_cast<GtkBrowserView*>(user_data);
-                     const auto frame = self->app_.ViewFrame();
+                     auto frame = self->app_.ViewFrame();
+#if KELPIE_LINUX_HAS_CEF
+                     auto* top = gtk_widget_get_toplevel(widget);
+                     if (frame.valid() && GTK_IS_WINDOW(top) && gtk_window_is_active(GTK_WINDOW(top))) {
+                       ScriptFrame composed{frame.width, frame.height, frame.width * 4, 0, std::move(frame.pixels)};
+                       auto shown = self->app_.ScriptPresentation();
+                       if (frame.tab_id != shown.value("tabId", std::string()) || frame.generation != shown.value("generation", std::uint64_t(0))) {
+                         shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
+                       }
+                       try { DrawScriptOverlay(composed, shown); }
+                       catch (...) { self->app_.StopScript(); }
+                       frame.pixels = std::move(composed.bgra);
+                     }
+#endif
                      const auto& snapshot = frame.pixels;
                      const int width = frame.width;
                      const int height = frame.height;
@@ -208,6 +233,10 @@ void GtkBrowserView::Sync() {
 #if KELPIE_LINUX_HAS_GTK
   if (label_ == nullptr) {
     return;
+  }
+  if (stop_) {
+    const bool playing = app_.ScriptPresentation().value("playing", false);
+    if (playing) gtk_widget_show(stop_); else gtk_widget_hide(stop_);
   }
   if (app_.HasNativeBrowser()) {
     gtk_widget_hide(label_);

@@ -661,3 +661,5 @@ session IDs and unsupported mobile keyboard defaults fail before actions.
 The matching iOS binding belongs to the same integrated PR. Native relink and real
 HTTP/MCP phone/tablet acceptance remain pending; the
 [Android ledger](plans/browser-automation-capture/android.md) records exact results.
+
+Linux CEF adds native capture adapters for the shared typed-workflow coordinator: Cairo presentation/PNG, giflib GIF, system GStreamer/OpenH264 MP4, owner-bound private artifacts and GTK Stop. The Linux native candidate requires actual build/API/codec and flavor verification before capability claims; headless and no-CEF availability remain explicit. See [Linux capture contract](api/linux-script-media.md).

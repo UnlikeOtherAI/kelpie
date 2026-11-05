@@ -1,17 +1,15 @@
 # Linux native automation and capture
 
 Owner: Linux (desktop_backend), Maxis source development only.
-Current prerequisite source worktree:
-D:/Worktrees/kelpie/capture-desktop-20261104.
-Linux worktree to create only after the backend prerequisite is integrated:
-D:/Worktrees/kelpie/capture-linux-20261104,
-branch codex/capture-linux-20261104.
-Assigned future bounded Linux test checkout:
+Source worktree: D:/Worktrees/kelpie/capture-linux-20261104,
+branch codex/capture-linux-20261104, integrated base dc0648e284c46582708b2ea31431de85a9f9946a.
+Portable worker prerequisites are integrated and verified separately; they do not
+prove Linux native behavior. Assigned bounded Linux test checkout:
  /home/ondre/Projects/kelpie-worktrees/capture-linux-20261104.
 
-No Linux source implementation, native build or acceptance is claimed by this
-initial inventory. The user now requests all platforms; Windows remains the first
-shared runtime gate, but that does not remove any Linux requirement below.
+The native implementation checkpoint is explicitly unverified before transport
+through Git to Fedora. All48 requirements below remain pending their actual
+Linux-specific evidence; source presence is not a passing result.
 
 ## Source inventory and reuse
 
