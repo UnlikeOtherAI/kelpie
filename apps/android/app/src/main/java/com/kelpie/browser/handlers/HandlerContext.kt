@@ -26,7 +26,7 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-internal class WebViewGuardRejected : IllegalStateException("WebView guard rejected")
+internal class WebViewGuardRejected : IllegalStateException("Tab document changed or job stopped")
 
 private val json =
     Json {

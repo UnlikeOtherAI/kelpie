@@ -113,7 +113,7 @@ animated GIF and H.264 MP4. GIF preserves the requested marker color and quantiz
 other pixels; MP4 requires an available native AVC encoder. A shared retained-byte
 budget covers outputs. Bounded backpressure can drop continuous frames. Stop,
 foreground loss, revocation or tab replacement finalizes partial outputs where
-possible. Finalizing remains active until codecs and renderer retirement finish.
+possible. Finalizing remains active until codecs and renderer retirement finish. When the navigation guard observes an explicit Stop after admission, it reports SCRIPT_ABORTED with mayHaveCompleted because navigation may already have started; it is never retried.
 
 Status exposes safe metadata only: success describes the query, runSuccess the
 terminal result, and runError a fixed safe failure. Only direct play returns bounded
