@@ -30,6 +30,16 @@ export async function runPaced({client,fixture,engine,base,capture,check,load,pl
   requireTrue(!events.some(e=>e.type==="paced-focus"||e.type==="paced-input"),"PACED_EMPTY_FOCUSED_OR_WROTE");
   return {screenshot:true,noFocusOrInput:true};
  });
+ await check("paced-empty-type-ineligible",async()=>{
+  await load("/paced");
+  for(const ineligible of [{role:"button",name:"Submit"},{label:"Static readonly"}]){
+   const begin=fixture.events.length;
+   const value=await play([{action:"type",target:ineligible,text:"",typingDelayMs:250}]);
+   requireTrue(!value.success&&value.error?.code==="TARGET_NOT_EDITABLE","PACED_EMPTY_INELIGIBLE");
+   requireTrue(!fixture.events.slice(begin).some(e=>e.type==="paced-focus"||e.type==="paced-input"),"PACED_EMPTY_INELIGIBLE_FOCUSED");
+  }
+  return {buttonRefused:true,readonlyRefused:true,noFocusOrInput:true};
+ });
  for(const route of ["/paced-blur","/paced-replace"])await check("paced-fence-"+route.slice(7),async()=>{
   await load(route);const begin=fixture.events.length;
   const value=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"]},

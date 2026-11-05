@@ -6,6 +6,18 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     typealias Body = [String: Any]
     private let tap: Body = ["action": "tap", "target": ["role": "button", "name": "Submit"]]
 
+    @MainActor
+    func testEmptyPacedTypeRequiresEditableTarget() throws {
+        try ScriptWorkflowActions.requireEmptyPacedEditable(["editable": true])
+        for value: Any? in [false, nil] {
+            var target: Body = [:]
+            target["editable"] = value
+            XCTAssertThrowsError(try ScriptWorkflowActions.requireEmptyPacedEditable(target)) {
+                XCTAssertEqual(($0 as? ScriptWorkflowFailure)?.code, "TARGET_NOT_EDITABLE")
+            }
+        }
+    }
+
     func testScrollbarTransitionAndProjection() {
         func viewport(client: CGFloat, visible: CGFloat, bounds: CGFloat = 900, scale: CGFloat = 1) -> ScriptCaptureViewport {
             ScriptCaptureViewport(bounds: CGSize(width: bounds, height: 700), layout: CGSize(width: 900, height: 700),

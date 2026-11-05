@@ -27,6 +27,7 @@ export async function startFixture() {
    <div id="cover-box"><button id="covered">Covered</button><div id="cover">Cover</div></div>
    <button id="replace"><span>Replace child</span></button>
    <label>Readonly on focus<input id="readonly" value="seed"></label>
+   <label>Static readonly<input id="static-readonly" value="seed" readonly></label>
    <button id="moving">Moving</button><button id="start">Start motion</button>
    <section id="catalogue"><h3>Green tea</h3><h3>Black tea</h3></section>
    <button id="scroll-target">Scrolled target</button>`;
@@ -43,6 +44,7 @@ export async function startFixture() {
     hit:typeof event.clientX==='number'?document.elementFromPoint(event.clientX,event.clientY)?.closest('button,a')?.id:null,
     rect:r?{left:Math.max(0,r.left,clip?.left??0),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right,clip?.right??innerWidth),bottom:Math.min(innerHeight,r.bottom)}:null});
   },true);
+  for(const id of ['submit','static-readonly'])document.getElementById(id)?.addEventListener('focus',()=>send({type:'paced-focus',target:id},true));
   for(const id of ['entry','focus-privacy']){
    const field=document.getElementById(id);
    field?.addEventListener('focus',()=>{if(pacedMode)send({type:'paced-focus',target:id},true)});

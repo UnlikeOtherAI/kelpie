@@ -176,10 +176,7 @@ final class ScriptWorkflowActions {
         if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let paced = workflow.pacedPlans[index]
         if let paced, paced.operations.isEmpty {
-            try requireOK(try await tab.target(
-                target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain
-            ))
-            if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
+            try await emptyPacedType(target, token: token, index: index, consume: consume, uncertain: uncertain)
             return
         }
         if editing {
@@ -239,6 +236,25 @@ final class ScriptWorkflowActions {
         do { try await check() } catch {
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
         }
+    }
+
+    private func emptyPacedType(
+        _ target: Body,
+        token: String,
+        index: Int,
+        consume: @escaping @MainActor (Body) -> Void,
+        uncertain: @escaping @MainActor () -> Void
+    ) async throws {
+        let result = try await tab.target(
+            target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain
+        )
+        try requireOK(result)
+        try Self.requireEmptyPacedEditable(result)
+        if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
+    }
+
+    static func requireEmptyPacedEditable(_ result: Body) throws {
+        guard result["editable"] as? Bool == true else { throw ScriptWorkflowFailure("TARGET_NOT_EDITABLE") }
     }
 
     /// An acknowledged scalar still needs privacy classification before continuing.
