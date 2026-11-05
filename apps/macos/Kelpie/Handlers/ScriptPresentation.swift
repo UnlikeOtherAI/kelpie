@@ -30,6 +30,9 @@ final class ScriptPresentation {
     private var timer: Timer?
     private var documentObserver: NSObjectProtocol?
     private var marker: Marker?
+    private(set) weak var markerWindow: NSWindow?
+    private(set) var markerGeometry: ScriptMarkerGeometry?
+    private(set) var markerDocument: String?
     private var pointer: CGPoint?
     private var commentary: String?
     private var held = false
@@ -54,6 +57,9 @@ final class ScriptPresentation {
 
     func clear() {
         marker = nil
+        markerWindow = nil
+        markerGeometry = nil
+        markerDocument = nil
         pointer = nil
         commentary = nil
         held = false
@@ -76,7 +82,10 @@ final class ScriptPresentation {
     }
 
     /// The clock stays at zero until an actual legal movie sample contains the marker.
-    func indicate(at point: CGPoint, options: [String: Any], hold: Bool = false) {
+    func indicate(at point: CGPoint, options: [String: Any], tab: ScriptWorkflowTab, hold: Bool = false) {
+        markerWindow = tab.view.window
+        markerGeometry = markerWindow.map { ScriptMarkerGeometry(tab: tab, window: $0) }
+        markerDocument = tab.document
         heldTime = ProcessInfo.processInfo.systemUptime
         held = hold
         marker = Marker(

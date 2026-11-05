@@ -1,6 +1,6 @@
 import AppKit
 
-/// Native geometry is captured before the recording chrome changes.
+/// Native geometry is captured when the marker is created.
 @MainActor
 struct ScriptMarkerGeometry: Equatable {
     let viewport: CGRect
@@ -31,12 +31,13 @@ final class ScriptMarkerRetiree {
         tab: ScriptWorkflowTab,
         window: NSWindow,
         end: TimeInterval,
-        geometry: ScriptMarkerGeometry
+        geometry: ScriptMarkerGeometry,
+        document: String
     ) {
         self.presentation = presentation
         self.tab = tab
         self.window = window
-        self.document = tab.document
+        self.document = document
         self.end = end
         self.geometry = geometry
         let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
