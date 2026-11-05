@@ -135,7 +135,7 @@ try {
     report.hiddenAdversariesInstalled = true; return { installed: true };
   });
   for (const [kind, options] of [
-    ["snapshot", { maxChars: 1024, maxElements: 20, prioritize: true }],
+    ["snapshot", { maxChars: 8000, maxElements: 20, prioritize: true, prefix: "lp-audit-a-" }],
     ["extract", { scope: "#catalogue", fields: [{ name: "titles", selector: "h3", source: "text", multiple: true }], metadata: true, maxChars: 8000 }],
     ["status", {}], ["ready", { state: "complete", selector: "#unique" }],
   ]) await check("fixed canonical " + kind + " correctness", async () => {
@@ -151,13 +151,27 @@ try {
     assert.equal(report.hiddenAdversariesInstalled, true);
     assert.equal(privateCanaryDetected, false);
     if (kind === "snapshot") {
-      assert.ok(value.text.includes("Capture acceptance fixture")); assert.ok(value.elements.some(el => el.name === "Confirm order"));
-      assert.ok(value.text.length <= 1024);
+      assert.ok(value.elements.some(el => el.name === "Confirm order"));
+      assert.equal(value.elements.length, 20); assert.equal(value.truncated, true);
+      assert.ok(value.text.length <= 8000 && value.elements.every(el => el.ref.startsWith("lp-audit-a-")));
+      assert.equal(new Set(value.elements.map(el => el.ref)).size, 20);
     } else if (kind === "extract") assert.ok(JSON.stringify(value.fields[0].values) === JSON.stringify(["Green tea", "Black tea"]), "Extraction included hidden/private or unexpected records");
     else if (kind === "status") assert.ok(value.viewport.width > 0 && value.documentState === "complete");
     else assert.ok(value.ready && value.visible && value.matches === 1);
     report.observations[kind] = { correct: true, bytes: Buffer.byteLength(JSON.stringify(value)) };
     return report.observations[kind];
+  });
+  await check("scoped canonical snapshot with fresh host references", async () => {
+    const value = await evaluate(page, "(" + fixedObservationExpression("snapshot", {
+      scope: "#catalogue", prefix: "lp-audit-b-", maxElements: 20, maxChars: 8000, prioritize: true,
+    }) + ").snapshot");
+    assert.ok(!JSON.stringify(value).includes("CAPTURE_SECRET_"));
+    for (const name of ["Available products", "Green tea", "Black tea"])
+      assert.ok(value.elements.some(element => element.name === name), name);
+    assert.equal(value.elements.filter(element => element.role === "link" && element.name === "Details").length, 2);
+    assert.ok(value.elements.every(element => element.ref.startsWith("lp-audit-b-")));
+    assert.equal(new Set(value.elements.map(element => element.ref)).size, value.elements.length);
+    return { elements: value.elements.length, textChars: value.text.length, privateCanaryDetected: false };
   });
   await check("hidden selector readiness refuses", async () => {
     const value = await evaluate(page, fixedObservationExpression("ready", { state: "complete", selector: "#lp-hidden-ready" }));

@@ -113,8 +113,8 @@ Retain a machine-readable report and concise ledger entry containing:
 - Verified teardown of the exact owned test resources.
 
 A successful protocol handshake, source inspection or mocked test is not a
-completed LP compatibility result. No real LP task or performance result is
-claimed by this plan.
+completed LP compatibility result. The prepared plan made no runtime claim;
+subsequent measured diagnostics are recorded below and in lightpanda-analysis.md.
 
 The candidate Linux IP controls and their unsupported-kernel caveat are documented by [systemd.resource-control](https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html#IPAddressAllow=ADDRESS[/PREFIXLENGTH]%E2%80%A6). This plan requires an actual enforcement probe and does not treat unit acceptance as proof.
 
@@ -122,7 +122,7 @@ The candidate Linux IP controls and their unsupported-kernel caveat are document
 
 Root assigned the existing owned Fedora checkout
 /home/ondre/Projects/kelpie-worktrees/capture-linux-20261104. Exact probe source:
-6fb0091aa9379e89ff0071fac2c34337032ba91f. Lightpanda itself has not run.
+6fb0091aa9379e89ff0071fac2c34337032ba91f. Lightpanda itself had not run at this checkpoint.
 
 Fedora systemd259.9 has cgroupv2/BPF support. The unfiltered documentation-address
 UDP baseline completed; the same send returned EPERM inside the restricted
@@ -167,3 +167,16 @@ concurrent-context refusal, close-then-new storage checks and explicit shared
 owned tabs. The source now continues those diagnostics instead of abandoning
 independent reader facts at context allocation. Production stdio profile
 advertisement remains gated off unless a later operator verification is approved.
+
+The next Lightpanda test source supplies explicit private host prefixes and
+asserts the actual prioritized20-control/truncation contract. A separate scoped
+catalogue snapshot checks public headings/links and private/hidden omission.
+These corrected assertions are not yet runtime evidence.
+
+The finite production entrypoint corpus is
+tests/linux/lightpanda-stdio-acceptance.mjs. It requires the newly checked CLI/SDK
+artifact, maxSessions1/maxTabs1 and the proven navigation-only method list.
+Seven sequential cases cover version/initialize, pre-allocation shared refusal,
+exact capabilities/resource ceilings, public history/reload, unsupported/foreign/
+origin refusal, close/fresh storage, TTL and clean shutdown preserving the
+borrowed LP endpoint. It has not run; source preparation is not admission proof.
