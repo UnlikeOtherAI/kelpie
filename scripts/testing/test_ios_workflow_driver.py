@@ -179,6 +179,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testLiveMarkerProjectionMatchesSameSceneTarget",
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchScrollableControl",
             "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
             "testPacedCaptureWithTextInteractionDisabled",
             "testTextInteractionPreferenceRestoresAfterStop",

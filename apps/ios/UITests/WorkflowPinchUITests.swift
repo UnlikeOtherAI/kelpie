@@ -79,6 +79,43 @@ extension WorkflowCaptureUITests {
 
     }
 
+    @MainActor
+    func testNativePinchScrollableControl() async throws {
+        let initialOrientation = XCUIDevice.shared.orientation
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = initialOrientation }
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let navigation = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/pinch-scroll"]]
+        ])
+        XCTAssertEqual(navigation["success"] as? Bool, true)
+        let viewport = XCUIApplication().webViews.firstMatch
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        let initial = try await pinchMetrics(tab, selector: "#zoom")
+        let initialNative = await nativeZoomEvidence()
+        viewport.pinch(withScale: 2, velocity: 1)
+        let deadline = Date().addingTimeInterval(5)
+        var zoomed = try await pinchMetrics(tab, selector: "#zoom")
+        while (zoomed["scale"] as? Double ?? 0) < (initial["scale"] as? Double ?? 1) * 1.3, Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            zoomed = try await pinchMetrics(tab, selector: "#zoom")
+        }
+        let zoomedNative = await nativeZoomEvidence()
+        let evidence = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+            "initial": initial, "zoomed": zoomed, "nativeBefore": initialNative, "nativeAfter": zoomedNative
+        ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
+        evidence.name = "Scrollable native pinch control metrics"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        let image = XCTAttachment(screenshot: viewport.screenshot())
+        image.name = "Scrollable native pinch control"
+        image.lifetime = .keepAlways
+        add(image)
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["scale"] as? Double), (initial["scale"] as? Double ?? 1) * 1.3)
+    }
+
     private func nativeZoomEvidence() async -> Body {
         guard let value = try? await probe.request("/v1/debug-screens", [:]),
               let webView = value["webView"] as? Body, let scroll = webView["scrollView"] as? Body else { return [:] }
