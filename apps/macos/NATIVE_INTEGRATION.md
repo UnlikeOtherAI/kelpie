@@ -6,7 +6,7 @@ The app uses Tuist and the repository's native CMake bootstrap. Do not edit or c
 
 Use an Apple Silicon Mac, Xcode with a macOS26 SDK or newer, CMake, Ninja, Node20+, pnpm, mise and SwiftLint. The app deployment target remains macOS14. Tuist is pinned by the root .mise.toml.
 
-The CI job uses the stable [GitHub macos-26 ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md), whose documented default is Xcode26.6. The pinned CEF bootstrap is ARM64-only. The job prints its actual toolchain and refuses a different architecture.
+The CI job uses the stable [GitHub macos-26 ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md), whose documented default is Xcode 26.6. The pinned CEF bootstrap is ARM64-only. The job prints its actual toolchain and refuses a different architecture.
 
 ## Bootstrap and build
 
@@ -40,7 +40,7 @@ Project.swift links the core libraries and llama/ggml outputs under native/.buil
 
 ## Scope and known diagnostics
 
-The local macOS27 candidate passed full Swift lint, native core/inference compilation, Tuist generation and app/XCTest build-for-testing. The hosted macos-26 workflow still needs its own actual CI result; a compatible documented SDK is not a hosted-run pass.
+The local macOS27 candidate passed full Swift lint, native core/inference compilation, Tuist generation and app/XCTest build-for-testing. The [hosted run 41950256231](https://github.com/UnlikeOtherAI/kelpie/actions/runs/41950256231) also passed at revision 28426edc2fe9faffefea4a3df508786d5107bc15 using Xcode 26.6 (17F113), macOS SDK 26.5, CEF 149.0.6 and native Metal/BLAS ON. The scope job took 6 seconds and the native job 8 minutes 10 seconds. This compiles XCTest without executing tests or launching Kelpie.
 
 The build emits known warnings in existing AppReveal concurrency declarations, native categories/callbacks, deprecated UI calls and script phases without output declarations. An absent optional Gecko helper also produces a warning; the checked renderer paths are WebKit and Chromium. The workflow retains build diagnostics and does not claim zero warnings or turn off diagnostics.
 
@@ -52,4 +52,4 @@ The workflow always runs a small Ubuntu change detector and its regression cases
 
 Pull requests compare merge-base to head; main pushes compare before/after and preserve both rename endpoints. A first push checks its tree. A manual dispatch explicitly requests the build. Failed Git comparison fails detection rather than silently skipping. GitHub reports conditionally skipped jobs as successful checks, preserving required-check behavior for unrelated-only changes. See [GitHub job conditions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions).
 
-Reproduce the lightweight scope tests with python3 -m unittest discover -s tests/ci -p test_macos_inputs.py. Hosted native execution remains unclaimed until the workflow actually runs.
+Reproduce the lightweight scope tests with python3 -m unittest discover -s tests/ci -p test_macos_inputs.py. The hosted compile result above covers its exact recorded revision. Later native-input changes require their own checks; installed runtime behavior remains separately tracked.

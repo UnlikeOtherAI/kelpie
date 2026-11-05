@@ -96,3 +96,9 @@ Computer Use stays off. Stop/replace favorites app12718 only after its owner han
 8. Query actual ai-status, load the smallest already-supported model through existing controls, run a bounded inference smoke with the pinned CPU/Metal/Accelerate graph, and unload through supported APIs. No unidentified vendor library substitutes or inference-disabled success are allowed.
 
 Focused active-capture deadline regression is reproducible with bash scripts/testing/apple-script-deadline.sh. It verifies exact limit admission, refusal immediately beyond the limit, invalid elapsed values and separate stopped/finalization grace. The running workflow now checks this independently of whether a continuous movie sampler exists.
+
+## Hosted compile evidence
+
+[Run 41950256231](https://github.com/UnlikeOtherAI/kelpie/actions/runs/41950256231) completed successfully on 2026-11-05 at 01:50:14 UTC for root 28426edc2fe9faffefea4a3df508786d5107bc15. The native job took 8 minutes 10 seconds on stable macos-26 ARM64: Xcode 26.6/17F113, macOS SDK 26.5, CEF 149.0.6, GGML_METAL=ON and GGML_BLAS=ON. Scope tests, pinned bootstrap, Swift lint, all six core/inference libraries, Tuist and full app/XCTest build-for-testing passed.
+
+Diagnostics are retained as the run's macos-build-diagnostics artifact and locally under .cache/mac-ci-41950256231. build.log SHA-256 is 529feff5be14b40b4e989b90ffbadc1f68fb49aaf421b4314be191a5dcd30353. Existing warnings remain, including AppReveal concurrency/optional coercion, native categories/callbacks, deprecated UI calls, script output declarations, optional Gecko, absent accent asset and duplicate C++ linker flag. No warning was attributed to the new workflow source files. This is a successful compile, not a zero-warning, test-execution, app-launch, signed-release or runtime acceptance claim. No run was re-dispatched and no local app was replaced.
