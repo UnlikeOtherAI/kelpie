@@ -13,7 +13,7 @@ export async function startFixture() {
   const mode=url.pathname;
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
   const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive"].includes(mode)?mode:"";
-  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):"Hosted Mac fixture";
+  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":"Hosted Mac fixture";
   const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
   const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`

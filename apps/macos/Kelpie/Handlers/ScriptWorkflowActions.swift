@@ -23,8 +23,12 @@ final class ScriptWorkflowPrivacy {
         uncertain(text: text)
     }
 
-    func uncertain(text: String?) {
+    func register(text: String?) {
         if let text, knownSecrets.insert(text).inserted { secrets.append(text) }
+    }
+
+    func uncertain(text: String?) {
+        register(text: text)
         if captures { discardMedia = true }
     }
 }
@@ -182,6 +186,7 @@ final class ScriptWorkflowActions {
             if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
             return
         }
+        if paced != nil { privacy.register(text: text) }
         if editing {
             #if DEBUG
             await tab.debugEditFocus("before", targetFocused: found["focused"] as? Bool)
@@ -240,6 +245,13 @@ final class ScriptWorkflowActions {
         }
     }
 
+    /// A completed scalar needs explicit classification before any continuation.
+    static func requireKnownPacedResult(_ result: Body) throws {
+        guard result["sensitivityKnown"] as? Bool == true else {
+            throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        }
+    }
+
     private func performPaced(
         _ plan: ScriptPacedTyping,
         target: Body,
@@ -268,6 +280,7 @@ final class ScriptWorkflowActions {
                 )
                 if result["mayHaveCompleted"] as? Bool == true { completedInput = true }
                 try requireOK(result)
+                try Self.requireKnownPacedResult(result)
                 if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
             }
             try await check()
