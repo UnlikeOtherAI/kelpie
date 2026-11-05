@@ -59,6 +59,37 @@ final class ScriptWorkflowTab {
         guard view.window?.isVisible == true, !view.isHiddenOrHasHiddenAncestor else { throw ScriptWorkflowFailure("TAB_NOT_VISIBLE") }
     }
 
+    /// Focus only the admitted renderer inside its already-key browser window.
+    func prepareEditFocus() async throws {
+        try await check()
+        guard router.browserLease.begin() else { throw ScriptWorkflowFailure("BUSY") }
+        defer { router.browserLease.end() }
+        try requireCurrent()
+        guard let window = view.window, window.isKeyWindow, window.attachedSheet == nil else {
+            throw ScriptWorkflowFailure("TAB_NOT_VISIBLE")
+        }
+        if renderer is WKWebViewRenderer {
+            guard Self.requestOwnedEditFocus(isKey: window.isKeyWindow, focus: { window.makeFirstResponder(view) }) else {
+                throw ScriptWorkflowFailure("INPUT_UNCERTAIN")
+            }
+        }
+        try requireCurrent()
+    }
+
+    static func requestOwnedEditFocus(isKey: Bool, focus: () -> Bool) -> Bool {
+        isKey && focus()
+    }
+
+    #if DEBUG
+    func debugEditFocus(_ phase: String, targetFocused: Bool?) async {
+        let values = try? await fixed("(()=>[document.hasFocus(),document.activeElement===document.body])()") as? [Bool]
+        let key = view.window?.isKeyWindow == true
+        let responder = (view.window?.firstResponder as? NSView).map { $0 === view || $0.isDescendant(of: view) } ?? false
+        func flag(_ value: Bool?) -> String { value.map { $0 ? "1" : "0" } ?? "u" }
+        print("[WorkflowEditFocus] phase=\(phase) key=\(flag(key)) responder=\(flag(responder)) doc=\(flag(values?.first)) body=\(flag(values?.last)) target=\(flag(targetFocused))")
+    }
+    #endif
+
     func waitForLayout() async throws {
         let end = ProcessInfo.processInfo.systemUptime + 2
         var previous = CGRect.null
