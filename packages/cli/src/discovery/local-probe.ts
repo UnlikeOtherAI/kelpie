@@ -82,7 +82,7 @@ export async function probeDeviceInfo(
 function candidatePorts(store: Awaited<ReturnType<typeof loadBrowserStore>>): number[] {
   const ports = new Set<number>();
   for (const running of Object.values(store.running)) {
-    ports.add(running.port);
+    if (!running.pendingLaunch) ports.add(running.port);
   }
   for (let i = 0; i < LOCAL_PORT_SWEEP; i++) {
     ports.add(DEFAULT_PORT + i);
@@ -96,7 +96,7 @@ function aliasForPort(
   port: number,
 ): { name: string; platform: DiscoveredDevice["platform"] } | undefined {
   for (const [name, running] of Object.entries(store.running)) {
-    if (running.port === port) {
+    if (!running.pendingLaunch && running.port === port) {
       return { name, platform: store.aliases[name]?.platform ?? "macos" };
     }
   }

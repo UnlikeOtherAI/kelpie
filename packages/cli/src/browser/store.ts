@@ -17,6 +17,7 @@ export interface RunningBrowser {
   launchId?: string;
   readinessFile?: string;
   deviceId?: string;
+  pendingLaunch?: { attemptId: string; appPath: string; profileDir: string; startedAt: string; previousLaunchId?: string };
 }
 
 export interface BrowserStore {
