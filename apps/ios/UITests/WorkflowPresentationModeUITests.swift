@@ -18,6 +18,14 @@ extension WorkflowCaptureUITests {
             ("Video", ["video"], false, true)
         ]
         let application = XCUIApplication()
+        let initialChrome = application.buttons["browser.more"]
+        XCTAssertTrue(initialChrome.waitForExistence(timeout: 5))
+        let chromeCoordinate = initialChrome.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        chromeCoordinate.tap()
+        let menuItem = application.buttons["browser.tabs.count"]
+        XCTAssertTrue(menuItem.waitForExistence(timeout: 5), "More must open at the captured coordinate")
+        application.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
+        XCTAssertFalse(menuItem.exists)
         for (name, formats, explicit, movie) in modes {
             let viewport = application.webViews.firstMatch
             let initial = viewport.frame
@@ -37,12 +45,10 @@ extension WorkflowCaptureUITests {
             if movie {
                 XCTAssertFalse(chrome.exists, name)
             } else {
-                if chrome.exists {
-                    XCTAssertFalse(chrome.isEnabled, name)
-                    chrome.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-                    XCTAssertTrue(stop.exists, name)
-                    XCTAssertFalse(application.buttons["browser.tabs.add"].exists, name)
-                }
+                if chrome.exists { XCTAssertFalse(chrome.isEnabled, name) }
+                chromeCoordinate.tap()
+                XCTAssertTrue(stop.exists, name)
+                XCTAssertFalse(menuItem.exists, name)
                 XCTAssertEqual(during.minX, initial.minX, accuracy: 0.5, name)
                 XCTAssertEqual(during.minY, initial.minY, accuracy: 0.5, name)
                 XCTAssertEqual(during.width, initial.width, accuracy: 0.5, name)
@@ -85,6 +91,9 @@ extension WorkflowCaptureUITests {
         XCTAssertTrue(stage.waitForExistence(timeout: 10))
         let viewport = application.webViews.firstMatch
         let before = viewport.frame
+        let closeBefore = application.buttons["browser.viewport.close"]
+        XCTAssertTrue(closeBefore.waitForExistence(timeout: 5))
+        let closeCoordinate = closeBefore.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let original = XCTAttachment(screenshot: application.screenshot())
         original.name = "Tablet stage before non-movie script"
         original.lifetime = .keepAlways
@@ -103,11 +112,9 @@ extension WorkflowCaptureUITests {
         XCTAssertEqual(during.width, before.width, accuracy: 0.5)
         XCTAssertEqual(during.height, before.height, accuracy: 0.5)
         let close = application.buttons["browser.viewport.close"]
-        if close.exists {
-            XCTAssertFalse(close.isEnabled)
-            close.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            XCTAssertTrue(stop.exists)
-        }
+        if close.exists { XCTAssertFalse(close.isEnabled) }
+        closeCoordinate.tap()
+        XCTAssertTrue(stop.exists)
         let active = XCTAttachment(screenshot: application.screenshot())
         active.name = "Tablet stage during non-movie script"
         active.lifetime = .keepAlways
@@ -134,7 +141,9 @@ extension WorkflowCaptureUITests {
         let application = XCUIApplication()
         let address = application.textFields["browser.url.field"]
         XCTAssertTrue(address.waitForExistence(timeout: 5))
-        address.tap()
+        let addressCoordinate = address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        addressCoordinate.tap()
+        XCTAssertTrue(application.keyboards.firstMatch.waitForExistence(timeout: 5), "Address must focus before playback")
         let playback = Task.detached { [probe] in
             try await probe.request("/v1/play-script", [
                 "version": 1, "tabId": tab, "actions": [["action": "wait", "ms": 10000]]
@@ -142,11 +151,9 @@ extension WorkflowCaptureUITests {
         }
         let stop = application.buttons["browser.recording.stop"]
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
-        if address.exists {
-            XCTAssertFalse(address.isEnabled)
-            address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            XCTAssertTrue(stop.exists)
-        }
+        if address.exists { XCTAssertFalse(address.isEnabled) }
+        addressCoordinate.tap()
+        XCTAssertTrue(stop.exists)
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         let attachment = XCTAttachment(screenshot: application.screenshot())
         attachment.name = "Non-movie script after address focus retirement"
