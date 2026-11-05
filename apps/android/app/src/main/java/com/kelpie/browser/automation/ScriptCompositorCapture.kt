@@ -141,11 +141,15 @@ internal class ScriptCompositorCapture(
         width: Int,
         height: Int,
     ): Bitmap {
-        if (!ScriptPixelCopySlot.acquire()) throw ScriptFailure("CAPTURE_FAILED")
+        if (!ScriptPixelCopySlot.acquire()) {
+            diagnostics.failure(ScriptCaptureDiagnostics.Failure.SLOT_BUSY)
+            throw ScriptFailure("CAPTURE_FAILED")
+        }
         val bitmap =
             try {
                 Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             } catch (error: Throwable) {
+                diagnostics.failure(ScriptCaptureDiagnostics.Failure.BITMAP_CREATE)
                 ScriptPixelCopySlot.release()
                 throw error
             }
@@ -166,6 +170,7 @@ internal class ScriptCompositorCapture(
                 handler,
             )
         } catch (error: Throwable) {
+            diagnostics.failure(ScriptCaptureDiagnostics.Failure.PIXEL_REQUEST)
             // A synchronous refusal does not transfer the bitmap to PixelCopy.
             gate.complete()
             gate.abandon()
@@ -173,7 +178,14 @@ internal class ScriptCompositorCapture(
             throw ScriptFailure("CAPTURE_FAILED")
         }
         try {
-            if (completed.await() != PixelCopy.SUCCESS || !gate.claim()) throw ScriptFailure("CAPTURE_FAILED")
+            if (completed.await() != PixelCopy.SUCCESS) {
+                diagnostics.failure(ScriptCaptureDiagnostics.Failure.PIXEL_STATUS)
+                throw ScriptFailure("CAPTURE_FAILED")
+            }
+            if (!gate.claim()) {
+                diagnostics.failure(ScriptCaptureDiagnostics.Failure.GATE_CLAIM)
+                throw ScriptFailure("CAPTURE_FAILED")
+            }
             return bitmap
         } catch (error: Throwable) {
             // The bitmap remains private and occupied until any late callback.

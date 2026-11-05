@@ -5,7 +5,7 @@ import com.kelpie.browser.BuildConfig
 
 /** Numeric, bounded diagnostics for compositor and encoder bottlenecks in debug builds. */
 internal class ScriptCaptureDiagnostics {
-    enum class Phase { VISUAL, COMMIT, PIXEL_COPY, QUEUE, ENCODE }
+    enum class Phase { VISUAL, COMMIT, PIXEL_COPY, QUEUE, ENCODE, PIXEL_READ, GIF, VIDEO }
 
     private data class Sample(
         var count: Long = 0,
@@ -25,6 +25,12 @@ internal class ScriptCaptureDiagnostics {
         sample.count++
         sample.total += nanos
         sample.maximum = maxOf(sample.maximum, nanos)
+    }
+
+    enum class Failure { SAMPLER_CANCELLED, SAMPLER_EXCEPTION, SNAPSHOT_TIMEOUT, SLOT_BUSY, BITMAP_CREATE, PIXEL_REQUEST, PIXEL_STATUS, GATE_CLAIM }
+
+    fun failure(failure: Failure) {
+        if (BuildConfig.DEBUG) Log.d("KelpieCaptureTiming", "failure=${failure.name}")
     }
 
     @Synchronized
