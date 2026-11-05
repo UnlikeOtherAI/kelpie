@@ -11,12 +11,14 @@ export async function startFixture() {
    res.writeHead(202).end();return;
   }
   const mode=url.pathname;
-  const title=mode==="/secret"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):"Hosted Mac fixture";
+  const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
+  const title=mode==="/secret"||privacyMode?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):"Hosted Mac fixture";
   const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
   const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
    <label>Draft message<textarea id="entry">Draft seed</textarea></label>
    <label>Account password<input id="password" type="password"></label>
+   <label id="privacy-label">Focus privacy<input id="focus-privacy" type="text"></label>
    <button id="submit">Submit</button><a id="next" href="/next">Next document</a>
    <div id="clip"><button id="partial">Partially visible</button></div>
    <button id="duplicate-a">Duplicate</button><button id="duplicate-b">Duplicate</button>
@@ -27,10 +29,12 @@ export async function startFixture() {
    <button id="moving">Moving</button><button id="start">Start motion</button>
    <section id="catalogue"><h3>Green tea</h3><h3>Black tea</h3></section>
    <button id="scroll-target">Scrolled target</button>`;
-  const script=`(()=>{const documentId=crypto.randomUUID();let sequence=0;
-  const send=(value)=>fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
+  const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)};const documentId=crypto.randomUUID();let sequence=0;
+  const send=(value,synchronous=false)=>{const body=JSON.stringify({
    documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight},
-   visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}})}).catch(()=>{});
+   visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}});
+   if(synchronous){const request=new XMLHttpRequest();request.open('POST','/events',false);request.setRequestHeader('content-type','application/json');request.send(body);return;}
+   return fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body}).catch(()=>{});};
   for(const type of ['pointermove','pointerdown','pointerup','click','input'])document.addEventListener(type,event=>{
    const target=event.target.closest('button,a,input,textarea');const r=target?.getBoundingClientRect();
    const clip=target?.id==='partial'?document.querySelector('#clip').getBoundingClientRect():null;
@@ -38,8 +42,19 @@ export async function startFixture() {
     hit:typeof event.clientX==='number'?document.elementFromPoint(event.clientX,event.clientY)?.closest('button,a')?.id:null,
     rect:r?{left:Math.max(0,r.left,clip?.left??0),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right,clip?.right??innerWidth),bottom:Math.min(innerHeight,r.bottom)}:null});
   },true);
+  document.querySelector('#submit')?.addEventListener('click',()=>{if(privacyMode==='/known-url')history.replaceState(null,'','/known-url-changed')});
   document.querySelector('#replace')?.addEventListener('pointerdown',event=>{event.currentTarget.replaceChildren(document.createElement('span'))});
   document.querySelector('#readonly')?.addEventListener('focus',event=>{event.target.readOnly=true});
+  document.querySelector('#focus-privacy')?.addEventListener('focus',event=>{
+   if(!privacyMode||privacyMode==='/input-autocomplete')return;
+   if(privacyMode==='/focus-password')event.target.type='password';else event.target.autocomplete='current-password';
+   send({type:'focus-privacy'},privacyMode==='/focus-delay');
+   if(privacyMode==='/focus-url')history.replaceState(null,'','/focus-url-changed');
+   if(privacyMode==='/focus-delay'){const end=performance.now()+5500;while(performance.now()<end){}}
+  });
+  document.querySelector('#focus-privacy')?.addEventListener('input',event=>{
+   if(privacyMode==='/input-autocomplete')event.target.autocomplete='current-password';
+  });
   document.querySelector('#password')?.addEventListener('input',event=>{document.title=event.target.value});
   document.querySelector('#start')?.addEventListener('click',()=>document.querySelector('#moving').animate(
    [{transform:'translateX(0px)'},{transform:'translateX(100px)'}],{duration:200,iterations:Infinity,direction:'alternate'}));
@@ -52,6 +67,7 @@ export async function startFixture() {
    next?"body{background:#ffe881;color:black}":`
    body{margin:12px;font:14px sans-serif;background:white;min-height:2000px}
    label{display:inline-block;margin:4px}textarea,input{width:150px;height:35px}button,a{padding:12px;margin:5px}
+   #privacy-label{position:absolute;left:560px;top:60px}
    #submit{position:absolute;left:140px;top:100px;width:180px;height:60px}
    #next{position:absolute;left:330px;top:110px}#clip{position:absolute;left:520px;top:110px;width:110px;overflow:hidden}
    #partial{width:180px;margin-left:-80px}#duplicate-a{position:absolute;left:20px;top:190px}
