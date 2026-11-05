@@ -21,7 +21,9 @@ try {
       "$all=Get-CimInstance Win32_Process; $ids=@(" + process.pid + "); do {$next=@($all|Where-Object {$ids -contains $_.ParentProcessId -and $ids -notcontains $_.ProcessId}|Select-Object -ExpandProperty ProcessId);$ids+=$next}while($next.Count); @($ids|ForEach-Object {$p=Get-Process -Id $_ -ErrorAction Stop;[pscustomobject]@{id=$p.Id;name=$p.ProcessName;affinity=$p.ProcessorAffinity.ToInt64();priority=[string]$p.PriorityClass}})|ConvertTo-Json -Compress"], { encoding: "utf8", timeout: 4000 });
     report.processPolicy = JSON.parse(policy);
     assert.ok(report.processPolicy.some(item => /chrome/.test(item.name)), "No browser leaf observed");
-    assert.ok(report.processPolicy.every(item => item.affinity === 1 && item.priority === "Normal"), "Process policy not inherited");
+    const expectedAffinity=Number(process.env.KELPIE_EXPECTED_AFFINITY??"1");
+    assert.ok(Number.isSafeInteger(expectedAffinity)&&expectedAffinity>0,"Invalid expected affinity");
+    assert.ok(report.processPolicy.every(item => item.affinity === expectedAffinity && item.priority === "Normal"), "Process policy not inherited");
   }
   const page = await browser.newPage({ viewport: { width: 800, height: 600 }, hasTouch: true });
   const cdp = await page.context().newCDPSession(page);
@@ -46,6 +48,23 @@ try {
     assert.ok(Math.abs(partial.x - 375) <= 1); assert.ok(Math.abs(partial.width - 50) <= 1);
     assert.equal(outside.ok, false);
   }
+  await cdp.send("Emulation.setPageScaleFactor",{pageScaleFactor:1});
+  const markup=bodyStyle=>'<style>html{overflow:visible}body{margin:0;'+bodyStyle+
+    '}button{position:absolute;left:40px;top:230px;width:30px;height:30px}</style><button id="first">First</button>';
+  await page.setContent(markup("height:0;overflow:hidden"));
+  const hit=await page.evaluate(()=>document.elementFromPoint(55,245)?.id);
+  const propagated=await invoke("#first");
+  assert.equal(hit,"first");assert.equal(propagated.ok,true);
+  assert.equal(propagated.x,55);assert.equal(propagated.y,245);
+  await page.setContent(markup("position:relative;height:0;overflow:hidden;contain:layout"));
+  const containedHit=await page.evaluate(()=>document.elementFromPoint(55,245)?.id??null);
+  const contained=await invoke("#first");
+  assert.notEqual(containedHit,"first");assert.equal(contained.ok,false);
+  await page.setContent('<style>html{height:0;overflow:hidden}body{margin:0;overflow:visible}button{position:absolute;left:40px;top:230px;width:30px;height:30px}</style><button id="first">First</button>');
+  const rootHit=await page.evaluate(()=>document.elementFromPoint(55,245)?.id);
+  const rootClipping=await invoke("#first");
+  assert.equal(rootHit,"first");assert.equal(rootClipping.ok,true);
+  report.bodyOverflow={hit,propagated,containedHit,contained,rootHit,rootClipping};
 } finally {
   clearTimeout(timeout);
   await writeFile(output, JSON.stringify(report, null, 2));

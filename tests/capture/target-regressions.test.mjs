@@ -318,3 +318,26 @@ test("post-input sensitive classification refuses capture but permits ordinary n
     if(capture){assert.equal(result.error,"SENSITIVE_CAPTURE_REFUSED");assert.equal(result.mayHaveCompleted,true);}
   }
 });
+
+test("root and propagated body overflow use the viewport; contained body still clips",()=>{
+ const f=fixture(),root=new Element(),body=new Element();
+ root.id="root";root.children=[f.element];root.localName="html";root.namespaceURI="http://www.w3.org/1999/xhtml";
+ root.rect={x:0,y:0,width:800,height:0};body.rect={x:0,y:0,width:800,height:0};
+ body.parentElement=root;f.element.parentElement=body;
+ f.element.rect={x:40,y:230,width:30,height:30};
+ document.documentElement=root;document.body=body;
+ let rootOverflow="visible",bodyContain="none",bodyOverflow="hidden";
+ globalThis.getComputedStyle=el=>({display:"block",visibility:"visible",opacity:"1",
+  overflowX:el===root?rootOverflow:el===body?bodyOverflow:"visible",
+  overflowY:el===root?rootOverflow:el===body?bodyOverflow:"visible",
+  contain:el===body?bodyContain:"none",contentVisibility:"visible",containerType:"normal"});
+ let result=resolveScriptTarget({selector:"#target"},"body-overflow");
+ assert.equal(result.ok,true);assert.equal(result.x,55);assert.equal(result.y,245);
+ bodyContain="layout";
+ assert.equal(resolveScriptTarget({selector:"#target"},"contained-body").ok,false);
+ bodyContain="none";rootOverflow="hidden";bodyOverflow="visible";
+ result=resolveScriptTarget({selector:"#target"},"root-overflow");
+ assert.equal(result.ok,true);assert.equal(result.x,55);assert.equal(result.y,245);
+ bodyOverflow="hidden";
+ assert.equal(resolveScriptTarget({selector:"#target"},"body-not-propagated").ok,false);
+});

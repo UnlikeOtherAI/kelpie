@@ -85,7 +85,7 @@ closing any requirement.
 
 ## Current scope supplement — 2026-11-05
 
-Integration source `1d4008bc` contains the current shared contract and
+Integration source `e36af009` contains the current shared contract and
 platform adapter changes. Earlier rows and platform receipts preserve failures
 at their own revisions. The following are scoped checkpoints, not platform,
 nine-runtime or 432-cell acceptance.
@@ -109,10 +109,13 @@ nine-runtime or 432-cell acceptance.
 - **Linux:** product `0c8526b8` with tests `692841e1` passed 54 native
   CDP cases and supplements; independent decoding covered 44 artifacts and
   126 frames. This is not dense G08, package, flavor or release acceptance.
-  GIF model `991ffed9` has matching media object/library identities and
-  retained-marker controls, but the actual pre-overlay backing ROI was not
-  observed. Its test-only model remains insufficient and unwired; a palette
-  collision demonstrates encoded-visible limits. MP4 has no relaxed rule.
+  The test-only instrumented `4cc334ac` capture subsequently observed
+  opaque-white backing for every mapped GIF frame. The integrated `e36af009`
+  oracle passed C and S GIF dense fits with model tail confidence limited to
+  encoded-visible pixels (19 motion and 26 marker samples each; 211 and 214
+  dropped frames). Both MP4 cases remain insufficient. The model's
+  positive-alpha palette collision prevents any physical-zero-alpha claim;
+  this instrumented result is not a production-binary or complete G08 pass.
 - **Windows:** two latest native runs each passed 53 of 54 cases, with
   different failures; investigate and retain both receipts. Earlier G08
   export passes and observed native spatial/Stop evidence are scoped to their
