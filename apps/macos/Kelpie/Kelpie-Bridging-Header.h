@@ -11,6 +11,7 @@
 #import "kelpie/viewport_presets_c_api.h"
 
 #include "kelpie/script_presentation.h"
+#include "kelpie/script_redaction.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/mcp_c_api.h"
 
