@@ -66,6 +66,7 @@ final class WorkflowLoopbackPage {
         if(location.pathname.startsWith('/paced')){
           const field=document.querySelector('#entry'), events=[];
           field.value='seed';
+          if(location.pathname==='/paced-readonly')field.readOnly=true;
           const report=()=>{document.title=JSON.stringify(events)};
           field.oninput=e=>{
             events.push({data:e.data,value:field.value,at:performance.now()});

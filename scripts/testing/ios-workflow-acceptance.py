@@ -66,6 +66,7 @@ def selection(scope):
                 "testPacedLostFinalCallbackProtectsLiteralWithoutCapture",
                 "testPacedLostFinalCallbackDiscardsCapture",
                 "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",
+                "testPacedEmptyTypeRejectsButtonAndReadonlyTargets",
             ])
         targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}

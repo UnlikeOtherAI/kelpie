@@ -71,6 +71,29 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testPacedEmptyTypeRejectsButtonAndReadonlyTargets() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let origin = "http://127.0.0.1:\(port)"
+        for (path, selector) in [("/paced", "button"), ("/paced-readonly", "#entry")] {
+            let result = try await probe.request("/v1/play-script", [
+                "version": 1, "tabId": tab, "actions": [
+                    ["action": "navigate", "url": origin + path],
+                    ["action": "type", "target": ["selector": selector], "text": "", "typingDelayMs": 120]
+                ], "capture": ["formats": ["screenshots"]]
+            ])
+            XCTAssertEqual((result["error"] as? Body)?["code"] as? String, "TARGET_NOT_EDITABLE")
+            XCTAssertEqual(result["actionsExecuted"] as? Int, 1)
+            XCTAssertNotEqual(result["mayHaveCompleted"] as? Bool, true)
+            let observed = try await probe.request("/v1/play-script", [
+                "version": 1, "tabId": tab, "actions": [["action": "output", "source": "title", "name": "title"]]
+            ])
+            XCTAssertEqual((observed["outputs"] as? Body)?["title"] as? String, "Count 0")
+        }
+    }
+
+    @MainActor
     func testPacedAcknowledgedFinalNavigationCompletesAndRedacts() async throws {
         try await pacedFinalNavigation(capture: false)
     }

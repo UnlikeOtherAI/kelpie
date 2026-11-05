@@ -148,9 +148,11 @@ final class IOSWorkflowActions {
         }
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         if let plan, !plan.clearFirst, plan.scalars.isEmpty {
-            try requireOK(try await tab.target(
+            let preflight = try await tab.target(
                 target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
-            ))
+            )
+            try requireOK(preflight)
+            guard preflight["editable"] as? Bool == true else { throw IOSWorkflowFailure("TARGET_NOT_EDITABLE") }
             try await check()
             guard tab.document == document, viewport == (try await tab.viewport()) else {
                 throw IOSWorkflowFailure("STALE_TARGET")
