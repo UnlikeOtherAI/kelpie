@@ -7,6 +7,7 @@ import {runSafety} from "./runtime-safety.mjs";
 import {runG08} from "./runtime-g08.mjs";
 import {runPaced} from "./runtime-paced.mjs";
 import {runRetiree} from "./runtime-retiree.mjs";
+import {runNonimmersive} from "./runtime-nonimmersive.mjs";
 import {runPumpControls} from "./runtime-pump-control.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
@@ -106,6 +107,7 @@ export async function runEngine(client,fixture,engine,report,scope="full",pumpCo
  if(scope==="cef-timing"){
   requireTrue(engine==="chromium","FOCUSED_RENDERER");
   await runRetiree({client,engine,base,capture,check,load,report});
+  await runNonimmersive({client,engine,base,capture,check,load,play});
   await runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure:true});
   await runDefaultMotion({client,fixture,engine,base,capture,check,load});
   if(pumpComparison)await runPumpControls({client,fixture,base,capture,check,load,play});
@@ -158,6 +160,7 @@ export async function runEngine(client,fixture,engine,report,scope="full",pumpCo
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
  await runRetiree({client,engine,base,capture,check,load,report});
+ await runNonimmersive({client,engine,base,capture,check,load,play});
  await runPaced({client,fixture,engine,base,capture,check,load,play});
  await load();
  await check("observation-and-readiness-public-entry",async()=>{

@@ -3,7 +3,7 @@ import SwiftUI
 extension BrowserView {
     var chromeUnderlap: CGFloat {
         guard #available(macOS 26.0, *), rendererState.activeEngine == .webkit,
-              viewportState.mode == .full, !serverState.isScriptRecording,
+              viewportState.mode == .full, !serverState.isScriptImmersive,
               tabStore.activeTab?.isStartPage != true else { return 0 }
         return BrowserChromeLayout.underlap(collapsed: isChromeCollapsed, hasBookmarks: !bookmarkStore.nodes.isEmpty)
     }
@@ -46,6 +46,7 @@ extension BrowserView {
             }
         }
         .frame(height: 32)
+        .disabled(serverState.isScriptRecording)
         .background(BrowserChromeStyle.tabs)
 
         .zIndex(2)
