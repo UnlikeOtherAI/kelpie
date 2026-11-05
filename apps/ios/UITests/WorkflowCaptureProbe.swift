@@ -81,8 +81,20 @@ final class WorkflowCaptureProbe {
 
     enum ProbeError: Error { case invalidChunk, pairing, listener }
 
-    static func containsMarker(_ image: CGImage) -> Bool {
-        let width = 200
+    static func containsTargetMarker(_ screen: XCUIScreenshot, visibleTarget: CGRect, app: CGRect) -> Bool {
+        guard !visibleTarget.isEmpty, !app.isEmpty, let image = screen.image.cgImage else { return false }
+        let xScale = CGFloat(image.width) / app.width
+        let yScale = CGFloat(image.height) / app.height
+        let radius = min(12, visibleTarget.width / 3, visibleTarget.height / 3)
+        let crop = CGRect(x: (visibleTarget.midX - app.minX - radius) * xScale,
+                          y: (visibleTarget.midY - app.minY - radius) * yScale,
+                          width: radius * 2 * xScale, height: radius * 2 * yScale)
+        guard let center = image.cropping(to: crop.integral) else { return false }
+        return containsMarker(center, minimumCoverage: 0.12)
+    }
+
+    static func containsMarker(_ image: CGImage, minimumCoverage: Double = 0) -> Bool {
+        let width = min(200, image.width)
         let height = max(1, width * image.height / image.width)
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         return pixels.withUnsafeMutableBytes { raw in
@@ -90,8 +102,22 @@ final class WorkflowCaptureProbe {
                                       bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
             ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            for index in stride(from: 0, to: raw.count, by: 4) {
-                if raw[index + 1] > 155, raw[index] < 90, raw[index + 2] < 95 { return true }
+            func green(_ pixel: Int) -> Bool {
+                let index = 4 * pixel
+                return raw[index + 1] > 155 && raw[index] < 90 && raw[index + 2] < 95
+            }
+            guard width >= 3, height >= 3 else { return false }
+            if minimumCoverage > 0 {
+                let count = (0..<(width * height)).reduce(0) { $0 + (green($1) ? 1 : 0) }
+                guard Double(count) >= minimumCoverage * Double(width * height) else { return false }
+            }
+            for y in 1..<(height - 1) {
+                for x in 1..<(width - 1) where green(y * width + x) {
+                    let center = y * width + x
+                    if [-width, 0, width].allSatisfy({ line in
+                        [-1, 0, 1].allSatisfy { green(center + line + $0) }
+                    }) { return true }
+                }
             }
             return false
         }

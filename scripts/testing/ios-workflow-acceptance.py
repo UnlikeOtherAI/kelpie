@@ -65,6 +65,39 @@ def runner_config(nonce):
     return config, ui["TestHostBundleIdentifier"]
 
 
+def terminate_owned(udid, bundle, pins):
+    installed = subprocess.run(["xcrun", "simctl", "get_app_container", udid, bundle, "app"],
+                               capture_output=True, text=True, timeout=20)
+    if installed.returncode:
+        return "absent"
+    root = Path(installed.stdout.strip())
+    if not pins or not all((root / name).is_file() and digest(root / name) == value for name, value in pins.items()):
+        raise RuntimeError("Refusing to terminate a bundle whose build hashes differ")
+    result = subprocess.run(["xcrun", "simctl", "terminate", udid, bundle], capture_output=True, text=True, timeout=20)
+    if result.returncode == 0:
+        return "terminated"
+    if "nothing to terminate" in result.stderr.lower() or "not running" in result.stderr.lower():
+        return "already stopped"
+    raise RuntimeError("Could not confirm termination of the pinned bundle")
+
+
+def failure_diagnostics(log_path, destination):
+    if not log_path.exists():
+        return
+    lines = []
+    with log_path.open(errors="replace") as log:
+        for line in log:
+            if not re.search(r"\berror:|Test Case .*failed|Test Suite .*failed|\*\* TEST .*FAILED|timed out", line, re.I):
+                continue
+            line = re.sub(r"(?i)(bearer\s+)\S+", r"\1[redacted]", line)
+            line = re.sub(r"(?i)([\"']?(?:access_token|token|password|authorization)[\"']?\s*[:=]\s*)[^\s,}]+",
+                          r"\1[redacted]", line)
+            lines.append(line.strip()[:600])
+            if len(lines) >= 100:
+                break
+    destination.write_text("\n".join(lines) + "\n")
+
+
 def run_device(device, product_hashes):
     udid = device["udid"]
     folder = EVIDENCE / device["family"]
@@ -74,6 +107,10 @@ def run_device(device, product_hashes):
     result = folder / "workflow.xcresult"
     started_here = device["state"] != "Booted"
     process = None
+    log_path = folder.parent.parent / (device["family"] + "-workflow-xcode.log")
+    runner_product = PRODUCTS / "Debug-iphonesimulator/KelpieUITests-Runner.app"
+    test_binary = "PlugIns/KelpieUITests.xctest/KelpieUITests"
+    runner_pins = {test_binary: digest(runner_product / test_binary)}
     try:
         if started_here:
             command("xcrun", "simctl", "boot", udid, timeout=120)
@@ -86,7 +123,7 @@ def run_device(device, product_hashes):
         cli_error = None
         cli_started = False
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
-        with (folder.parent.parent / (device["family"] + "-workflow-xcode.log")).open("w") as log:
+        with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 24 * 60
             while process.poll() is None and time.monotonic() < deadline:
@@ -127,11 +164,24 @@ def run_device(device, product_hashes):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=10)
+        cleanup = {}
+        for bundle, pins in [(runner, runner_pins), (BUNDLE, product_hashes)]:
+            try:
+                cleanup[bundle] = terminate_owned(udid, bundle, pins)
+            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+                cleanup[bundle] = "unconfirmed: " + str(error)[:150]
+        if started_here:
+            stopped = subprocess.run(["xcrun", "simctl", "shutdown", udid], capture_output=True, timeout=90)
+            cleanup["simulator"] = "shutdown requested" if stopped.returncode == 0 else "unconfirmed: shutdown refused"
+        else:
+            cleanup["simulator"] = "preserved initial boot state"
+        (folder / "cleanup.json").write_text(json.dumps(cleanup, indent=2))
+        failure_diagnostics(log_path, folder / "diagnostics.txt")
         if result.is_dir():
             subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
                             "--output-path", str(folder / "attachments")], check=False, timeout=120)
-        if started_here:
-            subprocess.run(["xcrun", "simctl", "shutdown", udid], check=False, timeout=90)
+        if any(value.startswith("unconfirmed") for value in cleanup.values()):
+            raise RuntimeError("Device app cleanup could not be confirmed; see cleanup report")
 
 
 def main():
@@ -162,6 +212,13 @@ def main():
             report["outcomes"][device["family"]] = {"passed": False, "error": str(error)[:512]}
         path.write_text(json.dumps(report, indent=2))
         print(device["family"], json.dumps(report["outcomes"][device["family"]]), flush=True)
+        cleanup_file = EVIDENCE / device["family"] / "cleanup.json"
+        cleanup = json.loads(cleanup_file.read_text()) if cleanup_file.is_file() else {}
+        if not cleanup or any(value.startswith("unconfirmed") for value in cleanup.values()):
+            for other in devices:
+                report["outcomes"].setdefault(other["family"], {"passed": False, "error": "Prior device cleanup unconfirmed"})
+            path.write_text(json.dumps(report, indent=2))
+            break
     return int(not all(value["passed"] for value in report["outcomes"].values()))
 
 
