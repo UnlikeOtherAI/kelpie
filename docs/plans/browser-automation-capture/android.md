@@ -242,3 +242,45 @@ not replayed yet. Verified copies under packages/emulator-2:
 
 - app-debug.apk SHA-256 34fed03d6a3f6ac28a39239a4b9006d8c2e32bdc73ad0e1f3fc9f9b5c00b4126
 - app-debug-androidTest.apk SHA-256 3e7afbd84d575552cfd8005e464b86a8739b03ad0631e112f3d0231725866529
+Phone replay2: source80e7f7cd, same phone profile/serial and emulator-2 APKs.
+Twelve instrumentation tests ran: ten passed, two failed
+(phone-instrumentation-2.log,43.677s). Passing cases include the bounded first AVC
+input, padded78x50 RGB decode, movie deadline interruption before a later click,
+combined PNG/GIF/MP4 exports, private ready/extract and direct/generic MCP.
+Raw exports are preserved in phone-evidence-2 and phone-codec-evidence-2.
+
+One failure retained an absolute-href assertion despite the documented raw-href
+contract; the multiline fixture assertion is now corrected. The Stop failure
+reported VIEWPORT_CHANGED. Native screenshot inspection found the Compose test
+clock had not committed the approved pairing dialog or recording chrome before
+the test clicked Stop. That click drove pending layout and changed the viewport.
+Tests now wait for pairing-dialog removal and native recording semantics before
+status polling or Stop. The forensic screenshot is not accepted final UI evidence.
+No viewport guard was weakened. Both corrections await replay. The phone emulator
+was shut down normally, preserving data; tablet remains unbooted.
+
+Pending source regressions additionally cover screenshots-only maxDuration during
+a wait followed by an unexecuted click; same-document private target token
+retirement; semantic fill/type; ambiguous/disabled/covered targets; mixed HTTP,
+direct MCP and generic MCP artifact chunks; and generic MCP abort/recovery.
+A single private resolver namespace replaces per-run page properties: each action
+starts with a fresh no-token resolution and dispatches only its returned token,
+under existing serialized renderer retirement.
+
+Hosted Android CI41950362604 at28426edc failed testReleaseUnitTest:
+OpenAIEndpointServiceTest.cancelReturnsInferenceCancelled,176 tests/one failure.
+Debug JVM and shipping ARM64/x86_64 native graph tasks completed in that run;
+the required overall check failed. The eager coroutine can enter the transport
+before cancellation registration. A deterministic unconfined-transport regression
+and queued/cancelled-scope lifecycle cases are staged. The fix and public local
+endpoint cancel/retirement/recovery test still require execution. No CI rerun or
+successful final-revision claim is implied.
+Inference lifecycle checkpoint: the old-ordering deterministic case failed exactly
+expected1/actual0 at transport entry (4m4s); inference-old-ordering.log and XML
+are preserved independently of Gradle's reports. The lazy-register-before-start
+fix passed ktlintFormat plus focused Debug19/19 and Release19/19 tests in4m10s
+(inference-lifecycle-fixed.log). Cases include transport-entry cancellation,
+queued-before-start cancellation, already-cancelled scope and worker cleanup.
+The run used one worker, in-process Kotlin,2GiB heap/two logical processors,
+without native/package/emulator jobs. Public device cancellation/recovery remains
+pending; this result does not replace the failed hosted CI or final full checks.

@@ -363,4 +363,28 @@ class OpenAIEndpointServiceTest {
         assertEquals(false, stored.toolCalling.value)
         assertEquals("test", stored.toolCalling.source)
     }
+
+    @Test
+    fun cancellationAtTransportEntrySeesRegisteredInference() {
+        val endpoint = save()
+        runBlocking { service.activate(endpoint.id, null) }
+        lateinit var inference: OpenAIInference
+        val hanging =
+            FakeTransport {
+                assertEquals("Transport must never execute before cancellation registration", 1, inference.cancelAll())
+                FakeResponse(hang = true)
+            }
+        val hangingService = OpenAIEndpointService(store, OpenAIClient(hanging), backend)
+        inference = OpenAIInference(hangingService, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
+        val result =
+            runBlocking {
+                withTimeout(5_000) {
+                    inference.infer(InferRequest.fromBody(mapOf("prompt" to "x", "text" to "y")), { _, _ -> emptyMap() }) { null }
+                }
+            }
+        assertEquals(OpenAIErrorCode.INFERENCE_CANCELLED, (result["error"] as Map<*, *>)["code"])
+        assertTrue(hanging.cancelled)
+        assertEquals(0, hangingService.inFlightCount(endpoint.id))
+        assertEquals(0, inference.cancelAll())
+    }
 }
