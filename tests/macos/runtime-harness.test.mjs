@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -211,4 +211,13 @@ test("capture coherence diagnostics accept only fixed sample and change labels",
  assert.deepEqual(captureCoherenceSignal("[WorkflowCaptureCoherence] sample=movie change=document"),{sample:"movie",change:"document"});
  assert.equal(captureCoherenceSignal("[WorkflowCaptureCoherence] sample=private change=document"),null);
  assert.equal(captureCoherenceSignal("[WorkflowCaptureCoherence] sample=movie change=private"),null);
+});
+
+test("timing diagnostics accept only bounded numeric fixed labels",()=>{
+ assert.deepEqual(captureTimingSignal("[WorkflowCaptureTiming] sample=movie engine=chromium ms=1,2,3,4,5"),
+  {sample:"movie",engine:"chromium",stagesMs:[1,2,3,4,5]});
+ assert.equal(captureTimingSignal("[WorkflowCaptureTiming] sample=movie engine=chromium ms=1,2,private,4,5"),null);
+ assert.deepEqual(pointerTimingSignal("[WorkflowPointerTiming] engine=chromium elapsed=350 updates=20 updateGap=20 draws=18 drawGap=24 complete=1"),
+  {engine:"chromium",elapsedMs:350,updates:20,maxUpdateGapMs:20,draws:18,maxDrawGapMs:24,completed:true});
+ assert.equal(pointerTimingSignal("[WorkflowPointerTiming] engine=private elapsed=350 updates=20 updateGap=20 draws=18 drawGap=24 complete=1"),null);
 });
