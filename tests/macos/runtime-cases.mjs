@@ -28,7 +28,11 @@ export async function runEngine(client,fixture,engine,report) {
  const tabId=engine==="chromium"?"chromium":(entries.find(t=>t.active||t.isActive)??entries[0]).id;
  const base={version:1,tabId,defaultWaitBetweenActions:0,tapIndicator:{color:"#F54242",radius:25,durationMs:700,wobble:true,fade:true}};
  const play=actions=>client.api("play-script",{...base,actions});
- async function load(route="/"){const begin=fixture.events.length;const result=await play([{action:"navigate",url:fixture.url+route},{action:"wait-ready",state:"complete",timeoutMs:10000}]);requireTrue(result.success,"FIXTURE_NAVIGATION");await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="document"&&e.path===route));}
+ async function load(route="/"){const begin=fixture.events.length;const result=await play([{action:"navigate",url:fixture.url+route},{action:"wait-ready",state:"complete",timeoutMs:10000}]);if(!result.success){
+  const allowed=new Set(["UNAUTHORIZED","INVALID_SCRIPT","BUSY","RECORDING_IN_PROGRESS","TAB_NOT_FOUND","TAB_NOT_ACTIVE","TAB_NOT_VISIBLE","TAB_CHANGED","RENDERER_CHANGED","SCRIPT_RENDERER_UNSUPPORTED","NAVIGATION_FAILED","TIMEOUT","WEBVIEW_ERROR","DOCUMENT_CHANGED","OBSERVATION_FAILED","CAPTURE_VIEWPORT_UNSTABLE","SCRIPT_ABORTED"]);
+  const code=allowed.has(result.error?.code)?result.error.code:"UNCLASSIFIED";
+  (report.fixtureNavigationFailures??=[]).push({engine,code,hasRunId:typeof result.runId==="string",mayHaveCompleted:result.mayHaveCompleted===true});
+ }requireTrue(result.success,"FIXTURE_NAVIGATION");await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="document"&&e.path===route));}
  await check("strict-capability",async()=>{
   const direct=await client.api("get-script-status");
   const generic=await client.direct("kelpie_get_script_status",{},true);
