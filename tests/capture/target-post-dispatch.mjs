@@ -31,7 +31,8 @@ try{
   const args=action==="click"?[{selector},"post-dispatch",first.token,true,undefined,false,{refuseSensitive:capture}]:
     [{selector},"post-dispatch",first.token,false,{action:"fill",text:"SYNTHETIC_POST_INPUT"},false,{refuseSensitive:capture}];
   const result=await call(args);
-  assert.equal(result.ok,false);assert.equal(result.error,"INPUT_UNCERTAIN");
+  assert.equal(result.ok,action==="click" || !capture);
+  if(action==="input" && capture)assert.equal(result.error,"SENSITIVE_CAPTURE_REFUSED");
   assert.equal(result.mayHaveCompleted,true);assert.equal(result.sensitivityKnown,true);
   assert.equal(result.sensitive,action==="input");
   assert.equal(await page.evaluate(()=>window.eventCount),1);

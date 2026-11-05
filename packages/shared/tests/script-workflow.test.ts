@@ -45,6 +45,12 @@ describe("strict authored workflows", () => {
     expect(scriptArtifactRequestSchema.parse({ runId: "run", artifactId: "gif" })).toMatchObject({ offset: 0, length: 262144 });
     for (const length of [0, -1, 1.5, 1048577]) expect(scriptArtifactRequestSchema.safeParse({ runId: "r", artifactId: "a", length }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ target: { x: 5, y: 10 }, key: "private", dispatch: true, edit: { action: "fill", text: "x" } }).success).toBe(false);
+    const post = { target: { selector: "#edit" }, key: "private", token: "t1", postMutation: true };
+    expect(scriptTargetRequestSchema.safeParse(post).success).toBe(true);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, token: undefined }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, dispatch: true }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, observe: true }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, edit: { action: "fill", text: "x" } }).success).toBe(false);
   });
 });
 describe("deterministic presentation", () => {

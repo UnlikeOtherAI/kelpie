@@ -237,8 +237,13 @@ void ScriptAssets() {
   target["policy"] = {{"refuseSensitive", true}};
   encoded = kelpie_browser_script_target_expression(target.dump().c_str());
   assert(encoded);
-  assert(json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true}))json") != std::string::npos);
+  assert(json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},false))json") != std::string::npos);
   kelpie_mcp_free_string(encoded);
+  target["token"] = "t1"; target["postMutation"] = true;
+  encoded = kelpie_browser_script_target_expression(target.dump().c_str());
+  assert(encoded && json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true},true))json") != std::string::npos);
+  kelpie_mcp_free_string(encoded);
+  target.erase("postMutation");
   target["observe"] = true; target["dispatch"] = true;
   assert(kelpie_browser_script_target_expression(target.dump().c_str()) == nullptr);
   encoded = kelpie_browser_validate_script(nullptr);
