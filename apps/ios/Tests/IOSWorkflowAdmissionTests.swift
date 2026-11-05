@@ -1,3 +1,4 @@
+import UIKit
 import WebKit
 import XCTest
 @testable import Kelpie
@@ -14,6 +15,93 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         XCTAssertThrowsError(try IOSBoundWorkflow(body), line: line) {
             XCTAssertEqual(($0 as? IOSWorkflowFailure)?.code, code, line: line)
         }
+    }
+
+    @MainActor
+    func testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles() throws {
+        let manager = FileManager.default
+        let base = manager.temporaryDirectory.appendingPathComponent("ios-capture-cleanup-" + UUID().uuidString)
+        let real = base.appendingPathComponent("real")
+        let alias = base.appendingPathComponent("alias")
+        let directory = real.appendingPathComponent("run")
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: base) }
+        try manager.createSymbolicLink(at: alias, withDestinationURL: real)
+        let retained = alias.appendingPathComponent("run/retained.png")
+        let discarded = directory.appendingPathComponent("unpublished.png")
+        let bytes = Data([1, 3, 5, 7])
+        try bytes.write(to: retained)
+        try Data([2, 4]).write(to: discarded)
+        let entries = try manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        XCTAssertFalse(entries.contains(retained), "The test must use different path spellings")
+        let run = UUID().uuidString
+        let manifest = try ScriptArtifactStore.shared.add(url: retained, runID: run, mimeType: "image/png", owner: "owner")
+        let id = try XCTUnwrap(manifest["id"] as? String)
+        let request: Body = ["runId": run, "artifactId": id, "offset": 0, "length": 4]
+
+        IOSCaptureCleanup.prune(directory: directory, retaining: [retained])
+        let owned = ScriptArtifactStore.shared.read(request, owner: "owner")
+        XCTAssertEqual(owned["data"] as? String, bytes.base64EncodedString())
+        XCTAssertEqual((ScriptArtifactStore.shared.read(request, owner: "foreign")["error"] as? Body)?["code"] as? String,
+                       "ARTIFACT_NOT_FOUND")
+        XCTAssertFalse(manager.fileExists(atPath: discarded.path))
+
+        // Privacy discard publishes no files: the retained set is empty.
+        IOSCaptureCleanup.prune(directory: directory, retaining: [])
+        XCTAssertFalse(manager.fileExists(atPath: directory.path))
+        XCTAssertEqual((ScriptArtifactStore.shared.read(request, owner: "owner")["error"] as? Body)?["code"] as? String,
+                       "ARTIFACT_READ_FAILED")
+    }
+
+    @MainActor
+    func testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed() async throws {
+        let context = HandlerContext()
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        let container = UIView(frame: view.frame)
+        container.addSubview(view)
+        let tab = BrowserTab(webView: view, recordsHistory: false)
+        let store = TabStore(isolatedTab: tab)
+        context.webView = view
+        context.tabStore = store
+        let router = Router()
+        let playback = ScriptPlaybackState()
+        router.handlerContext = context
+        router.scriptPlaybackState = playback
+        MobileTabHandler(context: context).register(on: router)
+        view.loadHTMLString("<body><p id='fixture'>workflow read ready</p></body>", baseURL: nil)
+        defer { view.stopLoading(); withExtendedLifetime(container) {} }
+        let deadline = Date().addingTimeInterval(10)
+        var loaded = false
+        repeat {
+            loaded = (try? await BrowserControlWebKit.evaluate("document.body?.textContent", in: view) as? String) == "workflow read ready"
+            if !loaded { try await Task.sleep(nanoseconds: 50_000_000) }
+        } while !loaded && Date() < deadline
+        XCTAssertTrue(loaded)
+        guard loaded else { return }
+        XCTAssertTrue(playback.start(totalActions: 1, continueOnError: false))
+        defer { _ = playback.finishSuccess() }
+
+        let blocked = await router.handle(method: "get-tabs", body: [:], browserGatewayDispatch: true).json
+        XCTAssertEqual((blocked["error"] as? Body)?["code"] as? String, "RECORDING_IN_PROGRESS")
+        let request: Body = ["version": 1, "method": "tab.ready", "tabId": tab.id.uuidString,
+                             "params": ["state": "complete", "selector": "#fixture"]]
+        let unscoped = await router.browserControl(request)
+        XCTAssertEqual((unscoped["error"] as? Body)?["code"] as? String, "COMMAND_FAILED")
+
+        let ready = await router.workflowRead(method: "tab.ready", tabID: tab.id.uuidString,
+                                              params: ["state": "complete", "selector": "#fixture"])
+        XCTAssertEqual(ready["ok"] as? Bool, true)
+        XCTAssertEqual((ready["value"] as? Body)?["ready"] as? Bool, true)
+        let extracted = await router.workflowRead(method: "tab.extract", tabID: tab.id.uuidString,
+                                                  params: ["fields": [["name": "text", "selector": "#fixture", "source": "text"]]])
+        let value = try XCTUnwrap(extracted["value"] as? Body)
+        let fields = try XCTUnwrap(value["fields"] as? [Body])
+        XCTAssertEqual(fields.first?["values"] as? [String], ["workflow read ready"])
+        let denied = await router.workflowRead(method: "tab.click", tabID: tab.id.uuidString, params: [:])
+        XCTAssertEqual((denied["error"] as? Body)?["code"] as? String, "UNSUPPORTED")
+        let stillBlocked = await router.handle(method: "get-tabs", body: [:], browserGatewayDispatch: true).json
+        XCTAssertEqual((stillBlocked["error"] as? Body)?["code"] as? String, "RECORDING_IN_PROGRESS")
+        withExtendedLifetime(store) {}
     }
 
     func testFullPreflightRejectsForeignSessionsAndUnsupportedKeyAfterTap() throws {

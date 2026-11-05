@@ -103,9 +103,7 @@ final class IOSWorkflowMedia {
         var retained: Set<URL> = []
         defer {
             for directory in [output.directory, scratch.directory] {
-                let entries = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-                for entry in entries where !retained.contains(entry) { try? FileManager.default.removeItem(at: entry) }
-                if entries.allSatisfy({ !retained.contains($0) }) { try? FileManager.default.removeItem(at: directory) }
+                IOSCaptureCleanup.prune(directory: directory, retaining: retained)
             }
         }
         output.reserveFooter(0)

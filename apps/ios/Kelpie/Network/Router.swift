@@ -5,6 +5,7 @@ typealias RouteHandler = @MainActor @Sendable ([String: Any]) async -> [String: 
 
 /// Maps POST /v1/{method} paths to handler functions.
 final class Router: @unchecked Sendable {
+    @TaskLocal private static var workflowObservation = false
     weak var browserReferenceOwner: Router?
     private var routes: [String: RouteHandler] = [:]
     var handlerContext: HandlerContext?
@@ -61,7 +62,8 @@ final class Router: @unchecked Sendable {
                 "error": ["code": "NOT_FOUND", "message": "Unknown method: \(method)"]
             ])
         }
-        if !bypassRecordingGate, let gateError = scriptPlaybackState?.recordingError(for: method) {
+        let internalInspection = browserGatewayDispatch && method == "get-tabs" && Self.workflowObservation
+        if !bypassRecordingGate, !internalInspection, let gateError = scriptPlaybackState?.recordingError(for: method) {
             return (409, gateError)
         }
         let result = await dispatch(handler, method: method, body: body, browserGatewayDispatch: browserGatewayDispatch)
@@ -100,6 +102,17 @@ final class Router: @unchecked Sendable {
             return errorResponse(code: "NO_WEBVIEW", message: "No active browser tab")
         }
         return await context.withBrowserTarget(view) { await handler(body) }
+    }
+
+    /// Only workflow-owned fixed reads may inspect the selected tab while playback holds the recording gate.
+    @MainActor
+    func workflowRead(method: String, tabID: String, params: [String: Any]) async -> [String: Any] {
+        guard ["tab.ready", "tab.extract"].contains(method) else {
+            return errorResponse(code: "UNSUPPORTED", message: "Workflow observation method is unavailable")
+        }
+        return await Self.$workflowObservation.withValue(true) {
+            await browserControl(["version": 1, "method": method, "tabId": tabID, "params": params])
+        }
     }
 
     func registerFallbacks() {
