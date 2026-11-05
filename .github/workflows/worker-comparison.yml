@@ -3,6 +3,13 @@ name: Opt-in same-host worker comparison
 on:
   workflow_dispatch:
     inputs:
+      runner_label:
+        description: Hosted runner (22.04 allowed only for sandbox smoke)
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-22.04
+        default: ubuntu-24.04
       sandbox_only:
         type: boolean
         default: false
@@ -23,6 +30,9 @@ on:
         default: ""
   workflow_call:
     inputs:
+      runner_label:
+        type: string
+        default: ubuntu-24.04
       sandbox_only:
         type: boolean
         default: false
@@ -49,13 +59,24 @@ concurrency:
 jobs:
   compare:
     name: Restricted same-host reader comparison
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner_label == 'ubuntu-22.04' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
     timeout-minutes: 25
     env:
       PREPARE_ONLY: ${{ inputs.prepare_only }}
+      REQUESTED_RUNNER: ${{ inputs.runner_label }}
+      SANDBOX_ONLY: ${{ inputs.sandbox_only }}
+      ISOLATION_ONLY: ${{ inputs.isolation_only }}
       CHROMIUM_ARCHIVE_SHA256: ${{ inputs.chromium_archive_sha256 }}
       CHROMIUM_BINARY_SHA256: ${{ inputs.chromium_binary_sha256 }}
     steps:
+      - name: Validate hosted runner choice
+        shell: bash
+        run: |
+          case "$REQUESTED_RUNNER" in
+            ubuntu-24.04) ;;
+            ubuntu-22.04) [[ "$SANDBOX_ONLY" == true && "$ISOLATION_ONLY" == false ]] || exit 1 ;;
+            *) exit 1 ;;
+          esac
       - uses: actions/checkout@v6.0.3
         with:
           persist-credentials: false
