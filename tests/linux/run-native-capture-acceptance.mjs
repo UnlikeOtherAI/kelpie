@@ -7,6 +7,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { control, waitFor } from "../windows/lib/http.mjs";
+import { runFinalizeFault } from "./finalize-fault.mjs";
 import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
 
 
@@ -83,6 +84,8 @@ try {
   await writeFile(join(output, "media-input.json"), JSON.stringify(media, null, 2));
   assert.equal(result.code, 0, result.stderr || result.stdout);
   assert.ok(report.checks.length > 0 && report.checks.every(check => check.passed));
+  if (process.env.KELPIE_LINUX_FINALIZE_FAULT === "1")
+    report.finalizeFault = await runFinalizeFault(readiness, runtime, output);
 } finally {
   try {
     if (browser.child.exitCode === null && browser.child.signalCode === null)

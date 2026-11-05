@@ -78,6 +78,7 @@ std::vector<ScriptMediaOutput> ScriptMediaEncoder::Finish(double terminal_elapse
     try {
       auto output = writer->Finish();
       if (output.frame_count) state.outputs.push_back(std::move(output));
+      else state.failed = true; // A requested movie format cannot silently be empty.
     } catch (...) { state.failed = true; }
   }
   state.finished = true; return state.outputs;

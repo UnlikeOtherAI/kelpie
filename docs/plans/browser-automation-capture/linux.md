@@ -301,3 +301,20 @@ not browser state. The next run must prove clean launcher exit.
 A separate decoded-pixel check now crops the actual trusted target's coordinates
 and checks the requested red marker, its center and disappearance in final movie
 frames. Its source is complete; pixel success remains pending actual execution.
+
+## Finalization failure candidate and release graph
+
+The next native checkpoint refuses a nominally successful capture missing any
+requested artifact family. A requested movie that finalizes empty is a failure.
+Permanent focused tests inject a collision after both writers have retained a
+picture, verify the GIF sibling remains decodable, and reject empty movie output.
+The public Linux supplement injects that collision only in its own0700 synthetic
+capture directory after observing the trusted click (therefore after movie ACK),
+then checks failed run/status, partial downloadable GIF and next-run recovery.
+These new failure assertions are source-complete, not yet executed.
+
+Root-approved release source15d2ae3c adds official distro native capture headers/
+plugins, actual factory and native codec-test gates, explicit linked GIF ABI,
+system-codec provenance and truthful AppImage requirements. Fedora44 replaces
+the EOL40 build row; Ubuntu22 remains. Distro-container build/package execution
+is pending. No codec binary, third-party repository or privileged helper is added.
