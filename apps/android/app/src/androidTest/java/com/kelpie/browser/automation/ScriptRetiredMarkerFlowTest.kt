@@ -60,10 +60,11 @@ class ScriptRetiredMarkerFlowTest : ScriptPublicFixture() {
                     } finally {
                         executor.shutdownNow()
                     }
+                File(evidence, "retired-marker-play-result.json").writeText(result.toString(2))
                 assertTrue(result.toString(), result.getBoolean("success"))
                 assertEquals("completed", result.getString("state"))
                 assertFalse(client.call("get-script-status").optBoolean("playing"))
-                val geometry = readSubmitGeometry(client)
+                val geometry = readSubmitGeometry(client, "/next")
                 val screen = captureBlueMarker(client, geometry)
 
                 File(evidence, "native-retired-navigation-marker.png").outputStream().use {

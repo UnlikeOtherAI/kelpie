@@ -154,7 +154,7 @@ abstract class ScriptPublicFixture {
     ): Bitmap {
         // Recording can resize the WebView; measure the same fixture after admission.
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
-        val currentGeometry = readSubmitGeometry(owned)
+        val currentGeometry = readSubmitGeometry(owned, geometry.getString("href"))
         assertEquals(geometry.getString("href"), currentGeometry.getString("href"))
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
@@ -287,16 +287,27 @@ abstract class ScriptPublicFixture {
         offsetLeft:v.offsetLeft,offsetTop:v.offsetTop,width:v.width,height:v.height,href:location.href};})()"""
 
     /** Resolve the single fixture button independently of the marker renderer. */
-    protected fun readSubmitGeometry(client: ScriptHttpFixture): JSONObject {
+    protected fun readSubmitGeometry(
+        client: ScriptHttpFixture,
+        expectedPath: String = "/fixture",
+    ): JSONObject {
         val geometry = client.call("evaluate", JSONObject().put("expression", submitGeometryExpression)).getJSONObject("result")
-        assertTrue(geometry.getString("href").contains("/fixture"))
+        assertEquals(
+            expectedPath,
+            android.net.Uri
+                .parse(geometry.getString("href"))
+                .path,
+        )
         assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
         assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
         return geometry
     }
 
     /** Read-only fixture probe bypasses the gateway's intentional recording lock. */
-    private fun readSubmitGeometry(view: android.webkit.WebView): JSONObject {
+    private fun readSubmitGeometry(
+        view: android.webkit.WebView,
+        expectedHref: String,
+    ): JSONObject {
         val value =
             java.util.concurrent.atomic
                 .AtomicReference<String>()
@@ -310,7 +321,7 @@ abstract class ScriptPublicFixture {
         }
         check(done.await(3, java.util.concurrent.TimeUnit.SECONDS)) { "Fixture geometry callback timed out" }
         val geometry = JSONObject(checkNotNull(value.get()))
-        assertTrue(geometry.getString("href").contains("/fixture"))
+        assertEquals(expectedHref, geometry.getString("href"))
         assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
         assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
         return geometry
