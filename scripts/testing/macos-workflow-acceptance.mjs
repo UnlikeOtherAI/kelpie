@@ -55,7 +55,7 @@ for(const stream of [child.stdout,child.stderr]){
 }
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
- report.pid=child.pid;client=new Client(child.pid,out);phase="listeners";
+ report.pid=child.pid;client=new Client(child.pid,out,executable);phase="listeners";
  await waitFor(()=>client.ready(),30000);
  phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
  fixture=await startFixture();phase="webkit";

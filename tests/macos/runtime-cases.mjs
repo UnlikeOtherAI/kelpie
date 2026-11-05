@@ -19,6 +19,7 @@ export async function runEngine(client,fixture,engine,report) {
    tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
   checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
+  const focus=await client.focusOwnedBrowser();
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");
   await client.tap("browser.action.more",more);
   const id="browser.renderer."+engine,window=await waitFor(()=>client.find(id));
@@ -26,7 +27,7 @@ export async function runEngine(client,fixture,engine,report) {
   await waitFor(async()=>{const value=await client.api("get-renderer");return value.engine===engine;});
   const resized=await client.api("resize-viewport",{width:900,height:700});
   requireTrue(resized.success,"NATIVE_VIEWPORT_RESIZE");
-  return await client.screenshot(engine+"-renderer");
+  return {...await client.screenshot(engine+"-renderer"),focus};
  });
  const tabs=await client.api("get-tabs");
  const entries=Array.isArray(tabs)?tabs:tabs.tabs;
