@@ -54,6 +54,7 @@ def selection(scope):
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testDefaultPointerMotionUsesShorterNativeTiming",
+                "testLivePointerMarkerAndStopAppearDuringCapture",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
