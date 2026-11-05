@@ -12,9 +12,11 @@ const StringList kAllEngines = {"webkit", "chromium", "gecko"};
 const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
 const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
-// Script routes are currently bound by the Windows CEF runtime; other bindings advertise no workflow support.
-const ToolAvailability kWindowsScriptAvailability{{P::kWindows}, {"chromium"}, false, true, {}};
-const ToolAvailability kWindowsScriptPlaybackAvailability{{P::kWindows}, {"chromium"}, true, false, {}};
+// Profiles describe compiled route bindings, never authority or runtime grants.
+const ToolAvailability kScriptAvailability{{P::kWindows, P::kIos}, {"chromium", "webkit"}, true, false, {},
+  {{P::kWindows, {"chromium"}, false, true}, {P::kIos, {"webkit"}, true, false}}};
+const ToolAvailability kScriptPlaybackAvailability{{P::kWindows, P::kIos}, {"chromium", "webkit"}, true, false, {},
+  {{P::kWindows, {"chromium"}, true, false}, {P::kIos, {"webkit"}, true, false}}};
 const std::vector<P> kRendererPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux,
                                            P::kWindows};
 
@@ -73,6 +75,24 @@ bool SupportsEngine(const ToolAvailability& availability, std::string_view engin
     }
   }
   return false;
+}
+
+ToolAvailability AvailabilityForPlatform(const ToolAvailability& availability, Platform platform) {
+  if (availability.runtime_profiles.empty()) return availability;
+  ToolAvailability projected = availability;
+  projected.platforms.clear(); projected.engines.clear(); projected.runtime_profiles.clear();
+  projected.requires_ui = true; projected.allowed_headless = false;
+  for (const auto& profile : availability.runtime_profiles) if (profile.platform == platform) {
+    projected.platforms = {platform}; projected.engines = profile.engines;
+    projected.requires_ui = profile.requires_ui; projected.allowed_headless = profile.allowed_headless;
+    break;
+  }
+  return projected;
+}
+
+bool SupportsRuntime(const ToolAvailability& availability, Platform platform, std::string_view engine) {
+  const auto projected = AvailabilityForPlatform(availability, platform);
+  return SupportsPlatform(projected, platform) && SupportsEngine(projected, engine);
 }
 
 bool HasRuntimeCaveat(const ToolAvailability& availability) {
@@ -197,10 +217,10 @@ std::vector<McpTool> CreateDefaultMcpTools() {
            UiAvailability(kMobilePlatforms, kAllEngines, {"soft-keyboard"})),
       Tool("kelpie_resize_viewport", "resize-viewport", "Resize the browser viewport"),
       Tool("kelpie_reset_viewport", "reset-viewport", "Reset viewport to device default"),
-      Tool("kelpie_play_script", "play-script", "Run a bounded workflow in the authenticated owner session", kWindowsScriptPlaybackAvailability),
-      Tool("kelpie_abort_script", "abort-script", "Abort the authenticated owner's active workflow", kWindowsScriptAvailability),
-      Tool("kelpie_get_script_status", "get-script-status", "Read the authenticated owner's workflow status", kWindowsScriptAvailability),
-      Tool("kelpie_get_script_artifact", "get-script-artifact", "Read a bounded chunk of the authenticated owner's workflow artifact", kWindowsScriptAvailability),
+      Tool("kelpie_play_script", "play-script", "Run a bounded workflow in the authenticated owner session", kScriptPlaybackAvailability),
+      Tool("kelpie_abort_script", "abort-script", "Abort the authenticated owner's active workflow", kScriptAvailability),
+      Tool("kelpie_get_script_status", "get-script-status", "Read the authenticated owner's workflow status", kScriptAvailability),
+      Tool("kelpie_get_script_artifact", "get-script-artifact", "Read a bounded chunk of the authenticated owner's workflow artifact", kScriptAvailability),
       Tool("kelpie_ai_status", "ai-status", "Get inference backend readiness"),
       Tool("kelpie_ai_load", "ai-load", "Load a local GGUF or explicitly select a saved inference endpoint"),
       Tool("kelpie_ai_record", "ai-record", "Control existing device audio recording"),

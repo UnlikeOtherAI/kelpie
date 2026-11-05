@@ -10,9 +10,9 @@ using json = nlohmann::json;
 void Accept(std::string_view endpoint, json arguments) {
   assert(kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema(endpoint), &arguments));
 }
-void ScriptRegistryForwarding() {
+void ScriptRegistryForwarding(int platform) {
   auto registry = kelpie_mcp_registry_create();
-  char* encoded = kelpie_mcp_registry_tools_for_platform(registry, KELPIE_PLATFORM_WINDOWS);
+  char* encoded = kelpie_mcp_registry_tools_for_platform(registry, platform);
   assert(encoded);
   const json extensions = json::parse(encoded);
   kelpie_mcp_free_string(encoded);
@@ -48,6 +48,11 @@ void ScriptRegistryForwarding() {
     assert(step["method"] == endpoint); assert(step["mutates"] == mutates);
     assert(gateway.Advance({{"success", true}, {"runId", "r"}})["response"]["result"]["isError"] == false);
   }
+  auto denied = gateway.BeginMcp(rpc(calls[0].first, calls[0].second));
+  assert(denied["kind"] == "authorize");
+  denied = gateway.Advance({{"success", false}});
+  assert(denied["kind"] == "complete");
+  assert(denied.dump().find("ACCESS_DENIED") != std::string::npos);
   kelpie::BrowserGateway read_only({{"nativeMethods", methods}, {"extensions", extensions}, {"allowActions", false}, {"requireAuthorization", false}});
   const auto visible = read_only.Extensions(nullptr);
   assert(visible.size() == 2);
@@ -124,7 +129,8 @@ void ScriptSessionPreflightErrors() {
 }
 int main() {
   ScriptSessionPreflightErrors();
-  ScriptRegistryForwarding();
+  ScriptRegistryForwarding(KELPIE_PLATFORM_WINDOWS);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_IOS);
   const kelpie::McpRegistry registry;
   for (const auto& tool : registry.all_tools()) {
     const auto schema = kelpie::NativeExtensionInputSchema(tool.http_endpoint);

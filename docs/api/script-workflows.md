@@ -29,7 +29,7 @@ Each artifact manifest contains `id,mimeType,byteLength,sha256,partial,width,hei
 
 ## Native MCP discovery
 
-Windows Chromium registers `kelpie_play_script`, `kelpie_abort_script`,
+Windows Chromium and iOS WebKit register `kelpie_play_script`, `kelpie_abort_script`,
 `kelpie_get_script_status`, and `kelpie_get_script_artifact` in the native catalogue.
 Playback requires the native app renderer and presentation/Stop factory. A hidden
 normal app is supported; this does not advertise pure headless-backend playback.
@@ -37,8 +37,12 @@ Their schemas come from the shared generated contract and work through direct to
 calls or `kelpie_extension` with the same names. Playback and abort are mutations;
 status and artifact reads remain available to read-only sessions, subject to the
 existing authenticated run-owner and browser-grant checks. Discovery still filters
-out any endpoint the selected native router does not implement. Other native
-platforms and renderer bindings do not advertise this workflow surface yet.
+out any endpoint the selected native router does not implement. iOS exposes a UI-required,
+non-headless WebKit profile for all four tools. Windows retains its existing Chromium
+profile; iOS Chromium/Gecko and Windows WebKit/Gecko refuse. Other native platforms
+and renderer bindings do not advertise this workflow surface until their compiled
+route and shipping-link checkpoints are accepted. Registry presence establishes a
+compiled binding, not actual capture/Stop/media acceptance.
 
 ## Version 1 status
 

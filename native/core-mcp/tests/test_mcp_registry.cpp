@@ -51,7 +51,10 @@ void TestRegistryFiltering() {
   for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
     assert(ContainsTool(windows_tools, name));
     assert(!ContainsTool(linux_tools, name));
-    assert(!ContainsTool(ios_tools, name));
+    assert(ContainsTool(ios_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kIos, "webkit"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "gecko"));
     assert(!ContainsTool(android_tools, name));
     assert(!ContainsTool(macos_tools, name));
     assert(registry.is_tool_available(name, kelpie::Platform::kWindows, "chromium"));
@@ -62,6 +65,13 @@ void TestRegistryFiltering() {
   assert(play != windows_tools.end());
   assert(play->availability.requires_ui);
   assert(!play->availability.allowed_headless);
+  for (const auto& tool : ios_tools) if (tool.http_endpoint == "play-script" ||
+      tool.http_endpoint == "abort-script" || tool.http_endpoint == "get-script-status" ||
+      tool.http_endpoint == "get-script-artifact") {
+    assert(tool.availability.platforms == std::vector<kelpie::Platform>{kelpie::Platform::kIos});
+    assert(tool.availability.engines == kelpie::StringList{"webkit"});
+    assert(tool.availability.requires_ui); assert(!tool.availability.allowed_headless);
+  }
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
@@ -69,11 +79,11 @@ void TestRegistryFiltering() {
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
   assert(all_tools.size() == 128);
-  assert(ios_tools.size() == 121);
+  assert(ios_tools.size() == 125);
   assert(android_tools.size() == 121);
   assert(macos_tools.size() == 118);
   assert(windows_tools.size() == 118);
-  assert(webkit_tools.size() == 124);
+  assert(webkit_tools.size() == 128);
   assert(chromium_tools.size() == 128);
 
   for (const auto* name : {"kelpie_bookmarks_create_folder", "kelpie_bookmarks_update", "kelpie_bookmarks_move"}) {
@@ -122,6 +132,8 @@ void TestCapabilitiesClassification() {
   const auto ios_webkit = registry.get_capabilities(kelpie::Platform::kIos, "webkit");
   assert(ContainsString(ios_webkit.supported, "navigate"));
   assert(ContainsString(ios_webkit.partial, "show-keyboard"));
+  for (const auto* endpoint : {"play-script", "abort-script", "get-script-status", "get-script-artifact"})
+    assert(ContainsString(ios_webkit.partial, endpoint));
   assert(ContainsString(ios_webkit.partial, "set-renderer"));
   assert(!ContainsString(ios_webkit.unsupported, "show-keyboard"));
 
@@ -147,6 +159,15 @@ void TestCApi() {
   assert(ios_tools[0].contains("mutates"));
   assert(ios_tools[0]["method"] == ios_tools[0]["http_endpoint"]);
   assert(ios_tools[0].contains("availability"));
+  for (const auto& tool : ios_tools) if (tool["method"] == "play-script" ||
+      tool["method"] == "abort-script" || tool["method"] == "get-script-status" ||
+      tool["method"] == "get-script-artifact") {
+    assert(tool["availability"]["engines"] == json::array({"webkit"}));
+    assert(tool["availability"]["platforms"] == json::array({"ios"}));
+    assert(tool["availability"]["requires_ui"] == true);
+    assert(tool["availability"]["allowed_headless"] == false);
+    assert(tool["mutates"] == (tool["method"] == "play-script" || tool["method"] == "abort-script"));
+  }
 
   assert(kelpie_mcp_registry_is_available(registry, "kelpie_show_keyboard", KELPIE_PLATFORM_IOS,
                                             "webkit") == 1);

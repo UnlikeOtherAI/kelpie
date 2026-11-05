@@ -17,7 +17,9 @@ std::vector<McpTool> McpRegistry::tools_for_platform(Platform platform) const {
   matches.reserve(tools_.size());
   for (const McpTool& tool : tools_) {
     if (SupportsPlatform(tool.availability, platform)) {
-      matches.push_back(tool);
+      auto projected = tool;
+      projected.availability = AvailabilityForPlatform(tool.availability, platform);
+      matches.push_back(std::move(projected));
     }
   }
   return matches;
@@ -41,8 +43,7 @@ bool McpRegistry::is_tool_available(const std::string& name, Platform platform,
   if (match == tools_.end()) {
     return false;
   }
-  return SupportsPlatform(match->availability, platform) &&
-         SupportsEngine(match->availability, engine);
+  return SupportsRuntime(match->availability, platform, engine);
 }
 
 McpCapabilities McpRegistry::get_capabilities(Platform platform, std::string_view engine) const {
@@ -52,13 +53,13 @@ McpCapabilities McpRegistry::get_capabilities(Platform platform, std::string_vie
   capabilities.unsupported.reserve(tools_.size());
 
   for (const McpTool& tool : tools_) {
-    const bool available = SupportsPlatform(tool.availability, platform) &&
-                           SupportsEngine(tool.availability, engine);
+    const auto availability = AvailabilityForPlatform(tool.availability, platform);
+    const bool available = SupportsRuntime(availability, platform, engine);
     if (!available) {
       capabilities.unsupported.push_back(tool.http_endpoint);
       continue;
     }
-    if (HasRuntimeCaveat(tool.availability)) {
+    if (HasRuntimeCaveat(availability)) {
       capabilities.partial.push_back(tool.http_endpoint);
       continue;
     }
