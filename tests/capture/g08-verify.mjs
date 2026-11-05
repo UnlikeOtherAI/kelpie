@@ -73,7 +73,7 @@ for(const item of input.cases){
       const marker={center:{x:config.to.x*config.scale.x,y:config.to.y*config.scale.y},
         radius:config.radius*config.scale.x,color:config.color};
       const child=spawn(process.env.FFMPEG??"ffmpeg",["-v","error","-threads","1","-filter_threads","1",
-        "-i",resolve(artifact.file),"-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],
+        "-i",resolve(artifact.file),"-map","0:v:0","-vsync","0","-f","rawvideo","-pix_fmt","rgb24","-"],
         {windowsHide:true,stdio:["ignore","pipe","pipe"]});
       const timeout=setTimeout(()=>child.kill(),120000);
       let stderr="";child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
