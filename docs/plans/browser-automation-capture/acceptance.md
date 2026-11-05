@@ -16,7 +16,8 @@ The latest user direction authorizes parallel implementation by per-platform own
 the earlier Windows-first execution gate is historical and no longer blocks other
 platform source work. Resource slots still come from the coordinator. Computer Use,
 VNC, CUA and custom OS/desktop-input helpers remain explicitly off. Root-authorized
-standard XCUITest/Compose instrumentation may exercise native app controls and
+standard XCUITest/Compose and scoped native accessibility instrumentation
+(Windows UIA/Linux AT-SPI where authorized) may exercise native app controls and
 capture app screenshots under its assigned simulator/emulator handoff and resource
 slot; that authorization does not grant arbitrary desktop control.
 Machine-interface evidence and native UI evidence must remain distinct.

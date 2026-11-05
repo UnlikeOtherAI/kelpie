@@ -33,7 +33,9 @@ export function nativeCoverage(report) {
       completeProtocolSet: protocols.every(protocol => build.protocols.has(protocol)) }));
     return { requirement, platform, renderer, deviceClass, runtimeMode, machineEvidence,
       sourceOrUnitRecords: records.filter(record => ["source-review", "unit"].includes(record.kind)).length,
-      uiRecords: records.filter(record => record.kind === "manual-ui" && record.status === "passed").map(record => ({
+      uiRecords: records.filter(record => ["manual-ui", "native-ui"].includes(record.kind) && record.status === "passed").map(record => ({
+        kind: record.kind, uiDriver: record.uiDriver, protocol: record.protocol,
+        result: record.result, entryPoint: record.entryPoint,
         revision: record.revision, binarySha256: record.binarySha256, artifacts: record.artifacts,
       })),
       mediaRecords: records.filter(record => record.kind === "manual-media" && record.status === "passed").map(record => ({

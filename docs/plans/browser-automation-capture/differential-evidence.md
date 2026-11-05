@@ -21,7 +21,16 @@ conditions or separately reviewed expectations, not global erasure.
 Existing version1 reports remain valid. New native records add:
 - deviceClass: desktop,phone,tablet (worker is separate);
 - runtimeMode: windowed or offscreen (stub/worker stay separate);
-- protocol: http,mcp-direct,mcp-generic,cli.
+- protocol: http,mcp-direct,mcp-generic,cli for machine transports.
+
+Actual standard app-control instrumentation uses the additive native-ui kind,
+protocol:native-ui and uiDriver:uia/xcuitest/compose/at-spi matching the platform.
+A passed native-ui record requires windowed mode,device class and the same exact
+source,binary/version,entry-point and artifact provenance as other real outcomes.
+Its result describes only the controls/states actually exercised. Source/unit
+records with a driver label cannot become UI evidence; exported manual-media
+stays separate. Native UI never fills the four machine-protocol set. Old manual-ui
+records remain valid; no capability or acceptance is granted by a driver label.
 
 These join requirement/platform/renderer/kind/revision/binary/version in evidence identity,
 allowing phone/tablet and protocol outcomes to coexist. Renderer uses canonical
