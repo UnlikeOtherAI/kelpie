@@ -26,6 +26,21 @@ and gateway contracts). Hard JobObject affinity1/Normal/2GiB,free25939176KiB,
 no new CEF/LLM bootstrap or application build. Existing MSVC DNDEBUG/UNDEBUG
 test-assert override warning remains. No owned job remains.
 
+## Authoritative native validation include
+
+Desktop callers can include kelpie/browser_schema.h and
+kelpie/native_extension_schema.h, then call
+ValidateBrowserJson(NativeExtensionInputSchema("get-script-artifact"), &body)
+on a mutable copy BEFORE phase availability checks. Validation applies generated
+defaults. The public header owns the existing declaration; src/browser_schema.h
+only forwards to it. No validator/schema copy or wire/C ABI was introduced.
+The native extension test now includes only the public validator path.
+
+Maxis existing stub test_native_extensions rebuilt and passed under hardJob1CPU/
+Normal/2GiB,free29341256KiB,32.946s. NoCEF/noLLM/no app; existing MSVC test-assert
+override warning only. This verifies public include/link and generated schema
+semantics; actual desktop caller/runtime remains platform-owned.
+
 ## Independent consumer review
 
 - iOS8964d68e: missing-result callback covers every initial/recheck/dispatch stage
