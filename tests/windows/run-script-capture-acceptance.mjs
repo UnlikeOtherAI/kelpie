@@ -20,6 +20,10 @@ await mkdir(output, { recursive: false });
 const fixture = await startCaptureFixture();
 const checks = [];
 const artifacts = [];
+const resourceEnabled=process.platform==="linux" && process.env.KELPIE_LINUX_RESOURCE_DIAGNOSTIC==="1";
+const resourceDiagnostic=resourceEnabled?(await import("../linux/navigation-resource-diagnostic.mjs"))
+  .createNavigationResourceDiagnostic({pid:Number(process.env.KELPIE_LINUX_RESOURCE_PID),
+    startTicks:process.env.KELPIE_LINUX_RESOURCE_START_TICKS,output}):null;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function request(method, body = {}, token = readiness.token) {
   const response = await fetch("http://127.0.0.1:" + readiness.port + "/v1/" + method, {
@@ -29,10 +33,14 @@ async function request(method, body = {}, token = readiness.token) {
   return { status: response.status, value: await response.json() };
 }
 async function api(method, body = {}) {
-  const { value } = await request(method, body);
-  if(method==="get-script-status" && value.success) scriptStatusV1Schema.parse(value);
-  return value;
+  const perform=async()=>{
+    const { value }=await request(method,body);
+    if(method==="get-script-status" && value.success) scriptStatusV1Schema.parse(value);
+    return value;
+  };
+  return resourceDiagnostic?resourceDiagnostic.invoke(method,perform):perform();
 }
+
 const mcp = (method, body = {}, generic = true) => captureMcp(readiness, method, body, generic);
 async function check(name, run) {
   if(process.env.KELPIE_CAPTURE_CASE_FILTER && !name.includes(process.env.KELPIE_CAPTURE_CASE_FILTER)) return;
@@ -481,6 +489,7 @@ try {
 } finally {
   const report={source:process.env.KELPIE_CAPTURE_SOURCE,port:readiness.port,launchId:readiness.launchId,checks,artifacts};
   await writeFile(resolve(output,"report.json"),JSON.stringify(report,null,2));
+  if(resourceDiagnostic) await resourceDiagnostic.write();
   try { await fixture.close();report.cleanup="closed"; }
   catch(error) {report.cleanup="failed";checks.push({name:"fixture cleanup",passed:false,error:error.message});}
   await writeFile(resolve(output,"report.json"),JSON.stringify(report,null,2));
