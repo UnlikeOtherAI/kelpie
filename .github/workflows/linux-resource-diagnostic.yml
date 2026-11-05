@@ -9,6 +9,15 @@ on:
       cli_only:
         type: boolean
         default: false
+      expected_source:
+        type: string
+        default: ""
+      expected_rpm:
+        type: string
+        default: ""
+      expected_cli:
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -33,10 +42,15 @@ jobs:
         env:
           SOURCE_RUN: ${{ inputs.source_run }}
           CLI_ONLY: ${{ inputs.cli_only }}
+          EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          EXPECTED_RPM: ${{ inputs.expected_rpm }}
+          EXPECTED_CLI: ${{ inputs.expected_cli }}
         run: |
           set -euo pipefail
           [[ "${SOURCE_RUN}" =~ ^[0-9]+$ ]]
-          if [[ "$CLI_ONLY" == true ]]; then [[ "$SOURCE_RUN" == 42102220654 ]]; fi
+          if [[ "$CLI_ONLY" == true ]]; then
+            [[ "$EXPECTED_SOURCE" =~ ^[a-f0-9]{40}$ && "$EXPECTED_RPM" =~ ^[a-f0-9]{64}$ && "$EXPECTED_CLI" =~ ^[a-f0-9]{64}$ ]]
+          fi
       - uses: actions/download-artifact@v8.0.1
         with:
           name: linux-native-candidate-${{ matrix.distro.name }}
@@ -53,15 +67,22 @@ jobs:
         env:
           DISTRO_NAME: ${{ matrix.distro.name }}
           CLI_ONLY: ${{ inputs.cli_only }}
+          EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          EXPECTED_RPM: ${{ inputs.expected_rpm }}
+          EXPECTED_CLI: ${{ inputs.expected_cli }}
         run: |
           set -euo pipefail
           package_root="dist/release/${DISTRO_NAME}"
           diagnostic_revision="$(git rev-parse HEAD)"
           package_revision="$(cat "${package_root}/source-revision.txt")"
           if [[ "$CLI_ONLY" == true ]]; then
-            [[ "$DISTRO_NAME" == fedora-44 && "$package_revision" == 1a148927ad081fab54a71ba8ada95bf038c7c9ef ]]
-            printf "%s  %s\n" 7872126627adb7e58a4d67497d578d94666dc3b7c6e12b5a3d6ff3380ed0f96e "$package_root/kelpie-0.1.15~candidate.1a148927ad08-1.x86_64.rpm" | sha256sum -c -
-            printf "%s  %s\n" e4020d1600a0a9701bcfc32047aaaa238c576b58a86f1915fface71fa0ca7c8d "$package_root/unlikeotherai-kelpie-0.1.22.tgz" | sha256sum -c -
+            [[ "$DISTRO_NAME" == fedora-44 && "$package_revision" == "$EXPECTED_SOURCE" ]]
+            mapfile -d '' rpm_files < <(find "$package_root" -maxdepth 1 -type f -name '*.rpm' -print0)
+            mapfile -d '' cli_files < <(find "$package_root" -maxdepth 1 -type f -name '*.tgz' -print0)
+            [[ ${#rpm_files[@]} == 1 && ${#cli_files[@]} == 1 ]]
+            [[ "$(sha256sum "${rpm_files[0]}" | cut -d' ' -f1)" == "$EXPECTED_RPM" ]]
+            [[ "$(sha256sum "${cli_files[0]}" | cut -d' ' -f1)" == "$EXPECTED_CLI" ]]
+            printf 'expectedSource=%s\nexpectedRPM=%s\nexpectedCLI=%s\n' "$EXPECTED_SOURCE" "$EXPECTED_RPM" "$EXPECTED_CLI" > "$package_root/resource-expected.txt"
           fi
           [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
           git cat-file -e "${package_revision}^{commit}"
@@ -103,7 +124,6 @@ jobs:
           cli_only=0; resource_mode=1
           if [[ "$CLI_ONLY" == true ]]; then cli_only=1; resource_mode=0; fi
           printf "cliOnly=%s\n" "$cli_only" > "$package_root/resource-scope.txt"
-          if [[ "$cli_only" == 1 ]]; then printf "sourceArtifact=13454040953\n" >> "$package_root/resource-scope.txt"; fi
           docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
             --security-opt no-new-privileges=true \
             --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
@@ -120,6 +140,7 @@ jobs:
         with:
           name: linux-resource-diagnostic-${{ matrix.distro.name }}
           path: |
+            dist/release/${{ matrix.distro.name }}/resource-expected.txt
             dist/release/${{ matrix.distro.name }}/resource-scope.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/outcome.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/installed-sha256.txt
