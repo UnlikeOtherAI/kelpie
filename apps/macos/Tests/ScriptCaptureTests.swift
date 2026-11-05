@@ -29,6 +29,31 @@ final class ScriptCaptureTests: XCTestCase {
     }
 
     @MainActor
+    func testCleanupRetainsRegisteredArtifactThroughDirectoryAliasAndDiscardRemovesIt() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let real = base.appendingPathComponent("real", isDirectory: true)
+        let alias = base.appendingPathComponent("alias", isDirectory: true)
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: real)
+        let directory = alias.appendingPathComponent("capture", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        let file = directory.appendingPathComponent("frame.png")
+        let orphan = directory.appendingPathComponent("orphan.png")
+        try Data([1, 2, 3]).write(to: file)
+        try Data([4]).write(to: orphan)
+        let store = ScriptArtifactStore()
+        let manifest = try store.add(url: file, runID: "run", mimeType: "image/png", owner: "owner")
+        let body: [String: Any] = ["runId": "run", "artifactId": try XCTUnwrap(manifest["id"] as? String)]
+
+        ScriptCaptureOutputCleanup.prune(directory: directory, retaining: [file])
+        XCTAssertEqual(store.read(body, owner: "owner")["data"] as? String, Data([1, 2, 3]).base64EncodedString())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.path))
+        try FileManager.default.removeItem(at: directory)
+        XCTAssertEqual((store.read(body, owner: "owner")["error"] as? [String: Any])?["code"] as? String, "ARTIFACT_READ_FAILED")
+    }
+
+    @MainActor
     func testPresentationCurvesShareEndpointsAndHaveDifferentBends() {
         let start = CGPoint(x: 10, y: 20)
         let end = CGPoint(x: 210, y: 120)
