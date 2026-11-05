@@ -657,3 +657,21 @@ produced zero in both under the existing threshold. Therefore a 19-pixel MP4
 allowance would hide a demonstrably retained marker, and the current metric also
 cannot prove absence of a fainter marker. The strict failed result is retained
 pending a stronger validated oracle; no tolerance was relaxed.
+
+The headless-pump candidate subsequently passed the 36-case offscreen
+HTTP/MCP regression and all supplements; the owned process and readiness file
+retired normally. In the candidate S/GIF final frame all 18 pixels flagged as
+blue had equal red and green channels and occupied the stationary pointer.
+Their three RGB triplets are consistent with neutral pointer antialiasing
+quantized by the GIF 3/3/2 palette. This finding does not by itself exclude a
+real overlapping blue marker; the shared oracle result remains failed until a
+control can distinguish those cases.
+
+A production-compositor and production-encoder pointer-only control reproduced
+the candidate S/GIF tail exactly: 18 flagged pixels, 23 chromatic pixels, and
+center (484.5, 228.5). All 18 real-tail pixels have equal red and green channels
+and the blue channel matches the coarser GIF palette quantization of neutral
+pointer antialiasing. Matched overlapping blue controls produced 32 flagged
+pixels for a small retained marker, 33 for a faint marker and 1804 for a full
+marker, against 18 for the pointer alone. This supports a matched pointer-baseline
+oracle but does not validate a generic 18-pixel allowance; no oracle was changed.
