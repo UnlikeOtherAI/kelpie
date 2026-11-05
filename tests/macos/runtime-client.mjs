@@ -17,9 +17,10 @@ export async function waitFor(run,ms=10000){
  throw last??new Failure("WAIT_TIMEOUT");
 }
 export class Client {
- constructor(pid,out){this.pid=pid;this.out=out;this.token=null;this.secrets=[];this.artifacts=[];this.counter=0;}
+ constructor(pid,out){this.pid=pid;this.out=out;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
  pin(port){requireTrue(listenerState(listeners(port),this.pid)==="owned","LISTENER_IDENTITY");}
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
+  if(this.readiness.at(-1)?.states.join(",")!==states.join(",")&&this.readiness.length<16)this.readiness.push({elapsedMs:Date.now()-this.began,states});
   requireTrue(!states.includes("foreign"),"LISTENER_IDENTITY");return states.every(state=>state==="owned");}
  async request(route,body={},options={}){
   const port=options.reveal?8421:28420;this.pin(port);

@@ -5,6 +5,7 @@ import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
 import {Client,Failure,requireTrue,listeners,waitFor,delay} from "../../tests/macos/runtime-client.mjs";
+import {bootstrapDiagnostics} from "../../tests/macos/runtime-bootstrap.mjs";
 import {startFixture} from "../../tests/macos/runtime-fixture.mjs";
 import {publicCLI,inference} from "../../tests/macos/runtime-interfaces.mjs";
 import {runEngine} from "../../tests/macos/runtime-cases.mjs";
@@ -34,35 +35,47 @@ const report={source,platform:process.platform,
  cefVersion:(await readFile("apps/macos/Frameworks/cef_include/cef_version.h","utf8")).match(/#define CEF_VERSION "([^"\n]+)"/)?.[1],
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
-let appLogBytes=0,fixture,client;
+let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"]});
-let childExited=false;child.once("exit",()=>{childExited=true;});
+let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr])stream.on("data",bytes=>{appLogBytes+=bytes.length;});
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
- report.pid=child.pid;client=new Client(child.pid,out);
+ report.pid=child.pid;client=new Client(child.pid,out);phase="listeners";
  await waitFor(()=>client.ready(),30000);
- client.token=await client.pair("Hosted Mac acceptance");
- fixture=await startFixture();
+ phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
+ fixture=await startFixture();phase="webkit";
  await runEngine(client,fixture,"webkit",report);
- report.publicCLI=await publicCLI(client,fixture,privateDir);
- report.inference=await inference(client,privateDir);
- await runEngine(client,fixture,"chromium",report);
+ phase="cli";report.publicCLI=await publicCLI(client,fixture,privateDir);
+ phase="inference";report.inference=await inference(client,privateDir);
+ phase="chromium";await runEngine(client,fixture,"chromium",report);
  report.corpusPassed=true;
-}catch(error){report.failure=error.code??"HOSTED_RUNTIME_FAILED";process.exitCode=1;}
+}catch(error){
+ report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;report.childExitAtFailure=childExit;process.exitCode=1;
+ if(["launch","listeners"].includes(phase)){
+  try{report.bootstrap=await bootstrapDiagnostics({pid:child.pid,executable,started,privateDir});}
+  catch{report.bootstrapDiagnosticError="BOOTSTRAP_DIAGNOSTICS_FAILED";}
+ }
+}
 finally{
  await fixture?.close();
- // The detached process group belongs exclusively to this exact child.
- try{const pgid=Number(execFileSync("/bin/ps",["-o","pgid=","-p",String(child.pid)],{encoding:"utf8"}).trim());
-  if(pgid===child.pid)process.kill(-pgid,"SIGTERM");else report.cleanup="OWNED_PROCESS_GROUP_MISMATCH";
- }catch{report.cleanup="OWNED_CHILD_ALREADY_EXITED";}
- const end=Date.now()+10000;
- while(Date.now()<end&&(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
- if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
- else {report.ownedListenersReleased=true;report.ownedChildExited=true;}
- // A failed teardown must not leave the test driver waiting forever on inherited pipes.
- child.stdout.destroy();child.stderr.destroy();child.unref();
+ stopping=true;
+ if(Number.isSafeInteger(child.pid)&&child.pid>1){
+  // The detached process group belongs exclusively to this exact child.
+  if(!childExited){
+   try{const pgid=Number(execFileSync("/bin/ps",["-o","pgid=","-p",String(child.pid)],{encoding:"utf8"}).trim());
+    if(pgid===child.pid)process.kill(-pgid,"SIGTERM");else report.cleanup="OWNED_PROCESS_GROUP_MISMATCH";
+   }catch{report.cleanup="OWNED_CHILD_ALREADY_EXITED";}
+  }
+  const end=Date.now()+10000;
+  while(Date.now()<end&&(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
+  if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
+  else {report.ownedListenersReleased=true;report.ownedChildExited=true;}
+ }else report.cleanup="NO_CHILD_SPAWNED";
+ child.stdout?.destroy();child.stderr?.destroy();child.unref();
+ report.childExit=childExit;report.readiness=client?.readiness??[];
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
  report.appLogBytes=appLogBytes;
+ report.artifacts=client?.artifacts??[];
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
 }
