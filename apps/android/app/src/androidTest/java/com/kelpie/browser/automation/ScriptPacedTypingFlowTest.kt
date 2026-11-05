@@ -344,7 +344,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     val action =
                         client
                             .action("type")
-                            .put("target", JSONObject().put("label", label))
+                            .put("target", if (label == "Button") JSONObject().put("role", "button").put("name", label) else JSONObject().put("label", label))
                             .put("text", "")
                             .put("typingDelayMs", 100)
                     val result = playRecorded(client, client.script(tab, action))
