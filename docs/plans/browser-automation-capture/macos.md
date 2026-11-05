@@ -126,3 +126,15 @@ A Mac caller that started GIF finalization after abort previously returned false
 Codec regression uses the actual caller policy, shared GIF encoder, full frame decode and artifact store: already-aborted grace retains three valid frames as partial, a newly arriving abort interrupts normal finalization, and the next GIF succeeds. Runtime acceptance must additionally run GIF-only capture, abort after frames are collected, retrieve and fully decode its partial GIF, then complete a fresh run without manual state repair. Native Stop and remote abort both need this flow through the pinned authenticated listener.
 
 The abort-prefix codec suite passed in .cache/apple-codec-kmPkt9 with peak private footprint 75.3 MB. ImageIO decoded every retained frame; independent FFmpeg/ffprobe fully decoded already-aborted, newly-aborted and recovered GIFs, each 3 frames at 160x90 with 0.1 second duration. This checks the production finalization policy/encoder/artifact-store seam, not native GIF-only Stop acceptance.
+
+
+## Explicit hosted runtime entry point
+
+The macOS workflow now accepts manual runtime_acceptance (default false). After the existing verified compilation, it can test-sign and launch only its own candidate on a dedicated hosted runner. The source driver and current coverage/gaps are documented in tests/macos/README.md. No local app handoff or global input is used. This tranche adds the concrete inferred-sensitive prior-output regression for both renderers and pins failure-time media disposal independently of redaction success. Hosted execution and remaining canonical coverage are pending; syntax/lint/fixture checks are not native acceptance.
+
+
+## First hosted runtime attempt: preparation failure
+
+Run 41963343846 at source 589e31a3ca6513b16c3144dfbcdad8e299486d01 passed full app/XCTest compilation, then failed strict ad-hoc test signature verification before launch. The embedded KelpieTests.xctest had a linker code signature without a sealed bundle resource envelope. No renderer, pairing or capture flow ran; no runtime media exists for this denominator. Downloaded build.log SHA-256: a73bcd67cad31ba1c8fd69ee24c2617517c3c28419b12fc6595b5d2bc4e98188.
+
+The test-only signing helper now seals debug dylibs and XCTest bundles before their containing app, retaining deep/strict verification. The same failure was reproduced on the owner's cached compiled bundle. On an isolated ignored copy, the corrected helper passed actual deep/strict verification; the original launcher d9dd958ecb2eea670cce5bc434a8d7d73bc5a84fc5a1819984f79dea8646a13e and debug library dc986bb2eefe19342eae7abdc65d33f5e21a58f914fb3b4c93a95f97a16185ee remained unchanged. This was signature verification only, with no local app launch or installed-app replacement. Preparation now writes a fixed structured evidence report before optional runtime dependency/signing work and records its failing exit code, so a pre-launch failure does not lose its evidence artifact.

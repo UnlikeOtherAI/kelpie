@@ -29,6 +29,7 @@ class ScriptRun(
     val redactor = ScriptRedactor()
 
     @Volatile private var captureDeadlineMs: Double? = null
+    val discardCapture = AtomicBoolean()
     val stopped = AtomicBoolean()
     val stopReason = AtomicReference<String?>(null)
     private var phase = "running"
@@ -41,6 +42,7 @@ class ScriptRun(
     private val outputs = linkedMapOf<String, Any?>()
 
     fun stop(code: String) {
+        if (code in setOf("SENSITIVE_CAPTURE_REFUSED", "OUTPUT_REDACTION_FAILED")) discardCapture.set(true)
         stopReason.compareAndSet(null, code)
         stopped.set(true)
     }
@@ -106,26 +108,32 @@ class ScriptRun(
     @Synchronized
     fun finish(
         code: String?,
-        aborted: Boolean,
         mayHaveCompleted: Boolean,
     ) {
-        error = code
-        uncertain = mayHaveCompleted
+        val firstCode = error ?: code ?: stopReason.get()
+        error = firstCode
+        uncertain = uncertain || mayHaveCompleted
         phase =
-            if (aborted) {
+            if (firstCode == "SCRIPT_ABORTED" || firstCode == "SCRIPT_BACKGROUND") {
                 "aborted"
-            } else if (code != null) {
+            } else if (firstCode != null) {
                 "failed"
             } else {
                 "completed"
             }
         endedMs = elapsedMs()
-        artifacts.discardUnregistered()
+        if (discardCapture.get()) artifacts.deleteOwned() else artifacts.discardUnregistered()
     }
+
+    @Synchronized
+    fun prepareOutputs(): Map<String, Any?> = redactor.redact(outputs.toMap(), extractionNames)
 
     /** Metadata-only queries never materialize or retain page-derived output bodies. */
     @Synchronized
-    fun status(includeOutputs: Boolean = false): Map<String, Any?> =
+    fun status(
+        includeOutputs: Boolean = false,
+        preparedOutputs: Map<String, Any?> = emptyMap(),
+    ): Map<String, Any?> =
         buildMap {
             put("success", if (includeOutputs) phase == "completed" else true)
             put("supportedVersions", listOf(1))
@@ -148,7 +156,7 @@ class ScriptRun(
                 put("currentActionName", currentName)
                 put("aborted", phase == "aborted")
                 put("partial", phase != "completed")
-                put("outputs", redactor.redact(outputs.toMap(), extractionNames))
+                put("outputs", preparedOutputs)
             }
         }
 }

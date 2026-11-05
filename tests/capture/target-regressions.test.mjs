@@ -66,6 +66,7 @@ test("semantic target resolves the center of its visible viewport portion", () =
   assert.equal(result.ok, true);
   assert.equal(result.x, 10);
   assert.equal(result.y, 50);
+  assert.deepEqual(result.visualViewport, { offsetLeft: 0, offsetTop: 0, width: 800, height: 600, scale: 1 });
 });
 
 test("dispatch stops uncertain after captured descendant is replaced", () => {
@@ -139,4 +140,45 @@ test("focus viewport resize prevents value mutation", () => {
   assert.equal(result.ok, false);
   assert.equal(result.mayHaveCompleted, true);
   assert.equal(f.element.value, "");
+});
+
+test("visual viewport clips layout CSS center and refuses offscreen coordinates", () => {
+  const f = fixture();
+  window.visualViewport = { offsetLeft: 100, offsetTop: 0, width: 300, height: 300, scale: 2 };
+  f.element.rect = { x: 350, y: 30, width: 200, height: 40 };
+  const result = resolveScriptTarget({ selector: "#target" }, "acceptance");
+  assert.equal(result.ok, true); assert.equal(result.x, 375); assert.equal(result.width, 50);
+  assert.deepEqual(result.visualViewport, { offsetLeft: 100, offsetTop: 0, width: 300, height: 300, scale: 2 });
+  assert.equal(result.viewportWidth, 800); assert.equal(result.viewportHeight, 600);
+  assert.equal(resolveScriptTarget({ x: 450, y: 50 }, "acceptance").error, "TARGET_OUTSIDE_VIEWPORT");
+});
+
+test("all visual viewport fields fence tokens even with unchanged layout dimensions", () => {
+  for (const field of ["offsetLeft", "offsetTop", "width", "height", "scale"]) {
+    fixture();
+    window.visualViewport = { offsetLeft: 0, offsetTop: 0, width: 400, height: 300, scale: 2 };
+    const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
+    assert.equal(first.ok, true);
+    window.visualViewport[field] += 0.01;
+    assert.equal(resolveScriptTarget({ selector: "#target" }, "acceptance", first.token).error, "VIEWPORT_CHANGED", field);
+  }
+});
+
+test("visual clipping composes with ancestor overflow", () => {
+  const f = fixture(), parent = new Element();
+  parent.rect = { x: 180, y: 0, width: 80, height: 200 };
+  f.element.parentElement = parent; f.element.rect = { x: 150, y: 30, width: 200, height: 40 };
+  window.visualViewport = { offsetLeft: 100, offsetTop: 0, width: 200, height: 300, scale: 2 };
+  globalThis.getComputedStyle = el => ({ display: "block", visibility: "visible", opacity: "1", overflowX: el === parent ? "hidden" : "visible", overflowY: "visible" });
+  const result = resolveScriptTarget({ selector: "#target" }, "acceptance");
+  assert.equal(result.ok, true); assert.equal(result.x, 220); assert.equal(result.width, 80);
+});
+
+test("visual viewport changing during dispatch reports uncertainty", () => {
+  const f = fixture();
+  window.visualViewport = { offsetLeft: 0, offsetTop: 0, width: 400, height: 300, scale: 2 };
+  const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
+  f.element.onEvent = () => { window.visualViewport.scale = 3; };
+  assert.deepEqual(resolveScriptTarget({ selector: "#target" }, "acceptance", first.token, true),
+    { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true });
 });

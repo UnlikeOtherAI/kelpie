@@ -165,6 +165,30 @@ final class WorkflowLoopbackPage {
           document.body.innerHTML='<button style="appearance:none;position:fixed;left:58vw;top:60vh;transform:translate(-50%,-50%);margin:0;background:#505050;color:#181818;border:0">Track</button>'
           document.querySelector('button').onclick=()=>{document.title='Track clicked'}
         }
+        if(location.pathname==='/pinch'){
+          document.documentElement.style.background='#606060';
+          document.body.style='margin:0;background:#606060;height:100vh;overflow:hidden';
+          document.body.innerHTML='<button id="edge" style="position:fixed;margin:0;width:150px;height:80px;appearance:none;background:#505050;color:#181818;border:0">Edge</button><output id="zoom" style="position:absolute;left:0;top:0;color:#181818;font-size:8px"></output><output id="clicked" style="position:absolute;left:0;top:14px;color:#181818;font-size:8px"></output>';
+          const edge=document.querySelector('#edge'),metrics=document.querySelector('#zoom');
+          let clicks=0;
+          const viewport=()=>({scale:visualViewport.scale,x:visualViewport.offsetLeft,y:visualViewport.offsetTop,
+            width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight});
+          const position=()=>{
+            const v=viewport();
+            edge.style.left=Math.min(innerWidth-150,v.x+v.width-50)+'px';
+            edge.style.top=(v.y+v.height/2-40)+'px';
+            metrics.textContent=JSON.stringify({...v,clicks});
+          };
+          visualViewport.addEventListener('resize',position);visualViewport.addEventListener('scroll',position);
+          edge.onclick=e=>{
+            const v=viewport(),r=edge.getBoundingClientRect(),left=Math.max(v.x,r.left),right=Math.min(v.x+v.width,r.right);
+            const top=Math.max(v.y,r.top),bottom=Math.min(v.y+v.height,r.bottom);
+            document.querySelector('#clicked').textContent=JSON.stringify({...v,clickX:e.clientX,clickY:e.clientY,
+              expectedX:(left+right)/2,expectedY:(top+bottom)/2,visibleWidth:right-left,buttonWidth:r.width,clicks:++clicks});
+            position();
+          };
+          position();
+        }
         if(location.pathname==='/landed'){
           document.body.style.background='#1848D8';document.body.innerHTML='<h1 id="landed">Landed</h1>';document.title='Landed'
         }

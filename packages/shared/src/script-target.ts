@@ -10,6 +10,7 @@ export interface ScriptTargetResult {
   width?: number;
   viewportWidth?: number;
   viewportHeight?: number;
+  visualViewport?: { offsetLeft: number; offsetTop: number; width: number; height: number; scale: number };
   height?: number;
   inputGuarantee?: "synthetic-coordinate";
   mayHaveCompleted?: boolean;
@@ -26,7 +27,8 @@ export interface ScriptTargetResult {
  * Optional dispatch is atomic synthetic coordinate input, never advertised as trusted input.
  */
 export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string }, observe = false): ScriptTargetResult {
-  interface Entry { element: Element; document: Document; inputType?: string; readOnly?: boolean; rectX: number; rectY: number; rectWidth: number; rectHeight: number; x: number; y: number; width: number; height: number; coordinate: boolean; url: string; viewportWidth: number; viewportHeight: number };
+  interface VisualViewportFrame { x: number; y: number; width: number; height: number; scale: number };
+  interface Entry { visual: VisualViewportFrame; element: Element; document: Document; inputType?: string; readOnly?: boolean; rectX: number; rectY: number; rectWidth: number; rectHeight: number; x: number; y: number; width: number; height: number; coordinate: boolean; url: string; viewportWidth: number; viewportHeight: number };
   interface State { document: Document; documentId: string; next: number; entries: Record<string, Entry> };
   const registry = window as unknown as Record<string, State | undefined>;
   let state = registry[key];
@@ -36,6 +38,16 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   }
   const fail = (error: string): ScriptTargetResult => ({ ok: false, error, mayHaveCompleted: false });
   if ((dispatch && edit) || (observe && (dispatch || edit))) return fail("INVALID_TARGET_OPERATION");
+  const viewportFrame = (): VisualViewportFrame => {
+    const view = window.visualViewport;
+    return { x: view?.offsetLeft ?? 0, y: view?.offsetTop ?? 0,
+      width: view?.width ?? innerWidth, height: view?.height ?? innerHeight, scale: view?.scale ?? 1 };
+  };
+  const visual = viewportFrame();
+  if (!Object.values(visual).every(Number.isFinite) || visual.width <= 0 || visual.height <= 0 || visual.scale <= 0) return fail("VIEWPORT_CHANGED");
+  // Client/target coordinates remain layout CSS pixels; only eligibility is clipped.
+  const viewport = { left: Math.max(0, visual.x), top: Math.max(0, visual.y),
+    right: Math.min(innerWidth, visual.x + visual.width), bottom: Math.min(innerHeight, visual.y + visual.height) };
   const budget = { limited: false };
   const isLimited = (): boolean => budget.limited;
   const normalized = (s: string): string => {
@@ -46,8 +58,8 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   const visibleBox = (el: Element): { x: number; y: number; width: number; height: number } | null => {
     if (!el.isConnected) return null;
     const r = el.getBoundingClientRect();
-    let left = Math.max(0, r.x), top = Math.max(0, r.y);
-    let right = Math.min(innerWidth, r.x + r.width), bottom = Math.min(innerHeight, r.y + r.height);
+    let left = Math.max(viewport.left, r.x), top = Math.max(viewport.top, r.y);
+    let right = Math.min(viewport.right, r.x + r.width), bottom = Math.min(viewport.bottom, r.y + r.height);
     let depth = 0;
     for (let parent: Element | null = el; parent; parent = parent.parentElement) {
       if (++depth > 64 || ++styleVisits > 20000) { budget.limited = true; return null; }
@@ -143,7 +155,7 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     let matches: Element[];
     try {
       if ("x" in target) {
-        if (target.x < 0 || target.y < 0 || target.x >= innerWidth || target.y >= innerHeight) return fail("TARGET_OUTSIDE_VIEWPORT");
+        if (target.x < viewport.left || target.y < viewport.top || target.x >= viewport.right || target.y >= viewport.bottom) return fail("TARGET_OUTSIDE_VIEWPORT");
         const el = document.elementFromPoint(target.x, target.y);
         matches = el ? [el] : [];
       } else {
@@ -171,12 +183,18 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     const r = element.getBoundingClientRect();
     const box = visibleBox(element);
     if (!box || isLimited()) return fail(isLimited() ? "TARGET_QUERY_LIMIT" : "TARGET_NOT_INTERACTABLE");
-    entry = { element, document, inputType: element instanceof HTMLInputElement ? element.type : undefined, readOnly: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.readOnly : undefined, rectX: r.x, rectY: r.y, rectWidth: r.width, rectHeight: r.height, x: "x" in target ? target.x : box.x + box.width / 2, y: "y" in target ? target.y : box.y + box.height / 2, width: box.width, height: box.height, coordinate: "x" in target, url: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight };
+    entry = { visual, element, document, inputType: element instanceof HTMLInputElement ? element.type : undefined, readOnly: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.readOnly : undefined, rectX: r.x, rectY: r.y, rectWidth: r.width, rectHeight: r.height, x: "x" in target ? target.x : box.x + box.width / 2, y: "y" in target ? target.y : box.y + box.height / 2, width: box.width, height: box.height, coordinate: "x" in target, url: location.href, viewportWidth: innerWidth, viewportHeight: innerHeight };
     resolvedToken = state.documentId + ":t" + String(++state.next);
     // Each action owns only its latest target, bounding ephemeral retention.
     state.entries = { [resolvedToken]: entry };
   }
-  if (entry.viewportWidth !== innerWidth || entry.viewportHeight !== innerHeight) return fail("VIEWPORT_CHANGED");
+  const unchangedViewport = (): boolean => {
+    const current = viewportFrame();
+    return entry.viewportWidth === innerWidth && entry.viewportHeight === innerHeight &&
+      entry.visual.x === current.x && entry.visual.y === current.y && entry.visual.width === current.width &&
+      entry.visual.height === current.height && entry.visual.scale === current.scale;
+  };
+  if (!unchangedViewport()) return fail("VIEWPORT_CHANGED");
   if (!eligible(entry.element)) return fail("TARGET_NOT_INTERACTABLE");
   const unchangedGeometry = (): boolean => {
     if ((entry.element instanceof HTMLInputElement && entry.element.type !== entry.inputType) ||
@@ -190,11 +208,11 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   };
   if (!unchangedGeometry()) return fail("TARGET_MOVED");
   if (isLimited()) return fail("TARGET_QUERY_LIMIT");
-  if (entry.x < 0 || entry.y < 0 || entry.x >= innerWidth || entry.y >= innerHeight) return fail("TARGET_OUTSIDE_VIEWPORT");
+  if (entry.x < viewport.left || entry.y < viewport.top || entry.x >= viewport.right || entry.y >= viewport.bottom) return fail("TARGET_OUTSIDE_VIEWPORT");
   const hit = document.elementFromPoint(entry.x, entry.y);
   if (!hit || (hit !== entry.element && !entry.element.contains(hit))) return fail("TARGET_OBSCURED");
   const unchanged = (): boolean => entry.element.isConnected && hit.isConnected && entry.document === document &&
-    entry.url === location.href && innerWidth === entry.viewportWidth && innerHeight === entry.viewportHeight &&
+    entry.url === location.href && unchangedViewport() &&
     eligible(entry.element) && !isLimited() && unchangedGeometry() && document.elementFromPoint(entry.x, entry.y) === hit;
   if (observe && (dispatch || edit)) return fail("INVALID_TARGET_OPERATION");
   if (edit) {
@@ -226,5 +244,5 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       hit.dispatchEvent(new MouseEvent("click", { ...options, buttons: 0 }));
     } catch { return { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true }; }
   }
-  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: entry.element instanceof HTMLInputElement && (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)), viewportWidth: innerWidth, viewportHeight: innerHeight, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
+  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: entry.element instanceof HTMLInputElement && (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)), viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
 }

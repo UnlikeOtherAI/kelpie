@@ -86,7 +86,7 @@ class ScriptObservationFlowTest : ScriptPublicFixture() {
                         .getString(0),
                 )
                 assertEquals(
-                    server.url("/alpha").toString(),
+                    "/alpha",
                     records
                         .getJSONArray(0)
                         .getJSONObject(1)

@@ -6,6 +6,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      runtime_acceptance:
+        description: Run isolated native WK and CEF acceptance after compilation
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,6 +28,12 @@ jobs:
       - name: Check dependency scope
         id: scope
         run: python3 scripts/ci/macos_inputs.py >> "$GITHUB_OUTPUT"
+      - name: Check hosted driver syntax
+        run: |
+          for file in tests/macos/runtime-*.mjs scripts/testing/macos-workflow-acceptance.mjs; do node --check "$file"; done
+          bash -n scripts/testing/macos-sign-test-app.sh
+          node --test tests/macos/runtime-harness.test.mjs
+
       - name: Verify scope gate
         run: python3 -m unittest discover -s tests/ci -p 'test_macos_inputs.py'
 
@@ -120,4 +131,31 @@ jobs:
           name: macos-build-diagnostics
           path: .cache/macos-ci/build.log
           if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Prepare explicitly requested hosted runtime
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
+        run: |
+          set -euo pipefail
+          node scripts/testing/macos-workflow-acceptance.mjs --preparation started 0
+          trap 'prepare_exit=$?; node scripts/testing/macos-workflow-acceptance.mjs --preparation failed "$prepare_exit"; exit "$prepare_exit"' ERR
+          brew install ffmpeg
+          pnpm --filter @unlikeotherai/kelpie build
+          bash scripts/testing/macos-sign-test-app.sh
+          node scripts/testing/macos-workflow-acceptance.mjs --preparation ready 0
+
+      - name: Exercise owned native app without global input
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
+        timeout-minutes: 15
+        env:
+          KELPIE_HOSTED_RUNTIME: '1'
+        run: node scripts/testing/macos-workflow-acceptance.mjs
+
+      - name: Retain sanitized native runtime evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-native-runtime-evidence
+          path: .cache/macos-runtime/evidence
+          if-no-files-found: error
           retention-days: 7

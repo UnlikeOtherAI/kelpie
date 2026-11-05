@@ -1,6 +1,6 @@
 # Bounded Lightpanda Linux verification
 
-Status: prepared, not run. The coordinator must assign the exact committed source,
+Status: bounded diagnostics and seven production stdio navigation cases passed. Reader expansion and comparable engine benchmarking remain pending. The coordinator must assign the exact committed source,
 owned Fedora test worktree and resource slot before execution. Fedora is a bounded
 Linux-native test target, not a development host or ongoing worker service.
 
@@ -10,7 +10,7 @@ Linux-native test target, not a development host or ongoing worker service.
   canonical public worker wiring and production stdio corpus, integrated by root.
   No uncommitted source is copied to Fedora.
 - Proposed test path: an explicitly assigned worktree under
-  /home/ondre/Projects/kelpie-test-worktrees. Do not create/reuse it until root gives
+  /home/ondre/Projects/kelpie-worktrees/capture-linux-20261104. Do not create/reuse it until root gives
   the exact path and branch and verifies ownership/status.
 - Executable: upstream stable 1.0.2, source commit
   c5f7bb29b127040c899d4e181b5709f76fc71a6f.
@@ -113,7 +113,107 @@ Retain a machine-readable report and concise ledger entry containing:
 - Verified teardown of the exact owned test resources.
 
 A successful protocol handshake, source inspection or mocked test is not a
-completed LP compatibility result. No real LP task or performance result is
-claimed by this plan.
+completed LP compatibility result. The prepared plan made no runtime claim;
+subsequent measured diagnostics are recorded below and in lightpanda-analysis.md.
 
 The candidate Linux IP controls and their unsupported-kernel caveat are documented by [systemd.resource-control](https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html#IPAddressAllow=ADDRESS[/PREFIXLENGTH]%E2%80%A6). This plan requires an actual enforcement probe and does not treat unit acceptance as proof.
+
+## Actual boundary probe, 5 November2026
+
+Root assigned the existing owned Fedora checkout
+/home/ondre/Projects/kelpie-worktrees/capture-linux-20261104. Exact probe source:
+6fb0091aa9379e89ff0071fac2c34337032ba91f. Lightpanda itself had not run at this checkpoint.
+
+Fedora systemd259.9 has cgroupv2/BPF support. The unfiltered documentation-address
+UDP baseline completed; the same send returned EPERM inside the restricted
+transient service, while its own TCP loopback handshake completed. Kernel
+cgroup files reported memory.max2147483648, cpu.max100000/100000 and pids.max64.
+The unit used operator User=ondre, CPUWeight1, NoNewPrivileges=yes,
+IPAddressDeny=any, IPAddressAllow=localhost, RuntimeMaxSec8 and control-group
+cleanup. These are resource/packet-egress controls, not a claim of a complete
+filesystem or local-service isolation boundary.
+
+Actual successful service runtime was266ms, CPU201ms and peak14.7MiB.
+It exited0 and the collected unit was not-found/inactive/MainPID0. No LP,
+browser or native compiler ran during the probe. The original pipe transport
+failed before service creation; manager-opened append stdout failed209 before
+execution. Default journal transport worked without policy changes. Failed
+transport evidence is preserved rather than counted as enforcement success.
+
+Sanitized artifacts are retained on Maxis at
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/linux-boundary, notably
+worker-boundary-journal-report.txt, worker-boundary-journal-unit.txt and
+worker-boundary-baseline.json. Future corpus execution must use the verified
+journal transport, retain the exact unit identity and recheck teardown. Runtime
+execution remains subject to the coordinator's functional-workload slot.
+
+## Initial actual binary result, 5 November2026
+
+The official1.0.2 Linux asset matched76408136 bytes and SHA-256
+ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e.
+Its version command reported1.0.2 and Playwright1.62.1 connected over CDP inside
+the verified resource/egress service. Exact corpus source1a182318d09ce81452d466e36b9cd893af14b6ce
+then encountered a definite refusal on the second new browser context:
+Cannot have more than one browser context at a time.
+
+That failure happened before navigation/read tasks and is retained in the
+denominator. No text/extraction/public profile is inferred from the handshake.
+The owned LP process exited and the transient unit was collected with MainPID0.
+Service totals were1.477s wall,1.402s CPU and187MiB peak on the contended host;
+these include setup and are not a comparison with Chromium.
+
+Root authorized one further diagnostic run with a single owned context, separate
+concurrent-context refusal, close-then-new storage checks and explicit shared
+owned tabs. The source now continues those diagnostics instead of abandoning
+independent reader facts at context allocation. Production stdio profile
+advertisement remains gated off unless a later operator verification is approved.
+
+The next Lightpanda test source supplies explicit private host prefixes and
+asserts the actual prioritized20-control/truncation contract. A separate scoped
+catalogue snapshot checks public headings/links and private/hidden omission.
+These corrected assertions are not yet runtime evidence.
+
+The finite production entrypoint corpus is
+tests/linux/lightpanda-stdio-acceptance.mjs. It requires the newly checked CLI/SDK
+artifact, maxSessions1/maxTabs1 and the proven navigation-only method list.
+Seven sequential cases cover version/initialize, pre-allocation shared refusal,
+exact capabilities/resource ceilings, public history/reload, unsupported/foreign/
+origin refusal, close/fresh storage, TTL and clean shutdown preserving the
+borrowed LP endpoint. The seven public cases passed in the later production checkpoint below.
+
+## Verified production stdio navigation profile, 5 November 2026
+
+The built production CLI/SDK at 9a30140514720ad34fe71e1a065b8de0209b5f00
+passed all seven public stdio cases from fixture revision
+0a6913f700f16080b47244f322a23ced23cebe65 on the exact 1.0.2 Linux asset above.
+CLI/package/MCP initialize all reported 0.1.22. The archive SHA-256 was
+2fa04e2e4cec3ae06c33047fc8c4bd84a0283135aaaa6a5389139cab7556a989.
+
+The operator configured one isolated session and one tab. Verified methods were
+tabs.list, tabs.close, tab.goto, tab.url, tab.title, tab.back, tab.forward and
+tab.reload, alongside documentation/capabilities. Shared isolation refused before
+allocation; a second session refused RESOURCE_LIMIT. Actual history/reload,
+foreign-tab and origin refusal, closed/stale handles, fresh cookie/localStorage
+isolation, TTL retirement and clean stdio shutdown all passed. A fresh context
+on the borrowed LP endpoint still worked after worker shutdown. No human storage
+or pages were imported. Unsupported readers/input/pixels/WebMCP stayed refused;
+the corrected diagnostic snapshot assertions remain separately unexecuted.
+
+The enforced unit retained one CPU/CPUWeight 1, 2 GiB, 64 tasks, 120 seconds,
+NoNewPrivileges and loopback-only egress. There were 41 tool calls and 3,999
+response bytes. Whole-service cost was 7.464 seconds wall, 4.280 seconds CPU,
+301.1 MiB peak; the report measured 6.462 seconds including teardown and a
+315,830,272-byte cgroup peak before exit. Quota throttling and host contention
+were present. These are one absolute sample, not a same-host engine comparison.
+Earlier four diagnostic attempts/failures remain in the denominator and table.
+
+Unit kelpie-lightpanda-public-1793850018 exited successfully, then was collected:
+not-found/inactive, MainPID 0, cgroup absent, no LP process. Worker stderr was
+empty and stdout remained valid MCP. Evidence on Maxis:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/lightpanda-actual/public-9a301405,
+including report.json, journal.txt, unit-begin.txt and teardown.txt.
+Report SHA-256:
+d7ca0d84efe7f232bb508443af655790cd0d6447b56a275e47f85261c7f63267.
+An initial artifact-copy wildcard encountered the synthetic empty-home directory;
+explicit report-file transfer then succeeded with the same verified report hash.
+No corpus result was changed. No ongoing worker service remains.

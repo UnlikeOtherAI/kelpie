@@ -35,7 +35,7 @@ class ScriptRedactorAdapterTest {
                 ScriptRedactor { response }.redact(mapOf("secret" to "private"), emptyList())
             } catch (error: ScriptFailure) {
                 refused = true
-                assertEquals("SCRIPT_OUTPUT_REDACTION_FAILED", error.code)
+                assertEquals("OUTPUT_REDACTION_FAILED", error.code)
                 assertFalse(error.message.orEmpty().contains("private"))
             }
             assertEquals(true, refused)

@@ -205,12 +205,108 @@ timing or OS/browser integration. Those require the real native/Chromium flow.
 
 | Evidence | Completed | Pending |
 | --- | --- | --- |
-| Source/release/API research | Commit-pinned sources and release metadata above | Downloaded executable hash/version |
-| Independent session/backend source | Draft in owned Maxis worktree | Focused checks and committed reviewed source |
-| Real Chromium session corpus | Durable harness drafted | Allocated browser run and artifact report |
-| Real LP CDP navigation/text/extraction | None claimed | Assigned Linux test checkout/resource slot |
-| Compatibility/performance comparison | None claimed | Correctness first, then bounded cost measurement |
+| Source/release/API research | Commit-pinned sources; exact 1.0.2 executable size/hash/version verified | Future release compatibility |
+| Independent session/backend source | eee84a26 plus checked 9a301405; shared/CLI full checks passed | Installed published package gate |
+| Real Chromium session corpus | Actual production stdio/private-world WebMCP corpus; see desktop-backend.md | Native platform flows are separate |
+| Real LP CDP navigation/text/extraction | Narrow production navigation profile and limited diagnostic facts below | Full reader/privacy/visibility corpus expansion |
+| Compatibility/performance comparison | Five bounded attempts with absolute correctness/cost evidence | Comparable same-host Chromium runs; no ratio claimed |
 | Native Windows/Linux capture | Not evidence for LP | Separate native owner/rollout gate |
 
 Never convert a pending row into completed support because a unit mock or a
 protocol handshake passed.
+
+## Measured stable-binary compatibility, 5 November2026
+
+Four disposable Fedora44 runs used the exact official1.0.2 binary (SHA-256
+ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e),
+Playwright1.62.1 and the permanent frozen capture fixture. Every run was under
+the independently verified loopback-only packet-egress/cgroup boundary:
+oneCPU, CPUWeight1,2GiB,64 tasks and120s maximum. No codec/native app build,
+human profile or background service was involved. All LP processes exited and
+all collected units ended inactive/not-found with MainPID0.
+
+| Source | Named checks | Result and retained limitation | Whole-service cost |
+| --- | --- | --- | --- |
+| 1a182318 | 0 | Setup failed at second context; no task success inferred |1.477s wall/1.402s CPU/187MiB peak |
+| 754503ba |2 | Extra page refused; URL test expected a noncanonical missing slash |1.544s/1.468s/183.4MiB |
+| 8cfe75c5 |16 |11 passed,5 failed; includes upstream limits and two invalid fixture expectations |1.752s/1.700s/191.4MiB |
+| c774ac3a |19 |15 passed,4 failed; controls/heading bound still needed correction |2.219s/2.167s/189.8MiB |
+
+Counts are per evolving diagnostic revision, not a blended compatibility score.
+All setup, test and refusal results remain in the evidence. These whole-service
+costs include Node/client/fixture setup and run under host contention; they are
+neither LP-only consumption nor an unloaded speed comparison. The last kernel
+cgroup peak was199065600 bytes with2.106386 CPU seconds before final report/exit;
+quota throttling was observed. Individual cold/warm task samples remain in JSON.
+
+Observed support within this fixture:
+- Navigation, title/URL, history back/forward and reload completed correctly.
+- Deterministic product extraction returned exactly Green tea/Black tea despite
+  hidden, inherited-hidden and editable/value canaries; none appeared in the
+  tested result. Document/viewport status and visible/hidden readiness checks
+  passed. Missing/ambiguous/nested extraction and opacity/collapse cases remain
+  outside this diagnostic proof.
+- Closing a context then creating another omitted prior synthetic cookies and
+  local storage. One managed isolated session with maxTabs1 passed owned-tab,
+  foreign-tab, unsupported-method and close/fresh-context checks.
+- A second concurrent context refused, as did a second page. Explicit shared
+  multiple-tab ownership could not operate. This requires conservative host
+  admission; it does not justify silently sharing a context or importing a page.
+- Actual document.modelContext was undefined. No site tool, canonical screenshot,
+  geometry/pointer or pixel/native-flow capability was admitted.
+
+The snapshot failure is inconclusive as backend evidence: the harness requested
+prioritized maxElements20 but required a heading after24 visible priority0
+controls. It also omitted the internal host prefix. The actual20-control result
+had no private canary. Independent common-owner source review confirmed that
+expectation was invalid. Corrected bounded/scoped snapshots must be exercised;
+we do not claim either parity or incompatibility from this failed assertion.
+
+No production worker stdio session was attempted in those first four diagnostics.
+The later seven-case production checkpoint below proves only its explicit
+navigation inventory. No public reader profile has been enabled; proposed reader
+expansion remains a separate full-contract gate.
+
+Reports and service/teardown logs:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/lightpanda-actual.
+The final c774ac3a-report.json SHA-256 is
+34e0239a682ded2224efde52b6721264968a513a46eeaa3235d212ce38d052a0.
+These are generated evidence artifacts; only the hand-authored corpus and
+conclusions are committed.
+
+## Verified production stdio navigation profile, 5 November 2026
+
+The built production CLI/SDK at 9a30140514720ad34fe71e1a065b8de0209b5f00
+passed all seven public stdio cases from fixture revision
+0a6913f700f16080b47244f322a23ced23cebe65 on the exact 1.0.2 Linux asset above.
+CLI/package/MCP initialize all reported 0.1.22. The archive SHA-256 was
+2fa04e2e4cec3ae06c33047fc8c4bd84a0283135aaaa6a5389139cab7556a989.
+
+The operator configured one isolated session and one tab. Verified methods were
+tabs.list, tabs.close, tab.goto, tab.url, tab.title, tab.back, tab.forward and
+tab.reload, alongside documentation/capabilities. Shared isolation refused before
+allocation; a second session refused RESOURCE_LIMIT. Actual history/reload,
+foreign-tab and origin refusal, closed/stale handles, fresh cookie/localStorage
+isolation, TTL retirement and clean stdio shutdown all passed. A fresh context
+on the borrowed LP endpoint still worked after worker shutdown. No human storage
+or pages were imported. Unsupported readers/input/pixels/WebMCP stayed refused;
+the corrected diagnostic snapshot assertions remain separately unexecuted.
+
+The enforced unit retained one CPU/CPUWeight 1, 2 GiB, 64 tasks, 120 seconds,
+NoNewPrivileges and loopback-only egress. There were 41 tool calls and 3,999
+response bytes. Whole-service cost was 7.464 seconds wall, 4.280 seconds CPU,
+301.1 MiB peak; the report measured 6.462 seconds including teardown and a
+315,830,272-byte cgroup peak before exit. Quota throttling and host contention
+were present. These are one absolute sample, not a same-host engine comparison.
+Earlier four diagnostic attempts/failures remain in the denominator and table.
+
+Unit kelpie-lightpanda-public-1793850018 exited successfully, then was collected:
+not-found/inactive, MainPID 0, cgroup absent, no LP process. Worker stderr was
+empty and stdout remained valid MCP. Evidence on Maxis:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/lightpanda-actual/public-9a301405,
+including report.json, journal.txt, unit-begin.txt and teardown.txt.
+Report SHA-256:
+d7ca0d84efe7f232bb508443af655790cd0d6447b56a275e47f85261c7f63267.
+An initial artifact-copy wildcard encountered the synthetic empty-home directory;
+explicit report-file transfer then succeeded with the same verified report hash.
+No corpus result was changed. No ongoing worker service remains.

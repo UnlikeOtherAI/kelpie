@@ -54,7 +54,7 @@ class ScriptOwnershipTest {
         }
         assertNotEquals(owner.owner, ScriptOwner("a", "new", "launch"))
         assertEquals("ScriptOwner", owner.owner.toString())
-        run.finish(null, false, false)
+        run.finish(null, false)
         assertFalse(run.active())
         assertTrue(store.start(owner, script()).active())
     }
@@ -114,7 +114,7 @@ class ScriptOwnershipTest {
         val store = ScriptRunStore(temporary.newFolder("retention")) { clock }
         val owner = authority()
         val run = store.start(owner, script())
-        run.finish(null, false, false)
+        run.finish(null, false)
         clock = 31L * 60 * 1000
         store.retire()
         fails("SCRIPT_NOT_FOUND") { store.owned(owner.owner, run.id) }
@@ -133,7 +133,7 @@ class ScriptOwnershipTest {
         assertEquals("finalizing", run.status()["state"])
         assertFalse(run.status().containsKey("runSuccess"))
         run.stop("SCRIPT_ABORTED")
-        run.finish("SCRIPT_ABORTED", true, true)
+        run.finish("SCRIPT_ABORTED", true)
         run.clearPrivate()
         val status = run.status()
         assertEquals(true, status["success"])
@@ -158,5 +158,33 @@ class ScriptOwnershipTest {
         assertTrue(run.captureExpired())
         run.clearPrivate()
         assertFalse(run.captureExpired())
+    }
+
+    @Test
+    fun privacyDiscardSurvivesRedactorFailureAndFirstUncertaintyWins() {
+        val run = ScriptRun("privacy", authority(), "tab", script(), File(temporary.root, "privacy"))
+        val file = run.artifacts.newFile("png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        run.artifacts.register(file, "image/png", emptyMap())
+        run.stop("SENSITIVE_CAPTURE_REFUSED")
+        run.finish("SENSITIVE_CAPTURE_REFUSED", true)
+        assertTrue(run.discardCapture.get())
+        assertFalse(file.exists())
+        assertEquals(emptyList<Any>(), run.status()["artifacts"])
+        try {
+            ScriptRedactor { null }.redact(mapOf("before" to "private"), emptyList())
+            error("Redaction must fail closed")
+        } catch (error: ScriptFailure) {
+            assertEquals("OUTPUT_REDACTION_FAILED", error.code)
+            run.stop(error.code)
+            run.finish(error.code, false)
+        }
+        run.stop("SCRIPT_ABORTED")
+        run.finish("SCRIPT_ABORTED", false)
+        val status = run.status()
+        assertEquals("SENSITIVE_CAPTURE_REFUSED", (status["runError"] as Map<*, *>)["code"])
+        assertEquals(true, status["mayHaveCompleted"])
+        assertEquals("failed", status["state"])
+        assertTrue(run.discardCapture.get())
+        assertFalse(status.containsKey("outputs"))
     }
 }
