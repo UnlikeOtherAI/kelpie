@@ -1,7 +1,7 @@
 import {execFileSync} from "node:child_process";
 import {createHash} from "node:crypto";
 import {requireTrue} from "./runtime-client.mjs";
-import {scriptPointerPosition} from "../../packages/shared/dist/index.js";
+import {fitFastPointer} from "../capture/g08-fast-profile.mjs";
 export function inspectMedia(item,{marker=false,preNavigation=false}={}) {
  const meta=JSON.parse(execFileSync("ffprobe",["-v","error","-select_streams","v:0","-show_streams","-show_frames","-of","json",item.file],{maxBuffer:16*1024*1024}));
  const stream=meta.streams[0];requireTrue(stream?.width===item.width&&stream?.height===item.height,"MEDIA_DIMENSIONS");
@@ -109,34 +109,7 @@ export function inspectDefaultMotion(item,scene){
   }
   const time=Number(frames[index].best_effort_timestamp_time)*1000;
   if(count>=3&&maxX-minX<24&&maxY-minY<24&&Number.isFinite(time))
-   tracks.push({time,x:minX*scene.width/item.width,y:minY*scene.height/item.height});
+   tracks.push({timeMs:time,x:minX*scene.width/item.width,y:minY*scene.height/item.height});
  }
- const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
- const endpoint=tracks.filter(point=>distance(point,scene.second)<8).at(-1);
- requireTrue(endpoint,"DEFAULT_MOTION_ENDPOINT");
- const offset={x:scene.second.x-endpoint.x,y:scene.second.y-endpoint.y};
- const corrected=tracks.map(point=>({...point,x:point.x+offset.x,y:point.y+offset.y}));
- const start=corrected.filter(point=>point.time<endpoint.time&&distance(point,scene.first)<4).at(-1);
- requireTrue(start,"DEFAULT_MOTION_START");
- const end=corrected.find(point=>point.time>start.time&&distance(point,scene.second)<4);
- requireTrue(end,"DEFAULT_MOTION_END");
- const path=corrected.filter(point=>point.time>start.time&&point.time<end.time);
- requireTrue(path.length>=4,"DEFAULT_MOTION_INSUFFICIENT_FRAMES");
- const dx=scene.second.x-scene.first.x,dy=scene.second.y-scene.first.y,length2=dx*dx+dy*dy;
- const progress=point=>((point.x-scene.first.x)*dx+(point.y-scene.first.y)*dy)/length2;
- requireTrue(Math.min(...path.map(progress))<.35&&Math.max(...path.map(progress))>.65,"DEFAULT_MOTION_INSUFFICIENT_COVERAGE");
- const samples=[start,...path,end],motion={from:scene.first,to:scene.second,curve:"s"};
- function fit(duration){
-  let best=Infinity,bestOnset=null;
-  for(let onset=start.time;onset<=path[0].time;onset+=2){
-   const errors=samples.map(point=>distance(point,scriptPointerPosition(motion,(point.time-onset)/duration)));
-   const rms=Math.sqrt(errors.reduce((sum,error)=>sum+error*error,0)/errors.length);
-   if(rms<best){best=rms;bestOnset=onset;}
-  }
-  return {rms:best,onset:bestOnset};
- }
- const current=fit(350),previous=fit(500);
- requireTrue(current.rms<9&&previous.rms>current.rms+6,"DEFAULT_MOTION_DURATION");
- return {samples:path.length,durationMs:350,fit350Px:current.rms,fit500Px:previous.rms,
-  observedSpanMs:end.time-start.time,endpointErrorPx:distance(endpoint,scene.second)};
+ return fitFastPointer(tracks,{from:scene.first,to:scene.second,curve:"s"});
 }
