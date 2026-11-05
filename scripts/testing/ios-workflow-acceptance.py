@@ -38,7 +38,13 @@ def selection(scope):
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchScrollableControl",
         ]
-        return ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods], set(methods)
+        unit = {
+            "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+            "testProjectionUsesInsetContentOriginAndVisualViewport",
+            "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
+        }
+        return (["KelpieTests/IOSCaptureViewportTests"] +
+                ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods]), set(methods) | unit
     if scope not in ("full", "navigation", "diagnostics"):
         raise ValueError("Unsupported native workflow test scope")
     targets = ["KelpieTests/IOSWorkflowNavigationTests"]
