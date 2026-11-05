@@ -50,6 +50,8 @@ test("sandbox smoke has a separate pinned and corpus-free dispatch",async()=>{
  assert.match(workflow,/name: Smoke test pinned Chromium sandbox[\s\S]*?inputs\.sandbox_only == true/);
  assert.ok(smoke.indexOf("assert.ok(ready")<smoke.indexOf("browser=spawn("));
  assert.doesNotMatch(smoke,/kelpie_worker_session|kelpie_browser_control/);
+ assert.ok(smoke.indexOf("assert.ok(canaryObserved")<smoke.indexOf("browser-identity.json"));
+ assert.ok(smoke.indexOf("SANDBOX_BROWSER_CHANGED")<smoke.indexOf("browser-identity.json"));
 });
 
 test("alternate runner is allowlisted for sandbox smoke only",async()=>{

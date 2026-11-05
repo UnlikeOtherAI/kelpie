@@ -2,7 +2,7 @@
 // Pinned Chromium only. No worker, fixture corpus, CLI, or comparative cost.
 import assert from "node:assert/strict";
 import {spawn} from "node:child_process";
-import {createHash} from "node:crypto";
+import {createHash,randomBytes} from "node:crypto";
 import {createReadStream} from "node:fs";
 import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
@@ -11,6 +11,7 @@ import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
 import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 import {classifySpawnError,createBoundedStderr} from "./worker-comparison-launch-diagnostic.mjs";
+import {startSmokeFixture} from "./worker-comparison-smoke-fixture.mjs";
 const [binary,expected,output]=process.argv.slice(2);
 assert.match(expected??"",/^[a-f0-9]{64}$/);
 assert.match(process.env.KELPIE_COMPARISON_ID??"",/^[a-f0-9]{64}$/);
@@ -32,11 +33,12 @@ const group=(await readFile("/proc/self/cgroup","utf8")).split("\n").find(x=>x.s
 assert.ok(group?.startsWith("/"));
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
 const env={PATH:process.env.PATH??"/usr/bin:/bin",HOME:home,LANG:"C.UTF-8"};
-let browser,category="startup",evidence=null,startTicks=null,spawnEvent="not-started",spawnError=null,closePromise;
+let browser,fixture,canaryObserved=false,category="startup",evidence=null,startTicks=null,spawnEvent="not-started",spawnError=null,closePromise;
 const stderr=createBoundedStderr();
 let preIdentityExit=false,exitObserved=false,exitCode=null,exitSignal=null,cleanup="none";
 try{
- browser=spawn(executable,["--headless=new","--remote-debugging-port=0","--user-data-dir="+join(home,"profile"),"--no-first-run","about:blank"],{env,stdio:["ignore","ignore","pipe"]});
+ fixture=await startSmokeFixture(randomBytes(32).toString("hex"));
+ browser=spawn(executable,["--headless=new","--remote-debugging-port=0","--user-data-dir="+join(home,"profile"),"--no-first-run",fixture.origin],{env,stdio:["ignore","ignore","pipe"]});
  browser.stderr.on("data",chunk=>stderr.append(chunk));
  closePromise=new Promise(ok=>browser.once("close",ok));
  browser.once("exit",(code,signal)=>{exitObserved=true;exitCode=code;exitSignal=signal;if(!startTicks&&cleanup==="none")preIdentityExit=true;});
@@ -49,6 +51,13 @@ try{
  category="identity";
  startTicks=await nativeProcessStartTicks(browser.pid);
  assert.ok(startTicks,"SANDBOX_BROWSER_ID");
+ category="page-canary-unobserved";
+ canaryObserved=await Promise.race([fixture.waitForCanary(15000),closePromise.then(()=>false)]);
+ assert.ok(canaryObserved,"PAGE_CANARY_MISSING");
+ category="identity";
+ assert.equal(await nativeProcessStartTicks(browser.pid),startTicks,"SANDBOX_BROWSER_CHANGED");
+ assert.equal(browser.exitCode,null,"SANDBOX_BROWSER_EXITED");
+ assert.equal(browser.signalCode,null,"SANDBOX_BROWSER_EXITED");
  await writeFile(join(dir,"browser-identity.json"),JSON.stringify({pid:browser.pid,startTicks,unitPid:process.pid,nonce:process.env.KELPIE_COMPARISON_ID}),{mode:0o600,flag:"wx"});
  category="host-audit-timeout";
  for(let attempt=0;attempt<400&&!evidence;attempt++){
@@ -70,10 +79,11 @@ try{
   cleanup="term";browser.kill("SIGTERM");await Promise.race([closePromise,delay(1500)]);
   if(browser.exitCode===null&&browser.signalCode===null){cleanup="kill";browser.kill("SIGKILL");await Promise.race([closePromise,delay(1500)]);}
  }else if(closePromise)await Promise.race([closePromise,delay(1500)]);
+ if(fixture)await fixture.close();
  const allowedSignals=["SIGABRT","SIGBUS","SIGFPE","SIGILL","SIGKILL","SIGSEGV","SIGSYS","SIGTERM","SIGTRAP"];
  const diagnostic={binarySHA256:expected,spawnEvent:spawnEvent==="not-started"?"timeout":spawnEvent,spawnError,
   pid:Number.isSafeInteger(browser?.pid)?browser.pid:null,startTicks,
-  preIdentityExit,exitObserved,exitCode:Number.isInteger(exitCode)?exitCode:null,
+  canaryObserved,preIdentityExit,exitObserved,exitCode:Number.isInteger(exitCode)?exitCode:null,
   exitSignal:allowedSignals.includes(exitSignal)?exitSignal:exitSignal?"OTHER":null,cleanup,stderr:stderr.result()};
  await writeFile(join(dir,"process-diagnostic.json"),JSON.stringify(diagnostic,null,2),{mode:0o600,flag:"wx"});
 }
