@@ -84,8 +84,10 @@ try {
  const actions=[{action:"commentary",text:"Stop accessibility acceptance",durationMs:30000}];
  if(mode!=="stop")actions.push({action:"click",target:{role:"button",name:"Capture target",exact:true}});
  actions.push({action:"wait",ms:30000});
+ const tapOptions={color:"#FF0000",radius:24,durationMs:5000,wobble:mode!=="wgc",fade:mode!=="wgc"};
+ if(mode==="wgc")report.spatialCase={purpose:"native spatial/Stop evidence only; animation has separate exported timeline evidence",tapIndicator:tapOptions};
  pending=observeInFlight(api("play-script",{version:1,tabId,actions,
-   ...(mode!=="stop"?{pointer:{enabled:true,curve:"c",durationMs:1200,easing:"ease-in-out"},tapIndicator:{color:"#FF0000",radius:24,durationMs:5000,wobble:true,fade:true}}:{}),
+   ...(mode!=="stop"?{pointer:{enabled:true,curve:"c",durationMs:1200,easing:"ease-in-out"},tapIndicator:tapOptions}:{}),
    capture:{formats:["gif","video","screenshots"],fps:10,maxWidth:640,maxBytes:8388608,maxDurationMs:60000}}));
  let status,provider;
  for(let attempt=0;attempt<50;attempt++){
@@ -97,7 +99,7 @@ try {
    await new Promise(done=>setTimeout(done,100));
  }
  assert.equal(status.playing,true);assert.equal(provider?.visibleInvokableButtons,1);
- await new Promise(done=>setTimeout(done,700));
+ if(mode!=="wgc")await new Promise(done=>setTimeout(done,700));
  const current=scriptStatusV1Schema.parse((await api("get-script-status")).value);
  assert.equal(current.runId,status.runId);assert.equal(current.playing,true);
  report.beforeInvoke={status:current,provider};await save();
@@ -119,8 +121,10 @@ try {
    report.nativeStopCapture=await automation(["capture-stop",String(running.pid),exe,identity.startTime,join(output,"native-stop-window")]);
    wgcCaptureDirectory=join(output,"wgc-native-window");
    report.phase="native-wgc-capture";
+   const captureBegan=performance.now();report.captureTiming={requestedAt:new Date().toISOString(),workflowElapsedMs:current.elapsedMs};
    report.wgc=JSON.parse((await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,wgcCaptureDirectory],
      {signal:deadline.signal,timeout:10000})).stdout);
+   report.captureTiming.completedAt=new Date().toISOString();report.captureTiming.durationMs=performance.now()-captureBegan;
    assert.equal(report.wgc.className,"KelpieScriptPresentation");assert.equal(report.wgc.processId,running.pid);
    assert.equal(report.wgc.windowHandle,window.windowHandle);
    await save();
