@@ -42,7 +42,25 @@ def run_fixture(tab: str, evidence: Path):
     inputs_path = evidence / "inputs.json"
     recipe_path.write_text(json.dumps(recipe))
     inputs_path.write_text(json.dumps({"entry": "Hosted typed input"}))
-    played = invoke(["script", "run", str(recipe_path), "--inputs", str(inputs_path), "--output", str(evidence / "downloads")])
+    try:
+        played = invoke(["script", "run", str(recipe_path), "--inputs", str(inputs_path), "--output", str(evidence / "downloads")])
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        # Read-only status only: preserve bounded metadata without output values or credentials.
+        report = {"status": "unavailable"}
+        try:
+            status = invoke(["script", "status", "--pinned"], timeout=10)
+            for key in ("state", "playing", "actionIndex", "totalActions", "elapsedMs", "runSuccess", "mayHaveCompleted"):
+                value = status.get(key)
+                if isinstance(value, (bool, int)) or (key == "state" and value in ("idle", "running", "finalizing", "completed", "failed", "aborted")):
+                    report[key] = value
+            code = status.get("runError", {}).get("code")
+            if isinstance(code, str) and re.fullmatch("[A-Z0-9_]{1,80}", code):
+                report["errorCode"] = code
+            report["status"] = "observed"
+        except (OSError, ValueError, AttributeError, RuntimeError, subprocess.SubprocessError):
+            pass
+        (evidence / "status-on-failure.json").write_text(json.dumps(report, indent=2))
+        raise
     result = played["result"]
     if not result["success"] or result["outputs"].get("page") != "Count 1":
         raise ValueError("CLI workflow outcome did not match the click")

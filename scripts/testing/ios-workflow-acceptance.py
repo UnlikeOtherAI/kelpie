@@ -23,7 +23,7 @@ NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
 
 
 def selection(scope):
-    if scope not in ("full", "navigation"):
+    if scope not in ("full", "navigation", "diagnostics"):
         raise ValueError("Unsupported native workflow test scope")
     targets = ["KelpieTests/IOSWorkflowNavigationTests"]
     files = [NAVIGATION_TESTS]
@@ -31,10 +31,19 @@ def selection(scope):
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieUITests/WorkflowCaptureUITests"])
         files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
-        targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST])
+        methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
+        if scope == "diagnostics":
+            methods.extend([
+                "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
+                "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
+                "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+                "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
+                "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
+            ])
+        targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
-    if scope == "navigation":
-        required.update([NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST])
+    if scope != "full":
+        required.update(methods)
     return targets, required
 
 
@@ -136,6 +145,12 @@ def failure_diagnostics(log_path, destination):
     lines = []
     with log_path.open(errors="replace") as log:
         for line in log:
+            capture = re.search(r"\[WorkflowCapture\] reason=(native-bounds|pixel-ratio|layout-size|visible-size|scale|snapshot-viewport|presentation-parent)\b", line)
+            if capture:
+                lines.append("[WorkflowCapture] reason=" + capture.group(1))
+                if len(lines) >= 100:
+                    break
+                continue
             if not re.search(r"\berror:|Test Case .*failed|Test Suite .*failed|\*\* TEST .*FAILED|timed out", line, re.I):
                 continue
             line = re.sub(r"(?i)(bearer\s+)\S+", r"\1[redacted]", line)
@@ -238,7 +253,7 @@ def run_device(device, product_hashes, scope):
             install_report["afterError"] = type(error).__name__
         (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
         missing = sorted(method for method in required if method not in tests)
-        cli_required = scope == "full"
+        cli_required = scope != "navigation"
         if process.returncode or (cli_required and not cli_started) or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
         if not install_verified:

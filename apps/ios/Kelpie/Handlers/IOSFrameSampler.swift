@@ -125,6 +125,12 @@ final class IOSFrameSampler {
         }
     }
 
+    static func diagnostic(_ reason: String) {
+        #if DEBUG
+        print("[WorkflowCapture] reason=" + reason)
+        #endif
+    }
+
     private func canvas(_ viewport: IOSWorkflowTab.Viewport) -> CGSize {
         let raw = viewport.bounds
         let factor = min(tab.view.contentScaleFactor, CGFloat(maxWidth) / raw.width, 1920 / raw.height)
@@ -150,7 +156,16 @@ final class IOSFrameSampler {
         if let initial {
             let nativeResize = initial.bounds != viewport.bounds || initial.pixelRatio != viewport.pixelRatio
             let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
-            if nativeResize || (initialDocument == generation && documentResize) { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
+            if nativeResize || (initialDocument == generation && documentResize) {
+                let reason: String
+                if initial.bounds != viewport.bounds { reason = "native-bounds" }
+                else if initial.pixelRatio != viewport.pixelRatio { reason = "pixel-ratio" }
+                else if initial.layout != viewport.layout { reason = "layout-size" }
+                else if initial.visible.size != viewport.visible.size { reason = "visible-size" }
+                else { reason = "scale" }
+                Self.diagnostic(reason)
+                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+            }
         }
         if initialDocument != generation {
             initial = viewport
@@ -185,7 +200,10 @@ final class IOSFrameSampler {
         if after != viewport {
             let scrolled = after.bounds == viewport.bounds && after.layout == viewport.layout &&
                 after.visible.size == viewport.visible.size && after.scale == viewport.scale && after.pixelRatio == viewport.pixelRatio
-            guard scrolled else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
+            guard scrolled else {
+                Self.diagnostic("snapshot-viewport")
+                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+            }
             if expected != nil { throw IOSWorkflowFailure("STALE_TARGET") }
             dropped += 1
             return false
