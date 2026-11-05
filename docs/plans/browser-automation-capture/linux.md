@@ -375,3 +375,39 @@ the actual generic kelpie_extension wrapper must reconstruct identical bytes,
 hash, length, offsets, EOF and MIME. Callback fetches honor the supplied abort
 signal; the helper creates no app or authority. The fixture closes in finally.
 Node syntax/whitespace checks passed; real native transport execution is pending.
+
+## Compiled privacy/identity checkpoint, 5 November 2026
+
+Exact integrated source 3001aa4171030b241657df9e3da4e247045fc5e1 built the Linux
+app, linux_script_media_test and linux_script_artifact_test on Fedora 44. Both
+focused tests passed (2/2, 0.26 seconds), including scope/replacement revocation,
+denied-unlink cleanup retry, decoded GIF/MP4 retained prefixes, budgets and
+finalization failure. Compiler diagnostics contained no warning/error matches.
+This is native compilation/unit evidence; the new browser-level privacy,
+finalization/profile/HTTP/MCP/CLI and GTK flows are still pending.
+
+Native executable SHA-256:
+efd1b73dc8bcb557344cefd4689b327dcd1870d6d32d1c3d458f73f0a0f070f0.
+Generated browser contract SHA-256:
+a4c274fedfa14433baebcdb0b34ade0f7b19fec1e92ddb9215482d87138dd831.
+The authoritative configure graph validated the unchanged frozen lock/cache
+(33 ms, no resolution/download), rebuilt shared TypeScript and regenerated the
+contract. Existing pinned CEF/cache assets were reused; no CEF/bootstrap install
+or general portable suite ran in Fedora.
+
+Actual unit limits were one CPU/CPUWeight 1, 2 GiB, 256 tasks, 15 minutes,
+NoNewPrivileges and loopback-only egress. A process sample showed one compiler.
+Build cost was 3 minutes 55.330 seconds wall, 3 minutes 50.088 seconds CPU and
+727 MiB peak; no memory-limit increase was needed. The initial orchestration
+wrapper stripped embedded shell quotes and exited 2 at its CTest expression
+after successful compilation. That failure is retained. CTest then ran directly
+in a separate 60-second unit under the same limits and passed. Both units were
+collected, their cgroups absent, and no compiler/app/LP process remained.
+Maxis free memory was 14.88 GiB at start and 18.64 GiB after teardown.
+
+Evidence:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/linux-native/native-3001-incremental,
+including build.log, ctest.log, unit journals/teardown, cgroup-limits.txt,
+processes.txt, generated/final hashes and actual runtime/package provenance.
+The separate common visual-viewport correction must land and relink before
+claiming the final geometry case; this build does not pre-empt that gate.
