@@ -60,6 +60,7 @@ jobs:
           git cat-file -e "${package_revision}^{commit}"
           git checkout --detach "${package_revision}"
           for path in scripts/ci/linux-installed-smoke.sh tests/linux/native-resource-snapshot.mjs \
+            tests/linux/navigation-resource-diagnostic.mjs \
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs; do
             git show "${diagnostic_revision}:${path}" > "${path}"
           done
