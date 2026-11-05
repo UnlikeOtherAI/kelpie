@@ -218,7 +218,7 @@ def run_device(device, product_hashes):
         for bundle, pins in [(runner, runner_pins), (BUNDLE, product_hashes)]:
             try:
                 cleanup[bundle] = terminate_owned(udid, bundle, pins)
-            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
                 cleanup[bundle] = "unconfirmed: " + str(error)[:150]
         if started_here:
             cleanup["simulator"] = shutdown_owned(udid)
