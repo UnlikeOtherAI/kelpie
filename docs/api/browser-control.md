@@ -133,7 +133,9 @@ materialization, copied text, and ancestor/style inspection, not engine-internal
 Traversal/output bounds, value exclusion, and fresh-reference semantics still apply.
 
 `tab.extract {scope?,fields,metadata?,maxChars?}` performs fixed, deterministic reads.
-Each field is `{name,selector,source?,multiple?,fields?}`. Source defaults to `text`;
+Each field is `{name,selector,source?,multiple?,fields?}`. Ordinary selectors query
+descendants; the exact `:scope` selector (case insensitive) explicitly selects the
+current content/record root. Source defaults to `text`;
 only `text`, `href`, `src`, and `datetime` are accepted. Nested `fields` maps repeated
 records relative to each matching parent. Three mapping levels, 32 top-level fields,
 16 fields per nested mapping, 100 total records, and 512 nested field evaluations
@@ -160,8 +162,8 @@ only `@type`, `name`, `headline`, `datePublished`, `dateModified`, `url`, and bo
 author/publisher names. Raw JSON, arbitrary object properties, script text, and
 article bodies are never returned. Every metadata item includes its selector,
 attribute/JSON path, `provenanceComplete`, and `authority:"publisher-claim"`.
-A complete source scan also includes a zero-based `index` among matching source
-nodes. An incomplete scan omits that index and never invents an exact CSS path.
+A complete source scan also includes a zero-based `index` among all raw matching
+source nodes, including private, empty, or malformed records that are omitted from output. An incomplete scan omits that index and never invents an exact CSS path.
 These are untrusted claims, never identity, verified facts, or instructions.
 
 `tab.status {}` reports current URL/title, document state, visibility, viewport,

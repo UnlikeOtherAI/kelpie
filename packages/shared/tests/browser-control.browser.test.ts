@@ -319,3 +319,41 @@ describe("bounded observation work on real DOMs", () => {
     } finally { await page.close(); }
   });
 });
+
+
+describe("metadata source positions and scoped root fields", () => {
+  it("counts raw metadata sources before filtering private or empty records", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<main><div contenteditable="true"><meta property="og:site_name" content="PRIVATE_INDEX_CANARY">' +
+        '<script type="application/ld+json">{"name":"PRIVATE_INDEX_CANARY"}</script></div>' +
+        '<meta property="og:site_name" content=""><script type="application/ld+json">{}</script>' +
+        '<meta property="og:site_name" content="Public Publisher"><script type="application/ld+json">{"name":"Public Article"}</script><p>Public</p></main>');
+      const result = await page.evaluate<BrowserExtraction>(fixedObservationExpression("extract", { metadata: true, fields: [{ name: "text", selector: "p", source: "text" }] }));
+      expect(result.metadata.find((item) => item.key === "publisher" && item.value === "Public Publisher")).toMatchObject({ provenanceComplete: true, index: 2 });
+      expect(result.metadata.find((item) => item.key === "name" && item.value === "Public Article")).toMatchObject({ provenanceComplete: true, index: 2 });
+      expect(JSON.stringify(result)).not.toContain("PRIVATE_INDEX_CANARY");
+    } finally { await page.close(); }
+  });
+  it("selects only explicit :scope roots and refuses nested or escaped scope syntax", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<main><article id="record" class="foo"><h2>Record text</h2><input value="PRIVATE_SCOPE_CANARY"></article></main>');
+      const result = await page.evaluate<BrowserExtraction>(fixedObservationExpression("extract", { scope: "#record", fields: [
+        { name: "root", selector: ":scope", source: "text" }, { name: "descendants", selector: "article", source: "text" },
+      ] }));
+      expect(result.fields[0]?.values).toEqual(["Record text"]);
+      expect(result.fields[1]?.status).toBe("missing");
+      expect(JSON.stringify(result)).not.toContain("PRIVATE_SCOPE_CANARY");
+      const nested = await page.evaluate<BrowserExtraction>(fixedObservationExpression("extract", { scope: "main", fields: [
+        { name: "records", selector: "article", source: "text", multiple: true, fields: [{ name: "self", selector: ":SCOPE", source: "text" }] },
+      ] }));
+      expect(nested.fields[0]?.records?.[0]?.[0]?.values).toEqual(["Record text"]);
+      for (const selector of [":scope > .foo:not(:scope)", ":scope > .foo:is(:SCOPE)"]) {
+        await expect(page.evaluate(fixedObservationExpression("extract", { scope: "main", fields: [{ name: "reject", selector, source: "text" }] }))).rejects.toThrow("UNSUPPORTED_SCOPE_SELECTOR");
+      }
+      const escaped = ":" + String.fromCharCode(92) + "73 cope";
+      await expect(page.evaluate(fixedObservationExpression("extract", { scope: "main", fields: [{ name: "reject", selector: escaped, source: "text" }] }))).rejects.toThrow("UNSUPPORTED_SELECTOR_ESCAPE");
+    } finally { await page.close(); }
+  });
+});

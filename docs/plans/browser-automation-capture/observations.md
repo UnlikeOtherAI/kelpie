@@ -218,3 +218,37 @@ Generic Playwright and default native capabilities remain closed; actual managed
 native session-origin-generation grants, API probe and encoding are the next owners'
 runtime dependency. Native JSON Schema shape projection does not replace shared
 semantic origin/input validators; no native WebMCP support is claimed here.
+
+## Narrow source-position and scope follow-up (verified on Maxis)
+
+EXT-03/EXT-04: an exact metadata source index counts every raw node matching its
+selector before omitting private, empty, malformed, or oversized records. The
+previous code skipped private nodes before incrementing, so a later public claim
+could point to the wrong source. New real-DOM regression places private and empty
+sources before public meta and JSON-LD claims; both public indices must be 2.
+
+OBS-01/EXT-01: additional or nested literal :scope tokens refuse before suffix
+matching. This prevents :scope > .foo:not(:scope) from changing its anchoring when
+Element.matches evaluates the suffix. Escaped selector syntax remains an explicit
+refusal. Exact case-insensitive field :scope now selects the current root/record;
+ordinary field selectors still select descendants only. A regression covers root
+and nested record extraction, not/is scope refusal, escaped syntax, and private values.
+
+- [x] Sequential pnpm recursive lint/build; shared131 tests pass; CLI685 pass/1skip.
+- [x] Real Chromium151.0.7922.34 corpus29/29 passes, including both new source-position/root-field regressions.
+- [x] Fresh generated contract build and native gateway/extensions CTest2/2 passes (1.77s).
+- [x] Built SDK -> proxy -> owned Playwright tab inspected: both public source indices2, root text Record text, ordinary article selector missing, nested scope refused COMMAND_FAILED, private canary absent.
+- [ ] Actual native app/UI verification; headless Chromium and core tests do not establish native parity.
+
+Commands: `pnpm -r --workspace-concurrency=1 lint`, same build;
+`pnpm -r --workspace-concurrency=1 test --maxWorkers=1 --minWorkers=1`;
+`pnpm --filter @unlikeotherai/kelpie test --maxWorkers=1 --minWorkers=1`;
+`pnpm --filter @unlikeotherai/kelpie-shared test:browser --maxWorkers=1 --minWorkers=1`.
+The first CLI run exposed a stale help assertion for the new Windows hidden flag;
+that assertion was corrected, linted and the full CLI suite rerun green.
+No fragmentation failure reproduced. Native targets test_browser_gateway and
+test_native_extensions built Debug MSVC14.44 with -j1 and ran CTest -j1.
+Logs common11-{lint,build,test,cli-final,browser,native-build}.log and inspected
+common11-manual-scope.json are under the owned D:/BuildArtifacts/kelpie/capture-observations-20261104 directory.
+Tests ran against the preserved follow-up source over7d14b704; permanent scoped
+commits identify the tested source. No CUA/app launch occurred.

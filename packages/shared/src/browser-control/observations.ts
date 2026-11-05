@@ -61,7 +61,7 @@ export function collectBrowserExtraction(options: BrowserExtractionOptions, fact
   };
   const root = dom.scope(options.scope);
   const extract = (scope: Document | Element, field: BrowserExtractionField): BrowserExtractedField => {
-    const result = dom.scan(scope, field.selector, { readable: true, limit: field.multiple ? 101 : 2 });
+    const result = dom.scan(scope, field.selector, { readable: true, includeRoot: field.selector.toLowerCase() === ":scope", limit: field.multiple ? 101 : 2 });
     const count = result.found.length;
     const status = !field.multiple && count > 1 ? "ambiguous" : !result.complete && (!field.multiple || count === 0) ? "incomplete" : count === 0 ? "missing" : "ok";
     const limit = field.fields ? recordsRemaining : 100;
@@ -88,22 +88,24 @@ export function collectBrowserExtraction(options: BrowserExtractionOptions, fact
       ["publishedTime", "meta[property='article:published_time']", "content"], ["title", "meta[property='og:title']", "content"],
     ];
     for (const [key, selector, attribute] of sources) {
-      let index = 0;
+      let sourceIndex = 0;
       for (const el of candidates.found) {
-        if (!el.matches(selector) || dom.state(el).editorAncestor || dom.state(el).unknown || (el.hasAttribute("contenteditable") && dom.attr(el, "contenteditable", 16) !== "false")) continue;
+        if (!el.matches(selector)) continue;
+        const index = sourceIndex++;
         if (index >= 4) { dom.mark(); break; }
+        if (dom.state(el).editorAncestor || dom.state(el).unknown || (el.hasAttribute("contenteditable") && dom.attr(el, "contenteditable", 16) !== "false")) continue;
         const value = bounded(dom.attr(el, attribute, Math.min(remaining, 2048)));
         if (value) metadata.push({ key, value, selector, attribute, authority: "publisher-claim",
           provenanceComplete: candidates.complete, ...(candidates.complete ? { index } : {}) });
-        index++;
       }
     }
     let jsonBudget = 65_536, scriptIndex = 0;
     const scriptSelector = "script[type='application/ld+json']";
     for (const script of candidates.found) {
-      if (!script.matches(scriptSelector) || dom.state(script).editorAncestor || dom.state(script).unknown || (script.hasAttribute("contenteditable") && dom.attr(script, "contenteditable", 16) !== "false")) continue;
-      if (scriptIndex >= 8) { dom.mark(); break; }
+      if (!script.matches(scriptSelector)) continue;
       const index = scriptIndex++;
+      if (index >= 8) { dom.mark(); break; }
+      if (dom.state(script).editorAncestor || dom.state(script).unknown || (script.hasAttribute("contenteditable") && dom.attr(script, "contenteditable", 16) !== "false")) continue;
       const raw = dom.text(script, Math.min(32_768, jsonBudget), true, true);
       if (!raw.complete) continue;
       jsonBudget -= raw.value.length;

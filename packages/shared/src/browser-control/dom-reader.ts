@@ -68,6 +68,7 @@ export function createBoundedDOMReader() {
   const matches = (el: Element, selector: string, root: Node): boolean => {
     if (selector.includes(String.fromCharCode(92))) throw new Error("UNSUPPORTED_SELECTOR_ESCAPE");
     if (!/:scope/i.test(selector)) return el.matches(selector);
+    if ((selector.match(/:scope/gi) ?? []).length > 1) throw new Error("UNSUPPORTED_SCOPE_SELECTOR");
     const anchor = root instanceof Document ? root.documentElement : root;
     if (selector.toLowerCase() === ":scope") return el === anchor;
     const child = /^:scope\s*>\s*([^\s>+~,]+)$/i.exec(selector);
