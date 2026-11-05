@@ -450,3 +450,22 @@ The byte-budget probe returned a complete 64,751-byte, ten-frame GIF below its
 Replacement/click times were observed, but initial target-resolution timing was
 not; no unsafe identity conclusion follows yet. The replay's failing status,
 227.6 MiB peak and clean app/readiness teardown remain in its evidence.
+
+The corrected independent replay (native 3001aa41, test source 9b79b91e) passed
+the three-transport PNG reconstruction and the post-ACK finalization fault:
+CAPTURE_FINALIZE_FAILED, failed terminal status, one downloadable partial GIF,
+unchanged collision file and next-run recovery. The app/readiness retired.
+Readonly diagnostics showed TARGET_MOVED with mayHaveCompleted:true, no input
+events and an unchanged empty control. Moving-target setup was offscreen after
+same-URL scroll restoration (TARGET_NOT_FOUND before any action), rather than
+a completed click on a stale moving target. These facts inform fixture fixes;
+the first 32/36 result remains retained.
+
+A separate durable driver now uses the actual packaged CLI to register a fresh
+Linux alias, launch with --headless, verify exact executable/PID/start ticks and
+readiness, run the existing observation and alias MCP/recipe/secret cases, then
+stop through the public alias command. It never writes running records or copies
+grants. The checked private package is source2c4b0fb8, SHA-256
+ef4b2c77954ab4120331c88dc567b8c2b6b140dac67387ae7b26caf230e8a6b9;
+it is not a newly published release. Driver syntax passed; actual alias replay
+is the next bounded gate.
