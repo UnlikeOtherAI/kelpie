@@ -191,8 +191,15 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchScrollableControl",
+            "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+            "testProjectionUsesInsetContentOriginAndVisualViewport",
+            "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
         })
-        self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
+        units = {"testFirstCaptureRequiresInsetPropagationIncludingZoom",
+                 "testProjectionUsesInsetContentOriginAndVisualViewport",
+                 "testUnsettledInsetAdmissionHonorsDeadlineAndStop"}
+        self.assertEqual(set(targets), {"KelpieTests/IOSCaptureViewportTests"} |
+                         {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names - units})
         _, full_names = DRIVER.selection("full")
         self.assertTrue(names < full_names)
 
