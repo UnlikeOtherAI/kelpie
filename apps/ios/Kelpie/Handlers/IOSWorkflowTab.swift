@@ -192,6 +192,23 @@ final class IOSWorkflowTab {
         }
     }
 
+    static func contentRect(bounds: CGSize, insets: UIEdgeInsets, visible: CGSize) -> CGRect? {
+        let values = [bounds.width, bounds.height, insets.left, insets.right, insets.top, insets.bottom,
+                      visible.width, visible.height]
+        guard values.allSatisfy(\.isFinite), bounds.width > 0, bounds.height > 0,
+              insets.left >= 0, insets.right >= 0, insets.top >= 0, insets.bottom >= 0,
+              visible.width > 0, visible.height > 0 else { return nil }
+        let availableWidth = bounds.width - insets.left - insets.right
+        let availableHeight = bounds.height - insets.top
+        guard availableWidth > 0, availableHeight > 0 else { return nil }
+        let widthScale = availableWidth / visible.width
+        let projectedHeight = visible.height * widthScale
+        // WebKit reports CSS viewport dimensions quantized to whole CSS pixels at zoom.
+        guard projectedHeight.isFinite, projectedHeight <= availableHeight + widthScale else { return nil }
+        let scale = min(widthScale, availableHeight / visible.height)
+        return CGRect(x: insets.left, y: insets.top, width: visible.width * scale, height: visible.height * scale)
+    }
+
     func viewport() async throws -> Viewport {
         #if DEBUG
         let bindFixture = ProcessInfo.processInfo.arguments.contains("--test-g08-document-binding")
@@ -220,12 +237,9 @@ final class IOSWorkflowTab {
         let insetValues = [insets.top, insets.bottom, insets.left, insets.right]
         guard insetValues.allSatisfy({ $0.isFinite && $0 >= 0 }), insets.left + insets.right < native.width,
               insets.top + insets.bottom < native.height else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
-        let content = CGRect(
-            x: insets.left,
-            y: insets.top,
-            width: native.width - insets.left - insets.right,
-            height: native.height - insets.top - insets.bottom
-        )
+        guard let content = Self.contentRect(
+            bounds: native, insets: insets, visible: CGSize(width: parts[4], height: parts[5])
+        ) else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         return Viewport(
             bounds: native,
             layout: CGSize(width: parts[0], height: parts[1]),

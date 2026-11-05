@@ -36,7 +36,28 @@ final class IOSCaptureViewportTests: XCTestCase {
     }
 
     @MainActor
-    func testProjectionUsesInsetContentOriginAndVisualViewport() {
+    func testProjectionUsesInsetContentOriginAndVisualViewport() throws {
+        let native = CGSize(width: 402, height: 874)
+        let insets = UIEdgeInsets(top: 62, left: 0, bottom: 34, right: 0)
+        let beforeRecording = try XCTUnwrap(IOSWorkflowTab.contentRect(
+            bounds: native, insets: insets, visible: CGSize(width: 402, height: 812)
+        ))
+        XCTAssertEqual(beforeRecording, CGRect(x: 0, y: 62, width: 402, height: 812))
+        let duringRecording = try XCTUnwrap(IOSWorkflowTab.contentRect(
+            bounds: native, insets: insets, visible: CGSize(width: 402, height: 778)
+        ))
+        XCTAssertEqual(duringRecording, CGRect(x: 0, y: 62, width: 402, height: 778))
+        let quantizedZoom = try XCTUnwrap(IOSWorkflowTab.contentRect(
+            bounds: native, insets: insets, visible: CGSize(width: 231, height: 467)
+        ))
+        XCTAssertLessThanOrEqual(quantizedZoom.maxY, native.height)
+        XCTAssertEqual(quantizedZoom.width / 231, quantizedZoom.height / 467, accuracy: 0.0001)
+        XCTAssertNil(IOSWorkflowTab.contentRect(bounds: native, insets: insets, visible: CGSize(width: 402, height: 850)))
+        XCTAssertNil(IOSWorkflowTab.contentRect(bounds: native, insets: insets, visible: CGSize(width: 0, height: 778)))
+        XCTAssertEqual(IOSWorkflowTab.contentRect(
+            bounds: CGSize(width: 874, height: 402), insets: UIEdgeInsets(top: 0, left: 62, bottom: 21, right: 34),
+            visible: CGSize(width: 389, height: 190.5)
+        ), CGRect(x: 62, y: 0, width: 778, height: 381))
         let phone = IOSWorkflowTab.Viewport(
             bounds: CGSize(width: 402, height: 874), layout: CGSize(width: 402, height: 778),
             visible: CGRect(x: 0, y: 0, width: 402, height: 778), scale: 1, pixelRatio: 3,
