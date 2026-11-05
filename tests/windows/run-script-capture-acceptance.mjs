@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { captureMcp } from "./capture-mcp.mjs";
+import { runPacedCases } from "./capture-paced-cases.mjs";
 import { downloadArtifacts } from "./capture-artifact-download.mjs";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
 import { startArtifactProtocolFixture } from "../capture/artifact-protocol-fixture.mjs";
@@ -136,6 +137,7 @@ try {
     assert.equal(result.success,true,JSON.stringify(result));
     assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#post-readonly').value"})).result,"safe");
   });
+  await runPacedCases({check,navigate,api,workflow,download,click,tabId,fixture});
   for (const [name, code] of [["Duplicate action", "AMBIGUOUS_TARGET"], ["Disabled action", "TARGET_NOT_FOUND"],
     ["Covered action", "TARGET_OBSCURED"], ["Hidden action", "TARGET_NOT_FOUND"]]) {
     await check("safe refusal " + name, async () => {

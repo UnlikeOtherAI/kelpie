@@ -5,6 +5,8 @@
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/mcp_c_api.h"
 #include <chrono>
+#include <thread>
+#include <algorithm>
 #include <optional>
 #include "include/cef_task.h"
 namespace {
@@ -40,23 +42,28 @@ void QueueRelease(const std::shared_ptr<kelpie::DesktopEngine::Impl>& impl,const
 namespace kelpie {
 using namespace engine_control;
 BrowserControlResult DesktopEngine::DispatchScriptTarget(
-    TabLease lease, const Json& options, const Json& action, Json* output, Timeout timeout) {
+    TabLease lease, const Json& options, const Json& action, Json* output, Timeout timeout,
+    const std::function<bool()>& cancelled) {
   if(output) *output=Json::object();
   const auto began = std::chrono::steady_clock::now();
-  bool dispatched = false, native_pressed=false, native_keys=false;
+  bool dispatched = false, unclassified_mutation = false, native_pressed=false, native_keys=false;
   struct CleanupOnExit {
     std::shared_ptr<Impl> impl; TabLease lease; bool& mouse; bool& keys;
     ~CleanupOnExit() { if(mouse || keys) QueueRelease(impl,lease); }
   } cleanup{impl_,lease,native_pressed,native_keys};
   Json target;
   const auto inspect = [&](bool privacy_only=false) -> BrowserControlResult {
+    if (cancelled && cancelled()) {
+      if (privacy_only && output) (*output)["inspectionUncertain"] = true;
+      return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped");
+    }
     const auto unknown_privacy = [&]() {
       if (output) (*output)["inspectionUncertain"] = true;
       return options.value("policy", Json::object()).value("refuseSensitive", false)
         ? BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy is unknown")
         : BrowserControlResult::Success();
     };
-    const auto remaining = RemainingTimeout(began, timeout);
+    const auto remaining = std::min(RemainingTimeout(began, timeout), std::chrono::duration_cast<Timeout>(std::chrono::seconds(10)));
     if (remaining <= Timeout::zero()) return privacy_only ? unknown_privacy() : DeadlineExceeded();
     Json inspection_options = options;
     if (privacy_only) inspection_options["postMutation"] = true;
@@ -93,13 +100,19 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     return BrowserControlResult::Success();
   };
   const auto send = [&](const std::string& method, const Json& params) -> BrowserControlResult {
-    const auto remaining = RemainingTimeout(began, timeout);
+    if (cancelled && cancelled()) return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped");
+    const auto remaining = std::min(RemainingTimeout(began, timeout), std::chrono::duration_cast<Timeout>(std::chrono::seconds(10)));
     if (remaining <= Timeout::zero()) return DeadlineExceeded();
     Json ignored;
     dispatched = true;
-    auto result=RunDevTools(impl_,lease,method,params,&ignored,remaining,[impl=impl_,lease] { return IsDialogOpen(impl,lease); });
+    unclassified_mutation = true;
+    auto result=RunDevTools(impl_,lease,method,params,&ignored,remaining,[impl=impl_,lease,cancelled] {
+      return IsDialogOpen(impl,lease) || (cancelled && cancelled());
+    });
     if(result.error_code=="INTERRUPTED") {
-      result=BrowserControlResult::Failure("DIALOG_OPENED","Native input opened a dialog");
+      result=(cancelled && cancelled())
+        ? BrowserControlResult::Failure("SCRIPT_STOPPED","Script stopped")
+        : BrowserControlResult::Failure("DIALOG_OPENED","Native input opened a dialog");
       result.operation_may_have_completed=true;
     }
     return result;
@@ -107,6 +120,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   const auto fail = [&](BrowserControlResult result) {
     if(native_pressed || native_keys) { QueueRelease(impl_,lease); native_pressed=false; native_keys=false; }
     result.operation_may_have_completed = result.operation_may_have_completed || dispatched;
+    if (unclassified_mutation && output) (*output)["inspectionUncertain"] = true;
     return result;
   };
   auto result = inspect();
@@ -130,6 +144,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   native_pressed=false;
   result = inspect(true);
   if (!result.ok) return fail(result);
+  unclassified_mutation = false;
   if (type == "fill" || type == "type") {
     result = inspect();
     if (!result.ok) return fail(result);
@@ -165,11 +180,49 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       }
     }
     native_keys=false;
-    result = send("Input.insertText", {{"text", action.at("text")}});
-    if (!result.ok) return fail(result);
-    // The trusted input handler may change sensitivity before returning.
-    result=inspect(true);
-    if(!result.ok) return fail(result);
+    if (action.contains("_typingPlan")) {
+      const auto& plan = action.at("_typingPlan");
+      const auto& scalars = plan.at("scalars");
+      const int delay = plan.at("typingDelayMs");
+      // A clear can dispatch input even when there are no following scalars.
+      if (type == "fill") {
+        result = inspect(true);
+        if (!result.ok) return fail(result);
+        unclassified_mutation = false;
+        if (output && output->value("inspectionUncertain", false) && !scalars.empty())
+          return fail(BrowserControlResult::Failure("INPUT_UNCERTAIN", "Privacy is unknown before paced continuation"));
+      }
+      for (std::size_t index = 0; index < scalars.size(); ++index) {
+        if (index) {
+          const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(delay);
+          while (std::chrono::steady_clock::now() < until) {
+            if (cancelled && cancelled()) return fail(BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped"));
+            if (RemainingTimeout(began, timeout) <= Timeout::zero()) return fail(DeadlineExceeded());
+            const auto remaining = until - std::chrono::steady_clock::now();
+            if (remaining > std::chrono::steady_clock::duration::zero())
+              std::this_thread::sleep_for(std::min(remaining, std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(20))));
+          }
+        }
+        result = inspect();
+        if (!result.ok) return fail(result);
+        if (!target.value("focused", false))
+          return fail(BrowserControlResult::Failure("INPUT_UNCERTAIN", "Target lost focus before paced input"));
+        result = send("Input.insertText", {{"text", scalars[index]}});
+        if (!result.ok) return fail(result);
+        result = inspect(true);
+        if (!result.ok) return fail(result);
+        unclassified_mutation = false;
+        if (output && output->value("inspectionUncertain", false) && index + 1 < scalars.size())
+          return fail(BrowserControlResult::Failure("INPUT_UNCERTAIN", "Privacy is unknown before paced continuation"));
+      }
+    } else {
+      result = send("Input.insertText", {{"text", action.at("text")}});
+      if (!result.ok) return fail(result);
+      // The trusted input handler may change sensitivity before returning.
+      result=inspect(true);
+      if(!result.ok) return fail(result);
+      unclassified_mutation = false;
+    }
   }
   if (output) { const bool sensitive=output->value("sensitive",false), uncertain=output->value("inspectionUncertain",false); *output = {{"sensitive",sensitive},{"inspectionUncertain",uncertain},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
                          {"targetGuarantee", "rechecked-before-dispatch-with-async-gap"}}; }
