@@ -27,6 +27,8 @@ class ScriptRun(
     private var outputBytes = 0L
     val artifacts = ScriptArtifacts(directory)
     val redactor = ScriptRedactor()
+
+    @Volatile private var captureDeadlineMs: Double? = null
     val stopped = AtomicBoolean()
     val stopReason = AtomicReference<String?>(null)
     private var phase = "running"
@@ -43,6 +45,15 @@ class ScriptRun(
         stopped.set(true)
     }
 
+    fun startCapture(
+        absoluteMs: Double,
+        maxDurationMs: Long,
+    ) {
+        captureDeadlineMs = absoluteMs + maxDurationMs
+    }
+
+    fun captureExpired(): Boolean = captureDeadlineMs?.let { (System.nanoTime() - startedNanos) / 1_000_000.0 >= it } == true
+
     fun elapsedMs(): Long = (System.nanoTime() - startedNanos) / 1_000_000
 
     fun authorizedOnMain(): Boolean = activeAuthority?.permitsOnMain() == true
@@ -54,6 +65,7 @@ class ScriptRun(
         outputs.clear()
         redactor.clear()
         activeAuthority = null
+        captureDeadlineMs = null
     }
 
     @Synchronized

@@ -131,3 +131,8 @@ The existing native Stop recording control has an accessible name for assistive
 technology and supported AndroidX UI testing. Video acknowledgements retain the
 captured document associated with the encoded presentation timestamp, even when
 the codec releases an older queued frame after a later snapshot.
+The first AVC input waits for bounded codec startup admission instead of silently
+dropping the sole frame. Non-budget empty video finalization fails explicitly.
+Capture deadlines are measured from the captured origin and gate later actions
+and frame admission, including screenshots-only runs; codec finalization does not
+extend the exported movie beyond maxDurationMs.

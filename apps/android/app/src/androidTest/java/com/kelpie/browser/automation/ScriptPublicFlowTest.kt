@@ -56,7 +56,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                     val deadline = System.nanoTime() + 5_000_000_000L
                     while (!client.call("get-script-status").optBoolean("playing") && System.nanoTime() < deadline) Thread.sleep(30)
                     Thread.sleep(550)
-                    val screen = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+                    val screen = captureBlueMarker()
                     File(evidence, "native-active-overlay.png").outputStream().use { screen.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     screen.recycle()
                     result = pending.get(30, TimeUnit.SECONDS)
@@ -73,7 +73,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                         .contains("Public fixture"),
                 )
                 val runId = result.getString("runId")
-                val status = client.mcp("kelpie_get_script_status", JSONObject().put("runId", runId))
+                val status = client.mcpValue("kelpie_get_script_status", JSONObject().put("runId", runId))
                 assertEquals("completed", status.getString("state"))
                 assertTrue(status.getBoolean("success"))
                 assertTrue(status.getBoolean("runSuccess"))
