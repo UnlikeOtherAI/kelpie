@@ -23,12 +23,8 @@ final class ScriptWorkflowPrivacy {
         uncertain(text: text)
     }
 
-    func register(text: String?) {
-        if let text, knownSecrets.insert(text).inserted { secrets.append(text) }
-    }
-
     func uncertain(text: String?) {
-        register(text: text)
+        if let text, knownSecrets.insert(text).inserted { secrets.append(text) }
         if captures { discardMedia = true }
     }
 }
@@ -186,7 +182,6 @@ final class ScriptWorkflowActions {
             if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
             return
         }
-        if paced != nil { privacy.register(text: text) }
         if editing {
             #if DEBUG
             await tab.debugEditFocus("before", targetFocused: found["focused"] as? Bool)

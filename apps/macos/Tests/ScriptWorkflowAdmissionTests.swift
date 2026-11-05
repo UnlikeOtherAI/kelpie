@@ -128,21 +128,23 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
-    func testPacedLiteralRegistrationAndUnknownClassificationFence() throws {
+    func testPacedUnknownClassificationFenceKeepsOrdinaryOutputUnredacted() throws {
         for captures in [true, false] {
             let privacy = ScriptWorkflowPrivacy(secrets: [], captures: captures)
-            privacy.register(text: "full literal")
-            privacy.register(text: "full literal")
-            XCTAssertEqual(privacy.secrets, ["full literal"])
+            privacy.consume(["sensitive": false, "sensitivityKnown": true], text: "full literal")
+            XCTAssertTrue(privacy.secrets.isEmpty)
             XCTAssertFalse(privacy.discardMedia)
             try ScriptWorkflowActions.requireKnownPacedResult(["sensitivityKnown": true])
             for result: Body in [[:], ["sensitivityKnown": false]] {
+                privacy.consume(result, text: "full literal")
                 XCTAssertThrowsError(try ScriptWorkflowActions.requireKnownPacedResult(result)) {
                     let failure = $0 as? ScriptWorkflowFailure
                     XCTAssertEqual(failure?.code, "INPUT_UNCERTAIN")
                     XCTAssertEqual(failure?.mayHaveCompleted, true)
                 }
             }
+            XCTAssertEqual(privacy.secrets, ["full literal"])
+            XCTAssertEqual(privacy.discardMedia, captures)
         }
     }
 

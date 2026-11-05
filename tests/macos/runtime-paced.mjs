@@ -12,14 +12,14 @@ export async function runPaced({client,fixture,engine,base,capture,check,load,pl
     {action:"fill",target,text:"A😀e",typingDelayMs:250},
     {action:"type",target,text:"xy",typingDelayMs:250}]});
   requireTrue(result.success,"PACED_MEDIA_WORKFLOW");
-  requireTrue(result.outputs?.before?.includes("[redacted]")&&!JSON.stringify(result.outputs).includes("A😀e"),"PACED_LITERAL_NOT_REDACTED");
+  requireTrue(result.outputs?.before?.includes("A😀e"),"PACED_ORDINARY_OUTPUT_REDACTED");
   const inputs=fixture.events.slice(begin).filter(e=>e.type==="paced-input"&&e.target==="entry");
   requireTrue(inputs.length===6&&inputs.map(e=>e.length).join(",")==="0,1,3,4,5,6","PACED_INPUT_SEQUENCE");
   const intervals=[inputs[2].time-inputs[1].time,inputs[3].time-inputs[2].time,inputs[5].time-inputs[4].time];
   requireTrue(intervals.every(value=>value>=190),"PACED_INTERVAL");
   const artifacts=await client.download(result,engine+"-paced"),movies=artifacts.filter(a=>a.mimeType!=="image/png");
   requireTrue(movies.length===2&&movies.some(a=>a.mimeType==="image/gif")&&movies.some(a=>a.mimeType==="video/mp4"),"PACED_MEDIA_FORMATS");
-  return {lengths:inputs.map(e=>e.length),intervals,ordinaryLiteralRedacted:true,media:movies.map(item=>({decode:inspectMedia(item),text:inspectPaced(item,inputs[1])}))};
+  return {lengths:inputs.map(e=>e.length),intervals,ordinaryOutputPreserved:true,media:movies.map(item=>({decode:inspectMedia(item),text:inspectPaced(item,inputs[1])}))};
  });
  await check("paced-empty-type-screenshot",async()=>{
   await load("/paced");const begin=fixture.events.length;
