@@ -71,16 +71,25 @@ class ScriptDispatchDeadlineTest {
 
     @Test
     fun acknowledgementMustMatchTokenAndExplicitCompletionStatus() {
-        val valid = mapOf("ok" to true, "token" to "expected", "mayHaveCompleted" to true, "inputGuarantee" to "synthetic-coordinate")
+        val valid = mapOf("ok" to true, "token" to "expected", "mayHaveCompleted" to true, "inputGuarantee" to "synthetic-coordinate", "sensitive" to false, "sensitivityKnown" to true)
         requireScriptDispatchReceipt(valid, "expected") { throw AssertionError("valid receipt") }
+        requireScriptDispatchReceipt(valid + ("sensitivityKnown" to false), "expected") { throw AssertionError("unknown privacy is still an acknowledged receipt") }
         val invalid =
             listOf(
                 valid - "token",
                 valid + ("token" to "other"),
+                valid + ("error" to "contradiction"),
+                valid - "sensitive",
+                valid + ("sensitivityKnown" to "true"),
                 valid - "mayHaveCompleted",
                 valid + ("mayHaveCompleted" to "true"),
                 valid + ("ok" to "true"),
             )
+        assertFalse(scriptDispatchReceiptWellFormed(valid + ("token" to ""), ""))
+        val refusal = mapOf("ok" to false, "error" to "TARGET_NOT_EDITABLE", "mayHaveCompleted" to false, "sensitive" to false, "sensitivityKnown" to true)
+        assertTrue(scriptDispatchReceiptWellFormed(refusal, "expected"))
+        assertFalse(scriptDispatchReceiptWellFormed(refusal + ("error" to ""), "expected"))
+        assertFalse(scriptDispatchReceiptWellFormed(refusal - "sensitive", "expected"))
         for (receipt in invalid) {
             var protected = false
             val error = runCatching { requireScriptDispatchReceipt(receipt, "expected") { protected = true } }.exceptionOrNull() as ScriptFailure
@@ -91,16 +100,16 @@ class ScriptDispatchDeadlineTest {
     }
 
     @Test
-    fun malformedCallbackCanBeProtectedBeforeLaterGuardFailure() {
-        val malformed = mapOf("ok" to true, "token" to "other", "mayHaveCompleted" to true, "inputGuarantee" to "synthetic-coordinate")
-        var protected = false
+    fun malformedClickCallbackCanDiscardCaptureBeforeLaterGuardFailure() {
+        val malformed = mapOf("ok" to true, "token" to "other", "mayHaveCompleted" to true, "inputGuarantee" to "synthetic-coordinate", "sensitive" to false, "sensitivityKnown" to true)
+        var captureDiscarded = false
         val original = IllegalStateException("authority revoked")
         val caught =
             runCatching {
-                protectMalformedScriptReceipt(malformed, "expected") { protected = true }
+                protectMalformedScriptReceipt(malformed, "expected") { captureDiscarded = true }
                 throw original
             }.exceptionOrNull()
-        assertTrue(protected)
+        assertTrue(captureDiscarded)
         assertTrue(caught === original)
     }
 }

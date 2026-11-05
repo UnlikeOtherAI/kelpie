@@ -7,8 +7,12 @@ internal fun checkPacedPostMutation(
     captures: Boolean,
     protectUnknown: () -> Unit,
 ) {
+    if (result["ok"] != true || result.containsKey("error") || result["sensitive"] !is Boolean || result["sensitivityKnown"] !is Boolean) {
+        protectUnknown()
+        throw ScriptFailure("INPUT_UNCERTAIN", true)
+    }
     if (result["sensitive"] == true && captures) throw ScriptFailure("SENSITIVE_CAPTURE_REFUSED", true)
-    if (result["ok"] != true || (result["sensitive"] != true && !(result["sensitive"] == false && result["sensitivityKnown"] == true))) {
+    if (result["sensitive"] != true && !(result["sensitive"] == false && result["sensitivityKnown"] == true)) {
         protectUnknown()
         if (!finalStep || captures) throw ScriptFailure("INPUT_UNCERTAIN", true)
     }

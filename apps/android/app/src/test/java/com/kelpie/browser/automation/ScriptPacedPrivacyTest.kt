@@ -8,7 +8,7 @@ class ScriptPacedPrivacyTest {
     @Test
     fun acknowledgedFinalNavigationProtectsLiteralWithoutInventingInputFailure() {
         var protected = false
-        checkPacedPostMutation(mapOf("ok" to true, "sensitivityKnown" to false), true, false) { protected = true }
+        checkPacedPostMutation(mapOf("ok" to true, "sensitive" to false, "sensitivityKnown" to false), true, false) { protected = true }
         assertTrue(protected)
     }
 
@@ -18,7 +18,7 @@ class ScriptPacedPrivacyTest {
             var protected = false
             val error =
                 runCatching {
-                    checkPacedPostMutation(mapOf("ok" to true, "sensitivityKnown" to false), finalStep, captures) { protected = true }
+                    checkPacedPostMutation(mapOf("ok" to true, "sensitive" to false, "sensitivityKnown" to false), finalStep, captures) { protected = true }
                 }.exceptionOrNull() as ScriptFailure
             assertTrue(protected)
             assertEquals("INPUT_UNCERTAIN", error.code)
@@ -37,8 +37,9 @@ class ScriptPacedPrivacyTest {
                 assertTrue(error.mayHaveCompleted)
             }
             var protected = false
-            checkPacedPostMutation(result, true, false) { protected = true }
+            val finalError = runCatching { checkPacedPostMutation(result, true, false) { protected = true } }.exceptionOrNull() as ScriptFailure
             assertTrue(protected)
+            assertEquals("INPUT_UNCERTAIN", finalError.code)
         }
     }
 
@@ -52,5 +53,29 @@ class ScriptPacedPrivacyTest {
                 checkPacedPostMutation(mapOf("ok" to true, "sensitive" to true, "sensitivityKnown" to false), false, true) {}
             }.exceptionOrNull() as ScriptFailure
         assertEquals("SENSITIVE_CAPTURE_REFUSED", error.code)
+    }
+
+    @Test
+    fun postMutationSuccessWithErrorIsMalformed() {
+        var protected = false
+        val error =
+            runCatching {
+                checkPacedPostMutation(mapOf("ok" to true, "error" to "CONTRADICTION", "sensitive" to false, "sensitivityKnown" to false), true, false) { protected = true }
+            }.exceptionOrNull() as ScriptFailure
+        assertTrue(protected)
+        assertEquals("INPUT_UNCERTAIN", error.code)
+    }
+
+    @Test
+    fun postMutationFailureCannotBeSwallowedAtFinalScalar() {
+        for (status in listOf(false, "true")) {
+            var protected = false
+            val error =
+                runCatching {
+                    checkPacedPostMutation(mapOf("ok" to status, "sensitive" to false, "sensitivityKnown" to false), true, false) { protected = true }
+                }.exceptionOrNull() as ScriptFailure
+            assertTrue(protected)
+            assertEquals("INPUT_UNCERTAIN", error.code)
+        }
     }
 }

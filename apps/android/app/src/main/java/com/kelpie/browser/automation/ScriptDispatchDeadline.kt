@@ -28,11 +28,18 @@ internal fun scriptDispatchReceiptWellFormed(
 ): Boolean =
     when (result["ok"]) {
         true ->
-            token != null &&
+            !token.isNullOrEmpty() &&
                 result["token"] == token &&
+                !result.containsKey("error") &&
                 result["mayHaveCompleted"] == true &&
-                result["inputGuarantee"] == "synthetic-coordinate"
-        false -> result["error"] is String && result["mayHaveCompleted"] is Boolean
+                result["inputGuarantee"] == "synthetic-coordinate" &&
+                result["sensitive"] is Boolean &&
+                result["sensitivityKnown"] is Boolean
+        false ->
+            (result["error"] as? String)?.isNotEmpty() == true &&
+                result["mayHaveCompleted"] is Boolean &&
+                result["sensitive"] is Boolean &&
+                result["sensitivityKnown"] is Boolean
         else -> false
     }
 

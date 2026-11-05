@@ -241,15 +241,13 @@ class ScriptActions(
                     rawTarget(action, token, postMutation = true)
                 } catch (error: Exception) {
                     consumeSensitivity(action, true)
-                    if (!finalStep || captures() || error is kotlinx.coroutines.CancellationException) throw error
-                    // An acknowledged final input may navigate. Do not hide a
-                    // revoked authority, abort or tab change while preserving it.
-                    guard()
-                    null
+                    throw error
                 }
-            if (classification != null) {
-                checkPacedPostMutation(classification, finalStep, captures()) { consumeSensitivity(action, true) }
+            if (classification["ok"] == false && scriptDispatchReceiptWellFormed(classification, token)) {
+                consumeSensitivity(action, true)
+                throw ScriptFailure(targetFailure(classification).code, true)
             }
+            checkPacedPostMutation(classification, finalStep, captures()) { consumeSensitivity(action, true) }
         }
         return last
     }
@@ -337,7 +335,7 @@ class ScriptActions(
     ): Map<String, Any?> {
         val result = rawTarget(action, token, dispatch, edit, editValue = editValue, requireFocused = requireFocused)
         if (result["ok"] != true) {
-            if ((dispatch || edit) && (result["ok"] != false || result["error"] !is String || result["mayHaveCompleted"] !is Boolean)) {
+            if ((dispatch || edit) && !scriptDispatchReceiptWellFormed(result, token)) {
                 if (edit) consumeSensitivity(action, true)
                 mutationInFlight = true
                 throw ScriptFailure("INPUT_UNCERTAIN", true)
@@ -396,7 +394,7 @@ class ScriptActions(
                 }
                 val unknown = classification.unknown()
                 consumeSensitivity(action, result["sensitive"] == true || unknown)
-                if (edit) protectMalformedScriptReceipt(result, token) { consumeSensitivity(action, true) }
+                if (edit || dispatch) protectMalformedScriptReceipt(result, token) { consumeSensitivity(action, true) }
             }
         }
     }
