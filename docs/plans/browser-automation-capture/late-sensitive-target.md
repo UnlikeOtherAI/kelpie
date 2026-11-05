@@ -14,8 +14,12 @@ the same strict policy object. Omitted policy retains legacy dispatch behavior.
 This field is not a new public workflow option or caller authority.
 
 The token latches observed password/current-password/new-password classification.
-Every explicit success and failure result includes sensitive:boolean, including
-stale/moved/uncertain failures. Capture callers pass refuseSensitive:true at
+Every explicit success and failure result includes sensitive:boolean and
+sensitivityKnown:boolean, including stale/moved/uncertain failures. Only an actual
+entry-backed classifier can set known:true; a missing token/new realm sets false.
+Thus sensitive:false alone is not a proof about a prior target whose record was
+lost. True sensitivity always protects, while old/invalid results without the
+known flag are conservative after attempted evaluation. Capture callers pass refuseSensitive:true at
 resolution, recheck and dispatch. Atomic editing classifies again after focus,
 before setting value. Focus-side effects preserve mayHaveCompleted uncertainty.
 No-capture callers still receive inferred sensitivity and register edit text.
@@ -90,3 +94,25 @@ and invalid policy shape/type; no shipping app was built. Existing MSVC
 DNDEBUG/UNDEBUG override warning remains, no compile errors.
 Platform callback wiring, final relinks and actual security replay remain pending.
 This checkpoint does not close SEC-01.
+
+## Known classification after realm loss
+
+The native81ed post-input reproduction exposed another distinction: after an
+input handler changes sensitivity then navigates, an old token can be absent
+from the new realm. sensitive:false on STALE_TARGET did not mean the original
+target was proved nonsensitive. The fixed result adds sensitivityKnown, derived
+from actual entry-backed classification rather than guessed error codes.
+
+Actual Chromium151.0.7922.34 tests/capture/target-sensitive-realm.mjs passed8 cases:
+focus/input classification followed by navigation/frame removal, capture/noCapture.
+Each fresh realm's old-token check returned sensitive:false,known:false;
+returned old-realm classifications remained sensitive:true. Context loss is not
+claimed to reveal unobservable intermediate mutations.
+Report privacy-known-checks/browser.json SHA-256
+0ccf988c6e8887eb3c9892d1d5862453d7f406fc28ed32cad6a45eb9dfbb8202.
+Hard JobObject1CPU/Normal/2GiB,3.212s,free29260380KiB; browser closed.
+Focused target17/17 passed. Required portable lint23.697s/build16.294s/
+fulltests52.756s passed: shared143,CLI703passed/1skip under the same hard policy.
+No native argument/schema changed; freshly built shared function serialization
+carries the added result field. Platform relinks/replays remain required.
+Native adapter consumers must require known:true for negative classification.

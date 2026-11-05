@@ -468,3 +468,12 @@ document/abort guard failure preserves ordinary partial capture and does not
 register the editing literal. A pre-evaluation refusal also leaves provenance
 unchanged. New JVM vectors and a real-WebView callback guard regression cover
 these boundaries; they are authored but not yet compiled/run.
+Lost classification protection also applies to initial click/tap resolution and
+non-dispatch target rechecks, not just edit/dispatch calls. The fallback latches
+capture discard for these stages while literal registration remains editing-only.
+The callback regression includes a real missing-metadata click-stage result.
+The shared follow-up adds sensitivityKnown: only sensitive:false with
+sensitivityKnown:true certifies nonsensitive provenance. Missing/legacy fields or
+missing-token/new-realm failures remain unknown after evaluation starts; a true
+sensitivity flag always protects. The thin tracker consumes both fixed fields.
+This adapter must ship with the matching regenerated common helper.

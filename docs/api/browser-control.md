@@ -191,11 +191,22 @@ Native workflow bindings use generated shared assets through
 The latter accepts `{target,key,token?,dispatch?,edit?,observe?,policy?}` with mutually exclusive
 operations. Optional private `policy:{refuseSensitive:boolean}` is the seventh fixed
 resolver argument; omitted policy preserves the six-argument behavior. Every explicit
-result carries token-latched `sensitive:boolean`, including failed checks. Capture
+result carries token-latched `sensitive:boolean` and `sensitivityKnown:boolean`,
+including failed checks. Only false sensitivity with known:true proves a
+nonsensitive target; missing token/new realm yields known:false. True sensitivity
+always protects. Old/malformed results missing the known flag are conservative
+after an attempted target evaluation. Capture
 runners set the policy and consume classification before post-evaluation guards,
 register edit text, and latch media discard. See [late sensitivity](../plans/browser-automation-capture/late-sensitive-target.md). These internal APIs do not resolve host secrets or authorize a workflow;
 the runner must enforce session ownership, binding and sensitivity/capture policy.
 Generated Zod/native parity fixtures include duplicate capture-format refusals.
+
+For trusted native get-script-artifact execute failures, direct and generic MCP
+preserve only ARTIFACT_NOT_READY (authorized active run) and ARTIFACT_NOT_FOUND
+(opaque absent/foreign run), with fixed safe gateway messages. Native response
+messages/data are never forwarded on failure; unrelated codes remain
+COMMAND_FAILED. Existing uncertainty is retained. Platform routes still validate
+the request and owner before deciding active/terminal availability.
 
 ## Typed WebMCP seam
 

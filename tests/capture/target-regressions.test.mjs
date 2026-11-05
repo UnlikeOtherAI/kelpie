@@ -180,7 +180,7 @@ test("visual viewport changing during dispatch reports uncertainty", () => {
   const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
   f.element.onEvent = () => { window.visualViewport.scale = 3; };
   assert.deepEqual(resolveScriptTarget({ selector: "#target" }, "acceptance", first.token, true),
-    { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true, sensitive: false });
+    { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true, sensitive: false, sensitivityKnown: true });
 });
 
 for (const change of ["autocomplete", "type", "remove"]) {
@@ -224,4 +224,23 @@ test("failed type change without capture still carries sensitivity", () => {
   assert.equal(result.ok, false);
   assert.equal(result.sensitive, true);
   assert.equal(f.element.value, "");
+});
+
+test("known false requires the original classified target entry", () => {
+  const f = fixture(new Input());
+  const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
+  assert.equal(first.sensitive, false);
+  assert.equal(first.sensitivityKnown, true);
+  const missing = resolveScriptTarget({ selector: "#target" }, "acceptance", "foreign-token");
+  assert.equal(missing.sensitive, false);
+  assert.equal(missing.sensitivityKnown, false);
+  f.element.onFocus = () => { f.element.type = "password"; f.element.isConnected = false; };
+  const failed = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token,
+    false, { action: "fill", text: "PRIVATE_CANARY" });
+  assert.equal(failed.sensitive, true);
+  assert.equal(failed.sensitivityKnown, true);
+  fixture(new Input());
+  const newRealm = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token);
+  assert.equal(newRealm.sensitive, false);
+  assert.equal(newRealm.sensitivityKnown, false);
 });

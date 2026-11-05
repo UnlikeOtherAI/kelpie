@@ -179,7 +179,9 @@ final class IOSWorkflowTab {
             expression,
             mutates: dispatch || edit != nil,
             consume: { result in
-                if let body = result as? Body, body["sensitive"] is Bool { consume?(body) } else { missingResult?() }
+                guard let body = result as? Body, body["sensitive"] is Bool else { missingResult?(); return }
+                consume?(body)
+                if body["sensitive"] as? Bool != true, body["sensitivityKnown"] as? Bool != true { missingResult?() }
             },
             missingResult: missingResult
         )

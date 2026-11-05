@@ -2,7 +2,7 @@
 #include "kelpie/mcp_registry.h"
 #include "kelpie/mcp_c_api.h"
 #include "kelpie/browser_gateway.h"
-#include "browser_schema.h"
+#include "kelpie/browser_schema.h"
 #include "browser_contract.h"
 #include <cassert>
 #include <iostream>
@@ -133,7 +133,55 @@ void ScriptSessionPreflightErrors() {
     assert(result["code"] == "COMMAND_FAILED"); assert(result["mayHaveCompleted"] == true);
   }
 }
+void ArtifactRefusalParity() {
+  const json extensions = json::array({
+    {{"name","kelpie_get_script_artifact"},{"method","get-script-artifact"},{"mutates",false},
+     {"inputSchema",kelpie::NativeExtensionInputSchema("get-script-artifact")}},
+    {{"name","kelpie_get_script_status"},{"method","get-script-status"},{"mutates",false},
+     {"inputSchema",kelpie::NativeExtensionInputSchema("get-script-status")}}
+  });
+  const json config={{"nativeMethods",{"get-script-artifact","get-script-status"}},
+    {"extensions",extensions},{"requireAuthorization",false}};
+  for(bool generic:{false,true}) {
+    auto request=[&](const std::string& tool,json body) {
+      std::string name=tool;
+      if(generic) {body={{"name",name},{"arguments",body}};name="kelpie_extension";}
+      return json{{"jsonrpc","2.0"},{"id",1},{"method","tools/call"},
+        {"params",{{"name",name},{"arguments",body}}}};
+    };
+    auto error=[](const json& step) {
+      assert(step["response"]["result"]["isError"]==true);
+      assert(step.dump().find("PRIVATE_NATIVE_MESSAGE")==std::string::npos);
+      assert(step.dump().find("PRIVATE_BYTES")==std::string::npos);
+      return json::parse(step["response"]["result"]["content"][0]["text"].get<std::string>())["error"];
+    };
+    kelpie::BrowserGateway gateway(config);
+    for(const std::string code:{"ARTIFACT_NOT_READY","ARTIFACT_NOT_FOUND"}) {
+      // Same fixed owner-store response used by the native HTTP route.
+      const json native={{"success",false},{"error",{{"code",code},{"message","PRIVATE_NATIVE_MESSAGE"}}},{"data","PRIVATE_BYTES"}};
+      for(int uncertainty:{0,1,2}) {
+        auto step=gateway.BeginMcp(request("kelpie_get_script_artifact",
+          {{"runId","r"},{"artifactId","a"},{"offset",0},{"length",16}}));
+        assert(step["method"]=="get-script-artifact");
+        auto response=native;
+        if(uncertainty==1) response["mayHaveCompleted"]=true;
+        if(uncertainty==2) response["error"]["mayHaveCompleted"]=true;
+        const auto answer=error(gateway.Advance(response));
+        assert(answer["code"]==native["error"]["code"]);
+        assert(answer["mayHaveCompleted"]==(uncertainty!=0));
+      }
+      auto step=gateway.BeginMcp(request("kelpie_get_script_status",{{"runId","r"}}));
+      assert(step["method"]=="get-script-status");
+      assert(error(gateway.Advance(native))["code"]=="COMMAND_FAILED");
+    }
+    auto step=gateway.BeginMcp(request("kelpie_get_script_artifact",
+      {{"runId","r"},{"artifactId","a"},{"offset",0},{"length",16}}));
+    assert(error(gateway.Advance({{"success",false},{"error",{{"code","TIMEOUT"}}}}))["code"]=="COMMAND_FAILED");
+  }
+}
+
 int main() {
+  ArtifactRefusalParity();
   ScriptSessionPreflightErrors();
   ScriptRegistryForwarding(KELPIE_PLATFORM_WINDOWS);
   ScriptRegistryForwarding(KELPIE_PLATFORM_IOS);

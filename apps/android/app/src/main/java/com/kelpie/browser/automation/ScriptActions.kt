@@ -265,7 +265,6 @@ class ScriptActions(
     ): Map<String, Any?> {
         val result = rawTarget(action, token, dispatch, edit)
         if (result["ok"] != true) {
-            if (action["action"] in setOf("fill", "type") && result["mayHaveCompleted"] == true && result["sensitive"] !is Boolean) consumeSensitivity(action, true)
             if (dispatch || edit) mutationInFlight = result["mayHaveCompleted"] == true
             throw targetFailure(result)
         }
@@ -279,7 +278,6 @@ class ScriptActions(
         edit: Boolean = false,
         observe: Boolean = false,
     ): Map<String, Any?> {
-        val editing = action["action"] in setOf("fill", "type")
         val options = mutableMapOf<String, Any?>("target" to action["target"], "key" to key)
         if (token != null) options["token"] = token
         if (dispatch) options["dispatch"] = true
@@ -298,14 +296,14 @@ class ScriptActions(
                 ctx.evaluateAutomationJSON(expression, ::validOnMain, classification::started) { result ->
                     // Before validity checks and retirement: a late focus handler
                     // can make the original editing literal private.
-                    classification.received(result["sensitive"] as? Boolean)
-                    val unknown = (editing || dispatch) && classification.unknown()
+                    classification.received(result["sensitive"] as? Boolean, result["sensitivityKnown"] as? Boolean)
+                    val unknown = classification.unknown()
                     consumeSensitivity(action, result["sensitive"] == true || unknown)
                 }
             }
         } catch (error: Exception) {
             // A lost classification cannot certify the inspected edit literal.
-            if ((editing || dispatch) && classification.unknown()) consumeSensitivity(action, true)
+            if (classification.unknown()) consumeSensitivity(action, true)
             throw error
         }
     }

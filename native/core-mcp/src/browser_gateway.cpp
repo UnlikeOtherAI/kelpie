@@ -174,6 +174,15 @@ json BrowserGateway::Advance(json result) {
           result.value("mayHaveCompleted", false) || result["error"].value("mayHaveCompleted", false);
         impl_->Finish(Failure("SESSION_UNSUPPORTED"));
       }
+      else if (impl_->extension && impl_->stage == "execute" && impl_->request["method"] == "get-script-artifact" &&
+               result.is_object() && result.contains("error") && result["error"].is_object() &&
+               (result["error"].value("code", std::string()) == "ARTIFACT_NOT_READY" ||
+                result["error"].value("code", std::string()) == "ARTIFACT_NOT_FOUND")) {
+        // Preserve only these trusted owner-store refusals, never arbitrary messages or payloads.
+        impl_->uncertain = impl_->uncertain || result.value("mayHaveCompleted", false) ||
+          result["error"].value("mayHaveCompleted", false);
+        impl_->Finish(Failure(result["error"]["code"].get<std::string>(), impl_->uncertain));
+      }
       // A read whose image cannot fit its caller's result budget is a definite refusal, not an unknown failure.
       else if (impl_->request["method"] == "tab.screenshot" && result.is_object() && result.contains("error") &&
                result["error"].is_object() && result["error"].value("code", std::string()) == "SCREENSHOT_TOO_LARGE")

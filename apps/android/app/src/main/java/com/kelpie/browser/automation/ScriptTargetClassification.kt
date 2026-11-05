@@ -10,8 +10,11 @@ class ScriptTargetClassification {
         evaluationStarted = true
     }
 
-    fun received(sensitive: Boolean?) {
-        explicitClassification = sensitive != null
+    fun received(
+        sensitive: Boolean?,
+        sensitivityKnown: Boolean?,
+    ) {
+        explicitClassification = sensitive == true || (sensitive == false && sensitivityKnown == true)
     }
 
     fun unknown(): Boolean = evaluationStarted && !explicitClassification
