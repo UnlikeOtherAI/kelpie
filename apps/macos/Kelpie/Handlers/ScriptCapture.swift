@@ -203,7 +203,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         try await tab.check()
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
-        if let initialViewport, initialViewport != viewport { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
+        if let initialViewport, !initialViewport.sameGeometry(as: viewport) { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
         initialViewport = viewport
         let document = try await tab.documentIdentity()
         if let firstDocument {
