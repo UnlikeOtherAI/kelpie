@@ -33,3 +33,5 @@ Stop and marker capture checks are reported separately. If either is black, unsu
 ## Before/After scope
 
 The Windows recording overlay and Stop state had no equivalent on main 195eb. The Before cell may say that explicitly. Only an actually captured and visually inspected owned native window/popup may be used as After. The existing exported GIF/MP4/PNG evidence remains labelled media and is not a substitute for native-window pixels. Foreground switching/minimize/modal and physical pointer clicking remain separate unverified states.
+
+Capture rechecks GetWindowThreadProcessId and visibility immediately before PrintWindow and again before writing PNG bytes. A mismatch throws while the memory bitmap is disposed, before any image file is created. CLI subprocesses scope USERPROFILE and KELPIE_HOME to the private root; Windows identity/session stay unchanged.

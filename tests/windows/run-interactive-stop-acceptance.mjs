@@ -17,7 +17,7 @@ const timer=setTimeout(()=>deadline.abort(),120000);timer.unref();
 const report={source:"9333ff507ec91d06d86e338b1d2d9378daca2ac5",checks:[],cleanup:"not-started",invocation:"standard Microsoft UIA InvokePattern; no physical input"};
 let launched=false,readiness,pending,outputCreated=false;
 const child=async(command,args,extra={})=>execute(command,args,{windowsHide:true,timeout:15000,maxBuffer:2097152,...extra});
-const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,KELPIE_HOME:cliHome}})).stdout);
+const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,USERPROFILE:home,KELPIE_HOME:cliHome}})).stdout);
 const automation=async args=>JSON.parse((await child(uia,args,{signal:deadline.signal,timeout:10000})).stdout);
 const api=async(method,body={},cleanup=false)=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",

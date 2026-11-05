@@ -120,7 +120,12 @@ public static class ScriptStopAutomation {
           using(var graphics=System.Drawing.Graphics.FromImage(bitmap)) {
             graphics.Clear(System.Drawing.Color.Black);
             IntPtr dc=graphics.GetHdc();
-            try { printed=PrintWindow(window,dc,2); } finally {graphics.ReleaseHdc(dc);}
+            try {
+              GetWindowThreadProcessId(window,out actualPid);
+              if(actualPid!=(uint)pid || !IsWindowVisible(window))
+                throw new InvalidOperationException("Capture ownership/visibility changed before PrintWindow");
+              printed=PrintWindow(window,dc,2);
+            } finally {graphics.ReleaseHdc(dc);}
           }
           var bounds=new System.Drawing.Rectangle(0,0,width,height);
           var data=bitmap.LockBits(bounds,System.Drawing.Imaging.ImageLockMode.ReadOnly,
@@ -138,6 +143,9 @@ public static class ScriptStopAutomation {
             }
           } finally {bitmap.UnlockBits(data);}
           centerRgb=bitmap.GetPixel(width/2,height/2).ToArgb()&0xFFFFFF;
+          GetWindowThreadProcessId(window,out actualPid);
+          if(actualPid!=(uint)pid || !IsWindowVisible(window))
+            throw new InvalidOperationException("Capture ownership/visibility changed before PNG persistence");
           using(var stream=new FileStream(file,FileMode.CreateNew,FileAccess.Write,FileShare.Read))
             bitmap.Save(stream,System.Drawing.Imaging.ImageFormat.Png);
         }
