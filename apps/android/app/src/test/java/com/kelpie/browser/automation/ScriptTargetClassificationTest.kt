@@ -37,6 +37,7 @@ class ScriptTargetClassificationTest {
             assertFalse(stage, state.unknown())
         }
     }
+
     @Test
     fun explicitTrueIsClassifiedRatherThanMissingMetadata() {
         val state = ScriptTargetClassification()
