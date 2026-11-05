@@ -96,8 +96,19 @@ int main() {
                                 callbackReturned = YES;
                                 assert(secondStopped && [second sealAfterAudit:YES] == nil);
                                 assert(acknowledgements == 2 && stops == 2);
-                                puts("PASS: observer ACK, bounded decode, delayed retirement and stale-identity discard");
-                                exit(0);
+                                holdAck = NO;
+                                CEFHostedStreamProbe *third = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:125 identity:^BOOL { return YES; }];
+                                [third startWithCompletion:^(BOOL thirdStarted) {
+                                    assert(thirdStarted);
+                                    observer->on_dev_tools_agent_detached(observer, &browser);
+                                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                        [third stopWithCompletion:^(BOOL) {
+                                            assert([third sealAfterAudit:YES] == nil && stops == 3);
+                                            puts("PASS: ACK, bounded decode, late events, delayed retirement, stale identity and detach");
+                                            exit(0);
+                                        }];
+                                    });
+                                }];
                             }];
                             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
                                 assert(!callbackReturned);

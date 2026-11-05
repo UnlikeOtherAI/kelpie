@@ -1,7 +1,7 @@
 import {createServer} from "node:http";
 export const canary = "KELPIE_NATIVE_Aa b+!_DO_NOT_EXPORT";
 export async function startFixture() {
- const events=[]; const sockets=new Set();
+ const events=[]; const sockets=new Set();let streamNavigate=false;
  const server=createServer(async(req,res)=>{
   const url=new URL(req.url,"http://fixture.invalid");
   if(req.method==="POST"&&url.pathname==="/events"){
@@ -16,12 +16,14 @@ export async function startFixture() {
    if(events.length<10000)events.push(value);
    res.writeHead(202).end();return;
   }
+  if(url.pathname==="/stream-gate"){res.writeHead(200,{"content-type":"text/plain","cache-control":"no-store"}).end(streamNavigate?"1":"0");return;}
   const mode=url.pathname;
+  if(mode==="/stream-nav")streamNavigate=false;
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
   const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"].includes(mode)?mode:"";
   const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":mode==="/paced-final-delay"?"Delayed X fixture":"Hosted Mac fixture";
-  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge";
-  const body=edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
+  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge",stream=["/stream","/stream-nav"].includes(mode);
+  const body=stream?'<div id="stream-dot"></div>':edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
    <label>Draft message<textarea id="entry">Draft seed</textarea></label>
    <label>Account password<input id="password" type="password"></label>
@@ -37,7 +39,7 @@ export async function startFixture() {
    <button id="moving">Moving</button><button id="start">Start motion</button>
    <section id="catalogue"><h3>Green tea</h3><h3>Black tea</h3></section>
    <button id="scroll-target">Scrolled target</button>`;
-  const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)},pacedMode=${JSON.stringify(pacedMode)};const documentId=crypto.randomUUID();let sequence=0;
+  const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)},pacedMode=${JSON.stringify(pacedMode)},streamMode=${JSON.stringify(mode)};const documentId=crypto.randomUUID();let sequence=0;
   const send=(value,synchronous=false)=>{const body=JSON.stringify({
    documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight,clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,pixelRatio:devicePixelRatio},
    visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}});
@@ -82,10 +84,11 @@ export async function startFixture() {
   document.querySelector('#password')?.addEventListener('input',event=>{document.title=event.target.value});
   document.querySelector('#start')?.addEventListener('click',()=>document.querySelector('#moving').animate(
    [{transform:'translateX(0px)'},{transform:'translateX(100px)'}],{duration:200,iterations:Infinity,direction:'alternate'}));
+  if(streamMode==='/stream-nav'){const timer=setInterval(async()=>{try{if(await (await fetch('/stream-gate')).text()==='1'){clearInterval(timer);location.href='/next'}}catch{}},100)}
   addEventListener('scroll',()=>send({type:'scroll'}));
   send({type:'document'});
   })();`;
-  const style=edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
+  const style=stream?`body{margin:0;background:white;overflow:hidden}#stream-dot{position:absolute;left:30px;top:120px;width:30px;height:30px;background:#f52233;animation:stream 2s linear infinite alternate}@keyframes stream{to{transform:translateX(500px)}}`:edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
    #first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}`:
    bands?`body{margin:0;height:9000px;background:repeating-linear-gradient(to bottom,#f00 0 1000px,#0f0 1000px 2000px,#00f 2000px 3000px,#f0f 3000px 4000px)}`:
    next?"body{background:#ffe881;color:black}":`
@@ -106,6 +109,6 @@ export async function startFixture() {
  });
  server.on("connection",socket=>{sockets.add(socket);socket.once("close",()=>sockets.delete(socket));});
  await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
- return {url:"http://127.0.0.1:"+server.address().port,events,
+ return {url:"http://127.0.0.1:"+server.address().port,events,armStreamNavigation:()=>{streamNavigate=true;},
   close:()=>new Promise(resolve=>{for(const socket of sockets)socket.destroy();server.close(resolve);})};
 }

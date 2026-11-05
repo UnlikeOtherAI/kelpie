@@ -102,3 +102,15 @@ export function cefPumpSignal(line){
  const match=/^\[WorkflowCEFPump\] mode=(legacy|scheduled)$/.exec(line);
  return match?.[1]??null;
 }
+
+// Numeric events from the compile-gated synthetic CEF fixture only.
+export function hostedStreamSignal(line){
+ if(line==="[WorkflowHostedStream] event=started")return {event:"started"};
+ if(line==="[WorkflowHostedStream] event=discarded")return {event:"discarded"};
+ const complete=/^\[WorkflowHostedStream\] event=complete count=(\d{1,2})$/.exec(line);
+ if(complete&&Number(complete[1])<=64)return {event:"complete",count:Number(complete[1])};
+ const sample=/^\[WorkflowHostedStream\] event=sample index=(\d{1,2}) receipt=(\d{1,4}) protocol=(\d{1,4}) x=(\d{1,4}) y=(\d{1,4})$/.exec(line);
+ if(!sample)return null;
+ const [index,receiptMs,protocolMs,x,y]=sample.slice(1).map(Number);
+ return index<64&&receiptMs<=5000&&protocolMs<=5000&&x<=1920&&y<=1920?{event:"sample",index,receiptMs,protocolMs,x,y}:null;
+}

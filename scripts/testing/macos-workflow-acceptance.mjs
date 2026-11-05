@@ -2,7 +2,7 @@
 import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
 import {StringDecoder} from "node:string_decoder";
-import {startupSignal,navigationSignal,editFocusSignal,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal,cefPumpSignal} from "../../tests/macos/runtime-ownership.mjs";
+import {startupSignal,navigationSignal,editFocusSignal,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal,cefPumpSignal,hostedStreamSignal} from "../../tests/macos/runtime-ownership.mjs";
 import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
@@ -24,7 +24,7 @@ if(process.argv[2]==="--preparation"){
 }
 requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
 const scope=process.env.KELPIE_RUNTIME_SCOPE??"full";
-requireTrue(["full","cef-timing"].includes(scope),"RUNTIME_SCOPE");
+requireTrue(["full","cef-timing","cef-stream"].includes(scope),"RUNTIME_SCOPE");
 const root=await realpath("."),app=await realpath("apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app");
 requireTrue(app.startsWith(root+"/apps/macos/.build-runtime/"),"CANDIDATE_PATH");
 const label=process.env.KELPIE_EVIDENCE_LABEL??"";
@@ -44,8 +44,10 @@ const report={source,scope,pumpMode,platform:process.platform,
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
-const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[],cefPumpSignals=[];
-const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],env:{...process.env,NSUnbufferedIO:"YES"}});
+const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[],cefPumpSignals=[],streamSignals=[];
+report.streamSignals=streamSignals;
+const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],
+ env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:scope==="cef-stream"?"1":"0"}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
  const decoder=new StringDecoder("utf8");let text="";
@@ -65,6 +67,7 @@ for(const stream of [child.stdout,child.stderr]){
    const pointerTiming=pointerTimingSignal(line);if(pointerTiming&&pointerTimingSignals.length<32)pointerTimingSignals.push({phase,...pointerTiming});
    const retiree=retireeSignal(line);if(retiree&&retireeSignals.length<32)retireeSignals.push({phase,...retiree});
    const pump=cefPumpSignal(line);if(pump&&cefPumpSignals.length<4)cefPumpSignals.push(pump);
+   const stream=hostedStreamSignal(line);if(stream&&streamSignals.length<140)streamSignals.push(stream);
   }
  });
 }
@@ -83,7 +86,7 @@ try{
    ...(error.code==="LISTENER_IDENTITY"?{listenerFailure:client.listenerFailure}:{}),
   }));
  }
- if(scope==="cef-timing"){
+ if(scope==="cef-timing"||scope==="cef-stream"){
   await independent("chromium",()=>runEngine(client,fixture,"chromium",report,scope,Boolean(label)));
  }else{
   await independent("webkit",()=>runEngine(client,fixture,"webkit",report));

@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal,cefPumpSignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal,cefPumpSignal,hostedStreamSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -235,4 +235,12 @@ test("pump experiment signal accepts only fixed modes",()=>{
  assert.equal(cefPumpSignal("[WorkflowCEFPump] mode=scheduled"),"scheduled");
  assert.equal(cefPumpSignal("[WorkflowCEFPump] mode=legacy"),"legacy");
  assert.equal(cefPumpSignal("[WorkflowCEFPump] mode=private"),null);
+});
+
+test("hosted stream parser accepts only bounded synthetic numeric events",()=>{
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=started"),{event:"started"});
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=sample index=1 receipt=50 protocol=48 x=300 y=120"),
+  {event:"sample",index:1,receiptMs:50,protocolMs:48,x:300,y:120});
+ assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=sample index=64 receipt=50 protocol=48 x=300 y=120"),null);
+ assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=sample index=1 receipt=50 protocol=48 x=secret y=120"),null);
 });
