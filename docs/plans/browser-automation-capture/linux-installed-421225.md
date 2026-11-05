@@ -31,3 +31,26 @@ marker
 `4a5a2cdfc3f47845b459088e7d35b293c292055d0c7b469809d9df0332563b38`;
 CLI
 `f0913d884d9a9f5dd77a9966d906c7e979f2c54c197f2e1f4701b5337c1ce24a`.
+
+## Fedora 44
+
+The RPM build and installed verification passed. The RPM SHA-256 was
+`e62df3aa575ccb74a1faa31dc537a66a5350c256c0e8f97d4c501c3fac0d637c`;
+the installed ELF was
+`15c6d43ddcc8f30d459dcc76002acee5516e32855047185e184d48af613b3f00`.
+The CEF library, CLI package and Node archive matched the Ubuntu hashes above.
+
+The native corpus passed 58/58 checks. All 47 retained artifacts decoded
+(23 PNG, 15 GIF, nine MP4), and the strict continuous marker check had no
+violations. The CLI passed five checks and ten observation checks, with public
+alias stop and readiness cleanup. FFmpeg was 8.1.3, GStreamer 1.28.8 and
+OpenH264 2.6.0. This run did not request the independent terminal-IDR check.
+
+Receipt SHA-256 values: native report
+`3893765c010a58c885e9e515415b686fa8b4b5cf3b668d411009be46c5f832be`;
+all-frame decoder
+`87e3cb2c044f77f15377a0a13a54b9ca703db3c506e3d01a37b7e5fe28588c6c`;
+marker
+`7935742cea491e82acb942f9f6f4b80d050352f5fe5dfc1b5952836016b94d7a`;
+CLI
+`7aec6f6bdf38337ba6cfdc22a25cbd2ae6e2fc4df5c312a18c51f4179d4cc995`.
