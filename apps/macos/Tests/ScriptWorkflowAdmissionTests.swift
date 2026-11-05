@@ -11,30 +11,73 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     func testBonjourTXTReplacementKeepsSameHTTPListenerReachable() async throws {
         let port: UInt16 = 28421
         let router = Router()
-        let server = try HTTPServer(port: port, router: router, pairingStore: PairingStore(),
+        router.register("listener-control") { _ in ["success": true] }
+        let pairing = PairingStore(storeURL: nil)
+        guard case .created(let pending) = pairing.startPairing(clientId: "listener-control", clientName: "CI", sourceAddress: "127.0.0.1"),
+              let token = pairing.approve(requestId: pending.requestId, persist: false)?.token else {
+            return XCTFail("Control pairing setup failed")
+        }
+        let server = try HTTPServer(port: port, router: router, pairingStore: pairing,
                                     deviceInfo: DeviceInfo.current(port: Int(port)))
         let ready = expectation(description: "owned listener ready")
-        server.onReady = { ready.fulfill() }
+        server.onReady = { [weak server] in server?.onReady = nil; ready.fulfill() }
         server.start()
         defer { server.stop() }
         await fulfillment(of: [ready], timeout: 10)
+        let firstIncarnation = try XCTUnwrap(server.scriptListener.incarnation)
+        let first = try await Self.probeHTTP(port: port, token: token)
+        XCTAssertEqual(first, 200)
         let serviceName = "Kelpie CI " + UUID().uuidString
         server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "webkit"]))
-        let first = try await Self.probeHTTP(port: port)
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let afterInitial = try await Self.awaitControlHTTP(port: port, token: token)
+        XCTAssertEqual(afterInitial, 200)
         server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "chromium"]))
         try await Task.sleep(nanoseconds: 500_000_000)
-        let second = try await Self.probeHTTP(port: port)
-        XCTAssertEqual(first, second)
+        let second = try await Self.awaitControlHTTP(port: port, token: token)
+        let secondIncarnation = try XCTUnwrap(server.scriptListener.incarnation)
+        print("[ListenerControl] recovered=\(firstIncarnation != secondIncarnation ? 1 : 0)")
+        XCTAssertEqual(first, 200)
+        XCTAssertEqual(second, 200)
+        XCTAssertEqual(pairing.validateBearer(token), "listener-control")
+        if firstIncarnation != secondIncarnation {
+            server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "webkit"]))
+            try await Task.sleep(nanoseconds: 200_000_000)
+            XCTAssertEqual(server.scriptListener.incarnation, secondIncarnation)
+            let third = try await Self.awaitControlHTTP(port: port, token: token)
+            XCTAssertEqual(third, 200)
+        }
     }
 
-    private static func probeHTTP(port: UInt16) async throws -> Int {
+    private static func awaitControlHTTP(port: UInt16, token: String) async throws -> Int {
+        let deadline = ProcessInfo.processInfo.systemUptime + 4
+        while true {
+            do { return try await probeHTTP(port: port, token: token) }
+            catch let error as URLError where [.cannotConnectToHost, .networkConnectionLost].contains(error.code) {
+                guard ProcessInfo.processInfo.systemUptime < deadline else { throw error }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+        }
+    }
+
+    private static func probeHTTP(port: UInt16, token: String) async throws -> Int {
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
-        var request = URLRequest(url: try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)/health")))
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)/v1/listener-control")))
         request.timeoutInterval = 3
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
         request.setValue("close", forHTTPHeaderField: "Connection")
         let (_, response) = try await session.data(for: request)
         return try XCTUnwrap((response as? HTTPURLResponse)?.statusCode)
+    }
+
+    func testOnlyServiceNotRunningDNSFailureIsRecoverable() {
+        XCTAssertTrue(HTTPListenerFailure.isRecoverableBonjour(.dns(-65563)))
+        XCTAssertFalse(HTTPListenerFailure.isRecoverableBonjour(.dns(-65537)))
+        XCTAssertFalse(HTTPListenerFailure.isRecoverableBonjour(.posix(.ECONNREFUSED)))
     }
 
     @MainActor
