@@ -174,6 +174,14 @@ final class ScriptWorkflowActions {
             throw ScriptWorkflowFailure("INVALID_TARGET")
         }
         if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        let paced = workflow.pacedPlans[index]
+        if let paced, paced.operations.isEmpty {
+            try requireOK(try await tab.target(
+                target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain
+            ))
+            if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
+            return
+        }
         if editing {
             #if DEBUG
             await tab.debugEditFocus("before", targetFocused: found["focused"] as? Bool)
@@ -203,6 +211,18 @@ final class ScriptWorkflowActions {
         try await check()
         let current = try await tab.viewport()
         guard tab.document == document, viewport == current else { throw ScriptWorkflowFailure("STALE_TARGET") }
+        if let paced {
+            try await performPaced(
+                paced,
+                target: target,
+                token: token,
+                document: document,
+                viewport: viewport,
+                consume: consume,
+                uncertain: uncertain
+            )
+            return
+        }
         let edit: Body? = editing ? ["action": action, "text": step["text"] ?? ""] : nil
         let result = try await tab.target(
             target,
@@ -217,6 +237,48 @@ final class ScriptWorkflowActions {
         if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
         do { try await check() } catch {
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+        }
+    }
+
+    private func performPaced(
+        _ plan: ScriptPacedTyping,
+        target: Body,
+        token: String,
+        document: String,
+        viewport: ScriptWorkflowTab.Viewport,
+        consume: @escaping @MainActor (Body) -> Void,
+        uncertain: @escaping @MainActor () -> Void
+    ) async throws {
+        var completedInput = false
+        do {
+            for operation in plan.operations {
+                if operation.delayBeforeMs > 0 { try await wait(milliseconds: operation.delayBeforeMs) }
+                try await check()
+                let current = try await tab.viewport()
+                guard tab.document == document, viewport == current else { throw ScriptWorkflowFailure("STALE_TARGET") }
+                var edit: Body = ["action": operation.action, "text": operation.text]
+                if operation.requireFocused { edit["requireFocused"] = true }
+                let result = try await tab.target(
+                    target,
+                    token: token,
+                    edit: edit,
+                    refuseSensitive: workflow.capture != nil,
+                    consume: consume,
+                    uncertain: uncertain
+                )
+                if result["mayHaveCompleted"] as? Bool == true { completedInput = true }
+                try requireOK(result)
+                if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            }
+            try await check()
+        } catch let failure as ScriptWorkflowFailure {
+            if completedInput && !failure.mayHaveCompleted {
+                throw ScriptWorkflowFailure(failure.code, mayHaveCompleted: true)
+            }
+            throw failure
+        } catch {
+            throw ScriptWorkflowFailure(Task.isCancelled ? "SCRIPT_ABORTED" : "WORKFLOW_FAILED",
+                                        mayHaveCompleted: completedInput)
         }
     }
 

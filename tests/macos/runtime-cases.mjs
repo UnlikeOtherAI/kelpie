@@ -5,6 +5,7 @@ import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
 import {runG08} from "./runtime-g08.mjs";
+import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
@@ -96,6 +97,8 @@ export async function runEngine(client,fixture,engine,report) {
   semanticStage="media-decode";
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
+ await runPaced({client,fixture,engine,base,capture,check,load,play});
+ await load();
  await check("observation-and-readiness-public-entry",async()=>{
   const results={};
   for(const [method,params] of [["tab.status",{}],["tab.ready",{state:"complete",selector:"#submit"}],["tab.snapshot",{}]]){

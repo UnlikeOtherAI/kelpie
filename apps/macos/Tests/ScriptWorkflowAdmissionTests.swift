@@ -33,14 +33,28 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         assertRejected(workflow([tap, fill.merging(["text": ["secret": "private"]]) { _, new in new }]), "UNRESOLVED_INPUT")
     }
 
-    func testPacedEditIsRefusedBeforeNativeAdmissionUntilImplemented() throws {
-        for action in ["fill", "type"] {
-            let step: Body = ["action": action, "text": "fixture", "typingDelayMs": 10]
-            XCTAssertThrowsError(try ScriptBoundWorkflow.requireSupportedEdit(step)) {
-                XCTAssertEqual(($0 as? ScriptWorkflowFailure)?.code, "UNSUPPORTED_SCRIPT_ACTION")
-            }
-            try ScriptBoundWorkflow.requireSupportedEdit(["action": action, "text": "fixture"])
-        }
+    func testPacedEditsPlanBeforeAdmissionAndKeepAtomicDefault() throws {
+        let fill: Body = ["action": "fill", "target": ["label": "Draft"], "text": "A😀e\u{301}", "typingDelayMs": 50]
+        let type: Body = ["action": "type", "target": ["label": "Draft"], "text": "xy", "typingDelayMs": 20]
+        let plan = try ScriptBoundWorkflow(workflow([tap, fill, type]))
+        let fillOps = try XCTUnwrap(plan.pacedPlans[1]).operations
+        XCTAssertEqual(fillOps.map(\.action), ["fill", "type", "type", "type", "type"])
+        XCTAssertEqual(fillOps.map(\.text), ["", "A", "😀", "e", "\u{301}"])
+        XCTAssertEqual(fillOps.map(\.delayBeforeMs), [0, 0, 50, 50, 50])
+        XCTAssertEqual(fillOps.map(\.requireFocused), [false, true, true, true, true])
+        let typeOps = try XCTUnwrap(plan.pacedPlans[2]).operations
+        XCTAssertEqual(typeOps.map(\.delayBeforeMs), [0, 20])
+        XCTAssertEqual(typeOps.map(\.requireFocused), [false, true])
+        let atomic = try ScriptBoundWorkflow(workflow([["action": "type", "target": ["label": "Draft"], "text": "xy"]]))
+        XCTAssertTrue(atomic.pacedPlans.isEmpty)
+        let emptyType = try ScriptBoundWorkflow(workflow([type.merging(["text": ""]) { _, new in new }]))
+        XCTAssertTrue(try XCTUnwrap(emptyType.pacedPlans[0]).operations.isEmpty)
+        let emptyFill = try ScriptBoundWorkflow(workflow([fill.merging(["text": ""]) { _, new in new }]))
+        XCTAssertEqual(try XCTUnwrap(emptyFill.pacedPlans[0]).operations.map(\.action), ["fill"])
+        let oversized = type.merging(["text": String(repeating: "a", count: 1001)]) { _, new in new }
+        assertRejected(workflow([tap, oversized]), "INVALID_PACED_TYPING")
+        let tooLong = type.merging(["text": String(repeating: "a", count: 1000), "typingDelayMs": 61]) { _, new in new }
+        assertRejected(workflow([tap, tooLong]), "INVALID_PACED_TYPING")
     }
 
     func testSuppliedCaptureDefaultsAndExplicitScreenshotScope() throws {

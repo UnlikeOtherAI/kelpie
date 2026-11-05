@@ -16,6 +16,7 @@ struct ScriptBoundWorkflow {
     let capture: Body?
     let stepScreenshots: Bool
     let sensitiveValues: [String]
+    let pacedPlans: [Int: ScriptPacedTyping]
 
     init(_ body: Body) throws {
         guard let input = Self.json(body),
@@ -29,13 +30,14 @@ struct ScriptBoundWorkflow {
         var secrets: [String] = []
         var names: Set<String> = []
         var hasScreenshot = false
-        for step in steps {
+        var pacedPlans: [Int: ScriptPacedTyping] = [:]
+        for (index, step) in steps.enumerated() {
             guard let action = step["action"] as? String, Self.actions.contains(action) else {
                 throw ScriptWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION")
             }
             if action == "fill" || action == "type" {
-                try Self.requireSupportedEdit(step)
                 guard let value = step["text"] as? String else { throw ScriptWorkflowFailure("UNRESOLVED_INPUT") }
+                pacedPlans[index] = try Self.planPacedEdit(action: action, text: value, step: step)
                 if step["sensitive"] as? Bool == true { secrets.append(value) }
             }
             if action == "output" || action == "extract" {
@@ -53,6 +55,7 @@ struct ScriptBoundWorkflow {
         self.steps = steps
         self.tabID = tabID
         self.sensitiveValues = secrets
+        self.pacedPlans = pacedPlans
         self.stepScreenshots = (requested?["formats"] as? [String])?.contains("screenshots") == true
         if var options = requested {
             if hasScreenshot, var formats = options["formats"] as? [String], !formats.contains("screenshots") {
@@ -68,9 +71,9 @@ struct ScriptBoundWorkflow {
         }
     }
 
-    /// Refuse paced edits until their native per-character fences are implemented.
-    static func requireSupportedEdit(_ step: Body) throws {
-        guard step["typingDelayMs"] == nil else { throw ScriptWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION") }
+    private static func planPacedEdit(action: String, text: String, step: Body) throws -> ScriptPacedTyping? {
+        guard let delay = step["typingDelayMs"] else { return nil }
+        return try ScriptPacedTyping(action: action, text: text, delay: delay)
     }
 
     static func json(_ body: Body) -> String? {

@@ -84,3 +84,16 @@ test("viewport diagnostics accept only bounded fixed numeric fields",()=>{
   {boundsSame:true,layoutSame:true,visibleSame:false,scaleSame:true,pixelSame:true,oldWidth:883,newWidth:900,oldHeight:700,newHeight:700});
  assert.equal(viewportSignal("[WorkflowViewport] bounds=1 layout=1 visible=0 scale=1 pixel=1 widths=883.00,900.00 heights=700.00,700.00 secret"),null);
 });
+
+test("paced fixture logs only synthetic lengths and bounded fixed transitions",async()=>{
+ const fixture=await startFixture();
+ try{
+  for(const route of ["/paced","/paced-blur","/paced-replace","/paced-sensitive"]){
+   const html=await (await fetch(fixture.url+route)).text();
+   new vm.Script(html.match(/<script>([\s\S]*)<\/script>/)[1]);
+   assert.ok(html.includes("pacedMode="+JSON.stringify(route)));
+   assert.ok(html.includes("type:'paced-input',target:id,length:value.value.length"));
+   assert.ok(!html.includes("value:value.value"));
+  }
+ }finally{await fixture.close();}
+});
