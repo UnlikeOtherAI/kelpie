@@ -13,6 +13,7 @@ STATES = frozenset({
 })
 CAPTURE_REASONS = frozenset({
     "native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
+    "responder-accepted", "responder-refused", "responder-descendant", "responder-outside",
     *(f"snapshot-{value}" for value in ("native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale")),
     *(f"focus-{value}" for value in (
         "document-focus", "target-focus", "identity", "viewport", "eligibility",
