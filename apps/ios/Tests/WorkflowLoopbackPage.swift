@@ -85,6 +85,9 @@ final class WorkflowLoopbackPage {
             },25);
           };
         }
+        if(location.pathname==='/projection'){
+          button.style='position:fixed;left:100px;top:300px;width:150px;height:80px;margin:0';
+        }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
           document.body.innerHTML='<button id="bottom" style="position:absolute;bottom:12px;left:12px;margin:0">Bottom</button>'

@@ -161,6 +161,9 @@ final class IOSWorkflowActions {
             return
         }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
+        #if DEBUG
+        IOSFrameSampler.projectionDiagnostic(view: tab.view, viewport: viewport, css: CGPoint(x: x, y: y), point: point)
+        #endif
         try await movePointer(to: point)
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width

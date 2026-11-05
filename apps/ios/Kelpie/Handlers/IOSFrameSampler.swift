@@ -190,6 +190,17 @@ final class IOSFrameSampler {
                 window.top, window.bottom, CGFloat(view.scrollView.contentInsetAdjustmentBehavior.rawValue)]
     }
 
+    static func projectionDiagnostic(view: WKWebView, viewport: IOSWorkflowTab.Viewport, css: CGPoint, point: CGPoint) {
+        let insets = view.scrollView.adjustedContentInset
+        let offset = view.scrollView.contentOffset
+        let values = [viewport.bounds.width, viewport.bounds.height, viewport.visible.minX, viewport.visible.minY,
+                      viewport.visible.width, viewport.visible.height, viewport.scale, insets.top, insets.bottom,
+                      insets.left, insets.right, offset.x, offset.y, css.x, css.y, point.x, point.y]
+        guard values.allSatisfy({ $0.isFinite && abs($0) <= 10000 }) else { return }
+        let encoded = values.map { String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double($0)) }
+        print("[WorkflowProjection] values=" + encoded.joined(separator: ","))
+    }
+
     private static func insetsDiagnostic(before: [CGFloat], after: [CGFloat]) {
         guard before.count == 9, after.count == 9,
               (before + after).allSatisfy({ $0.isFinite && abs($0) <= 10_000 }) else { return }
