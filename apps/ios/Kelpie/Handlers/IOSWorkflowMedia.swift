@@ -56,6 +56,13 @@ final class IOSWorkflowMedia {
     }
 
     func receive(_ image: CGImage, seconds: Double, step: Int?, document: String, viewport: IOSWorkflowTab.Viewport) throws -> Bool {
+        #if DEBUG
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            let elapsedMs = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
+            if (0...10000).contains(elapsedMs) { print("[WorkflowCaptureEncode] elapsedMs=" + String(elapsedMs)) }
+        }
+        #endif
         let stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
         if first.isEmpty { first = stamp; firstTime = seconds }
         let time = max(0, seconds - (firstTime ?? seconds))

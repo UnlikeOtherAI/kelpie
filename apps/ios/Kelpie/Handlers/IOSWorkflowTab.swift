@@ -110,6 +110,7 @@ final class IOSWorkflowTab {
     private func fixed(
         _ expression: String,
         mutates: Bool = false,
+        deferEdit: Bool = false,
         consume: (@MainActor (Any?) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
     ) async throws -> Any? {
@@ -130,7 +131,7 @@ final class IOSWorkflowTab {
                 guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
                 evaluationStarted = true
                 do {
-                    let result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    let result = try await evaluateFixed(expression, deferEdit: deferEdit)
                     resultReceived = true
                     // Consume privacy metadata before guards and even after the caller's deadline.
                     consume?(result)
@@ -147,6 +148,16 @@ final class IOSWorkflowTab {
         do { try requireCurrent() } catch { throw IOSWorkflowFailure("TAB_CHANGED", mayHaveCompleted: mutates) }
         guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates) }
         return value
+    }
+
+    private func evaluateFixed(_ expression: String, deferEdit: Bool) async throws -> Any? {
+        guard deferEdit else { return try await BrowserControlWebKit.evaluate(expression, in: view) }
+        // Host-evaluated focus starts the software keyboard. Execute the same fixed
+        // edit in the next isolated-world task, outside WebKit's host-evaluation
+        // interaction scope, while retaining its single bounded callback.
+        let body = "return await new Promise((resolve,reject)=>setTimeout(()=>{try{resolve(" + expression +
+            ")}catch(error){reject(error)}},0));"
+        return try await view.callAsyncJavaScript(body, arguments: [:], in: nil, contentWorld: BrowserControlWebKit.world)
     }
 
     func viewport() async throws -> Viewport {
@@ -204,6 +215,7 @@ final class IOSWorkflowTab {
             value = try await fixed(
                 expression,
                 mutates: dispatch || edit != nil,
+                deferEdit: edit != nil,
                 consume: { result in
                     acknowledgement = IOSPacedTypingExecutor.consumeCallback(
                         result,

@@ -80,6 +80,12 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         ]), {"focus-viewport": 1, "observation-INVALID_ARGUMENTS": 1, "responder-outside": 1,
               "snapshot-visible-size": 1})
 
+    def test_capture_encode_diagnostics_accept_only_bounded_numbers(self):
+        from ios_workflow_diagnostics import fixed_capture_encode
+        self.assertEqual(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=137"), 137)
+        self.assertIsNone(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=10001"))
+        self.assertIsNone(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=private"))
+
     def test_capture_diagnostics_only_keep_fixed_reasons(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "log"
