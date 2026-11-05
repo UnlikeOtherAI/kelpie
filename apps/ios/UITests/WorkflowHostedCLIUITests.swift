@@ -9,6 +9,7 @@ extension WorkflowCaptureUITests {
               UUID(uuidString: nonce) != nil,
               let value = ProcessInfo.processInfo.environment["KELPIE_WORKFLOW_CLI_PORT"],
               let port = Int(value), (1...65535).contains(port) else { throw XCTSkip("Requires the hosted CLI acceptance driver") }
+        testLaunchArguments.append("--test-g08-document-binding")
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let bridge = WorkflowCaptureProbe(port: port)

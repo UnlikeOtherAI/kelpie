@@ -20,6 +20,9 @@ final class IOSWorkflowMedia {
     private var videoDrops = 0
     private var firstTime: Double?
     private(set) var failure: IOSWorkflowFailure?
+    #if DEBUG
+    private var geometryEvidence = IOSG08GeometryEvidence()
+    #endif
 
     init(runID: String, owner: String, settings: Body) throws {
         self.runID = runID
@@ -62,6 +65,9 @@ final class IOSWorkflowMedia {
             let elapsedMs = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
             if (0...10000).contains(elapsedMs) { print("[WorkflowCaptureEncode] elapsedMs=" + String(elapsedMs)) }
         }
+        #endif
+        #if DEBUG
+        geometryEvidence.record(document: document, viewport: viewport)
         #endif
         let stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
         if first.isEmpty { first = stamp; firstTime = seconds }
@@ -122,6 +128,9 @@ final class IOSWorkflowMedia {
                 extra["frameCount"] = video.encodedFrameCount
                 extra["durationMs"] = video.durationMs
                 extra["droppedFrames"] = videoDrops + video.rejectedFrameCount + dropped
+                #if DEBUG
+                extra["geometry"] = geometryEvidence.manifest(encodedFrames: video.encodedFrameCount)
+                #endif
                 if video.budgetExceeded { failure = IOSWorkflowFailure("CAPTURE_BUDGET_EXCEEDED") }
                 pending.append((url, "video/mp4", extra))
             } catch {
@@ -140,6 +149,9 @@ final class IOSWorkflowMedia {
                 extra["durationMs"] = result.durationMs
                 extra["frameCount"] = result.frameCount
                 extra["droppedFrames"] = dropped
+                #if DEBUG
+                extra["geometry"] = geometryEvidence.manifest(encodedFrames: result.frameCount)
+                #endif
                 if result.partial {
                     let limit = shouldContinue() ? "CAPTURE_BUDGET_EXCEEDED" : "CAPTURE_FINALIZATION_LIMIT"
                     failure = IOSWorkflowFailure(isAborted() ? "SCRIPT_ABORTED" : limit)

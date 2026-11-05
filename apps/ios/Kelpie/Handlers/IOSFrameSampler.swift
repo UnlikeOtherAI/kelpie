@@ -291,7 +291,8 @@ final class IOSFrameSampler {
         }
         let after = try await tab.viewport()
         if after != viewport {
-            let scrolled = after.bounds == viewport.bounds && after.content == viewport.content && after.layout == viewport.layout &&
+            let scrolled = after.bounds == viewport.bounds && after.content == viewport.content &&
+                after.fixtureDocumentID == viewport.fixtureDocumentID && after.layout == viewport.layout &&
                 after.visible.size == viewport.visible.size && after.scale == viewport.scale && after.pixelRatio == viewport.pixelRatio
             guard scrolled else {
                 Self.diagnostic("snapshot-" + Self.resizeReason(initial: viewport, viewport: after))

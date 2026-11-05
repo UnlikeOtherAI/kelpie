@@ -11,14 +11,24 @@ final class IOSWorkflowTab {
         let scale: CGFloat
         let pixelRatio: CGFloat
         let content: CGRect
+        let fixtureDocumentID: String?
 
-        init(bounds: CGSize, layout: CGSize, visible: CGRect, scale: CGFloat, pixelRatio: CGFloat, content: CGRect? = nil) {
+        init(
+            bounds: CGSize,
+            layout: CGSize,
+            visible: CGRect,
+            scale: CGFloat,
+            pixelRatio: CGFloat,
+            content: CGRect? = nil,
+            fixtureDocumentID: String? = nil
+        ) {
             self.bounds = bounds
             self.layout = layout
             self.visible = visible
             self.scale = scale
             self.pixelRatio = pixelRatio
             self.content = content ?? CGRect(origin: .zero, size: bounds)
+            self.fixtureDocumentID = fixtureDocumentID
         }
 
         var metadata: Body { ["width": layout.width, "height": layout.height] }
@@ -177,12 +187,23 @@ final class IOSWorkflowTab {
     }
 
     func viewport() async throws -> Viewport {
+        #if DEBUG
+        let bindFixture = ProcessInfo.processInfo.arguments.contains("--test-g08-document-binding")
+        #else
+        let bindFixture = false
+        #endif
+        let suffix = bindFixture ? ",document.documentElement.getAttribute('data-kelpie-g08-document-id')" : ""
         let result = try await fixed("""
         (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
         v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
-        v?.scale??1,devicePixelRatio]})()
+        v?.scale??1,devicePixelRatio\(suffix)]})()
         """)
-        guard let values = result as? [NSNumber], values.count == 8 else {
+        guard let raw = result as? [Any], raw.count == (bindFixture ? 9 : 8),
+              let values = Array(raw.prefix(8)) as? [NSNumber] else {
+            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
+        }
+        let fixtureID = bindFixture ? raw.last as? String : nil
+        guard fixtureID == nil || (fixtureID?.utf8.count ?? 0) <= 128 else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
         let parts = values.map { CGFloat($0.doubleValue) }
@@ -207,7 +228,8 @@ final class IOSWorkflowTab {
             visible: CGRect(x: parts[2], y: parts[3], width: parts[4], height: parts[5]),
             scale: parts[6],
             pixelRatio: parts[7],
-            content: content
+            content: content,
+            fixtureDocumentID: fixtureID
         )
     }
 
