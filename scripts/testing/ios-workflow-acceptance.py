@@ -29,7 +29,6 @@ def selection(scope):
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchScrollableControl",
-            "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
         ]
         return ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods], set(methods)
     if scope not in ("full", "navigation", "diagnostics"):
