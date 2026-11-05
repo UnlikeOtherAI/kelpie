@@ -74,7 +74,12 @@ try {
   };
   const snapshot = await waitFor(async () => {
     const response = await canonical("tab.snapshot");
-    return response.ok && response.value.text.includes("Confirm order") ? response.value : false;
+    assert.equal(response.ok, true, JSON.stringify(response.error));
+    const loaded = response.value.text.includes("Confirm order") ||
+      response.value.elements?.some(element => element.name === "Confirm order");
+    report.lastSnapshot = { title: response.value.title, textLength: response.value.text.length,
+      elementNames: response.value.elements?.slice(0, 12).map(element => element.name) };
+    return loaded ? response.value : false;
   }, "actual loaded capture fixture", 15000);
   report.snapshot = { title: snapshot.title, bytes: Buffer.byteLength(JSON.stringify(snapshot)) };
   const image = await canonical("tab.screenshot");
