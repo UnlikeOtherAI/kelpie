@@ -94,7 +94,8 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     func testMalformedCallbackLatchesPrivacyBeforeLaterGuardFailure() async {
         for captures in [true, false] {
             for value: Any? in [nil, "malformed", [1, 2], ["sensitivityKnown": true],
-                                ["ok": true, "sensitive": false, "sensitivityKnown": true]] {
+                                ["ok": true, "sensitive": false, "sensitivityKnown": true],
+                                ["ok": true, "mayHaveCompleted": false, "sensitive": false, "sensitivityKnown": true]] {
                 let privacy = ScriptWorkflowPrivacy(secrets: [], captures: captures)
                 do {
                     ScriptWorkflowTab.consumeTargetResult(
@@ -137,7 +138,8 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(unknown))
         for malformed: Any? in [nil, "missing", [:], ["ok": true, "sensitive": false, "sensitivityKnown": false],
                                 ["ok": false, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
-                                ["ok": true, "error": "bad", "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]] {
+                                ["ok": true, "error": "bad", "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
+                                ["ok": true, "mayHaveCompleted": false, "sensitive": false, "sensitivityKnown": true]] {
             XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(malformed))
         }
         try ScriptWorkflowActions.requirePacedAckShape(known)

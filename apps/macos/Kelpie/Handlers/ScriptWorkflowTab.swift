@@ -226,7 +226,9 @@ final class ScriptWorkflowTab {
     ) {
         guard let body = value as? Body else { uncertain?(); return }
         consume?(body)
-        let invalidStatus = body["ok"] as? Bool == true ? body["error"] != nil : !(body["error"] is String)
+        let invalidStatus = body["ok"] as? Bool == true
+            ? body["error"] != nil || body["mayHaveCompleted"] as? Bool != true
+            : !(body["error"] is String)
         if mutates && (!(body["ok"] is Bool) || invalidStatus || !(body["sensitive"] is Bool) ||
                        !(body["sensitivityKnown"] is Bool) || !(body["mayHaveCompleted"] is Bool)) {
             uncertain?()
