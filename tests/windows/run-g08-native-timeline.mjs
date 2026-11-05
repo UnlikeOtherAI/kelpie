@@ -33,7 +33,7 @@ const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
 const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
-let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,helperExit,helperError="",monitorStop=false,monitor;
+let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,helperExit,helperError="",nativeProgress,monitorStop=false,monitor;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
@@ -120,7 +120,7 @@ try{
  helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
  helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
  helperTimer=setTimeout(()=>helper.kill(),42000);
- const nativePromise=evaluateWgcFrames(helper.stdout,config);void nativePromise.catch(()=>{});
+ const nativePromise=evaluateWgcFrames(helper.stdout,config,{onProgress:state=>{nativeProgress={config,...state};}});void nativePromise.catch(()=>{});
  const activeSamples=[];monitor=(async()=>{while(!monitorStop&&!pendingDone){
   const status=await api("get-script-status");if(status.playing){assert.equal(status.runId,active.runId);assert.ok(activeSamples.length<140,"STATUS_SAMPLE_BOUND");activeSamples.push({runId:status.runId,playing:true});}
   await new Promise(done=>setTimeout(done,300));
@@ -158,10 +158,20 @@ try{
  report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;
 }catch(error){
  if(helperExit&&!report.helperExit){if(helper&&helper.exitCode===null)helper.kill();try{report.helperExit=await awaitBounded(helperExit,2000);}catch{report.helperExit={code:null,signal:null};}report.helperDiagnostic=safeWgcDiagnostic(helperError);}
+ if(nativeProgress){try{
+  const samples=nativeProgress.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
+  const bytes=Buffer.from(JSON.stringify({config:nativeProgress.config,frameCount:nativeProgress.frameCount,shape:nativeProgress.shape,samples}));
+  if(bytes.length<=33554432)await writeFile(join(outputRoot,"partial-native-observation.json"),bytes,{flag:"wx"});
+ }catch{}}
+ if(fixture){try{
+  const partial=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(3000)})).json();
+  const bytes=Buffer.from(JSON.stringify(partial));if(bytes.length<=16384)await writeFile(join(outputRoot,"partial-fixture-events.json"),bytes,{flag:"wx"});
+ }catch{}}
+ const location=String(error.stack??"").match(/(?:wgc-frame-stream|wgc-g08-evaluate|wgc-g08-rgb|g08-pixels|g08-retention).mjs:\d+/)?.[0]??null;
  const errorKind=["AbortError","TimeoutError","TypeError","AssertionError","Error"].includes(error.name)?error.name:"Other";
  const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|WGC_|G08_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL|HTTP_[0-9]{3})[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
  report.checks.push({name:"owned native and exported G08 case",passed:false,stage:report.phase,
-  category:error.safeDetails?.category??safe,errorKind,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
+  category:error.safeDetails?.category??safe,errorKind,location,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
  process.exitCode=1;
 }finally{
  monitorStop=true;if(helperTimer)clearTimeout(helperTimer);if(helper&&helper.exitCode===null)helper.kill();
