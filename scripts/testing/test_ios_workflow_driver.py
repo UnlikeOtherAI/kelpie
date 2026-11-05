@@ -5,6 +5,9 @@ import sys
 import tempfile
 import types
 import unittest
+import json
+import urllib.error
+import urllib.request
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -16,6 +19,33 @@ SPEC.loader.exec_module(DRIVER)
 
 
 class HostedSimulatorCleanupTests(unittest.TestCase):
+    def test_two_stage_rendezvous_requires_explicit_original_result_acknowledgment(self):
+        from ios_workflow_rendezvous import HostedCLIRendezvous
+        bridge = HostedCLIRendezvous("test-nonce")
+        bridge.start()
+        url = f"http://127.0.0.1:{bridge.port}/test-nonce"
+        def post(body):
+            request = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=2) as response:
+                return response.status
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as early:
+                post({"verified": True})
+            self.assertEqual(early.exception.code, 409)
+            self.assertEqual(post({"tabId": "a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed"}), 202)
+            self.assertFalse(bridge.standard_verified())
+            bridge.standard_passed()
+            self.assertEqual(post({"verified": True}), 202)
+            self.assertTrue(bridge.standard_verified())
+            with self.assertRaises(urllib.error.HTTPError) as duplicate:
+                post({"verified": True})
+            self.assertEqual(duplicate.exception.code, 409)
+            bridge.finish(False)
+            with urllib.request.urlopen(url, timeout=2) as response:
+                self.assertEqual(json.load(response), {"state": "failed"})
+        finally:
+            bridge.close()
+
     def test_navigation_diagnostics_emit_only_known_fixed_events(self):
         from ios_workflow_diagnostics import fixed_events
         raw = [
