@@ -111,9 +111,9 @@ export function hostAuditCategory(error){
  return "other";
 }
 
-export function validHostSandboxHandoff(result,pid,startTicks,unitPid,nonce){
+export function validHostSandboxHandoff(result,pid,startTicks,unitPid,nonce,stageNonce){
  const categories=["cdp-missing","cmdline-unreadable","cdp-omission","cdp-mismatch","proc-unreadable","process-race","budget","no-renderer","flags","filters","namespace","identity","other"];
- return result?.pid===pid&&result.startTicks===startTicks&&result.unitPid===unitPid&&result.nonce===nonce&&
+ return result?.pid===pid&&result.startTicks===startTicks&&result.unitPid===unitPid&&result.nonce===nonce&&(stageNonce===undefined||result.stageNonce===stageNonce)&&
   (result.ok===true?result.evidence?.allOwnedRenderers===true&&result.evidence?.ownedRenderer===true&&
    result.evidence?.chromiumFlagsSafe===true&&result.evidence?.rendererSeccomp===2&&
    result.evidence?.additionalSeccompFilter===true&&result.evidence?.rendererNamespaceSeparated===true&&

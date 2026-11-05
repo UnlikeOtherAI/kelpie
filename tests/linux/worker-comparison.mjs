@@ -2,7 +2,7 @@
 // One engine per isolated unit. Setup/downloads happen before the loopback-only run.
 import assert from "node:assert/strict";
 import {spawn,execFile} from "node:child_process";
-import {createHash} from "node:crypto";
+import {createHash,randomBytes} from "node:crypto";
 import {createReadStream} from "node:fs";
 import {readFile,mkdir,writeFile} from "node:fs/promises";
 import {createServer as httpServer} from "node:http";
@@ -16,7 +16,8 @@ import {promisify} from "node:util";
 import {runLightpandaReaderDiagnostics} from "./lightpanda-reader-diagnostics.mjs";
 import {observePrivateBoundary,validatePrivateProbe} from "./worker-comparison-network.mjs";
 import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
-import {inspectOwnedChromiumSandbox} from "./worker-comparison-sandbox.mjs";
+import {queryRendererPidsAtOwnedPort} from "./worker-comparison-cdp-process.mjs";
+import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
@@ -91,8 +92,8 @@ const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBind
  engineSHA256:expectedHash,archiveSHA256:backend==="playwright"?process.env.KELPIE_CHROMIUM_ARCHIVE_SHA256:null,fixtureSHA256:createHash("sha256").update(html).update(extra).update(js).digest("hex"),
  boundary:{memoryMax,cpuMax,tasksMax},uid:process.getuid(),pid:process.pid,networkProbe,startupMs:null,warm:[],checks:[],toolCalls:0,responseBytes:0,
  unsupported:[],notProbed:["shared sessions","concurrent contexts"],unitCostScope:"memory peak covers the whole unit including hash/version preflight, fixture, CLI and browser; CPU covers engine run and teardown",
- startupScope:"engine spawn to isolated session ready; fixture, binary setup, and separately reported sandbox validation excluded",
- networkBoundary:"external systemd policy verification required",sandboxEvidence:null,sessionSandboxEvidence:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
+ startupScope:"engine spawn through isolated session and common preflight navigation; fixture setup and separately reported sandbox validation excluded",
+ networkBoundary:"external systemd policy verification required",sessionSandboxEvidence:null,sandboxAuditStatus:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
 let engine,transport,client,failure,session;
 const started=performance.now();
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
@@ -142,16 +143,6 @@ try{
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
  report.enginePid=engine.pid;report.engineStartTicks=await verifyOwnedListener(engine.pid,port,engineStart);
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
- if(backend==="playwright"){
-  const sandboxStart=performance.now(),sandboxCpu=await cpu();
-  for(let attempt=0;attempt<30&&!report.sandboxEvidence;attempt++){
-   try{report.sandboxEvidence=await inspectOwnedChromiumSandbox(cgroup,engine.pid,engineStart);}
-   catch{await delay(100);}
-  }
-  report.sandboxValidationMs=performance.now()-sandboxStart;
-  report.sandboxValidationCpuUsec=await cpu()-sandboxCpu;
-  assert.ok(report.sandboxEvidence,"CHROMIUM_SANDBOX_NOT_PROVEN");
- }
  const methods=["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload",
   "tab.snapshot","tab.extract","tab.status","tab.ready"];
  const config=join(dir,"operator.json");
@@ -178,11 +169,27 @@ try{
  const lifecycle=request=>tool("kelpie_worker_session",{request});
  const created=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
  assert.equal(created.ok,true);session=created.value;assert.equal(session.ownedTabIds.length,1);
+ const preflightStart=performance.now();
+ const preflight=await tool("kelpie_browser_control",{sessionId:session.sessionId,request:{version:1,method:"tab.goto",params:{url:origin+"/preflight"},tabId:session.ownedTabIds[0]}});
+ assert.equal(preflight.ok,true);report.preflight={method:"tab.goto",target:"owned",wallMs:performance.now()-preflightStart};
  if(backend==="playwright"){
-  const sandboxStart=performance.now(),sandboxCpu=await cpu();
-  report.sessionSandboxEvidence=await inspectOwnedChromiumSandbox(cgroup,engine.pid,engineStart);
-  report.sandboxValidationMs+=performance.now()-sandboxStart;
-  report.sandboxValidationCpuUsec+=await cpu()-sandboxCpu;
+  const sandboxStart=performance.now(),sandboxCpu=await cpu(),stageNonce=randomBytes(32).toString("hex");
+  try{
+   report.sandboxAuditStatus="devtools-failed";
+   const rendererPids=await queryRendererPidsAtOwnedPort(port,engine.pid,engineStart);
+   await writeFile(join(dir,"browser-identity.json"),JSON.stringify({pid:engine.pid,startTicks:engineStart,rendererPids,unitPid:process.pid,nonce:process.env.KELPIE_COMPARISON_ID,stage:"isolated-session",stageNonce}),{mode:0o600,flag:"wx"});
+   let completed=false;report.sandboxAuditStatus="timeout";
+   for(let attempt=0;attempt<400&&!completed;attempt++){
+    if(engine.exitCode!==null||engine.signalCode!==null)break;
+    try{const proof=JSON.parse(await readFile(join(dir,"host-sandbox-result.json"),"utf8"));
+     if(validHostSandboxHandoff(proof,engine.pid,engineStart,process.pid,process.env.KELPIE_COMPARISON_ID,stageNonce)){
+      completed=true;if(proof.ok){report.sessionSandboxEvidence=proof.evidence;report.sandboxAuditStatus="passed";}else report.sandboxAuditStatus=proof.category;
+     }
+    }catch{/* Host audit pending. */}
+    if(!completed)await delay(100);
+   }
+   assert.ok(report.sessionSandboxEvidence,"CHROMIUM_SANDBOX_NOT_PROVEN");
+  }finally{report.sandboxValidationMs=performance.now()-sandboxStart;report.sandboxValidationCpuUsec=await cpu()-sandboxCpu;}
  }
  report.startupMs=performance.now()-engineStarted-report.sandboxValidationMs;
  await check("second session refused at configured limit",async()=>{

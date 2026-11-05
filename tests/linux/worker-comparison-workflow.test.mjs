@@ -10,12 +10,12 @@ test("hosted comparison defaults to identity preparation and explicit hashes gat
  assert.match(workflow,/if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.prepare_only == false/);
  assert.match(workflow,/\[\[ "\$archive_sha" == "\$CHROMIUM_ARCHIVE_SHA256" \]\]/);
  assert.match(workflow,/\[\[ "\$binary_sha" == "\$CHROMIUM_BINARY_SHA256" \]\]/);
- assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' \}\}/);
+ assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' && inputs\.worker_comparison_mode != 'execute-2204' \}\}/);
  const input=caller.match(/worker_comparison_mode:\s*\n([\s\S]*?)\n      worker_comparison_archive_sha256:/);
  assert.ok(input);
  const options=[...input[1].matchAll(/^\s*- (?:'([^']+)'|([^\s]+))\s*$/gm)].map(match=>match[1]??match[2]);
- assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","prepare","execute"]);
- assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- prepare\s*\n {10}- execute/);
+ assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","execute-2204","prepare","execute"]);
+ assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- execute-2204\s*\n {10}- prepare\s*\n {10}- execute/);
  const [setup,build]=workflow.split("      - name: Build comparison CLI and shared packages");
  assert.ok(build);assert.doesNotMatch(setup,/pnpm --filter @unlikeotherai\/kelpie(?:-shared)? build/);
  assert.match(build,/^\s*if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.prepare_only == false/m);
@@ -39,8 +39,8 @@ test("live namespace handoff precedes all engine processes and sandbox precedes 
  const gate=corpus.indexOf('assert.ok(boundaryReady,"PRIVATE_NETWORK_NOT_VERIFIED")');
  const version=corpus.indexOf("const version=(await exec(executable,");
  const spawn=corpus.indexOf("engine=spawn(executable,");
- const sandbox=corpus.indexOf("inspectOwnedChromiumSandbox(cgroup,engine.pid,engineStart)");
- const corpusRun=corpus.indexOf("const methods=[");
+ const sandbox=corpus.indexOf("queryRendererPidsAtOwnedPort(port,engine.pid,engineStart)");
+ const corpusRun=corpus.indexOf("await check(\"second session refused");
  assert.ok(gate>=0&&gate<version&&version<spawn&&spawn<sandbox&&sandbox<corpusRun);
 });
 
@@ -54,9 +54,9 @@ test("sandbox smoke has a separate pinned and corpus-free dispatch",async()=>{
  assert.ok(smoke.indexOf("SANDBOX_BROWSER_CHANGED")<smoke.indexOf("browser-identity.json"));
 });
 
-test("alternate runner is allowlisted for sandbox smoke only",async()=>{
+test("alternate runner is allowlisted for reviewed runs",async()=>{
  const workflow=await readFile(new URL("../../.github/workflows/worker-comparison.yml",import.meta.url),"utf8");
  const caller=await readFile(new URL("../../.github/workflows/lint.yml",import.meta.url),"utf8");
- assert.ok(workflow.includes('ubuntu-22.04) [[ "$SANDBOX_ONLY" == true && "$ISOLATION_ONLY" == false ]] || exit 1 ;;'));
+ assert.ok(workflow.includes('ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false ) ]] || exit 1 ;;'));
  assert.ok(caller.includes("worker_comparison_mode == 'sandbox-2204'"));
 });

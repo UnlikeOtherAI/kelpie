@@ -21,6 +21,8 @@ test("host handoff rejects stale identity and malformed success",()=>{
  const evidence={ownedRenderer:true,chromiumFlagsSafe:true,rendererSeccomp:2,additionalSeccompFilter:true,rendererNamespaceSeparated:true,allOwnedRenderers:true,rendererCount:1};
  const result={ok:true,pid:2,startTicks:"20",unitPid:1,nonce:"n",evidence};
  assert.equal(validHostSandboxHandoff(result,2,"20",1,"n"),true);
+ assert.equal(validHostSandboxHandoff({...result,stageNonce:"stage"},2,"20",1,"n","stage"),true);
+ assert.equal(validHostSandboxHandoff({...result,stageNonce:"old"},2,"20",1,"n","stage"),false);
  assert.equal(validHostSandboxHandoff(result,2,"21",1,"n"),false);
  assert.equal(validHostSandboxHandoff({...result,evidence:{allOwnedRenderers:true}},2,"20",1,"n"),false);
  assert.equal(validHostSandboxHandoff({...result,nonce:"old"},2,"20",1,"n"),false);
