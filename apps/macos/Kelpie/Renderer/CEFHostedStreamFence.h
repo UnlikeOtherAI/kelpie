@@ -23,7 +23,7 @@ public:
         : browserID_(browserID), epoch_(epoch), startMs_(startMs) {}
 
     Decision admit(int browserID, uint64_t epoch, int sessionID, double receiptMs,
-                   double protocolMs, size_t encodedBytes, bool identityCurrent) {
+                   double protocolMs, size_t encodedBytes, bool identityCurrent, uint64_t *decodeToken = nullptr) {
         std::lock_guard<std::mutex> guard(lock_);
         if (!active_ || browserID != browserID_ || epoch != epoch_ || sessionID <= 0) { return Decision::reject; }
         if (stopRequested_) { return Decision::ackDrop; }
@@ -45,15 +45,16 @@ public:
         totalBytes_ += encodedBytes;
         if (decodePending_) { ++dropped_; return Decision::ackDrop; }
         decodePending_ = true;
-        pendingSessionID_ = sessionID;
+        pendingDecodeToken_ = ++nextDecodeToken_;
+        if (decodeToken != nullptr) { *decodeToken = pendingDecodeToken_; }
         pendingReceiptMs_ = receiptMs;
         pendingProtocolMs_ = protocolMs;
         return Decision::ackDecode;
     }
 
-    void complete(uint64_t epoch, int sessionID, bool identityCurrent, bool decoded, int x, int y) {
+    void complete(uint64_t epoch, uint64_t decodeToken, bool identityCurrent, bool decoded, int x, int y) {
         std::lock_guard<std::mutex> guard(lock_);
-        if (epoch != epoch_ || !decodePending_ || sessionID != pendingSessionID_) { return; }
+        if (epoch != epoch_ || !decodePending_ || decodeToken != pendingDecodeToken_) { return; }
         decodePending_ = false;
         if (!active_ || !identityCurrent || !decoded || x < 0 || y < 0 || x > 1920 || y > 1920) {
             valid_ = false;
@@ -95,7 +96,8 @@ private:
     bool valid_ = true;
     bool decodePending_ = false;
     bool stopRequested_ = false;
-    int pendingSessionID_ = 0;
+    uint64_t pendingDecodeToken_ = 0;
+    uint64_t nextDecodeToken_ = 0;
     size_t observed_ = 0;
     size_t totalBytes_ = 0;
     size_t dropped_ = 0;
