@@ -42,3 +42,5 @@ The pinned ArtifactSigning.Client preparation/download and an actual signing aut
 6. Complete changed-native-UI evidence with strictly owned-window capture. Do not use another task's process as a supposed base or relabel renderer/composited media as a native-window screenshot.
 
 The published artifact and installed signed acceptance remain pending. This audit does not choose a version, publish a release or change the other task's installed app.
+
+Root selected Windows0.1.16 for the final integrated candidate. Fresh origin/main195eb90fa5df47291a75e8d165c72fc2f825e3c9 inspection confirmed all four Windows mirrors0.1.15 before this bump. Only CMake project, RC numeric/string versions, device info and runtime Windows versions changed. Compilation/public replay remains pending; this is not a signed or published release. f1880.1.15 evidence and archived EXE/DLL are preserved. No signing, upload or install has occurred.
