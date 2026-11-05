@@ -142,7 +142,8 @@ class Video final : public Writer {
     const auto end = GstClockTime(std::llround(end_ms * GST_MSECOND));
     Buffer packet;
     if (prepared_) {
-      if (purpose == ScriptMediaFramePurpose::TerminalClear && !ContainsVclAccessUnit(prepared_.get(), caps_, true)) {
+      if (purpose == ScriptMediaFramePurpose::TerminalClear &&
+          (!ContainsVclAccessUnit(prepared_.get(), caps_, true) || GST_BUFFER_FLAG_IS_SET(prepared_.get(),GST_BUFFER_FLAG_DELTA_UNIT))) {
         terminal_force_failed_=true; stopped_=true; ++output_.dropped_frames; return false;
       }
       packet = std::move(prepared_);
@@ -224,7 +225,8 @@ class Video final : public Writer {
     Sample sample(encoder_->Pull());
     auto* sample_caps = gst_sample_get_caps(sample.get());
     auto* packet = gst_sample_get_buffer(sample.get());
-    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps, force_keyframe))
+    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps, force_keyframe) ||
+        (force_keyframe && GST_BUFFER_FLAG_IS_SET(packet,GST_BUFFER_FLAG_DELTA_UNIT)))
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     if (!caps_) caps_ = gst_caps_ref(sample_caps);
     Buffer copied(gst_buffer_copy_deep(packet));

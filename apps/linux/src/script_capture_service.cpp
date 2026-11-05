@@ -149,17 +149,17 @@ class Capture final : public DesktopScriptCapture {
         {"committedAfter",encoder_->committed_movie_frames()}});
     }
     #endif
+    if (encoder_->budget_exceeded()) failure = "CAPTURE_BUDGET_EXCEEDED";
+    if (encoder_->finalization_failed()) failure = "CAPTURE_FINALIZE_FAILED";
     for (const auto& output : outputs) {
       try {
         owned_.emplace(output.path, InspectCaptureFile(output.path));
         manifests_.push_back(service_->artifacts().Publish(output.path, output.mime_type,
             {{"width", output.width}, {"height", output.height}, {"durationMs", output.duration_ms},
-             {"frameCount", output.frame_count}, {"droppedFrames", output.dropped_frames}, {"partial", partial}}, run_, owner_));
+             {"frameCount", output.frame_count}, {"droppedFrames", output.dropped_frames}, {"partial", partial || !failure.empty()}}, run_, owner_));
         retained_.insert(output.path);
       } catch (...) { failure = "CAPTURE_FINALIZE_FAILED"; }
     }
-    if (encoder_->budget_exceeded()) failure = "CAPTURE_BUDGET_EXCEEDED";
-    if (encoder_->finalization_failed()) failure = "CAPTURE_FINALIZE_FAILED";
     // Successful capture supplies every requested artifact family. Empty
     // encoder output or publication failure cannot become nominal success.
     if (failure.empty()) for (const auto& format : options_.at("formats")) {
