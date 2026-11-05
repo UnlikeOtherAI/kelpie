@@ -34,3 +34,8 @@ export function validateNetnsEvidence({host,unit,after,addresses,routes4,routes6
  }
  return {distinctNamespace:true,interfaces:"loopback-only",externalRoutes:false};
 }
+
+export function validNamespaceHandoff(proof,pid,nonce){
+ return proof?.pid===pid&&proof.nonce===nonce&&proof.distinctNamespace===true&&
+  proof.interfaces==="loopback-only"&&proof.externalRoutes===false;
+}

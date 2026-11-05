@@ -33,3 +33,13 @@ test("retirement requires the whole owned cgroup to be empty",async()=>{
  assert.ok(shell.includes('[[ -z "$procs" ]] || return 1'));
  assert.ok(shell.indexOf("arm_retired=1")<shell.indexOf('local observation_status=1'));
 });
+
+test("live namespace handoff precedes all engine processes and sandbox precedes corpus",async()=>{
+ const corpus=await readFile(new URL("./worker-comparison.mjs",import.meta.url),"utf8");
+ const gate=corpus.indexOf('assert.ok(boundaryReady,"PRIVATE_NETWORK_NOT_VERIFIED")');
+ const version=corpus.indexOf("const version=(await exec(executable,");
+ const spawn=corpus.indexOf("engine=spawn(executable,");
+ const sandbox=corpus.indexOf("inspectOwnedChromiumSandbox(cgroup,engine.pid,engineStart)");
+ const corpusRun=corpus.indexOf("const methods=[");
+ assert.ok(gate>=0&&gate<version&&version<spawn&&spawn<sandbox&&sandbox<corpusRun);
+});

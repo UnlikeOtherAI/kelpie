@@ -14,7 +14,9 @@ import {fileURLToPath} from "node:url";
 import {loadavg,release} from "node:os";
 import {promisify} from "node:util";
 import {runLightpandaReaderDiagnostics} from "./lightpanda-reader-diagnostics.mjs";
-import {observeWorkerBoundary,validateProbe} from "./worker-comparison-network.mjs";
+import {observePrivateBoundary,validatePrivateProbe} from "./worker-comparison-network.mjs";
+import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
+import {inspectOwnedChromiumSandbox} from "./worker-comparison-sandbox.mjs";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
@@ -46,9 +48,6 @@ assert.ok(group?.startsWith("/"));const cgroup="/sys/fs/cgroup"+group;
 const [memoryMax,cpuMax,tasksMax]=await Promise.all(["memory.max","cpu.max","pids.max"].map(x=>readFile(cgroup+"/"+x,"utf8").then(v=>v.trim())));
 assert.equal(memoryMax,"2147483648");assert.equal(tasksMax,"256");
 const [quota,period]=cpuMax.split(/\s+/).map(Number);assert.equal(quota,period);
-const version=(await exec(executable,[backend==="lightpanda"?"version":"--version"],{timeout:5000,env:environment})).stdout.trim();
-if(backend==="lightpanda")assert.equal(version,"1.0.2");
-else assert.match(version,/\b151\.0\.7922\.34\b/);
 const html=await readFile(new URL("../capture/fixture.html",import.meta.url),"utf8");
 const js=await readFile(new URL("../capture/fixture.js",import.meta.url));
 const extra=await readFile(new URL("./lightpanda-reader-adversaries.html",import.meta.url),"utf8");
@@ -69,10 +68,21 @@ const endpoint="http://127.0.0.1:"+port;
 const args=backend==="lightpanda"?["serve","--host","127.0.0.1","--port",String(port),"--log-level","error"]:
  ["--headless=new","--remote-debugging-address=127.0.0.1","--remote-debugging-port="+port,
   "--user-data-dir="+join(home,"chromium"),"--no-first-run","about:blank"];
-const networkObservation=await observeWorkerBoundary(process.env.KELPIE_AB_CANARY_HOST??"",
+const networkObservation=await observePrivateBoundary(process.env.KELPIE_AB_CANARY_HOST??"",
  Number(process.env.KELPIE_AB_CANARY_PORT));
 await writeFile(join(dir,"network-observation.json"),JSON.stringify({pid:process.pid,uid:process.getuid(),observed:networkObservation}),{mode:0o600,flag:"wx"});
-const networkProbe=validateProbe("inside",networkObservation.local,networkObservation.nonlocal);
+const networkProbe=validatePrivateProbe(networkObservation.local,networkObservation.nonlocal);
+let boundaryReady=false;
+for(let n=0;n<300&&!boundaryReady;n++){
+ try{const proof=JSON.parse(await readFile(join(dir,"namespace-verified.json"),"utf8"));
+  boundaryReady=validNamespaceHandoff(proof,process.pid,process.env.KELPIE_COMPARISON_ID);
+ }catch{/* Independent validation is pending. */}
+ if(!boundaryReady)await new Promise(ok=>setTimeout(ok,100));
+}
+assert.ok(boundaryReady,"PRIVATE_NETWORK_NOT_VERIFIED");
+const version=(await exec(executable,[backend==="lightpanda"?"version":"--version"],{timeout:5000,env:environment})).stdout.trim();
+if(backend==="lightpanda")assert.equal(version,"1.0.2");
+else assert.match(version,/\b151\.0\.7922\.34\b/);
 const hostBinding=createHash("sha256").update(await readFile("/etc/machine-id"))
  .update(process.env.KELPIE_COMPARISON_ID).digest("hex");
 const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBinding,
@@ -81,8 +91,8 @@ const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBind
  engineSHA256:expectedHash,archiveSHA256:backend==="playwright"?process.env.KELPIE_CHROMIUM_ARCHIVE_SHA256:null,fixtureSHA256:createHash("sha256").update(html).update(extra).update(js).digest("hex"),
  boundary:{memoryMax,cpuMax,tasksMax},uid:process.getuid(),pid:process.pid,networkProbe,startupMs:null,warm:[],checks:[],toolCalls:0,responseBytes:0,
  unsupported:[],notProbed:["shared sessions","concurrent contexts"],unitCostScope:"memory peak covers the whole unit including hash/version preflight, fixture, CLI and browser; CPU covers engine run and teardown",
- startupScope:"engine spawn to isolated session ready; fixture and binary setup excluded",
- networkBoundary:"external systemd policy verification required",forcedCleanup:false};
+ startupScope:"engine spawn to isolated session ready; fixture, binary setup, and separately reported sandbox validation excluded",
+ networkBoundary:"external systemd policy verification required",sandboxEvidence:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
 let engine,transport,client,failure,session;
 const started=performance.now();
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
@@ -132,6 +142,16 @@ try{
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
  report.enginePid=engine.pid;report.engineStartTicks=await verifyOwnedListener(engine.pid,port,engineStart);
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
+ if(backend==="playwright"){
+  const sandboxStart=performance.now(),sandboxCpu=await cpu();
+  for(let attempt=0;attempt<30&&!report.sandboxEvidence;attempt++){
+   try{report.sandboxEvidence=await inspectOwnedChromiumSandbox(cgroup,engine.pid,engineStart);}
+   catch{await delay(100);}
+  }
+  report.sandboxValidationMs=performance.now()-sandboxStart;
+  report.sandboxValidationCpuUsec=await cpu()-sandboxCpu;
+  assert.ok(report.sandboxEvidence,"CHROMIUM_SANDBOX_NOT_PROVEN");
+ }
  const methods=["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload",
   "tab.snapshot","tab.extract","tab.status","tab.ready"];
  const config=join(dir,"operator.json");
@@ -158,7 +178,7 @@ try{
  const lifecycle=request=>tool("kelpie_worker_session",{request});
  const created=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
  assert.equal(created.ok,true);session=created.value;assert.equal(session.ownedTabIds.length,1);
- report.startupMs=performance.now()-engineStarted;
+ report.startupMs=performance.now()-engineStarted-report.sandboxValidationMs;
  await check("second session refused at configured limit",async()=>{
   const second=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
   assert.equal(second.ok,false);assert.equal(second.error.code,"RESOURCE_LIMIT");
@@ -209,11 +229,11 @@ try{
  fixture.closeAllConnections?.();if(fixture.listening)await new Promise(ok=>fixture.close(ok));
  report.engineExited=!engine||engine.exitCode!==null||engine.signalCode!==null;
  clearInterval(rssTimer);await rssPending;
- report.cpuUsec=await cpu()-cpuBefore;report.cpuStatAfter=(await readFile(cgroup+"/cpu.stat","utf8")).trim();
+ report.cpuUsec=await cpu()-cpuBefore-report.sandboxValidationCpuUsec;report.cpuStatAfter=(await readFile(cgroup+"/cpu.stat","utf8")).trim();
  report.loadAfter=loadavg();report.unitMemoryPeakBytes=(await readFile(cgroup+"/memory.peak","utf8")).trim();
  report.rss={sampledPeakBytes:rssSampledPeakBytes,samples:rssSamples,readFailures:rssReadFailures,
   intervalMs:250,meaning:"sampled sum of unit process RSS, not a guaranteed peak"};
- report.wallMs=performance.now()-started;report.failure=failure??null;
+ report.wallInclusiveMs=performance.now()-started;report.wallMs=report.wallInclusiveMs-report.sandboxValidationMs;report.failure=failure??null;
  report.eligibleForComparison=!failure&&!report.forcedCleanup&&report.engineExited&&
   report.rss.samples>0&&report.rss.readFailures===0&&report.warm.length===5&&report.checks.every(x=>x.passed);
  if(report.eligibleForComparison){
