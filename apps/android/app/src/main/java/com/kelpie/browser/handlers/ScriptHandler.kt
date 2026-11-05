@@ -12,9 +12,18 @@ class ScriptHandler(
     private val playbackState: ScriptPlaybackState,
 ) {
     fun register(router: Router) {
-        router.register("play-script") { playScript(it) }
-        router.register("abort-script") { abortScript() }
-        router.register("get-script-status") { getScriptStatus() }
+        router.register("play-script") { body ->
+            ctx.scriptRuntime?.play(body) { playScript(body) } ?: errorResponse("SCRIPT_UNAVAILABLE", "Script runtime is unavailable")
+        }
+        router.register("abort-script") { body ->
+            ctx.scriptRuntime?.abort(body) { abortScript() } ?: errorResponse("SCRIPT_UNAVAILABLE", "Script runtime is unavailable")
+        }
+        router.register("get-script-status") { body ->
+            ctx.scriptRuntime?.status(body) { getScriptStatus() } ?: errorResponse("SCRIPT_UNAVAILABLE", "Script runtime is unavailable")
+        }
+        router.register("get-script-artifact") { body ->
+            ctx.scriptRuntime?.artifact(body) ?: errorResponse("SCRIPT_UNAVAILABLE", "Script runtime is unavailable")
+        }
     }
 
     private suspend fun playScript(body: Map<String, Any?>): Map<String, Any?> {
@@ -33,12 +42,16 @@ class ScriptHandler(
             ctx.mark3DInspectorInactive()
         }
 
-        return runScript(
-            actions = actions,
-            overlayColor = overlayColor,
-            defaultWaitBetweenActions = defaultWaitBetweenActions,
-            continueOnError = continueOnError,
-        )
+        return try {
+            runScript(
+                actions = actions,
+                overlayColor = overlayColor,
+                defaultWaitBetweenActions = defaultWaitBetweenActions,
+                continueOnError = continueOnError,
+            )
+        } finally {
+            if (playbackState.isRecording.value) playbackState.finishFatalFailure("SCRIPT_INTERRUPTED", "Script interrupted")
+        }
     }
 
     private fun abortScript(): Map<String, Any?> = playbackState.requestAbort() ?: errorResponse("NO_SCRIPT_RUNNING", "No script is currently playing")
@@ -52,6 +65,9 @@ class ScriptHandler(
         continueOnError: Boolean,
     ): Map<String, Any?> {
         for ((index, action) in actions.withIndex()) {
+            com.kelpie.browser.automation
+                .currentScriptAuthority()
+                .requireCurrent()
             if (playbackState.isAbortRequested()) {
                 return playbackState.finishAborted()
             }
@@ -261,6 +277,9 @@ class ScriptHandler(
         val total = maxOf(milliseconds, 0)
         var elapsed = 0
         while (elapsed < total) {
+            com.kelpie.browser.automation
+                .currentScriptAuthority()
+                .requireCurrent()
             if (playbackState.isAbortRequested()) return false
             val slice = minOf(50, total - elapsed)
             delay(slice.toLong())

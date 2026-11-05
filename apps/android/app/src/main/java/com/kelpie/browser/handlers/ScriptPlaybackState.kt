@@ -186,7 +186,8 @@ class ScriptPlaybackState {
             if (session == null) {
                 return@withLock null
             }
-            if (method == "abort-script" || method == "get-script-status") {
+            // Canonical envelopes still authorize their underlying operation.
+            if (method in setOf("abort-script", "get-script-status", "get-script-artifact", "mcp", "browser-control")) {
                 return@withLock null
             }
             return@withLock errorResponse("RECORDING_IN_PROGRESS", "Script is playing. Call abort-script to stop.")

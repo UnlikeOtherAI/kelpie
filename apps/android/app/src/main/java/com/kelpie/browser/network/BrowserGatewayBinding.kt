@@ -263,10 +263,67 @@ class BrowserGatewayBinding(
         lock.withLock { sessions.toList() }.forEach { closeSession(it) }
     }
 
+    /** Script mutations share the existing retirement lease, never a second queue. */
+    suspend fun <T> scriptLease(
+        tabId: String,
+        view: android.webkit.WebView,
+        mutates: Boolean,
+        authority: suspend () -> Unit,
+        action: suspend () -> T,
+    ): T =
+        withBrowserGatewayLease(lock, ctx.browserRetirement) {
+            authority()
+            withContext(Dispatchers.Main.immediate) {
+                if (ctx.tabStore?.activeTabId?.value != tabId || ctx.tabStore?.activeTab?.webView !== view) {
+                    throw com.kelpie.browser.automation
+                        .ScriptFailure("SCRIPT_TAB_CHANGED")
+                }
+                if (mutates) sessions.forEach { it.invalidateLocked() }
+                ctx.withBrowserTarget(view) { action() }
+            }
+        }
+
+    /** Canonical read-only readers for one owned script. No arbitrary evaluation API. */
+    fun scriptObservationSession(
+        tabId: String,
+        view: android.webkit.WebView,
+        authority: suspend () -> Boolean,
+    ): BrowserGatewaySession =
+        BrowserGatewaySession(
+            mapOf(
+                "nativeMethods" to listOf("get-current-url"),
+                "extensions" to emptyList<Any>(),
+                "targeting" to "selected",
+                "fixedReader" to true,
+                "allowActions" to false,
+                "requireAuthorization" to true,
+            ),
+            lock,
+            authorize = { request, mutates ->
+                !mutates && request["tabId"] == tabId && authority()
+            },
+            retirement = ctx.browserRetirement,
+            dispatch = { method, params ->
+                withContext(Dispatchers.Main.immediate) {
+                    if (!authority() || ctx.tabStore?.activeTab?.webView !== view) {
+                        errorResponse("FORBIDDEN", "Script authority changed")
+                    } else {
+                        ctx.withBrowserTarget(view) {
+                            if (method == "browser-control-evaluate") {
+                                invoke(method, params)
+                            } else {
+                                router.handle(method, params, bypassRecordingGate = true, fromGateway = true).second
+                            }
+                        }
+                    }
+                }
+            },
+        )
+
     private fun nativeExtensions(): List<Map<String, Any?>> = (OpenAIJson.parseOrNull(BrowserGatewayNative.extensions()) as? JsonArray).orEmpty().map { OpenAIJson.toMap(it as JsonObject) }
 
     companion object {
-        private val REENTRANT_METHODS = setOf("ai-infer", "ai-record", "ai-cancel", "abort-script", "get-script-status")
+        private val REENTRANT_METHODS = setOf("ai-infer", "ai-record", "ai-cancel", "play-script", "abort-script", "get-script-status", "get-script-artifact")
         private val READ_METHODS = AgentBrowserPolicy.methods(false) + setOf("connect-snapshot", "get-tabs", "get-current-url", "get-capabilities", "get-device-info")
     }
 }

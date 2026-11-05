@@ -94,3 +94,30 @@ extension discovery, renderer timeout retirement, and the actual OpenAI agent
 catalog/admission/uncertainty stop using a local mock endpoint. It also runs the
 standard MCP SDK initialize/list/call journey from the CLI's installed dependency.
 Bearer contents stay in memory and stdin; no persistent pairing is created.
+
+## Typed script capture
+
+Android has a strict opt-in version1 script implementation beside the unversioned
+legacy handler. It consumes shared validation, target resolution, presentation and
+bounded redaction through JNI. Native relink, public HTTP/MCP discovery and real
+phone/tablet acceptance remain pending; see
+[Android verification](../plans/browser-automation-capture/android.md).
+
+Version1 pins the selected foreground WebView under the existing authenticated
+grant. Supplied sessionId fails full preflight with SESSION_UNSUPPORTED. Mobile
+press-key also fails full preflight because matching verified keyboard defaults
+are unavailable. Target input reports synthetic-coordinate.
+
+The same native overlay draws into the live container and exported step PNG,
+animated GIF and H.264 MP4. GIF preserves the requested marker color and quantizes
+other pixels; MP4 requires an available native AVC encoder. A shared retained-byte
+budget covers outputs. Bounded backpressure can drop continuous frames. Stop,
+foreground loss, revocation or tab replacement finalizes partial outputs where
+possible. Finalizing remains active until codecs and renderer retirement finish.
+
+Status exposes safe metadata only: success describes the query, runSuccess the
+terminal result, and runError a fixed safe failure. Only direct play returns bounded
+redacted outputs, after a current authority recheck. Artifacts have opaque owner/
+grant/listener-bound IDs, bounded chunks and hashes, never arbitrary paths or URLs.
+Lightpanda stays desktop orchestration; WebMCP requires a real API and explicit
+grant. A Nessie connection alone cannot grant recording permission.
