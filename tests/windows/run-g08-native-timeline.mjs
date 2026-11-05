@@ -8,6 +8,7 @@ import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mj
 import {applyG08MotionProfile} from "./g08-motion-profile.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
+import {evaluateFastWgc} from "./wgc-fast-profile.mjs";
 import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
 import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
 import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable,safeUiaFailure} from "./wgc-presentation-identity.mjs";
@@ -152,10 +153,25 @@ try{
  const factEvidence=Buffer.from(JSON.stringify(trustedFacts));assert.ok(factEvidence.length<=budget.remaining,"OUTPUT_BUDGET");
  budget.remaining-=factEvidence.length;await writeFile(join(outputRoot,"facts-observation.json"),factEvidence,{flag:"wx"});
  const provenance=verifyWgcProvenance(trustedFacts);
+ let fastProfile;
+ if(motionProfile!=="dense"){
+  fastProfile=evaluateFastWgc(native.samples,config,{width:provenance.width,height:provenance.height});
+  const fastBytes=Buffer.from(JSON.stringify(fastProfile,null,2));
+  assert.ok(fastBytes.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=fastBytes.length;
+  await writeFile(join(outputRoot,"fast-profile.json"),fastBytes,{flag:"wx"});
+ }
  const caseData={curve,profile:motionProfile,binarySHA256:manifest.dllSha256,scene:sceneFacts,artifacts,
-  provenance,facts:trustedFacts,config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount},summary};
+  provenance,facts:trustedFacts,config,...(fastProfile?{fastProfile}:{}),native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount},summary};
  const bytes=Buffer.from(JSON.stringify(caseData,null,2));assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");await writeFile(join(outputRoot,"case.json"),bytes,{flag:"wx"});
- report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;
+ report.phase="complete";
+ if(fastProfile){
+  report.checks.push({name:"owned native fast motion",passed:fastProfile.passed,code:fastProfile.code??null,
+   fit:fastProfile.fit??null,frameCount:native.frameCount,statusPolls});
+  if(!fastProfile.passed)process.exitCode=1;
+ }else{
+  report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});
+  if(!native.analysis?.passed)process.exitCode=1;
+ }
 }catch(error){
  if(helperExit&&!report.helperExit){if(helper&&helper.exitCode===null)helper.kill();try{report.helperExit=await awaitBounded(helperExit,2000);}catch{report.helperExit={code:null,signal:null};}report.helperDiagnostic=safeWgcDiagnostic(helperError);}
  if(nativeProgress){try{
@@ -169,7 +185,7 @@ try{
  }catch{}}
  const location=String(error.stack??"").match(/(?:wgc-frame-stream|wgc-g08-evaluate|wgc-g08-rgb|g08-pixels|g08-retention).mjs:\d+/)?.[0]??null;
  const errorKind=["AbortError","TimeoutError","TypeError","AssertionError","Error"].includes(error.name)?error.name:"Other";
- const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|WGC_|G08_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL|HTTP_[0-9]{3})[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
+ const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|WGC_|G08_|FAST_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL|HTTP_[0-9]{3})[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
  report.checks.push({name:"owned native and exported G08 case",passed:false,stage:report.phase,
   category:error.safeDetails?.category??safe,errorKind,location,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
  process.exitCode=1;

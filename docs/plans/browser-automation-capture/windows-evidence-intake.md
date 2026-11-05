@@ -265,3 +265,12 @@ may perturb timing. It supports investigation of the sampler latch; it does
 not prove actual paint time or replace the earlier same-run WGC evidence.
 The sanitized report SHA-256 is
 `7d4a4f861361244abbd09fd9046261a071d92f4f85a23bc5211b6459b2952799`.
+The supported Windows G08 runner evaluates short default/fast profiles with
+`tests/windows/wgc-fast-profile.mjs`, which maps actual WGC positions and
+timestamps into fixture CSS coordinates before calling the shared
+`tests/capture/g08-fast-profile.mjs` fitter. It writes the input points and
+result to `fast-profile.json` after provenance verification. Dense runs still
+use the independent dense oracle. For de318b47, a separate retained fit on the
+original default C WGC samples passed: 350 ms RMS 6.00 CSS px versus 500 ms
+RMS 90.47 px, five intermediate positions and a 383.34 ms sampled bracket.
+The original `FAST_PROFILE_NOT_DENSE` receipt remains unchanged.
