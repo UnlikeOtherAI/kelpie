@@ -192,6 +192,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testLiveMarkerProjectionMatchesSameSceneTarget",
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchRejectsClippedUnhittableTarget",
             "testNativePinchScrollableControl",
             "testFirstCaptureRequiresInsetPropagationIncludingZoom",
             "testProjectionUsesInsetContentOriginAndVisualViewport",
@@ -250,7 +251,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         marker_targets, marker_names = DRIVER.selection("marker")
         self.assertEqual(targets, geometry_targets + marker_targets)
         self.assertEqual(names, geometry_names | marker_names)
-        self.assertEqual(len(names), 15)
+        self.assertEqual(len(names), 16)
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:

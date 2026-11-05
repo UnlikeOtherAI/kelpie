@@ -12,7 +12,7 @@ extension WorkflowCaptureUITests {
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
         let navigation = try await probe.request("/v1/play-script", [
-            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": origin + "/pinch"]]
+            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": origin + "/pinch?case=visible"]]
         ])
         XCTAssertEqual(navigation["success"] as? Bool, true)
         let viewport = XCUIApplication().webViews.firstMatch
@@ -46,6 +46,7 @@ extension WorkflowCaptureUITests {
         // WebKit can report innerWidth equal to the zoomed visual width; compare the
         // same visual viewport before and after the actual gesture instead.
         XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(initial["width"] as? Double))
+        XCTAssertEqual(zoomed["hitEdge"] as? Bool, true, "Calibrated intersection must be hit-testable")
         XCTAssertGreaterThan(try XCTUnwrap(zoomed["visibleWidth"] as? Double), 10)
         XCTAssertLessThan(try XCTUnwrap(zoomed["visibleWidth"] as? Double), try XCTUnwrap(zoomed["edgeWidth"] as? Double) - 20)
         XCTAssertGreaterThan(try XCTUnwrap(zoomed["visibleHeight"] as? Double), 10)
@@ -105,6 +106,49 @@ extension WorkflowCaptureUITests {
         let facts = try XCTUnwrap(artifacts[try XCTUnwrap(manifest["id"] as? String)] as? Body)
         try verifyPinchMarker(data, click: click, facts: facts)
 
+    }
+
+    @MainActor
+    func testNativePinchRejectsClippedUnhittableTarget() async throws {
+        let initialOrientation = XCUIDevice.shared.orientation
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = initialOrientation }
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let navigation = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab,
+            "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/pinch"]]
+        ])
+        XCTAssertEqual(navigation["success"] as? Bool, true)
+        let viewport = XCUIApplication().webViews.firstMatch
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
+        let initial = try await pinchMetrics(tab, selector: "#zoom")
+        viewport.pinch(withScale: 2, velocity: 1)
+        let deadline = Date().addingTimeInterval(5)
+        var zoomed = try await pinchMetrics(tab, selector: "#zoom")
+        while (zoomed["scale"] as? Double ?? 0) < (initial["scale"] as? Double ?? 1) * 1.3,
+              Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            zoomed = try await pinchMetrics(tab, selector: "#zoom")
+        }
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: zoomed, options: [.sortedKeys]),
+                                       uniformTypeIdentifier: "public.json")
+        attachment.name = "Unhittable pinch target before refusal"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["scale"] as? Double), try XCTUnwrap(initial["scale"] as? Double) * 1.3)
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["visibleWidth"] as? Double), 10)
+        XCTAssertEqual(zoomed["hitEdge"] as? Bool, false)
+        let envelope = try await probe.toolEnvelope("kelpie_extension", ["name": "kelpie_play_script", "arguments": [
+            "version": 1, "tabId": tab, "actions": [["action": "tap", "target": ["role": "button", "name": "Edge"]]]
+        ]])
+        XCTAssertEqual(envelope["ok"] as? Bool, false)
+        let status = try await probe.toolEnvelope("kelpie_get_script_status", [:])
+        let error = ((status["value"] as? Body)?["runError"] as? Body) ?? [:]
+        XCTAssertEqual(WorkflowCaptureProbe.errorCode(["error": error]), "TARGET_NOT_FOUND")
+        let after = try await pinchMetrics(tab, selector: "#zoom")
+        XCTAssertEqual(after["clicks"] as? Int, 0)
     }
 
     @MainActor

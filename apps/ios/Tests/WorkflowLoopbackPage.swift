@@ -115,6 +115,7 @@ final class WorkflowLoopbackPage {
           document.body.innerHTML='<button id="edge" style="position:fixed;margin:0;width:150px;height:80px;appearance:none;background:#505050;color:#181818;border:0">Edge</button><output id="zoom" style="position:absolute;left:0;top:0;color:#181818;font-size:8px"></output><output id="clicked" style="position:absolute;left:0;top:14px;color:#181818;font-size:8px"></output>';
           const edge=document.querySelector('#edge'),metrics=document.querySelector('#zoom');
           let clicks=0;
+          const calibrated=new URLSearchParams(location.search).get('case')==='visible';
           const viewport=()=>({scale:visualViewport.scale,x:visualViewport.offsetLeft,y:visualViewport.offsetTop,
             width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight});
           const position=()=>{
@@ -125,16 +126,23 @@ final class WorkflowLoopbackPage {
             // Calibrate against the actual DOMRect, without dispatching input.
             for(let i=0;i<3;i++){
               const rect=edge.getBoundingClientRect();
-              const dx=(v.x+v.width-50)-rect.left,dy=(v.y+v.height/2-40)-rect.top;
+              const body=document.body.getBoundingClientRect();
+              const right=calibrated?Math.min(v.x+v.width,innerWidth,body.right):v.x+v.width;
+              const dx=(right-50)-rect.left,dy=(v.y+v.height/2-40)-rect.top;
               if(Math.abs(dx)<0.5&&Math.abs(dy)<0.5)break;
               edge.style.left=(parseFloat(edge.style.left)+dx)+'px';
               edge.style.top=(parseFloat(edge.style.top)+dy)+'px';
             }
             const rect=edge.getBoundingClientRect();
-            const visibleWidth=Math.max(0,Math.min(v.x+v.width,rect.right)-Math.max(v.x,rect.left));
-            const visibleHeight=Math.max(0,Math.min(v.y+v.height,rect.bottom)-Math.max(v.y,rect.top));
-            const centerX=(Math.max(v.x,rect.left)+Math.min(v.x+v.width,rect.right))/2;
-            const centerY=(Math.max(v.y,rect.top)+Math.min(v.y+v.height,rect.bottom))/2;
+            const bodyRect=document.body.getBoundingClientRect();
+            const clipLeft=calibrated?Math.max(v.x,0,bodyRect.left):v.x;
+            const clipRight=calibrated?Math.min(v.x+v.width,innerWidth,bodyRect.right):v.x+v.width;
+            const clipTop=calibrated?Math.max(v.y,0,bodyRect.top):v.y;
+            const clipBottom=calibrated?Math.min(v.y+v.height,innerHeight,bodyRect.bottom):v.y+v.height;
+            const visibleWidth=Math.max(0,Math.min(clipRight,rect.right)-Math.max(clipLeft,rect.left));
+            const visibleHeight=Math.max(0,Math.min(clipBottom,rect.bottom)-Math.max(clipTop,rect.top));
+            const centerX=(Math.max(clipLeft,rect.left)+Math.min(clipRight,rect.right))/2;
+            const centerY=(Math.max(clipTop,rect.top)+Math.min(clipBottom,rect.bottom))/2;
             const describe=element=>{
               const r=element.getBoundingClientRect(),style=getComputedStyle(element);
               return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,
@@ -147,8 +155,9 @@ final class WorkflowLoopbackPage {
           };
           visualViewport.addEventListener('resize',position);visualViewport.addEventListener('scroll',position);
           edge.onclick=e=>{
-            const v=viewport(),r=edge.getBoundingClientRect(),left=Math.max(v.x,r.left),right=Math.min(v.x+v.width,r.right);
-            const top=Math.max(v.y,r.top),bottom=Math.min(v.y+v.height,r.bottom);
+            const v=viewport(),r=edge.getBoundingClientRect(),body=document.body.getBoundingClientRect();
+            const left=Math.max(v.x,0,body.left,r.left),right=Math.min(v.x+v.width,innerWidth,body.right,r.right);
+            const top=Math.max(v.y,0,body.top,r.top),bottom=Math.min(v.y+v.height,innerHeight,body.bottom,r.bottom);
             document.querySelector('#clicked').textContent=JSON.stringify({...v,clickX:e.clientX,clickY:e.clientY,
               expectedX:(left+right)/2,expectedY:(top+bottom)/2,visibleWidth:right-left,buttonWidth:r.width,clicks:++clicks});
             position();

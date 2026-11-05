@@ -51,6 +51,7 @@ def selection(scope):
             "testLiveMarkerProjectionMatchesSameSceneTarget",
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchRejectsClippedUnhittableTarget",
             "testNativePinchScrollableControl",
         ]
         unit = {
