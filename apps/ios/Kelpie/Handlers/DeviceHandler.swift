@@ -234,7 +234,7 @@ struct DeviceHandler {
             }
         }
 
-        return successResponse([
+        let response: [String: Any] = [
             "screenCount": screens.count,
             "screens": screens.enumerated().map { i, screen in
                 [
@@ -257,7 +257,16 @@ struct DeviceHandler {
             "vcView": vcViewInfo,
             "webView": webViewInfo,
             "html": htmlInfo
-        ])
+        ]
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--test-g08-document-binding") || args.contains("--test-pinch-projection") {
+            var extended = response
+            extended["testCaptureEvidence"] = IOSWorkflowMedia.testEvidence
+            return successResponse(extended)
+        }
+        #endif
+        return successResponse(response)
     }
 
     @MainActor

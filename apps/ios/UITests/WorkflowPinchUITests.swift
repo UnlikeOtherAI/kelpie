@@ -7,6 +7,7 @@ extension WorkflowCaptureUITests {
         let initialOrientation = XCUIDevice.shared.orientation
         XCUIDevice.shared.orientation = .portrait
         defer { XCUIDevice.shared.orientation = initialOrientation }
+        testLaunchArguments.append("--test-pinch-projection")
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
@@ -75,7 +76,12 @@ extension WorkflowCaptureUITests {
         geometry.name = "Actual visual viewport and clicked center"
         geometry.lifetime = .keepAlways
         add(geometry)
-        try verifyPinchMarker(data, click: click, manifest: manifest)
+        let diagnostics = try await probe.request("/v1/debug-screens", [:])
+        let evidence = try XCTUnwrap(diagnostics["testCaptureEvidence"] as? Body)
+        XCTAssertEqual(evidence["runId"] as? String, tapped["runId"] as? String)
+        let artifacts = try XCTUnwrap(evidence["artifacts"] as? Body)
+        let facts = try XCTUnwrap(artifacts[try XCTUnwrap(manifest["id"] as? String)] as? Body)
+        try verifyPinchMarker(data, click: click, facts: facts)
 
     }
 
@@ -147,10 +153,10 @@ extension WorkflowCaptureUITests {
         return try pinchValue(XCTUnwrap(response["value"] as? Body))
     }
 
-    private func verifyPinchMarker(_ png: Data, click: Body, manifest: Body) throws {
+    private func verifyPinchMarker(_ png: Data, click: Body, facts: Body) throws {
         let source = try XCTUnwrap(CGImageSourceCreateWithData(png as CFData, nil))
         let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        let projection = try XCTUnwrap(manifest["projection"] as? Body)
+        let projection = try XCTUnwrap(facts["projection"] as? Body)
         func number(_ key: String) throws -> Double {
             let value = try XCTUnwrap(projection[key] as? Double)
             XCTAssertTrue(value.isFinite)

@@ -30,12 +30,18 @@ for(const curve of ["c","s"]){
   stage=curve+"-facts-and-probe"; await record("running");
   const facts=await(await fetch(new URL("/events",fixture.url))).json();
   const scene=iosG08Scene(facts);
+  const diagnostics=await cli(["debug-screens"]);
+  const evidence=diagnostics.testCaptureEvidence;
+  assert.equal(evidence?.runId,played.result.runId);
+  assert.ok(evidence?.artifacts);
   const artifacts=[];
   for(const manifest of played.result.artifacts){
    const downloaded=played.downloaded.find(item=>item.id===manifest.id); assert.ok(downloaded);
    const file=resolve(downloaded.file); assert.ok(file.startsWith(folder+"/"));
    const p=JSON.parse((await run("ffprobe",["-v","error","-select_streams","v:0","-show_frames","-show_entries","frame=best_effort_timestamp_time:stream=width,height","-of","json",file],{timeout:30000,maxBuffer:1048576})).stdout);
-   artifacts.push({...manifest,file,width:p.streams[0].width,height:p.streams[0].height,timestamps:p.frames.map(f=>Number(f.best_effort_timestamp_time))});
+   const geometry=evidence.artifacts[manifest.id]?.geometry;
+   assert.ok(geometry);
+   artifacts.push({...manifest,geometry,file,width:p.streams[0].width,height:p.streams[0].height,timestamps:p.frames.map(f=>Number(f.best_effort_timestamp_time))});
   }
   report.cases.push({curve,scene,artifacts});
   await writeFile(join(dir,"input.json"),JSON.stringify(report,null,2));
