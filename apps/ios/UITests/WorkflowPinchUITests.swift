@@ -3,7 +3,9 @@ import XCTest
 
 extension WorkflowCaptureUITests {
     @MainActor
-    func testNativePinchClipsTapCenterAndInvalidatesPointerTarget() async throws {
+    func testNativePinchClipsTapCenterAndRotationInvalidatesPointerTarget() async throws {
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
@@ -79,7 +81,7 @@ extension WorkflowCaptureUITests {
             let screen = viewport.screenshot()
             if let image = screen.image.cgImage, try WorkflowMotionFrames.measure(image, time: 0).pointer != nil {
                 let evidence = XCTAttachment(screenshot: screen)
-                evidence.name = "Native pointer is moving before the second pinch"
+                evidence.name = "Native pointer is moving before device rotation"
                 evidence.lifetime = .keepAlways
                 add(evidence)
                 observedPointer = true
@@ -87,8 +89,9 @@ extension WorkflowCaptureUITests {
             }
             try await Task.sleep(nanoseconds: 60_000_000)
         } while Date() < pointerDeadline
-        XCTAssertTrue(observedPointer, "A displayed pointer proves target resolution preceded the second pinch")
-        viewport.pinch(withScale: 1.4, velocity: 1)
+        XCTAssertTrue(observedPointer, "A displayed pointer proves target resolution preceded rotation")
+        // Recording disables touch gestures on the page. System rotation can still change its viewport.
+        XCUIDevice.shared.orientation = .landscapeLeft
         let refused = try await playback.value
         XCTAssertEqual(refused["success"] as? Bool, false)
         let code = try XCTUnwrap((refused["error"] as? Body)?["code"] as? String)
@@ -96,7 +99,7 @@ extension WorkflowCaptureUITests {
         XCTAssertEqual(refused["actionsExecuted"] as? Int, 0)
         XCTAssertEqual(refused["mayHaveCompleted"] as? Bool ?? false, false)
         let after = try await pinchMetrics(tab, selector: "#zoom")
-        XCTAssertGreaterThan(try XCTUnwrap(after["scale"] as? Double), try XCTUnwrap(before["scale"] as? Double) + 0.1)
+        XCTAssertGreaterThan(abs(try XCTUnwrap(after["layoutWidth"] as? Double) - XCTUnwrap(before["layoutWidth"] as? Double)), 50)
         XCTAssertEqual(after["clicks"] as? Int, 1)
         let final = XCTAttachment(data: try JSONSerialization.data(withJSONObject: after, options: [.sortedKeys]),
                                  uniformTypeIdentifier: "public.json")
