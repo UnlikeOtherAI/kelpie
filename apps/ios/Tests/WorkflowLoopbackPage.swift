@@ -65,6 +65,15 @@ final class WorkflowLoopbackPage {
         }
         if(location.pathname.startsWith('/paced')){
           const field=document.querySelector('#entry'), events=[];
+          const facts=document.createElement('output'), scene=String(Date.now())+'-'+Math.random().toString(36).slice(2);
+          facts.id='keyboard-geometry';facts.style='position:absolute;left:0;top:0;color:transparent;font-size:1px;pointer-events:none';document.body.appendChild(facts);
+          const reportGeometry=()=>{const v=visualViewport;facts.textContent=JSON.stringify({
+            scene,width:v.width,height:v.height,x:v.offsetLeft,y:v.offsetTop,scale:v.scale,
+            layoutWidth:innerWidth,layoutHeight:innerHeight,dpr:devicePixelRatio
+          })};
+          visualViewport.addEventListener('resize',reportGeometry);visualViewport.addEventListener('scroll',reportGeometry);
+          window.addEventListener('resize',reportGeometry);
+          reportGeometry();
           field.value='seed';
           if(location.pathname==='/paced-readonly')field.readOnly=true;
           const report=()=>{document.title=JSON.stringify(events)};

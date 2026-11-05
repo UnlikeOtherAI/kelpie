@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 extension WorkflowCaptureUITests {
@@ -37,6 +38,12 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testKeyboardGeometryForOwnedPacedCapture() async throws {
+        testLaunchArguments = ["--test-keyboard-geometry"]
+        try await pacedCaptureKeyboardCheck()
+    }
+
+    @MainActor
     func testPostEvaluationCallbackKeepsKeyboardClosed() async throws {
         testLaunchArguments = ["--test-post-evaluation"]
         try await pacedCaptureKeyboardCheck()
@@ -52,6 +59,13 @@ extension WorkflowCaptureUITests {
             "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/paced"]]
         ])
         XCTAssertEqual(navigation["success"] as? Bool, true)
+        let isGeometryProof = testLaunchArguments.contains("--test-keyboard-geometry")
+        let beforeGeometry = isGeometryProof ? try await keyboardFixtureGeometry(tab: tab) : [:]
+        let beforeSnapshot = isGeometryProof ? try await keyboardFixtureSnapshot(tab: tab) : nil
+        if isGeometryProof {
+            let confirmed = try await keyboardFixtureGeometry(tab: tab)
+            XCTAssertEqual(NSDictionary(dictionary: beforeGeometry), NSDictionary(dictionary: confirmed))
+        }
         let script: Body = [
             "version": 1, "tabId": tab,
             "actions": [["action": "type", "target": ["selector": "#entry"], "text": "ABCD", "typingDelayMs": 800]],
@@ -69,6 +83,20 @@ extension WorkflowCaptureUITests {
             add(screenshot)
         }
         let result = try await playback.value
+        if let beforeSnapshot {
+            let afterGeometry = try await keyboardFixtureGeometry(tab: tab)
+            let afterSnapshot = try await keyboardFixtureSnapshot(tab: tab)
+            let confirmedGeometry = try await keyboardFixtureGeometry(tab: tab)
+            let geometry = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+                "before": beforeGeometry, "after": afterGeometry, "afterSnapshot": confirmedGeometry
+            ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
+            geometry.name = "Owned fixture visual geometry before and after editing"
+            geometry.lifetime = .keepAlways
+            add(geometry)
+            XCTAssertEqual(beforeGeometry["scene"] as? String, afterGeometry["scene"] as? String)
+            XCTAssertEqual(NSDictionary(dictionary: afterGeometry), NSDictionary(dictionary: confirmedGeometry))
+            try retainFixedCanvasProof(before: beforeSnapshot, after: afterSnapshot)
+        }
         let facts: Body = ["keyboardVisible": keyboardVisible, "success": result["success"] as? Bool ?? false,
                            "errorCode": WorkflowCaptureProbe.errorCode(result),
                            "artifactCount": (result["artifacts"] as? [Body])?.count ?? 0]
@@ -84,6 +112,49 @@ extension WorkflowCaptureUITests {
         let manifest = try XCTUnwrap((result["artifacts"] as? [Body])?.first)
         let bytes = try await probe.bytes(manifest, run: try XCTUnwrap(result["runId"] as? String))
         XCTAssertGreaterThan(try WorkflowMotionFrames.decode(bytes).count, 2)
+    }
+
+    private func keyboardFixtureSnapshot(tab: String) async throws -> Data {
+        let response = try await probe.request("/v1/browser-control", [
+            "version": 1, "tabId": tab, "method": "tab.screenshot", "params": [:]
+        ])
+        let value = try XCTUnwrap(response["value"] as? Body)
+        let encoded = try XCTUnwrap(value["data"] as? String)
+        return try XCTUnwrap(Data(base64Encoded: encoded))
+    }
+
+    private func retainFixedCanvasProof(before: Data, after: Data) throws {
+        let first = try XCTUnwrap(UIImage(data: before)?.cgImage)
+        let second = try XCTUnwrap(UIImage(data: after)?.cgImage)
+        let factor = CGFloat(first.width) / CGFloat(second.width)
+        let height = CGFloat(second.height) * factor
+        XCTAssertLessThanOrEqual(height, CGFloat(first.height) + 1)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: CGSize(width: first.width, height: first.height), format: format).image { renderer in
+            UIColor.black.setFill()
+            renderer.fill(CGRect(x: 0, y: 0, width: first.width, height: first.height))
+            UIImage(cgImage: second).draw(in: CGRect(x: 0, y: 0, width: first.width, height: height))
+        }
+        for (name, data) in [("Original WK snapshot", before), ("Keyboard WK snapshot", after),
+                             ("Unstretched fixed-canvas candidate", try XCTUnwrap(image.pngData()))] {
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
+    @MainActor
+    private func keyboardFixtureGeometry(tab: String) async throws -> Body {
+        let response = try await probe.request("/v1/browser-control", [
+            "version": 1, "tabId": tab, "method": "tab.extract",
+            "params": ["fields": [["name": "geometry", "selector": "#keyboard-geometry", "source": "text"]]]
+        ])
+        let value = try XCTUnwrap(response["value"] as? Body)
+        let text = try XCTUnwrap(((value["fields"] as? [Body])?.first?["values"] as? [String])?.first)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? Body)
     }
 
     @MainActor

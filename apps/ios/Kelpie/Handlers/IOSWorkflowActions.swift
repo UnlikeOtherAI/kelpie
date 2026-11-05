@@ -31,6 +31,10 @@ final class IOSWorkflowActions {
     func execute(_ step: Body, index: Int) async throws {
         try await check()
         let action = step["action"] as? String ?? ""
+        #if DEBUG
+        let keyboardProbe = ["type", "fill"].contains(action) && workflow.capture != nil ? IOSKeyboardGeometryProbe(tab: tab) : nil
+        defer { keyboardProbe?.stop() }
+        #endif
         switch action {
         case "click", "tap", "type", "fill":
             try await interact(step, action: action, index: index)
