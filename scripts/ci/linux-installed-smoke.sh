@@ -7,6 +7,7 @@ package_root="$(realpath "$2")"
 [[ "$package_root" == /workspace/dist/release/* && -d "$package_root" ]] || exit 1
 output="$package_root/installed-smoke"
 if [[ "${KELPIE_INSTALLED_SMOKE_REPLAY:-}" == 1 ]]; then output="$package_root/installed-smoke-replay"; fi
+if [[ "${KELPIE_INSTALLED_SMOKE_DIAGNOSTIC:-}" == 1 ]]; then output="$package_root/installed-smoke-resource"; fi
 mkdir "$output"
 stage=install
 cgroup_snapshot() {
@@ -67,6 +68,8 @@ cp /etc/os-release "$output/os-release.txt"
 source_revision="$(cat "$package_root/source-revision.txt")"
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ ]]
 printf '%s\n' "$source_revision" > "$output/source-revision.txt"
+test_revision="${KELPIE_RESOURCE_TEST_REVISION:-$source_revision}"
+[[ "$test_revision" =~ ^[a-f0-9]{40}$ ]]
 [[ "$(cat /opt/kelpie/source-revision.txt)" == "$source_revision" ]]
 sha256sum /opt/kelpie/source-revision.txt > "$output/embedded-source-sha256.txt"
 
@@ -100,7 +103,8 @@ runuser -u kelpie-smoke -- timeout 10 unshare --user --map-root-user --net --pid
 run() {
   runuser -u kelpie-smoke -- env HOME="$home" XDG_RUNTIME_DIR="$home/runtime" \
     TMPDIR="$home/runtime" NODE_OPTIONS=--max-old-space-size=2048 \
-    KELPIE_CAPTURE_SOURCE="$source_revision" KELPIE_TEST_REVISION="$source_revision" \
+    KELPIE_CAPTURE_SOURCE="$source_revision" KELPIE_TEST_REVISION="$test_revision" \
+    KELPIE_LINUX_RESOURCE_DIAGNOSTIC="${KELPIE_LINUX_RESOURCE_DIAGNOSTIC:-0}" \
     KELPIE_CLI_BUILD_REVISION="$source_revision" \
     KELPIE_LINUX_FINALIZE_FAULT=1 KELPIE_LINUX_PREINPUT_REPLACEMENT=1 \
     timeout --signal=TERM --kill-after=10 300 "$node" "$@"
