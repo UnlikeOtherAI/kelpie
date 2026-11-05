@@ -45,6 +45,7 @@ extension WorkflowCaptureUITests {
     @MainActor
     private func pacedCaptureKeyboardCheck() async throws {
         let (fixture, tab) = try await ready()
+        continueAfterFailure = true
         defer { fixture.listener.cancel() }
         let port = try XCTUnwrap(fixture.listener.port?.rawValue)
         let navigation = try await probe.request("/v1/play-script", [
@@ -68,6 +69,14 @@ extension WorkflowCaptureUITests {
             add(screenshot)
         }
         let result = try await playback.value
+        let facts: Body = ["keyboardVisible": keyboardVisible, "success": result["success"] as? Bool ?? false,
+                           "errorCode": WorkflowCaptureProbe.errorCode(result),
+                           "artifactCount": (result["artifacts"] as? [Body])?.count ?? 0]
+        let report = XCTAttachment(data: try JSONSerialization.data(withJSONObject: facts, options: [.sortedKeys]),
+                                   uniformTypeIdentifier: "public.json")
+        report.name = "Paced capture outcome and keyboard observation"
+        report.lifetime = .keepAlways
+        add(report)
         XCTAssertFalse(keyboardVisible, "Programmatic capture edits should not open the software keyboard")
         XCTAssertEqual(result["success"] as? Bool, true, WorkflowCaptureProbe.errorCode(result))
         let events = try await pacedEvents(tab: tab)

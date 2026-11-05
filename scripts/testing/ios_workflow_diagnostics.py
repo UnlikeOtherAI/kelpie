@@ -14,6 +14,7 @@ STATES = frozenset({
 CAPTURE_REASONS = frozenset({
     "native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
     "responder-accepted", "responder-refused", "responder-descendant", "responder-outside",
+    "postedit-authorized", "postedit-result",
     "text-interaction-still-on", "text-interaction-disabled", "text-interaction-restored-on", "text-interaction-restored-off",
     *(f"snapshot-{value}" for value in ("native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale")),
     *(f"focus-{value}" for value in (
