@@ -67,6 +67,7 @@ bool ScriptMediaEncoder::MarkTerminalClear(const ScriptFrame& observed) {
       pending.stride!=observed.stride || pending.bgra!=observed.bgra) return false;
   state.terminal_clear=true; return true;
 }
+void ScriptMediaEncoder::ClearTerminalClear() { impl_->terminal_clear=false; }
 bool ScriptMediaEncoder::WriteStepPNG(const ScriptFrame& frame, const std::filesystem::path& path) {
   auto& state = *impl_;
   if (state.finished || state.stopped) throw std::runtime_error("CAPTURE_ALREADY_FINISHED");

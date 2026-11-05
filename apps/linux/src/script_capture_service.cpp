@@ -3,6 +3,7 @@
 #include "script_frame_compositor.h"
 #include "script_capture_cadence.h"
 #include "script_media_encoder.h"
+#include "script_terminal_frame.h"
 #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
 #include "../tests/script_admission_trace.h"
 #include "../tests/script_fixture_roi.h"
@@ -28,7 +29,10 @@ class Capture final : public DesktopScriptCapture {
       std::vector<std::string> formats;
       for (const auto& value : options_.at("formats")) {
         const auto format = value.get<std::string>();
-        if (format == "screenshots") screenshots_ = true; else formats.push_back(format == "video" ? "mp4" : format);
+        if (format == "screenshots") screenshots_ = true; else {
+          if (format == "video") video_=true;
+          formats.push_back(format == "video" ? "mp4" : format);
+        }
       }
       movies_ = !formats.empty();
       encoder_ = ScriptMediaEncoder::Create(directory_, formats, options_.value("fps", 15), options_.value("maxBytes", std::size_t(67108864)));
@@ -42,7 +46,8 @@ class Capture final : public DesktopScriptCapture {
     std::error_code ignored;
     std::filesystem::remove(directory_, ignored); // Preserve unrelated collision files.
   }
-  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step) override {
+  bool SupportsTerminalClear() const override { return video_; }
+  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step, DesktopScriptFramePurpose purpose) override {
     ScriptFrameSourceSize source_size;
     auto frame = DecodeScriptFrame(image.base64_data, options_.value("maxWidth", 1280), elapsed, &source_size);
     if (source_size_.width && (source_size_.width != source_size.width || source_size_.height != source_size.height))
@@ -68,6 +73,7 @@ class Capture final : public DesktopScriptCapture {
     #endif
     if (movie_due) {
       if (!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      pending_terminal_proof_=TerminalFrameProof(shown,elapsed);
       #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
       admitted_index=static_cast<int>(trace_admitted_index_++);
       if (FixtureRoiEnabled()) WriteFixtureRoi(admitted_index,fixture_before,FixtureRoi(frame));
@@ -108,6 +114,11 @@ class Capture final : public DesktopScriptCapture {
         {"admittedIndex",admitted_index}});
     }
     #endif
+    if (purpose==DesktopScriptFramePurpose::TerminalClear) {
+      if (!video_ || !MatchingTerminalFrameProof(TerminalFrameProof(shown,elapsed),pending_terminal_proof_) ||
+          !encoder_->MarkTerminalClear(frame))
+        throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
+    }
     if (step && screenshots_) {
       const auto path = directory_ / ("step-" + std::to_string(index) + ".png");
       if (!encoder_->WriteStepPNG(frame, path)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
@@ -123,6 +134,7 @@ class Capture final : public DesktopScriptCapture {
     if (finished_) return result_;
     std::string failure;
     std::vector<ScriptMediaOutput> outputs;
+    if (partial) encoder_->ClearTerminalClear();
     try { outputs = encoder_->Finish(std::max(last_elapsed_ + 1, terminal)); }
     catch (...) { failure = "CAPTURE_FINALIZE_FAILED"; }
     #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
@@ -175,7 +187,8 @@ class Capture final : public DesktopScriptCapture {
   double last_elapsed_ = 0, last_movie_frame_ = -1;
   std::deque<DesktopScriptFrameAdmission> movie_markers_;
   std::size_t committed_marker_frames_ = 0;
-  bool screenshots_ = false, movies_ = false, finished_ = false;
+  bool screenshots_ = false, movies_ = false, video_ = false, finished_ = false;
+  ScriptTerminalFrameProof pending_terminal_proof_;
   #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
   std::size_t trace_admitted_index_ = 0;
   #endif

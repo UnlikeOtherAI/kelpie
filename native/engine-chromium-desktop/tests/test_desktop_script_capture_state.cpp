@@ -16,9 +16,17 @@ int main() {
   assert(!kelpie::DesktopMovieEndpointRequired({{"actions",{{{"action","screenshot"}}}}}));
   assert(kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"gif"}}}}}));
   assert(kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"screenshots","video"}}}}}));
-  json active={{"runId","run"},{"tabId","tab"},{"generation",7},{"documentVersion","doc"},
-               {"marker",{{"startedMs",100.0},{"durationMs",700.0}}},
+  json active={{"runId","run"},{"tabId","tab"},{"generation",std::uint64_t{7}},{"documentVersion","doc"},
+               {"marker",{{"actionIndex",3},{"startedMs",100.0},{"durationMs",700.0}}},
                {"pointer",true},{"commentary","text"}};
+  const auto markerIdentity=kelpie::DesktopTerminalMarkerIdentity(active);
+  assert(!markerIdentity.is_null());
+  auto changedIdentity=active; changedIdentity["documentVersion"]="other";
+  assert(kelpie::DesktopTerminalMarkerIdentity(changedIdentity)!=markerIdentity);
+  changedIdentity=active; changedIdentity["marker"]["actionIndex"]=4;
+  assert(kelpie::DesktopTerminalMarkerIdentity(changedIdentity)!=markerIdentity);
+  changedIdentity=active; changedIdentity["marker"].erase("startedMs");
+  assert(kelpie::DesktopTerminalMarkerIdentity(changedIdentity).is_null());
   const auto detached=kelpie::DetachedDesktopMarker(active,300.0);
   assert(detached.value("detachedMarker",false) && !detached.value("playing",true));
   assert(detached.contains("marker") && !detached.contains("pointer") && !detached.contains("commentary"));

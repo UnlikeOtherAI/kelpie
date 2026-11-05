@@ -32,7 +32,7 @@ class Capture final : public DesktopScriptCapture {
       RemoveCaptureFile(entry.first,entry.second);
     std::filesystem::remove(directory_,ignored);
   }
-  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image,const Json& presentation,double elapsed_ms,int index,bool step) override {
+  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image,const Json& presentation,double elapsed_ms,int index,bool step,DesktopScriptFramePurpose) override {
     ScriptFrameSourceSize source;
     auto frame=DecodeScriptFrame(image.base64_data,options_.value("maxWidth",1280),elapsed_ms,&source);
     if(source_width_ && (source.width!=source_width_ || source.height!=source_height_)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");

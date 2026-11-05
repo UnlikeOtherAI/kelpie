@@ -141,6 +141,7 @@ void CadenceAndPendingEndpoint() {
     const auto dir=CreatePrivateCaptureDirectory();
     auto encoder=ScriptMediaEncoder::Create(dir,{"gif","mp4"},10,1048576);
     auto first=Frame(0); first.elapsed_ms=0;
+    assert(!encoder->MarkTerminalClear(first));
     auto active=Frame(1); active.elapsed_ms=650;
     assert(encoder->AddFrame(first) && encoder->AddFrame(active));
     assert(encoder->committed_movie_frames()==1);
@@ -158,6 +159,8 @@ void CadenceAndPendingEndpoint() {
       auto observed=Frame(2); observed.elapsed_ms=request; std::fill(observed.bgra.begin(),observed.bgra.end(),255);
       auto changed=observed; changed.bgra[0]=0;
       assert(!encoder->MarkTerminalClear(changed));
+      assert(encoder->MarkTerminalClear(observed));
+      encoder->ClearTerminalClear();
       assert(encoder->MarkTerminalClear(observed));
     }
     const auto outputs=encoder->Finish(850);
