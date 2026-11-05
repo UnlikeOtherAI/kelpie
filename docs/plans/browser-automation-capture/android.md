@@ -343,3 +343,24 @@ report regression1/1 pass. The initial direct cached CLI formatter could not
 start because CLI-only dependencies were absent; it changed no source and is not
 a successful check. Kotlin compilation/JVM privacy test and actual hosted
 phone/tablet/public CLI/privacy replay remain pending.
+## G07 native pinch and pending resize probe
+
+Source depends on integrated b3f2d93e/common34a39319: target x/y remain layout CSS,
+and the same captured target frame supplies visualViewport offsets, size and scale.
+Android's one live/export overlay canvas maps those coordinates by visual size and
+offset, including pointer shape and tap radius. No separate numerical trajectory
+or resolver implementation is introduced. A target is checked again after pointer
+animation before the tap is shown/captured, then atomically rechecked at dispatch.
+
+Normal shipping tabs now enable built-in WebView pinch while hiding zoom buttons.
+Android's official WebSettings reference states builtInZoomControls enables pinch
+and defaultsfalse; displayZoomControls false hides deprecated visible controls:
+https://developer.android.com/reference/android/webkit/WebSettings#setBuiltInZoomControls(boolean)
+The setting is in TabStore, never enabled only in a test.
+
+The authored phone/tablet probe sends standard two-pointer Android MotionEvents
+only to the exact visible app-owned WebView before playback. It records actual
+scale/offset/size and requires real zoom/nonzero offset, not CSS zoom or a stage
+transform. A partially visible button records the actual event and viewport; the
+test checks intersection center and decoded exported PNG marker pixels. The probe covers pre-play pinch only. Recording blocks ordinary renderer touches; iOS also locks orientation. Android currently has no matching orientation lock in MainActivity/BrowserScreen, so that parity gap is reported separately. No mid-play gesture or rotation is presented as a supported shared user flow. Common JS/CDP tests cover stale pinch-token rejection; native stale-viewport evidence remains unclaimed.
+This probe is authored, not yet compiled or executed on either emulator profile.

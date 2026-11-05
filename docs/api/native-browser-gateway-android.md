@@ -157,3 +157,9 @@ discard latch survives later errors, cleanup or Stop; the first concrete failure
 and uncertainty flag remain authoritative. Ordinary abort/failure can retain valid
 partial captures. Output preparation and capture disposal precede terminal state
 and restoration of recording UI.
+Native pinch uses the normal WebView built-in zoom mechanism with visible zoom
+buttons disabled. Semantic targets still use layout CSS coordinates; native live
+and exported pointer/tap overlays map using visual viewport offsets and size from
+the same fenced resolver frame. A resize or zoom change invalidates a pending
+target before input. Playback's native overlay continues to block ordinary page
+touches. G07 hosted tests require pre-play user pinch with measured geometry changes rather than CSS transform simulations. Mid-play pinch/rotation are not presented as a supported shared mobile user route; common stale-token tests remain distinct evidence.
