@@ -266,6 +266,18 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         } catch { XCTFail("Unexpected failure type") }
     }
 
+    @MainActor
+    func testPacedUnknownPostMutationSensitivityStops() throws {
+        try IOSPacedTypingExecutor.requireKnownSensitivity(true)
+        for known in [false, nil] as [Bool?] {
+            XCTAssertThrowsError(try IOSPacedTypingExecutor.requireKnownSensitivity(known)) { error in
+                let failure = error as? IOSWorkflowFailure
+                XCTAssertEqual(failure?.code, "INPUT_UNCERTAIN")
+                XCTAssertEqual(failure?.mayHaveCompleted, true)
+            }
+        }
+    }
+
     func testPacedEditsArePlannedBeforeAnyEarlierAction() throws {
         let target: Body = ["label": "Entry"]
         let text = "e\u{0301}\u{1F600}"

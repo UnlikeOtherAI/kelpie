@@ -3,6 +3,10 @@ import Foundation
 /// Sequences already-planned scalars; each mutation callback owns the renderer fences.
 @MainActor
 enum IOSPacedTypingExecutor {
+    static func requireKnownSensitivity(_ known: Bool?) throws {
+        guard known == true else { throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) }
+    }
+
     static func run(
         clearFirst: Bool,
         scalars: [String],
