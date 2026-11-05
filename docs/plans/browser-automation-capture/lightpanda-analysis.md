@@ -214,3 +214,63 @@ timing or OS/browser integration. Those require the real native/Chromium flow.
 
 Never convert a pending row into completed support because a unit mock or a
 protocol handshake passed.
+
+## Measured stable-binary compatibility, 5 November2026
+
+Four disposable Fedora44 runs used the exact official1.0.2 binary (SHA-256
+ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e),
+Playwright1.62.1 and the permanent frozen capture fixture. Every run was under
+the independently verified loopback-only packet-egress/cgroup boundary:
+oneCPU, CPUWeight1,2GiB,64 tasks and120s maximum. No codec/native app build,
+human profile or background service was involved. All LP processes exited and
+all collected units ended inactive/not-found with MainPID0.
+
+| Source | Named checks | Result and retained limitation | Whole-service cost |
+| --- | --- | --- | --- |
+| 1a182318 | 0 | Setup failed at second context; no task success inferred |1.477s wall/1.402s CPU/187MiB peak |
+| 754503ba |2 | Extra page refused; URL test expected a noncanonical missing slash |1.544s/1.468s/183.4MiB |
+| 8cfe75c5 |16 |11 passed,5 failed; includes upstream limits and two invalid fixture expectations |1.752s/1.700s/191.4MiB |
+| c774ac3a |19 |15 passed,4 failed; controls/heading bound still needed correction |2.219s/2.167s/189.8MiB |
+
+Counts are per evolving diagnostic revision, not a blended compatibility score.
+All setup, test and refusal results remain in the evidence. These whole-service
+costs include Node/client/fixture setup and run under host contention; they are
+neither LP-only consumption nor an unloaded speed comparison. The last kernel
+cgroup peak was199065600 bytes with2.106386 CPU seconds before final report/exit;
+quota throttling was observed. Individual cold/warm task samples remain in JSON.
+
+Observed support within this fixture:
+- Navigation, title/URL, history back/forward and reload completed correctly.
+- Deterministic product extraction returned exactly Green tea/Black tea despite
+  hidden, inherited-hidden and editable/value canaries; none appeared in the
+  tested result. Document/viewport status and visible/hidden readiness checks
+  passed. Missing/ambiguous/nested extraction and opacity/collapse cases remain
+  outside this diagnostic proof.
+- Closing a context then creating another omitted prior synthetic cookies and
+  local storage. One managed isolated session with maxTabs1 passed owned-tab,
+  foreign-tab, unsupported-method and close/fresh-context checks.
+- A second concurrent context refused, as did a second page. Explicit shared
+  multiple-tab ownership could not operate. This requires conservative host
+  admission; it does not justify silently sharing a context or importing a page.
+- Actual document.modelContext was undefined. No site tool, canonical screenshot,
+  geometry/pointer or pixel/native-flow capability was admitted.
+
+The snapshot failure is inconclusive as backend evidence: the harness requested
+prioritized maxElements20 but required a heading after24 visible priority0
+controls. It also omitted the internal host prefix. The actual20-control result
+had no private canary. Independent common-owner source review confirmed that
+expectation was invalid. Corrected bounded/scoped snapshots must be exercised;
+we do not claim either parity or incompatibility from this failed assertion.
+
+No production worker stdio session was attempted in these diagnostics and no
+new public reader profile was enabled. The next finite acceptance should use
+one session/one tab, explicitly refuse unsupported shared isolation before
+allocation, exercise the built production CLI with only proven navigation
+methods, and separately verify any proposed reader expansion.
+
+Reports and service/teardown logs:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/lightpanda-actual.
+The final c774ac3a-report.json SHA-256 is
+34e0239a682ded2224efde52b6721264968a513a46eeaa3235d212ce38d052a0.
+These are generated evidence artifacts; only the hand-authored corpus and
+conclusions are committed.

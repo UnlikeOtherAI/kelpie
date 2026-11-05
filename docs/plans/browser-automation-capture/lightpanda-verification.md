@@ -1,6 +1,6 @@
 # Bounded Lightpanda Linux verification
 
-Status: prepared, not run. The coordinator must assign the exact committed source,
+Status: bounded actual diagnostics completed; public production profile pending. The coordinator must assign the exact committed source,
 owned Fedora test worktree and resource slot before execution. Fedora is a bounded
 Linux-native test target, not a development host or ongoing worker service.
 
