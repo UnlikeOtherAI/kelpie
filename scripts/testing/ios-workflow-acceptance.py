@@ -63,6 +63,7 @@ def selection(scope):
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
                 "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
+                "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
                 "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
                 "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
