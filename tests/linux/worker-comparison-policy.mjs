@@ -14,6 +14,7 @@ export function validateWorkerPolicy(text,expectedUser){
  assert.ok(Number(entries.get("ExecMainPID"))>0,"POLICY_NO_PROCESS");
  assert.equal(entries.get("NoNewPrivileges"),"yes","POLICY_NNP");
  assert.equal(entries.get("KillMode"),"control-group","POLICY_KILL_MODE");
+ if((entries.get("ControlGroup")??"").endsWith("-probe.service")) assert.equal(entries.get("PrivateNetwork"),"yes","POLICY_PRIVATE_NETWORK");
  assert.match(entries.get("ControlGroup")??"",
   /^\/system\.slice\/kelpie-worker-ab-\d+-\d+-(lightpanda|playwright|probe)\.service$/);
  assert.equal(entries.get("MemoryMax"),"2147483648","POLICY_MEMORY");

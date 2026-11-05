@@ -4,6 +4,8 @@ umask 077
 : "${GITHUB_WORKSPACE:?}" "${RUNNER_TEMP:?}" "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}"
 isolation_only="${KELPIE_AB_ISOLATION_ONLY:-false}"
 [[ "$isolation_only" == true || "$isolation_only" == false ]]
+# Measurement remains disabled pending private-network and sandbox review.
+if [[ "$isolation_only" != true ]]; then echo PRIVATE_NETWORK_MEASUREMENT_NOT_APPROVED >&2; exit 1; fi
 [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-1}" =~ ^[0-9]+$ ]]
 if [[ "$isolation_only" == false ]]; then
  : "${CHROMIUM_ARCHIVE_SHA256:?}" "${CHROMIUM_BINARY_SHA256:?}"
@@ -48,7 +50,7 @@ run_arm() {
  sudo -n systemd-run --quiet --wait --pipe --unit="$unit" --uid="$uid" --gid="$gid" \
   --property="WorkingDirectory=$root" --property=CPUQuota=100% --property=MemoryMax=2G \
   --property=TasksMax=256 --property=RuntimeMaxSec=120 --property=NoNewPrivileges=yes --property=KillMode=control-group \
-  --property=IPAddressDeny=any --property=IPAddressAllow=localhost \
+  --property=PrivateNetwork=yes --property=IPAddressDeny=any --property=IPAddressAllow=localhost \
   --setenv="PATH=$PATH" --setenv="KELPIE_TEST_REVISION=$GITHUB_SHA" \
   --setenv="KELPIE_COMPARISON_ID=$comparison_id" --setenv="KELPIE_AB_CANARY_HOST=$host_ip" \
   --setenv="KELPIE_AB_CANARY_PORT=$port" --setenv="KELPIE_CHROMIUM_ARCHIVE=$assets/chrome.zip" \
@@ -58,7 +60,7 @@ run_arm() {
  for _ in $(seq 1 100); do
   sudo -n systemctl show "$unit" --no-pager --property=User --property=ActiveState \
    --property=ExecMainPID --property=ControlGroup --property=NoNewPrivileges --property=KillMode --property=MemoryMax --property=TasksMax \
-   --property=CPUQuotaPerSecUSec --property=IPAddressAllow --property=IPAddressDeny >"$dir/policy.txt" 2>/dev/null || true
+   --property=CPUQuotaPerSecUSec --property=IPAddressAllow --property=IPAddressDeny --property=PrivateNetwork >"$dir/policy.txt" 2>/dev/null || true
   if grep -qx 'ActiveState=active' "$dir/policy.txt" && grep -Eq '^ExecMainPID=[1-9][0-9]*$' "$dir/policy.txt"; then active=1; break; fi
   if ! kill -0 "$launcher" 2>/dev/null; then break; fi
   sleep 0.1
@@ -70,6 +72,24 @@ run_arm() {
    printf '%s\n' available >"$dir/bpf-status.txt"
   else printf '%s\n' query-failed >"$dir/bpf-status.txt"; fi
  else printf '%s\n' unavailable >"$dir/bpf-status.txt"; fi
+ if [[ "$active" == 1 && "$backend" == probe ]]; then
+  local pid host_ns unit_ns unit_ns_after current_pid address_status=failed routes4_status=failed routes6_status=failed pid_status=failed
+  pid="$(sed -n 's/^ExecMainPID=//p' "$dir/policy.txt")"
+  if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+   host_ns="$(readlink /proc/self/ns/net)" || host_ns=""
+   unit_ns="$(timeout 3s sudo -n readlink "/proc/$pid/ns/net")" || unit_ns=""
+   printf '%s\n' "$host_ns" >"$dir/host-netns.txt"
+   printf '%s\n' "$unit_ns" >"$dir/unit-netns.txt"
+   if timeout 3s sudo -n nsenter -t "$pid" -n ip -j address show >"$dir/net-address.json"; then address_status=ok; fi
+   if timeout 3s sudo -n nsenter -t "$pid" -n ip -j -4 route show table all >"$dir/net-routes4.json"; then routes4_status=ok; fi
+   if timeout 3s sudo -n nsenter -t "$pid" -n ip -j -6 route show table all >"$dir/net-routes6.json"; then routes6_status=ok; fi
+   unit_ns_after="$(timeout 3s sudo -n readlink "/proc/$pid/ns/net")" || unit_ns_after=""
+   printf '%s\n' "$unit_ns_after" >"$dir/unit-netns-after.txt"
+   current_pid="$(timeout 3s sudo -n systemctl show "$unit" --value --property=ExecMainPID)" || current_pid=""
+   [[ "$current_pid" == "$pid" ]] && pid_status=ok
+  fi
+  printf '{"address":"%s","routes4":"%s","routes6":"%s","pid":"%s"}\n' "$address_status" "$routes4_status" "$routes6_status" "$pid_status" >"$dir/namespace-query-status.json"
+ fi
  local status=0
  wait "$launcher" || status=$?
  printf '%s\n' "$status" >"$dir/launcher-exit.txt"
@@ -94,6 +114,9 @@ run_arm() {
    "$dir/policy.txt" "$uid" "$dir/network-observation.json" "$dir/policy-observed.json" || observation_status=$?
  fi
  if [[ "$active" != 1 || "$status" != 0 || "$observation_status" != 0 || ! -s "$dir/report.json" ]]; then return 1; fi
+ if [[ "$backend" == probe ]]; then
+  "$node" "$root/tests/linux/worker-comparison-netns-check.mjs" "$dir" || return 1
+ fi
  "$node" "$root/tests/linux/worker-comparison-policy-check.mjs" \
   "$dir/policy.txt" "$uid" "$dir/report.json" "$dir/policy-verified.json"
 }

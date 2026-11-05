@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {validateProbe,classifySocketError} from "./worker-comparison-network.mjs";
+import {validateProbe,classifySocketError,validatePrivateProbe} from "./worker-comparison-network.mjs";
 import {validateWorkerPolicy,verifyWorkerPolicyBinding,verifyWorkerObservationBinding} from "./worker-comparison-policy.mjs";
 const good=["User=1001","ActiveState=active","ExecMainPID=123","NoNewPrivileges=yes",
  "KillMode=control-group","ControlGroup=/system.slice/kelpie-worker-ab-123-1-lightpanda.service","MemoryMax=2147483648","TasksMax=256","CPUQuotaPerSecUSec=1s",
@@ -43,4 +43,9 @@ test("raw connection classifications remain bounded and tied to the active proce
  assert.throws(()=>verifyWorkerObservationBinding(policy,{...observation,pid:124},"1001"));
  assert.throws(()=>verifyWorkerObservationBinding(policy,{...observation,uid:0},"1001"));
  assert.throws(()=>verifyWorkerObservationBinding(policy,{...observation,observed:{local:"connected",nonlocal:"raw message"}},"1001"));
+});
+
+test("private namespace probe rejects timeout and inconclusive errors",()=>{
+ for(const x of ["EACCES","EPERM","ENETUNREACH","EHOSTUNREACH"]) assert.equal(validatePrivateProbe("connected",x).nonlocal,"denied");
+ for(const x of ["timeout","ETIMEDOUT","ECONNREFUSED","connected","OTHER"]) assert.throws(()=>validatePrivateProbe("connected",x));
 });
