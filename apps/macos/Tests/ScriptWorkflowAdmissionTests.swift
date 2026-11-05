@@ -33,6 +33,16 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         assertRejected(workflow([tap, fill.merging(["text": ["secret": "private"]]) { _, new in new }]), "UNRESOLVED_INPUT")
     }
 
+    func testPacedEditIsRefusedBeforeNativeAdmissionUntilImplemented() throws {
+        for action in ["fill", "type"] {
+            let step: Body = ["action": action, "text": "fixture", "typingDelayMs": 10]
+            XCTAssertThrowsError(try ScriptBoundWorkflow.requireSupportedEdit(step)) {
+                XCTAssertEqual(($0 as? ScriptWorkflowFailure)?.code, "UNSUPPORTED_SCRIPT_ACTION")
+            }
+            try ScriptBoundWorkflow.requireSupportedEdit(["action": action, "text": "fixture"])
+        }
+    }
+
     func testSuppliedCaptureDefaultsAndExplicitScreenshotScope() throws {
         let one = try ScriptBoundWorkflow(workflow([tap, ["action": "screenshot"]]))
         XCTAssertFalse(one.stepScreenshots)
