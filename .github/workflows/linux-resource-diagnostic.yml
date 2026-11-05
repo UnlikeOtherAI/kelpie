@@ -9,6 +9,9 @@ on:
       cli_only:
         type: boolean
         default: false
+      require_terminal_idr:
+        type: boolean
+        default: false
       expected_source:
         type: string
         default: ""
@@ -67,6 +70,7 @@ jobs:
         env:
           DISTRO_NAME: ${{ matrix.distro.name }}
           CLI_ONLY: ${{ inputs.cli_only }}
+          REQUIRE_IDR: ${{ inputs.require_terminal_idr }}
           EXPECTED_SOURCE: ${{ inputs.expected_source }}
           EXPECTED_RPM: ${{ inputs.expected_rpm }}
           EXPECTED_CLI: ${{ inputs.expected_cli }}
@@ -87,7 +91,7 @@ jobs:
           [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
           git cat-file -e "${package_revision}^{commit}"
           git diff "${package_revision}" "${diagnostic_revision}" -- \
-            scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/capture/ffmpeg-passthrough.mjs \
+            scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/linux/verify-native-replay.mjs tests/linux/verify-terminal-idr.mjs tests/capture/ffmpeg-passthrough.mjs \
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs tests/windows/capture-final-dwell-cases.mjs \
             > "${package_root}/resource-hook-diff.patch"
           git checkout --detach "${package_revision}"
@@ -96,6 +100,11 @@ jobs:
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs; do
             git show "${diagnostic_revision}:${path}" > "${path}"
           done
+          if [[ "$REQUIRE_IDR" == true ]]; then
+            for path in tests/linux/verify-native-replay.mjs tests/linux/verify-terminal-idr.mjs; do
+              git show "$diagnostic_revision:$path" > "$path"
+            done
+          fi
           if git cat-file -e "$diagnostic_revision:tests/windows/capture-final-dwell-cases.mjs" 2>/dev/null; then
             git show "$diagnostic_revision:tests/windows/capture-final-dwell-cases.mjs" > tests/windows/capture-final-dwell-cases.mjs
           fi
@@ -111,6 +120,7 @@ jobs:
           DISTRO_IMAGE: ${{ matrix.distro.image }}
           SOURCE_RUN: ${{ inputs.source_run }}
           CLI_ONLY: ${{ inputs.cli_only }}
+          REQUIRE_IDR: ${{ inputs.require_terminal_idr }}
         run: |
           set -euo pipefail
           package_root="dist/release/${DISTRO_NAME}"
@@ -123,12 +133,13 @@ jobs:
           test_revision="$(cat "${package_root}/resource-test-revision.txt")"
           cli_only=0; resource_mode=1
           if [[ "$CLI_ONLY" == true ]]; then cli_only=1; resource_mode=0; fi
-          printf "cliOnly=%s\n" "$cli_only" > "$package_root/resource-scope.txt"
+          require_idr=0; if [[ "$REQUIRE_IDR" == true ]]; then require_idr=1; fi
+          printf "cliOnly=%s\nrequireTerminalIDR=%s\n" "$cli_only" "$require_idr" > "$package_root/resource-scope.txt"
           docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
             --security-opt no-new-privileges=true \
             --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
             -e KELPIE_LINUX_RESOURCE_DIAGNOSTIC="$resource_mode" -e KELPIE_INSTALLED_SMOKE_DIAGNOSTIC="$resource_mode" \
-            -e KELPIE_INSTALLED_SMOKE_CLI_ONLY="$cli_only" \
+            -e KELPIE_INSTALLED_SMOKE_CLI_ONLY="$cli_only" -e KELPIE_VERIFY_TERMINAL_IDR="$require_idr" \
             -e KELPIE_RESOURCE_TEST_REVISION="${test_revision}" \
             -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
             -w /workspace "${DISTRO_IMAGE}" \

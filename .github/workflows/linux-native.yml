@@ -281,6 +281,7 @@ jobs:
           docker version > "${package_root}/test-docker-version.txt"
           docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
             --security-opt no-new-privileges=true \
+            -e KELPIE_VERIFY_TERMINAL_IDR=1 \
             --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
             -v "${PWD}:/workspace:ro" \
             -v "${PWD}/${package_root}:/workspace/${package_root}" \
@@ -321,7 +322,7 @@ jobs:
           docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
             --security-opt no-new-privileges=true \
             --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
-            -e KELPIE_INSTALLED_SMOKE_REPLAY=1 -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
+            -e KELPIE_INSTALLED_SMOKE_REPLAY=1 -e KELPIE_VERIFY_TERMINAL_IDR=1 -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
             -w /workspace "${DISTRO_IMAGE}" \
             bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
             2>&1 | tee "${package_root}/candidate-installed-replay.log"
