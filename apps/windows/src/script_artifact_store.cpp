@@ -57,10 +57,7 @@ std::string Base64(const std::vector<BYTE>& bytes) {
     throw std::runtime_error("ARTIFACT_READ_FAILED");
   result.resize(length&&result[length-1]=='\0'?length-1:length); return result;
 }
-void Remove(const std::filesystem::path& path,const BY_HANDLE_FILE_INFORMATION& identity) {
-  RemoveCaptureFile(path,identity);
-  std::error_code ignored; std::filesystem::remove(path.parent_path(),ignored);
-}
+
 }
 BY_HANDLE_FILE_INFORMATION CaptureFileIdentity(const std::filesystem::path& path) {
   const HANDLE file=CreateFileW(path.c_str(),FILE_READ_ATTRIBUTES,
@@ -96,9 +93,12 @@ void WindowsScriptService::Discard(const std::string& run,const std::string& own
   std::lock_guard lock(mutex_);bool cleaned=true;
   for(auto it=entries_.begin();it!=entries_.end();) {
     if(it->second.run!=run || it->second.owner!=owner) {++it;continue;}
-    const auto entry=it->second;it=entries_.erase(it); // Revoke before attempting filesystem cleanup.
-    cleaned=RemoveCaptureFile(entry.path,entry.identity)&&cleaned;
-    std::error_code ignored;std::filesystem::remove(entry.path.parent_path(),ignored);
+    it->second.revoked=true;
+    if(RemoveCaptureFile(it->second.path,it->second.identity)) {
+      std::error_code ignored;std::filesystem::remove(it->second.path.parent_path(),ignored);
+      it=entries_.erase(it);
+    } else {cleaned=false;++it;}
+
   }
   if(!cleaned) throw std::runtime_error("CAPTURE_PRIVACY_CLEANUP_FAILED");
 }
@@ -129,13 +129,25 @@ WindowsScriptService::Json WindowsScriptService::Publish(const std::filesystem::
 }
 void WindowsScriptService::Expire() {
   const auto now=std::chrono::steady_clock::now();
+  const auto retire=[&](auto it) {
+    it->second.revoked=true;
+    if(!RemoveCaptureFile(it->second.path,it->second.identity))return false;
+    std::error_code ignored;std::filesystem::remove(it->second.path.parent_path(),ignored);
+    entries_.erase(it);return true;
+  };
   for(auto it=entries_.begin();it!=entries_.end();) {
-    if(now-it->second.created>std::chrono::hours(1)) { Remove(it->second.path,it->second.identity); it=entries_.erase(it); } else ++it;
+    auto current=it++;
+    if(current->second.revoked||now-current->second.created>std::chrono::hours(1))retire(current);
   }
-  std::uintmax_t total=0; for(const auto& [id,entry]:entries_) total+=entry.manifest.value("byteLength",std::uintmax_t(0));
-  while(total>268435456&&!entries_.empty()) {
-    const auto oldest=std::min_element(entries_.begin(),entries_.end(),[](const auto& a,const auto& b){return a.second.created<b.second.created;});
-    total-=oldest->second.manifest.value("byteLength",std::uintmax_t(0)); Remove(oldest->second.path,oldest->second.identity); entries_.erase(oldest);
+  std::uintmax_t total=0;
+  for(const auto& item:entries_)total+=item.second.manifest.value("byteLength",std::uintmax_t(0));
+  while(total>268435456) {
+    auto oldest=entries_.end();
+    for(auto it=entries_.begin();it!=entries_.end();++it)
+      if(!it->second.revoked&&(oldest==entries_.end()||it->second.created<oldest->second.created))oldest=it;
+    if(oldest==entries_.end())throw std::runtime_error("CAPTURE_STORAGE_CLEANUP_PENDING");
+    const auto bytes=oldest->second.manifest.value("byteLength",std::uintmax_t(0));
+    if(retire(oldest))total-=bytes;
   }
 }
 WindowsScriptService::Json WindowsScriptService::Read(const Json& body,const std::string& owner) {
@@ -151,7 +163,7 @@ WindowsScriptService::Json WindowsScriptService::Read(const Json& body,const std
   const auto offset=body.value("offset",std::uint64_t(0)),length=body.value("length",std::uint64_t(262144));
   if(!length||length>1048576) return ErrorResponse("INVALID_PARAMS","Artifact chunk exceeds range limit");
   std::lock_guard lock(mutex_); Expire(); const auto found=entries_.find(body["artifactId"].get<std::string>());
-  if(owner.empty()||found==entries_.end()||found->second.owner!=owner||found->second.run!=body["runId"].get_ref<const std::string&>())
+  if(owner.empty()||found==entries_.end()||found->second.revoked||found->second.owner!=owner||found->second.run!=body["runId"].get_ref<const std::string&>())
     return ErrorResponse("ARTIFACT_NOT_FOUND","Artifact expired or is not owned by this grant");
   const auto& entry=found->second; const auto total=entry.manifest["byteLength"].get<std::uint64_t>();
   if(offset>total) return ErrorResponse("INVALID_PARAMS","Artifact offset is beyond end");
