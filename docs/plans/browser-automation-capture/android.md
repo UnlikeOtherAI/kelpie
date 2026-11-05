@@ -540,3 +540,26 @@ and ScriptPixelCopyGateTest3/3 passed in4m40s. It used a fresh writable Gradle
 home, separately copied read-only modules-2 seed, one CPU and2GiB heap. Existing
 unrelated warnings remain. No emulator, native screenshot, media replay, API28,
 or signed release was exercised by this check.
+
+## Scene and geometry follow-up (source only)
+
+The scene predicate explicitly tracks inspector, tab overview, address editing
+and menu, sheets, welcome, pairing and queued panel requests. Native action modes
+and direct inspector/panel transitions invalidate a monotonic generation before
+any frame can publish. Browser chrome is unmounted during recording; its transient
+state remains uncertified until disposal. PixelCopy bounds use the full view
+matrix and admit only fully visible positive uniform scale with pixel-aligned
+edges. Rotation, skew, nonuniform scale and fractional boundaries fail closed.
+AndroidX cases exercise tab-overview/address entry and restoration, action-mode
+and inspector/panel generation, a pixel-aligned scaled owned view with
+nonuniform rejection, and tablet stage screenshot restoration across success,
+abort and failure. These are authored cases, not native pass claims.
+Hosted run42006190219 at b2bcb247 failed lintDebug before the native job: lint
+could not propagate the API29 guard into the frame callback. Follow-up cffe3a96
+isolates the guarded callback in an annotated Q-only method. Historical run
+remains failed; the integrated rerun must establish lint and device behavior.
+Maxis follow-up check: online ktlintFormat/Check, lintDebug, main and
+AndroidTest Kotlin compilation, and targeted gate/scene JVM tests4/4 passed
+in2m25s with one CPU and2GiB heap. Previous offline lint dependency and
+AndroidTest import failures remain recorded in scene-geometry-check.log and
+scene-geometry-online.log. Device cases remain authored, not executed.

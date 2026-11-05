@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +18,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.abs
+import kotlin.math.round
 
 /**
  * Copies the committed recording scene from the owned window, never a software
@@ -49,12 +53,11 @@ internal class ScriptCompositorCapture(
         ) {
             throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
         }
-        val location = IntArray(2)
-        view.getLocationInWindow(location)
-        val expected = Rect(location[0], location[1], location[0] + view.width, location[1] + view.height)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+        val window = window()
+        val expected = transformedRectangle(window)
         val visible = Rect()
         if (!view.getGlobalVisibleRect(visible) || visible != expected) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
-        val window = window()
         if (expected.left < 0 ||
             expected.top < 0 ||
             expected.right > window.decorView.width ||
@@ -63,6 +66,38 @@ internal class ScriptCompositorCapture(
             throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
         }
         return expected
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun transformedRectangle(window: Window): Rect {
+        val matrix = Matrix()
+        view.transformMatrixToGlobal(matrix)
+        val values = FloatArray(9)
+        matrix.getValues(values)
+        val sx = values[Matrix.MSCALE_X]
+        val sy = values[Matrix.MSCALE_Y]
+        if (values.any { !it.isFinite() } ||
+            sx <= 0f ||
+            sy <= 0f ||
+            abs(sx - sy) > maxOf(sx, sy) * 0.0001f ||
+            abs(values[Matrix.MSKEW_X]) > 0.0001f ||
+            abs(values[Matrix.MSKEW_Y]) > 0.0001f ||
+            values[Matrix.MPERSP_0] != 0f ||
+            values[Matrix.MPERSP_1] != 0f ||
+            values[Matrix.MPERSP_2] != 1f
+        ) {
+            throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+        }
+        val bounds = RectF(0f, 0f, view.width.toFloat(), view.height.toFloat())
+        if (!matrix.mapRect(bounds)) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+        val origin = IntArray(2)
+        window.decorView.getLocationOnScreen(origin)
+        bounds.offset(-origin[0].toFloat(), -origin[1].toFloat())
+        if (listOf(bounds.left, bounds.top, bounds.right, bounds.bottom).any { abs(it - round(it)) > 0.0001f }) {
+            // PixelCopy accepts integer rectangles; do not include adjacent pixels.
+            throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+        }
+        return Rect().also { bounds.roundOut(it) }
     }
 
     /**

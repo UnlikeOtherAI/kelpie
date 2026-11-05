@@ -21,7 +21,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,8 +34,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.kelpie.browser.FeatureFlags
@@ -94,11 +91,22 @@ fun BrowserScreen(
     val isIn3DInspector by handlerContext.isIn3DInspectorFlow.collectAsState()
     val isScriptRecording by scriptPlaybackState.isRecording.collectAsState()
     RecordingOrientationEffect(activity, isScriptRecording)
-    SideEffect { handlerContext.scriptCaptureScene = isScriptRecording }
-    DisposableEffect(handlerContext) { onDispose { handlerContext.scriptCaptureScene = false } }
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
     var showTabOverview by remember { mutableStateOf(false) }
+    var chromeTransient by remember { mutableStateOf(false) }
+    val activePanel by handlerContext.activePanel.collectAsState()
+    val pairingPrompt by pairingCoordinator.currentPrompt.collectAsState()
+    ScriptCaptureSceneEffect(
+        handlerContext,
+        isScriptRecording,
+        listOf(
+            isIn3DInspector || showTabOverview || chromeTransient,
+            showSettings || showPairedClients || showBookmarks || showHistory,
+            showNetworkInspector || showAI || showWelcome || forceShowWelcome || pendingWelcomeFromHelp,
+            activePanel != null || pairingPrompt != null,
+        ),
+    )
     val sampler =
         remember(activity) {
             com.kelpie.browser.browser
@@ -261,6 +269,7 @@ fun BrowserScreen(
                     onShare = { sharePage(context, currentUrl) },
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
+                    onTransientUiChanged = { chromeTransient = it },
                     moreContent = { dismiss ->
                         BrowserMoreMenu(
                             onDismiss = dismiss,
@@ -336,12 +345,7 @@ fun BrowserScreen(
         }
 
         if (isScriptRecording) {
-            // Keep the existing Stop control out of the captured parent window.
-            Popup(alignment = Alignment.TopEnd, properties = PopupProperties(focusable = false)) {
-                Box(Modifier.statusBarsPadding().padding(top = 12.dp, end = 12.dp)) {
-                    RecordingStopButton(onClick = { scriptPlaybackState.requestAbort() })
-                }
-            }
+            RecordingStopPopup { scriptPlaybackState.requestAbort() }
         }
     }
 
@@ -355,6 +359,7 @@ fun BrowserScreen(
         if (isScriptRecording) {
             showTabOverview = false
             showSettings = false
+            showPairedClients = false
             showBookmarks = false
             showHistory = false
             showNetworkInspector = false
@@ -470,7 +475,6 @@ fun BrowserScreen(
     }
 
     // Observe programmatic panel requests from the HTTP API
-    val activePanel by handlerContext.activePanel.collectAsState()
     LaunchedEffect(activePanel, isScriptRecording) {
         if (isScriptRecording) return@LaunchedEffect
         val panel = activePanel ?: return@LaunchedEffect

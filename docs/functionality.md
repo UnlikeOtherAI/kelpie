@@ -660,7 +660,8 @@ extraction, readiness and native presentation/redaction. It adds the requested
 pointer/tap overlay, GIF, H.264 MP4 and step PNG capture, with owner-bound status,
 abort and artifact chunks. Input reports synthetic-coordinate. Supplied native
 session IDs and unsupported mobile keyboard defaults fail before actions.
-Capture uses the certified committed WebView scene; Android API28 refuses capture until its scene can be fenced.
+Capture uses the certified committed WebView scene. Android API28 and view transforms
+that cannot be isolated at pixel-aligned uniform bounds refuse capture.
 The matching iOS binding belongs to the same integrated PR. Native relink and real
 HTTP/MCP phone/tablet acceptance remain pending; the
 [Android ledger](plans/browser-automation-capture/android.md) records exact results.

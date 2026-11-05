@@ -1,6 +1,7 @@
 package com.kelpie.browser
 
 import android.os.Bundle
+import android.view.ActionMode
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -78,12 +79,25 @@ class MainActivity : ComponentActivity() {
 
     private val router = Router()
     private val handlerContext = HandlerContext()
+    private val activeActionModes = mutableSetOf<ActionMode>()
     private val scriptPlaybackState = ScriptPlaybackState()
     private var httpServer: HTTPServer? = null
     private var mdnsAdvertiser: MDNSAdvertiser? = null
     private var networkStage: NetworkServiceStage? = null
     private lateinit var pairingStore: PairingStore
     private lateinit var pairingCoordinator: PairApprovalCoordinator
+
+    override fun onActionModeStarted(mode: ActionMode) {
+        super.onActionModeStarted(mode)
+        activeActionModes.add(mode)
+        handlerContext.scriptCaptureActionMode = activeActionModes.isNotEmpty()
+    }
+
+    override fun onActionModeFinished(mode: ActionMode) {
+        activeActionModes.remove(mode)
+        handlerContext.scriptCaptureActionMode = activeActionModes.isNotEmpty()
+        super.onActionModeFinished(mode)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
