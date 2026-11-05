@@ -916,3 +916,32 @@ This is separate from the failed Fedora independent-media gate; it does not
 mark the complete installed package or a published release as accepted.
 An earlier CLI-only dispatch, 42115481155, failed before runtime because the
 selector helper was absent from that owner ref, and remains preserved.
+
+## Test-only terminal keyframe control
+
+A separate test-only media target at source 18c9f152d106e3ac36d95b322427ef0471b0fcdb
+sent a GStreamer upstream force-key-unit event after the preceding packet was
+pulled and immediately before the final raw frame of the paired codec-history
+stimulus. The normal production target did not enable this instrumentation.
+Four events were accepted in 12–15 microseconds. The complete four-scenario
+producer took 0.64 s elapsed, 0.47 s user and 0.11 s system; the earlier
+baseline did not retain comparable CPU timing.
+
+All four outputs retained 15 aligned PTS and byte-identical complete final
+raw BGRA frames against their respective baseline. The final sample had the
+MP4 packet key flag and an AVC IDR NAL, parsed using the four-byte length size
+in its avcC configuration. Both red-history final ROIs decoded with zero red
+pixels, compared with three each in the preceding unforced control; clear
+controls also remained at zero. Each history MP4 was 7,531 bytes, 2,131 bytes
+larger than its baseline; each clear control grew by 2,153 bytes. Packet
+analysis SHA-256:
+b9c8397820ff659c500d246bbe5e0a114641d3263d60f6862e548061f9c54d5b.
+Producer log SHA-256:
+537aadfe6edd82acf9b8bfee7a89a40e364265556a40ac560f86dc558b16e0e0.
+
+The initial independent verifier failed because Fedora ffprobe reported
+unknown decoded frame types and key_frame=0 even for the first sample.
+The retained output was then checked directly using packet offsets, flags,
+avcC and AVC NALs; no stimulus was repeated. This is a synthetic control,
+not proof of the original installed failure's cause, and no shipping encoder
+or pixel threshold was changed.
