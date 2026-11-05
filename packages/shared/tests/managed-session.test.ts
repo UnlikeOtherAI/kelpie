@@ -15,9 +15,10 @@ function fixture() {
     let closed = false;
     let url = "about:blank";
     const page = {
-      isClosed: () => closed, url: () => url,
+      isClosed: () => closed, url: () => url, context: () => context as unknown as BrowserContext,
       once: vi.fn((event: string, callback: (...args: never[]) => void) => { listeners.set(event, callback); }),
-      on: vi.fn(),
+      on: vi.fn(), off: vi.fn(),
+      evaluate: vi.fn<() => Promise<unknown>>(async () => ({ ok: true, value: { available: false } })),
       goto: vi.fn(async (value: string) => { url = value; }),
       title: vi.fn(async () => "Fixture"),
       close: vi.fn(async () => { closed = true; listeners.get("close")?.(); }),
@@ -25,6 +26,15 @@ function fixture() {
     return page;
   }
   const context = {
+    newCDPSession: vi.fn(async (page: Page) => ({
+      on: vi.fn(), detach: vi.fn(async () => undefined),
+      send: vi.fn(async (method: string) => {
+        if (method === "Page.getFrameTree") return { frameTree: { frame: { id: "frame", url: page.url() } } };
+        if (method === "Page.createIsolatedWorld") return { executionContextId: 7 };
+        if (method === "Runtime.evaluate") return { result: { value: await page.evaluate(() => undefined) } };
+        return {};
+      }),
+    })),
     newPage: vi.fn(async () => { const page = makePage(); created.push(page); return page as unknown as Page; }),
     close: vi.fn(async () => { await Promise.all(created.map((page) => page.close())); }),
     pages: vi.fn(() => { throw new Error("Must not enumerate shared human pages"); }),
@@ -154,9 +164,103 @@ describe("operator-managed automation sessions", () => {
     const f = fixture();
     const session = await allocateManagedBrowserSession(f.input);
     f.context.close.mockRejectedValueOnce(new Error("transport lost"));
-    await expect(session.close()).rejects.toMatchObject({ code: "CLEANUP_FAILED" });
+    await expect(session.close()).rejects.toMatchObject({ code: "CLEANUP_PENDING" });
     await expect(session.backend.execute(request("tabs.list"))).rejects.toMatchObject({ code: "SESSION_CLOSED" });
     await session.close();
     expect(f.context.close).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("failed allocation cleanup remains owned", () => {
+  it("tracks a page before post-creation admission and retries failed initial cleanup", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const original = f.context.newPage.getMockImplementation();
+    if (!original) throw new Error("fixture creation missing");
+    f.context.newPage.mockImplementationOnce(async () => {
+      const page = await original();
+      f.created[0]!.close.mockRejectedValueOnce(new Error("page cleanup unavailable"));
+      f.authorize.mockImplementation(() => { throw new Error("revoked during allocation"); });
+      return page;
+    });
+    f.context.close.mockRejectedValueOnce(new Error("context cleanup unavailable"));
+    try {
+      await expect(allocateManagedBrowserSession(f.input)).rejects.toMatchObject({ code: "CLEANUP_PENDING" });
+      expect(f.context.close).toHaveBeenCalledOnce();
+      expect(f.created[0]?.isClosed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(f.context.close).toHaveBeenCalledTimes(2);
+      expect(f.created[0]?.isClosed()).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("retains an unreturned failed tab against the session budget until automatic cleanup", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const session = await allocateManagedBrowserSession(f.input);
+    const original = f.context.newPage.getMockImplementation();
+    if (!original) throw new Error("fixture creation missing");
+    f.context.newPage.mockImplementationOnce(async () => {
+      const page = await original();
+      f.created[1]!.close.mockRejectedValueOnce(new Error("page cleanup unavailable"));
+      f.authorize.mockImplementation(() => { throw new Error("revoked during allocation"); });
+      return page;
+    });
+    try {
+      await expect(session.backend.execute(request("tabs.new"))).rejects.toMatchObject({ code: "CLEANUP_PENDING" });
+      f.authorize.mockReset();
+      expect(await session.backend.execute(request("tabs.list"))).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(await session.backend.execute(request("tabs.list"))).toHaveLength(1);
+      expect(f.created[1]?.isClosed()).toBe(true);
+    } finally { await session.close(); vi.useRealTimers(); }
+  });
+});
+
+describe("managed operator WebMCP capability gate", () => {
+  it("adds canonical methods only with a configured origin and real API probe", async () => {
+    const f = fixture();
+    f.input.webMcp = { origins: ["https://allowed.example"], inputEncoding: "json-string" };
+    const session = await allocateManagedBrowserSession(f.input);
+    try {
+      expect(session.backend.capabilities.methods).not.toContain("tab.webmcp.call");
+      f.created[0]!.evaluate.mockResolvedValue({ ok: true, value: { available: true, api: "document.modelContext" } });
+      await session.backend.execute(request("tab.goto", { url: "https://allowed.example/" }, session.describe().ownedTabIds[0]));
+      expect(session.backend.capabilities.methods).toContain("tab.webmcp.discover");
+      expect(session.backend.capabilities.methods).toContain("tab.webmcp.call");
+      expect(f.created[0]?.evaluate).toHaveBeenCalledOnce();
+    } finally { await session.close(); }
+  });
+
+  it("does not advertise an absent browser API or infer a grant from request origin", async () => {
+    const f = fixture();
+    const session = await allocateManagedBrowserSession(f.input);
+    try {
+      const id = session.describe().ownedTabIds[0];
+      await session.backend.execute(request("tab.goto", { url: "https://allowed.example/" }, id));
+      expect(f.created[0]?.evaluate).not.toHaveBeenCalled();
+      const result = await session.transport.call(request("tab.webmcp.discover", { origin: "https://allowed.example" }, id));
+      expect(result).toMatchObject({ ok: false, error: { code: "UNSUPPORTED", mayHaveCompleted: false } });
+    } finally { await session.close(); }
+  });
+
+  it("withholds site tools when an authorized origin has no real API", async () => {
+    const f = fixture();
+    f.input.webMcp = { origins: ["https://allowed.example"], inputEncoding: "json-string" };
+    const session = await allocateManagedBrowserSession(f.input);
+    try {
+      const id = session.describe().ownedTabIds[0];
+      await session.backend.execute(request("tab.goto", { url: "https://allowed.example/" }, id));
+      expect(session.backend.capabilities.methods).not.toContain("tab.webmcp.call");
+      expect(await session.transport.call(request("tab.webmcp.discover", { origin: "https://allowed.example" }, id)))
+        .toMatchObject({ ok: false, error: { code: "UNSUPPORTED" } });
+    } finally { await session.close(); }
+  });
+
+  it("rejects unaudited trusted configuration before allocating browser resources", async () => {
+    const f = fixture();
+    f.input.webMcp = { origins: ["https://allowed.example"], inputEncoding: "guess" as never };
+    await expect(allocateManagedBrowserSession(f.input)).rejects.toMatchObject({ code: "INVALID_ARGUMENTS" });
+    expect(f.browser.newContext).not.toHaveBeenCalled();
   });
 });

@@ -130,3 +130,58 @@ The durable real interfaces are:
 Safe reports go under `KELPIE_TEST_ARTIFACT_DIR`; set
 `KELPIE_TEST_REVISION` to the tested commit. Actual runtime results are tracked in
 [the desktop/backend ledger](../plans/browser-automation-capture/desktop-backend.md).
+
+## Explicit managed WebMCP grant
+
+WebMCP is disabled by default. To enable it for a tested browser API, the operator
+adds both fields to startup configuration:
+
+```json
+{
+  "webMcpOrigins": ["https://example.com"],
+  "webMcpInputEncoding": "json-string"
+}
+```
+
+This gate is implemented for verified Playwright-backed Chromium only; the restricted Lightpanda profile refuses site tool configuration until separately verified.
+
+The origin list must be an exact subset of allowedOrigins. The input encoding is
+an audited browser-runtime choice: Chromium151 uses json-string, while the current
+specification uses object. Unsupported encodings are refused before invocation.
+These settings cannot be changed by lifecycle or browser tool arguments.
+
+Navigate an owned tab to a granted origin, then call capabilities. Canonical
+tab.webmcp.discover/call appear only after an actual private-world API probe
+succeeds on an owned eligible page. For page-driven navigation, request capabilities
+with that tabId to refresh availability. A missing API or private world does not
+become a polyfill fallback.
+
+Discovery params are {origin,maxTools?,maxChars?}. Invocation params are
+{origin,ref,input?,timeoutMs?}, using the opaque ref returned by that document's
+latest discovery. No endpoint, owner, encoding or origin grant is accepted in the
+request. Every call is structurally mutating even when publisher hints say read
+only. Native app exposure remains separately gated and is not implied by a worker
+capability.
+
+Managed probes and calls use a private main-frame CDP world without universal
+access, reached only through the already owned Page. Page-authored modelContext
+shadows cannot turn a page shim into browser API support. Current authenticated
+session, exact browser origin and actual execution-context identity are checked
+around dispatch; no cross-frame tool delegation is introduced.
+
+A deadline may request AbortSignal cancellation. An abort rejection is not proof
+that a page executor stopped: completion stays BUSY until an actual late reply
+retires it or the trusted host confirms exact page/context teardown. A URL, hash
+or history change does not clear that fence. Closing the owned tab/session remains
+the supported recovery path; an uncertain mutation is never replayed.
+
+Failed allocation cleanup remains owned, counts against resource limits and
+retries with bounded backoff while the host is alive. CLEANUP_PENDING is not a
+successful release. This applies to pages created before admission, initial
+session failures and registry allocations whose later admission fails.
+
+The production bundle corpus is
+node tests/native/worker-stdio-acceptance.mjs. It uses the actual
+packages/cli/bin/kelpie.js worker entrypoint, two shared sibling sessions and their
+popups, isolated storage, public observations, explicit WebMCP grants/refusals,
+borrowed-endpoint survival and stdout JSON protocol integrity. The Maxis corpus passed on sandbox-enabled headless Chromium151.0.7922.34; see the exact candidate, versions, hashes and limits in the desktop/backend ledger.

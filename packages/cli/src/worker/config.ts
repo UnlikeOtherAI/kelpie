@@ -16,7 +16,13 @@ export const workerConfigSchema = z.object({
   maxTtlMs: z.number().int().min(1000).max(3_600_000).default(300_000),
   networkBoundary: z.literal("operator-enforced"),
   verifiedLightpandaMethods: z.array(z.enum(LIGHTPANDA_CANDIDATE_METHODS)).max(50).default([]),
-}).strict();
+  webMcpOrigins: z.array(origin).max(100).default([]),
+  webMcpInputEncoding: z.enum(["json-string", "object"]).optional(),
+}).strict().superRefine((config, ctx) => {
+  if (config.backend === "lightpanda" && config.webMcpOrigins.length) ctx.addIssue({ code: "custom", message: "Site tools are not verified for the Lightpanda backend." });
+  if (config.webMcpOrigins.some(value => !config.allowedOrigins.includes(value))) ctx.addIssue({ code: "custom", message: "Site tool origins must be a subset of allowedOrigins." });
+  if (config.webMcpOrigins.length && !config.webMcpInputEncoding) ctx.addIssue({ code: "custom", message: "Site tools require an audited input encoding." });
+});
 export type WorkerConfig = z.infer<typeof workerConfigSchema>;
 
 /** Operator-only startup config. Never use tool inputs to select an endpoint. */
