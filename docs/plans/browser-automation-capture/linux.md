@@ -585,3 +585,75 @@ Isolated attempt 3 (`kelpie-linux-isolated-wayland3-1793859486`, test `f161e401`
 Isolated active-window attempt 4 (`kelpie-linux-isolated-wayland4-1793859924`, test `cbfec13f`) passed six public checks and ten observations, supported HTTP abort/partials/recovery, and natural process/socket/readiness cleanup. The personally inspected original 1280×900 screenshot shows the active native Stop button and red circle/virtual pointer on Confirm order. A separate unmoved compatibility-seat compositor cursor remains visible on the heading; it is not the script pointer or injected input. Before/after credential inventories contain only the owned GTK client (PID 654173/start ticks 12047793) and internal background. PNG hash `ce9b2d8d088df6ca1aefefffac7a49dbd1e575a2cedbefa68521119aa33fba04`; receipt `2fb847eb1b2f90b754f50670d81352620ee52110b918a759eee56ef9613020ee`. Unit 30.597 seconds/30.323 CPU seconds/507 MiB, inactive/MainPID zero/cgroup absent. Root independently copied, rehashed and viewed the image. This establishes isolated native spatial evidence at compiled `3001`, not physical GNOME display, animation or final-source acceptance. Final relink must produce a fresh After image.
 
 The recording/Stop/overlay state has no equivalent in base `195eb90fa5df47291a75e8d165c72fc2f825e3c9`: [base GTK viewport constructor](https://github.com/UnlikeOtherAI/kelpie/blob/195eb90fa5df47291a75e8d165c72fc2f825e3c9/apps/linux/src/gtk_browser_view.cpp#L13) creates the drawing area and status label, with no native recording Stop or presentation compositor. The PR Before cell should say new recording state/no prior equivalent, with the verified final native image in the After cell.
+
+
+## Integrated Fedora verification, 5 November 2026
+
+Fedora 44 built GTK/CEF, HEADLESS_ONLY CEF, and HEADLESS_ONLY no-CEF/LLM-off from
+`0d3d4e892b3993baa5fbac97e27a8aec9396767b` with cached dependencies in bounded
+one-CPU, 2-GiB units. The GTK executable SHA-256 is
+`58d3e50a8e15fbe5a2186da9ccb0d0eb49d28dd2ec0c49187b67795c7011f5a5`;
+the focused media and artifact tests passed 2/2. The offscreen native HTTP/MCP
+corpus passed 36/36 plus artifact protocol, finalization fault, and pre-input
+replacement supplements, then retired the app and readiness file. Its first
+two attempts timed out before readiness while inheriting GNOME session variables;
+a private display-free runtime completed. Both failures remain in the receipts.
+
+The independent full-frame decode succeeded, but the continuous marker check
+failed on 19 red pixels in the last MP4 frame. The paired GIF ended with zero
+red pixels; a localized MP4 compression trace is plausible, not established.
+The shared G08 oracle returned insufficient evidence for C and S in both GIF
+and MP4 at one CPU and at two CPUs. Each two-CPU run retained 60 frames and
+dropped about 250 across 15 seconds at requested 20 fps. PTS intervals average
+253 ms; this is sustained sparse cadence, not a 60-frame cutoff. Do not mark
+the fade or dense animation gate passed without further evidence.
+
+Instrumented Linux offscreen profiling on the same GTK executable measured
+median state, viewport, and screenshot calls at 10.16, 61.04, and 62.73 ms.
+Each capture frame fences two state and two viewport reads around its screenshot.
+A separately built one-millisecond headless-pump candidate reduced those medians
+to 1.35, 6.72, and 37.54 ms and retained 34 instead of 15 frames in the same
+three-second instrumented diagnostic; its ten-second idle main-process CPU
+was 12 ticks instead of five at USER_HZ 100. It has not passed the G08 gate.
+
+Public CLI alias checks passed on the integrated GTK executable and a CLI
+package built from matching 0d3d CLI/shared/lock inputs. Offscreen covered five
+checks and ten observations; isolated Weston Wayland covered six checks and ten
+observations, partial media after public HTTP abort, recovery, and natural
+process/socket/readiness cleanup. The actual private-compositor PNG SHA-256 is
+`e538f31fc7fe68e512e4cee56ee87e974e636f62651818d54f921a668d621462`;
+it shows the red indicator and pointer on the target and the Stop control.
+This is isolated Wayland evidence, not a physical GNOME Stop click.
+
+The original no-CEF runtime published port zero after an ephemeral bind. A
+separate fix uses getsockname; on test revision
+`8114738b272d38498cc5592e82388f8234bd7926` the HTTP server test passed,
+and the no-CEF runtime refused HTTP and MCP script execution with zero fixture
+requests, unchanged URL, and clean SIGTERM exit. The Fedora VM already has an
+installed Kelpie RPM, and Ubuntu was unreachable. Fresh installed DEB/RPM
+candidate verification remains open; neither the existing Fedora package nor
+the sandbox is altered as a workaround.
+
+The offscreen harness isolation change was then exercised against the same 0d3d
+executable with deliberately invalid inherited display and session-bus variables.
+Test revision `cb520132e3b83a3fc405cf45e109a30afa5d664c` passed 36/36 cases
+and all supplements, and removed readiness on clean exit.
+
+A further uninstrumented one-CPU G08 run of the headless-pump candidate
+(retaining the exact screenshot and five-metric fences) retained 128 C frames
+and 129 S frames across about 13 seconds, while dropping 144 and 140 cadence
+slots. The shared oracle passed S/MP4, reported S/GIF marker stuck, and found
+insufficient C/GIF marker phases and C/MP4 wobble phases. The full gate remains
+open. This candidate ELF is
+`b012335bc2f025a8c365e77317eadd3f096c5322589e6579026651b2c622ae82`;
+the test source includes the no-CEF port fix and pump candidate.
+
+Matched 1000x702 GIF and OpenH264 MP4 controls used the actual Linux production
+encoder and marker compositor, with matching requested 15 fps, 14 frames and
+3.85-second duration. With a wobble/fade history, all four clean tail frames
+contained zero thresholded red pixels in both formats. A retained two-pixel
+radius marker produced 16 GIF and eight MP4 red pixels; a fainter retained marker
+produced zero in both under the existing threshold. Therefore a 19-pixel MP4
+allowance would hide a demonstrably retained marker, and the current metric also
+cannot prove absence of a fainter marker. The strict failed result is retained
+pending a stronger validated oracle; no tolerance was relaxed.
