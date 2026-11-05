@@ -218,6 +218,10 @@ final class IOSFrameSampler {
                 try requirePinnedNativeViewport(viewport)
                 guard generation == tab.document else { return nil }
                 return viewport
+            },
+            admissible: { [self] viewport in
+                let insets = tab.view.scrollView.adjustedContentInset
+                return IOSCaptureViewportStability.matchesInsets(viewport, top: insets.top, bottom: insets.bottom)
             }
         )
         guard let viewport else {
