@@ -77,3 +77,14 @@ export function captureCoherenceSignal(line){
  const match=/^\[WorkflowCaptureCoherence\] sample=(screenshot|critical|movie) change=(document|viewport)$/.exec(line);
  return match?{sample:match[1],change:match[2]}:null;
 }
+
+// Bounded numeric timing aggregates only; no positions, content, or raw logs.
+export function captureTimingSignal(line){
+ const match=/^\[WorkflowCaptureTiming\] sample=(screenshot|critical|movie) engine=(webkit|chromium|other) ms=(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5})$/.exec(line);
+ return match?{sample:match[1],engine:match[2],stagesMs:match.slice(3).map(Number)}:null;
+}
+export function pointerTimingSignal(line){
+ const match=/^\[WorkflowPointerTiming\] engine=(webkit|chromium|other) elapsed=(\d{1,5}) updates=(\d{1,5}) updateGap=(\d{1,5}) draws=(\d{1,5}) drawGap=(\d{1,5}) complete=([01])$/.exec(line);
+ return match?{engine:match[1],elapsedMs:Number(match[2]),updates:Number(match[3]),maxUpdateGapMs:Number(match[4]),
+  draws:Number(match[5]),maxDrawGapMs:Number(match[6]),completed:match[7]==="1"}:null;
+}
