@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { control, waitFor } from "../windows/lib/http.mjs";
 import { runFinalizeFault } from "./finalize-fault.mjs";
+import { runAdversaryDiagnostics } from "./adversary-diagnostics.mjs";
 import { runArtifactProtocolAcceptance } from "./artifact-protocol-acceptance.mjs";
 import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
 
@@ -54,6 +55,7 @@ const browser = startBrowser(executable, ["--headless", "--port", "0", "--profil
   "--readiness-file", readinessPath, "--width", "1280", "--height", "900", "--url", "about:blank"]);
 const report = {
   source: process.env.KELPIE_CAPTURE_SOURCE,
+  testSource: process.env.KELPIE_TEST_REVISION,
   binarySHA256: createHash("sha256").update(await readFile(executable)).digest("hex"),
   headless: true, runtime, profile, checks: [],
 };
@@ -83,11 +85,20 @@ try {
     ...item, file: join(corpusOutput, item.id + "." + extension[item.mimeType]),
   })) };
   await writeFile(join(output, "media-input.json"), JSON.stringify(media, null, 2));
+  report.supplementFailures = [];
+  const supplement = async (name, run) => {
+    try { report[name] = await run(); }
+    catch (error) { report.supplementFailures.push({ name, error: error.message }); }
+  };
+  // Independent evidence must survive a failed canonical case; overall failure remains.
+  await supplement("artifactProtocols", () => runArtifactProtocolAcceptance(readiness, output, cancellation.signal));
+  if (process.env.KELPIE_LINUX_FINALIZE_FAULT === "1")
+    await supplement("finalizeFault", () => runFinalizeFault(readiness, runtime, output));
+  if (process.env.KELPIE_LINUX_ADVERSARY_DIAGNOSTICS === "1")
+    await supplement("adversaryDiagnostics", () => runAdversaryDiagnostics(readiness, output, cancellation.signal));
   assert.equal(result.code, 0, result.stderr || result.stdout);
   assert.ok(report.checks.length > 0 && report.checks.every(check => check.passed));
-  report.artifactProtocols = await runArtifactProtocolAcceptance(readiness, output, cancellation.signal);
-  if (process.env.KELPIE_LINUX_FINALIZE_FAULT === "1")
-    report.finalizeFault = await runFinalizeFault(readiness, runtime, output);
+  assert.equal(report.supplementFailures.length, 0, JSON.stringify(report.supplementFailures));
 } finally {
   try {
     if (browser.child.exitCode === null && browser.child.signalCode === null)

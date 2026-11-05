@@ -411,3 +411,28 @@ including build.log, ctest.log, unit journals/teardown, cgroup-limits.txt,
 processes.txt, generated/final hashes and actual runtime/package provenance.
 The separate common visual-viewport correction must land and relink before
 claiming the final geometry case; this build does not pre-empt that gate.
+
+## Actual offscreen replay at 3001aa41
+
+The actual native app replay completed 32 of 36 canonical checks on Fedora,
+then exited cleanly and removed readiness. Privacy refusal, earlier-output
+redaction, discarded artifact manifests, status, recovery, foreign grants,
+direct/generic MCP, native input and navigation-marker cases passed. Four
+failures remain explicit: readonly-focus uncertainty, moving-target recovery,
+the retained-byte-budget expectation and replacement during movie-evidence hold.
+Their cause is not yet established; no canonical assertion was weakened.
+
+All 27 downloaded PNG/GIF/MP4 artifacts independently decoded every frame with
+matching dimensions/counts and increasing timestamps. OSR cost was 61.460 seconds
+wall, 16.979 seconds CPU, 334.7 MiB peak; decode cost was 8.048 seconds wall,
+7.779 seconds CPU and 43.4 MiB peak under the same one-CPU/resource/egress policy.
+The OSR unit exited 1 from the failed assertions. Its app/readiness and both
+unit cgroups were cleaned; no compiler/app/LP/decoder remained.
+
+The wrapper previously asserted the canonical subprocess exit before independent
+protocol/finalization supplements, preventing those facts from being collected.
+It now runs them independently and still fails overall on canonical/supplement
+failure. An optional four-case diagnostic records actual result codes, uncertainty,
+read-only/input state, moving-target hit/recovery, encoded byte sizes and page
+replacement timing. It does not replace acceptance or enable a capability.
+Node syntax and whitespace checks passed; that diagnostic replay is pending.
