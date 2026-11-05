@@ -196,7 +196,7 @@ final class ScriptWorkflowActions {
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await presentation.move(to: point, options: workflow.settings["pointer"] as? Body ?? [:], check: check)
         var settings = workflow.settings["tapIndicator"] as? Body ?? [:]
-        settings["radius"] = Double(CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width)
+        settings["radius"] = Double(CGFloat(settings["radius"] as? Double ?? 20) * viewport.displayScale)
         let verified = try await tab.target(
             target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain
         )

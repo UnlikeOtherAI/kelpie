@@ -14,8 +14,8 @@ export async function startFixture() {
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
   const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"].includes(mode)?mode:"";
   const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":mode==="/paced-final-delay"?"Delayed X fixture":"Hosted Mac fixture";
-  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
-  const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
+  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge";
+  const body=edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
    <label>Draft message<textarea id="entry">Draft seed</textarea></label>
    <label>Account password<input id="password" type="password"></label>
@@ -77,7 +77,7 @@ export async function startFixture() {
   addEventListener('scroll',()=>send({type:'scroll'}));
   send({type:'document'});
   })();`;
-  const style=motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
+  const style=edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
    #first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}`:
    bands?`body{margin:0;height:9000px;background:repeating-linear-gradient(to bottom,#f00 0 1000px,#0f0 1000px 2000px,#00f 2000px 3000px,#f0f 3000px 4000px)}`:
    next?"body{background:#ffe881;color:black}":`

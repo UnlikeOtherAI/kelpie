@@ -160,15 +160,17 @@ final class ScriptWorkflowTab {
         guard let values = try await fixed("""
         (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
         v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
-        v?.scale??1,devicePixelRatio,v?.pageLeft??scrollX,v?.pageTop??scrollY]})()
-        """) as? [NSNumber], values.count == 10 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+        v?.scale??1,devicePixelRatio,v?.pageLeft??scrollX,v?.pageTop??scrollY,
+        document.documentElement.clientWidth,document.documentElement.clientHeight]})()
+        """) as? [NSNumber], values.count == 12 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         let parts = values.map { CGFloat($0.doubleValue) }
         let bounds = renderer.scriptViewportRect.size
         guard parts.allSatisfy({ $0.isFinite }), parts[0] > 0, parts[1] > 0, parts[4] > 0, parts[5] > 0,
-              parts[6] > 0, parts[7] > 0, bounds.width > 0, bounds.height > 0 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+              parts[6] > 0, parts[7] > 0, parts[10] > 0, parts[11] > 0, bounds.width > 0, bounds.height > 0 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         return Viewport(
             bounds: bounds,
             layout: CGSize(width: parts[0], height: parts[1]),
+            client: CGSize(width: parts[10], height: parts[11]),
             visible: CGRect(x: parts[2], y: parts[3], width: parts[4], height: parts[5]),
             scale: parts[6],
             pixelRatio: parts[7],

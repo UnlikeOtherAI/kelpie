@@ -6,6 +6,21 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     typealias Body = [String: Any]
     private let tap: Body = ["action": "tap", "target": ["role": "button", "name": "Submit"]]
 
+    func testScrollbarTransitionAndProjection() {
+        func viewport(client: CGFloat, visible: CGFloat, bounds: CGFloat = 900, scale: CGFloat = 1) -> ScriptCaptureViewport {
+            ScriptCaptureViewport(bounds: CGSize(width: bounds, height: 700), layout: CGSize(width: 900, height: 700),
+                client: CGSize(width: client, height: 700), visible: CGRect(x: 0, y: 0, width: visible, height: 700),
+                scale: scale, pixelRatio: 1, pageOrigin: .zero)
+        }
+        let scrollbar = viewport(client: 883, visible: 883), plain = viewport(client: 900, visible: 900)
+        XCTAssertEqual(scrollbar.displayPoint(CGPoint(x: 860, y: 100)).x, 860)
+        XCTAssertTrue(scrollbar.acceptsScrollbarTransition(to: plain, documentChanged: true))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: plain, documentChanged: false))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: viewport(client: 900, visible: 890), documentChanged: true))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: viewport(client: 900, visible: 900, bounds: 901), documentChanged: true))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: viewport(client: 900, visible: 900, scale: 2), documentChanged: true))
+    }
+
     private func workflow(_ steps: [Body], _ extra: Body = [:]) -> Body {
         ["version": 1, "tabId": "test-tab", "actions": steps].merging(extra) { _, new in new }
     }
