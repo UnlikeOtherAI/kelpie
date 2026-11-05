@@ -9,7 +9,7 @@ import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
- let authorityRun;
+ let authorityRun,foreignToken;
  const checks=[];report.engines.push({engine,checks});
  async function check(name,run){try{const detail=await run();checks.push({name,passed:true,detail});}
  catch(error){checks.push({name,passed:false,code:error.code??"CHECK_FAILED"});throw error;}}
@@ -65,7 +65,7 @@ export async function runEngine(client,fixture,engine,report) {
  await check("generic-mcp-play-and-owner-fence",async()=>{
   const value=await client.direct("kelpie_play_script",{...base,actions:[{action:"click",target:{selector:"#submit"}}]},true);
   requireTrue(value.success,"GENERIC_MCP_PLAY");
-  const foreign=await client.pair("Hosted foreign owner");
+  const foreign=await client.pair("Hosted foreign owner");foreignToken=foreign;
   const status=await client.api("get-script-status",{runId:value.runId},foreign);
   const abort=await client.api("abort-script",{runId:value.runId},foreign);
   const chunk=await client.api("get-script-artifact",{runId:authorityRun.runId,artifactId:authorityRun.artifacts[0].id,offset:0,length:1024},foreign);
@@ -123,7 +123,7 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(!("outputs" in status),"STATUS_OUTPUT_LEAK");
   return {code:value.error.code,priorOutputScrubbed:true,noInput:true,artifactsDiscarded:true};
  });
- await runPrivacy({client,fixture,base,capture,check,load});
+ await runPrivacy({client,fixture,base,capture,check,load,authorityRun,foreignToken});
  await check("gif-native-stop-partial-recovery",async()=>{
   await load();
   const pending=client.api("play-script",{...base,capture:{...capture,formats:["gif"]},actions:[

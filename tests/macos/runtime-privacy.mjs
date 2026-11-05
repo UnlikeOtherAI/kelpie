@@ -1,7 +1,7 @@
 import {canary} from "./runtime-fixture.mjs";
-import {requireTrue} from "./runtime-client.mjs";
+import {requireTrue,waitFor} from "./runtime-client.mjs";
 
-export async function runPrivacy({client,fixture,base,capture,check,load}) {
+export async function runPrivacy({client,fixture,base,capture,check,load,authorityRun,foreignToken}) {
  const variants=[canary,encodeURIComponent(canary),new URLSearchParams({v:canary}).toString().slice(2)];
  for(const route of ["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete"]){
   for(const recording of route==="/focus-delay"||route==="/input-autocomplete"?[true,false]:[true]){
@@ -27,4 +27,31 @@ export async function runPrivacy({client,fixture,base,capture,check,load}) {
    });
   }
  }
+ await check("late-sensitive-cancel-active-artifact-fence",async()=>{
+  await load("/focus-delay");const begin=fixture.events.length;
+  const pending=client.api("play-script",{...base,capture:{...capture,formats:["screenshots"]},actions:[
+   {action:"output",name:"before",source:"title"},{action:"fill",target:{label:"Focus privacy"},text:canary}]});
+  // Observe completion immediately, including transport failure, without leaving an unhandled rejection.
+  const settled=pending.then(value=>({value}),()=>({transportFailed:true}));
+  await waitFor(()=>fixture.events.slice(begin).some(e=>e.type==="focus-privacy"));
+  const active=await client.api("get-script-status");requireTrue(active.playing&&active.runId,"ACTIVE_RUN_MISSING");
+  const abort=await client.api("abort-script",{runId:active.runId});requireTrue(abort.success,"ACTIVE_ABORT_FAILED");
+  const finalizing=await waitFor(async()=>{const status=await client.api("get-script-status",{runId:active.runId});return status.state==="finalizing"?status:null;});
+  requireTrue((finalizing.artifacts??[]).length===0,"ACTIVE_STATUS_MEDIA_EXPOSED");
+  const request={runId:active.runId,artifactId:"pending-artifact",offset:0,length:1024};
+  for(const read of [()=>client.api("get-script-artifact",request),()=>client.direct("kelpie_get_script_artifact",request),()=>client.direct("kelpie_get_script_artifact",request,true)]){
+   const value=await read();requireTrue(!value.success&&value.error?.code==="ARTIFACT_NOT_READY"&&!value.data,"ACTIVE_MEDIA_EXPOSED");
+  }
+  const foreign=await client.api("get-script-artifact",request,foreignToken);
+  requireTrue(!foreign.success&&foreign.error?.code==="ARTIFACT_NOT_FOUND","FOREIGN_ACTIVE_MEDIA_DISCLOSED");
+  const old=await client.api("get-script-artifact",{runId:authorityRun.runId,artifactId:authorityRun.artifacts[0].id,offset:0,length:1024});
+  requireTrue(old.success&&typeof old.data==="string","PRIOR_SAFE_MEDIA_BLOCKED");
+  const result=await settled;requireTrue(!result.transportFailed,"CANCEL_TRANSPORT_FAILED");
+  const value=result.value,serialized=JSON.stringify(value);
+  requireTrue(!value.success&&(value.artifacts??[]).length===0,"CANCEL_PRIVACY_MEDIA_RETAINED");
+  for(const variant of variants)requireTrue(!serialized.includes(variant),"CANCEL_PRIOR_OUTPUT_LEAK");
+  requireTrue(!fixture.events.slice(begin).some(e=>e.type==="input"&&e.target==="focus-privacy"),"CANCEL_SENSITIVE_INPUT");
+  return {code:value.error?.code,activeProtocolsWithheld:3,foreignDenied:true,priorSafeReadable:true,lateResultRetired:true};
+ });
+
 }
