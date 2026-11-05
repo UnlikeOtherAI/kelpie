@@ -11,6 +11,7 @@ import { runFinalizeFault } from "./finalize-fault.mjs";
 import { runAdversaryDiagnostics } from "./adversary-diagnostics.mjs";
 import { runPreinputReplacement } from "./preinput-replacement.mjs";
 import { runArtifactProtocolAcceptance } from "./artifact-protocol-acceptance.mjs";
+import { writeGifRuntimeEvidence } from "./gif-runtime-evidence.mjs";
 import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
 
 
@@ -85,6 +86,13 @@ try {
   report.corpus = { code: result.code, stdout: result.stdout, stderr: result.stderr };
   const corpus = JSON.parse(await readFile(join(corpusOutput, "report.json"), "utf8"));
   report.checks = corpus.checks;
+  if (process.env.KELPIE_GIF_RUNTIME_EVIDENCE === "1") {
+    assert.ok(result.code === 0 && corpus.checks.some(check =>
+      check.name === "continuous GIF MP4 marker PNG semantic trusted center extraction" && check.passed),
+    "Runtime evidence requires a successful production capture");
+    await writeGifRuntimeEvidence(browser.child.pid, executable, process.env.KELPIE_CAPTURE_SOURCE,
+      join(output, "gif-runtime-evidence.json"));
+  }
   const extension = { "image/png": "png", "image/gif": "gif", "video/mp4": "mp4" };
   const media = { ...corpus, binarySHA256: report.binarySHA256, artifacts: corpus.artifacts.map(item => ({
     ...item, file: join(corpusOutput, item.id + "." + extension[item.mimeType]),
