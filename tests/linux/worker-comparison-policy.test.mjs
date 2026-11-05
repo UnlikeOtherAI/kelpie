@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {validateProbe,classifySocketError,validatePrivateProbe} from "./worker-comparison-network.mjs";
 import {validateWorkerPolicy,verifyWorkerPolicyBinding,verifyWorkerObservationBinding} from "./worker-comparison-policy.mjs";
 const good=["User=1001","ActiveState=active","ExecMainPID=123","NoNewPrivileges=yes",
- "KillMode=control-group","ControlGroup=/system.slice/kelpie-worker-ab-123-1-lightpanda.service","MemoryMax=2147483648","TasksMax=256","CPUQuotaPerSecUSec=1s",
+ "PrivateNetwork=yes","KillMode=control-group","ControlGroup=/system.slice/kelpie-worker-ab-123-1-lightpanda.service","MemoryMax=2147483648","TasksMax=256","CPUQuotaPerSecUSec=1s",
  "IPAddressDeny=0.0.0.0/0 ::/0","IPAddressAllow=127.0.0.0/8 ::1/128"].join("\n");
 test("independent unit policy rejects extra network grants and resource drift",()=>{
  assert.equal(validateWorkerPolicy(good,"1001").pid,123);

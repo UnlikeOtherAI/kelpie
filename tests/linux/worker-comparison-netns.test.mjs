@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {validateNetnsEvidence} from "./worker-comparison-netns.mjs";
+import {validateNetnsEvidence,validNamespaceHandoff} from "./worker-comparison-netns.mjs";
 const good={host:"net:[1]",unit:"net:[2]",after:"net:[2]",
  queries:{address:"ok",routes4:"ok",routes6:"ok",pid:"ok"},
  addresses:[{ifname:"lo",flags:["UP","LOOPBACK"],addr_info:[
@@ -19,4 +19,11 @@ test("namespace proof rejects host, query, address and route failures",()=>{
   {routes6:[{dst:"ff00::/8",dev:"lo"}]}, {routes4:[{dst:"127.0.0.1",dev:"eth0"}]},
   {routes4:[{dst:"127.0.0.1",dev:"lo",gateway:"1.1.1.1"}]}])
   assert.throws(()=>validateNetnsEvidence({...good,...change}));
+});
+
+test("namespace handoff binds process and per-run nonce",()=>{
+ const p={pid:7,nonce:"n",distinctNamespace:true,interfaces:"loopback-only",externalRoutes:false};
+ assert.equal(validNamespaceHandoff(p,7,"n"),true);
+ for(const [pid,nonce] of [[8,"n"],[7,"other"]])assert.equal(validNamespaceHandoff(p,pid,nonce),false);
+ assert.equal(validNamespaceHandoff({...p,externalRoutes:true},7,"n"),false);
 });

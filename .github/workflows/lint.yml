@@ -46,6 +46,7 @@ on:
         options:
           - 'off'
           - probe
+          - sandbox
           - prepare
           - execute
         default: 'off'
@@ -69,6 +70,7 @@ jobs:
     with:
       prepare_only: ${{ inputs.worker_comparison_mode != 'execute' }}
       isolation_only: ${{ inputs.worker_comparison_mode == 'probe' }}
+      sandbox_only: ${{ inputs.worker_comparison_mode == 'sandbox' }}
       chromium_archive_sha256: ${{ inputs.worker_comparison_archive_sha256 }}
       chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
 

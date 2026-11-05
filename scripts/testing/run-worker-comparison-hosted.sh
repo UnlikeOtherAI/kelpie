@@ -3,9 +3,12 @@ set -euo pipefail
 umask 077
 : "${GITHUB_WORKSPACE:?}" "${RUNNER_TEMP:?}" "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}"
 isolation_only="${KELPIE_AB_ISOLATION_ONLY:-false}"
+sandbox_only="${KELPIE_AB_SANDBOX_ONLY:-false}"
+[[ "$sandbox_only" == true || "$sandbox_only" == false ]]
+[[ "$isolation_only" != true || "$sandbox_only" != true ]]
 [[ "$isolation_only" == true || "$isolation_only" == false ]]
 # Measurement remains disabled pending private-network and sandbox review.
-if [[ "$isolation_only" != true ]]; then echo PRIVATE_NETWORK_MEASUREMENT_NOT_APPROVED >&2; exit 1; fi
+if [[ "$isolation_only" != true && "$sandbox_only" != true ]]; then echo PRIVATE_NETWORK_MEASUREMENT_NOT_APPROVED >&2; exit 1; fi
 [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-1}" =~ ^[0-9]+$ ]]
 if [[ "$isolation_only" == false ]]; then
  : "${CHROMIUM_ARCHIVE_SHA256:?}" "${CHROMIUM_BINARY_SHA256:?}"
@@ -41,9 +44,12 @@ run_arm() {
  local backend="$1" executable="$2" expected="$3" dir="$out/$1"
  local unit="kelpie-worker-ab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}-$backend"
  mkdir -m 700 "$dir"
+ "$node" "$root/tests/linux/worker-comparison-canary.mjs" outside "$host_ip" "$port" >"$dir/outside-probe.json" || return 1
  local -a command
  if [[ "$backend" == probe ]]; then
   command=("$node" "$root/tests/linux/worker-isolation-probe.mjs" "$dir")
+ elif [[ "$backend" == sandbox ]]; then
+  command=("$node" "$root/tests/linux/worker-comparison-sandbox-smoke.mjs" "$executable" "$expected" "$dir")
  else
   command=("$node" "$root/tests/linux/worker-comparison.mjs" "$backend" "$executable" "$expected" "$dir")
  fi
@@ -72,7 +78,7 @@ run_arm() {
    printf '%s\n' available >"$dir/bpf-status.txt"
   else printf '%s\n' query-failed >"$dir/bpf-status.txt"; fi
  else printf '%s\n' unavailable >"$dir/bpf-status.txt"; fi
- if [[ "$active" == 1 && "$backend" == probe ]]; then
+ if [[ "$active" == 1 ]]; then
   local pid host_ns unit_ns unit_ns_after current_pid address_status=failed routes4_status=failed routes6_status=failed pid_status=failed
   pid="$(sed -n 's/^ExecMainPID=//p' "$dir/policy.txt")"
   if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
@@ -90,6 +96,16 @@ run_arm() {
   fi
   printf '{"address":"%s","routes4":"%s","routes6":"%s","pid":"%s"}\n' "$address_status" "$routes4_status" "$routes6_status" "$pid_status" >"$dir/namespace-query-status.json"
  fi
+ if [[ "$active" == 1 ]]; then
+  for _ in $(seq 1 250); do [[ -s "$dir/network-observation.json" ]] && break; sleep 0.1; done
+  if [[ -s "$dir/network-observation.json" ]]; then
+   "$node" "$root/tests/linux/worker-observation-policy-check.mjs" "$dir/policy.txt" "$uid" \
+    "$dir/network-observation.json" "$dir/policy-observed.json" || true
+   if [[ -s "$dir/policy-observed.json" ]]; then
+    "$node" "$root/tests/linux/worker-comparison-netns-check.mjs" "$dir" "$comparison_id" || true
+   fi
+  fi
+ fi
  local status=0
  wait "$launcher" || status=$?
  printf '%s\n' "$status" >"$dir/launcher-exit.txt"
@@ -97,8 +113,9 @@ run_arm() {
   --property=ControlGroup --property=Result --property=ExecMainStatus >"$dir/unit-final.txt" 2>&1 || true
  grep -Eq '^ActiveState=(inactive|failed)$' "$dir/unit-final.txt" || return 1
  [[ "$group" == "/system.slice/${unit}.service" ]] || return 1
- local procs="" events="" cgpath="/sys/fs/cgroup$group"
+ local procs="" events="" cgpath="/sys/fs/cgroup$group" retirement=absent
  if [[ -d "$cgpath" ]]; then
+  retirement=empty
   [[ -r "$cgpath/cgroup.procs" ]] || return 1
   procs="$(cat "$cgpath/cgroup.procs")" || return 1
   [[ -z "$procs" ]] || return 1
@@ -106,22 +123,29 @@ run_arm() {
   events="$(cat "$cgpath/cgroup.events")" || return 1
   [[ "$(printf '%s\n' "$events" | grep -cx 'populated 0')" == 1 ]] || return 1
  fi
+ local final_state
+ final_state="$(sed -n 's/^ActiveState=//p' "$dir/unit-final.txt")"
+ [[ "$final_state" == inactive || "$final_state" == failed ]] || return 1
+ printf '{"verified":true,"state":"%s","cgroup":"%s"}\n' "$final_state" "$retirement" >"$dir/retirement.json"
  arm_retired=1
  local observation_status=1
- if [[ "$active" == 1 && -s "$dir/network-observation.json" ]]; then
+ [[ -s "$dir/policy-observed.json" ]] && observation_status=0
+ if [[ "$active" == 1 && -s "$dir/network-observation.json" && ! -s "$dir/policy-observed.json" ]]; then
   observation_status=0
   "$node" "$root/tests/linux/worker-observation-policy-check.mjs" \
    "$dir/policy.txt" "$uid" "$dir/network-observation.json" "$dir/policy-observed.json" || observation_status=$?
  fi
  if [[ "$active" != 1 || "$status" != 0 || "$observation_status" != 0 || ! -s "$dir/report.json" ]]; then return 1; fi
- if [[ "$backend" == probe ]]; then
-  "$node" "$root/tests/linux/worker-comparison-netns-check.mjs" "$dir" || return 1
- fi
+ [[ -s "$dir/namespace-verified.json" ]] || return 1
  "$node" "$root/tests/linux/worker-comparison-policy-check.mjs" \
   "$dir/policy.txt" "$uid" "$dir/report.json" "$dir/policy-verified.json"
 }
 if [[ "$isolation_only" == true ]]; then
  run_arm probe "" "" || failed=1
+ exit "$failed"
+fi
+if [[ "$sandbox_only" == true ]]; then
+ run_arm sandbox "$assets/chrome/chrome-linux64/chrome" "$CHROMIUM_BINARY_SHA256" || failed=1
  exit "$failed"
 fi
 run_arm lightpanda "$assets/lightpanda" ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e || failed=1
