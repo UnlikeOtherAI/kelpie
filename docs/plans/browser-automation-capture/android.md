@@ -743,3 +743,14 @@ f2ab740b7432d205dd53c194b66a6e3775d03d08b1af2461d0b67d1d85d3f16d and
 7abbae1a41bacb0b93e6c8da5b38c578ca60c24d3a20deaf7a6cc4bc6265a5ec.
 The hosted job ended and retained its logs; independent post-job process
 cleanup was not observed.
+
+Independent inspection of the hosted native screenshots found the blue marker
+and virtual pointer centered on Submit with native Stop visible on both
+profiles. Their SHA-256 values are
+e6f6dfc4dabaf375c88d5e5fef91801adb08e7ecb2515932cc07a8fb7ba0741d
+(phone) and cb30cc2a46bedd3d8dd836d7142f2fb727c3a016b066b224f0d22ae54ebd5b07
+(tablet). Separate native Stop images showed Stop with no marker, with hashes
+c3f07367acc85baebcfdf42ec9e11f82b3dd3ce4f44684fff011fcbb2fe22ad2
+(phone) and 21bdd5b17169c8b295a334468926afc9c3cbb3e72d1abd9c9e182d71fa76cd58
+(tablet). The image alone does not resolve whether an earlier marker retired
+naturally or because of a subsequent run.
