@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 
@@ -84,8 +84,10 @@ export async function runSelectedG08({ readiness, binary, output, signal, invoke
         const destination = join(staging, item.name);
         await copyFile(item.path, destination, 1);
         assert.equal(createHash("sha256").update(await readFile(destination)).digest("hex"), item.hash);
+        await chmod(destination, 0o644);
       }
       signal.throwIfAborted();
+      await chmod(staging, 0o755);
       await rename(staging, published);
     } catch (error) {
       if (signal.aborted) throw error;

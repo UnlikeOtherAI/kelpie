@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -43,6 +43,10 @@ test("selected OSR keeps eight independent format outcomes and validated media",
     assert.ok(result.results.every(row => row.droppedFrames === 3));
     assert.doesNotMatch(JSON.stringify(result), /private-canary|private/);
     assert.equal((await readFile(join(root, "dense", "published", "c.gif"))).toString(), "cimage/gif");
+    if (process.platform !== "win32") {
+      assert.equal((await stat(join(root, "dense", "published"))).mode & 0o777, 0o755);
+      assert.equal((await stat(join(root, "dense", "published", "c.gif"))).mode & 0o777, 0o644);
+    }
   } finally {
     if (oldSource === undefined) delete process.env.KELPIE_CAPTURE_SOURCE; else process.env.KELPIE_CAPTURE_SOURCE = oldSource;
     if (oldTest === undefined) delete process.env.KELPIE_TEST_REVISION; else process.env.KELPIE_TEST_REVISION = oldTest;
@@ -118,4 +122,14 @@ test("phase budget leaves time for startup and cleanup within wrapper", async ()
   assert.match(text, /timeout: 120000/);
   assert.match(text, /timeout: 240000/);
   assert.ok(2 * (120 + 240) + 30 + 15 < 900);
+});
+
+test("media remains private until all validation and copies finish", async () => {
+  const text = await readFile("tests/linux/osr-g08-selected.mjs", "utf8");
+  const mkdirAt = text.indexOf('await mkdir(staging, { mode: 0o700 })');
+  const hashAt = text.indexOf('assert.equal(createHash("sha256").update(await readFile(destination))');
+  const fileAt = text.indexOf('await chmod(destination, 0o644)');
+  const dirAt = text.indexOf('await chmod(staging, 0o755)');
+  const renameAt = text.indexOf('await rename(staging, published)');
+  assert.ok(mkdirAt >= 0 && mkdirAt < hashAt && hashAt < fileAt && fileAt < dirAt && dirAt < renameAt);
 });
