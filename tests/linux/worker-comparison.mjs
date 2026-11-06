@@ -22,6 +22,7 @@ import {observeClientClose,clientCloseWasForced,observeEngineStop,engineStopFail
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {diagnoseChromiumFirstFailure} from "./worker-comparison-first-failure.mjs";
 import {createHistoryProbe} from "./worker-comparison-history-probe.mjs";
+import {publicHistoryDiagnostic} from "./public-history-diagnostic.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
 const require=createRequire(new URL("../../packages/cli/package.json",import.meta.url));
@@ -33,6 +34,8 @@ const diagnostic=process.env.KELPIE_AB_DIAGNOSTIC_ONLY==="true";
 assert.ok(!diagnostic||backend==="playwright","DIAGNOSTIC_BACKEND_INVALID");
 const bfcacheOff=process.env.KELPIE_AB_BFCACHE_OFF==="true";
 assert.ok(!bfcacheOff||diagnostic,"BFCACHE_CONTROL_REQUIRES_DIAGNOSTIC");
+const publicHistory=process.env.KELPIE_AB_PUBLIC_HISTORY==="true";
+assert.ok(!publicHistory||(diagnostic&&!bfcacheOff),"HISTORY_DIAGNOSTIC_MODE_INVALID");
 const historyProbe=diagnostic?createHistoryProbe():null;
 assert.match(expectedHash??"",/^[a-f0-9]{64}$/);
 if(backend==="playwright")assert.match(process.env.KELPIE_CHROMIUM_ARCHIVE_SHA256??"",/^[a-f0-9]{64}$/);
@@ -217,8 +220,14 @@ try{
    if(method==="tab.back")backMark=historyProbe.mark();
    return method==="__session_limit"?lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}}):tool("kelpie_browser_control",{sessionId:session.sessionId,request:{version:1,method,params,tabId:session.ownedTabIds[0]}});
   };
-  report.firstFailureDiagnostic=await diagnoseChromiumFirstFailure({call:diagnosticCall,origin,now:()=>performance.now(),sessionStarted,timeoutError:diagnosticTimeout});
-  if(backMark!==null){await delay(250);report.historyObservationWindowMs=250;report.historyLifecycle=historyProbe.result(backMark);}
+  if(publicHistory){
+   report.publicHistory=await publicHistoryDiagnostic({call:diagnosticCall,origin,lifecycle:historyProbe,delay});
+   const closed=await diagnosticCall("tabs.close",{});
+   assert.equal(closed.ok,true);report.cleanup.session.tabClose="ok";
+   const retired=await lifecycle({action:"close",sessionId:session.sessionId});
+   assert.equal(retired.ok,true);report.cleanup.session.sessionClose="ok";
+  }else report.firstFailureDiagnostic=await diagnoseChromiumFirstFailure({call:diagnosticCall,origin,now:()=>performance.now(),sessionStarted,timeoutError:diagnosticTimeout});
+  if(!publicHistory&&backMark!==null){await delay(250);report.historyObservationWindowMs=250;report.historyLifecycle=historyProbe.result(backMark);}
   report.bfcacheControl=bfcacheOff?"disabled":"browser-default";
  }else{
  await check("second session refused at configured limit",async()=>{
@@ -289,7 +298,7 @@ try{
   const values=report.warm.map(x=>x.wallMs).sort((a,b)=>a-b);
   report.warmDistributionMs={samples:values.length,median:values[2],p95NearestRank:values[4]};
  }
- if(diagnostic)report.diagnosticEvidenceComplete=!!report.firstFailureDiagnostic&&!failure&&!report.forcedCleanup&&report.engineExited;
+ if(diagnostic)report.diagnosticEvidenceComplete=(publicHistory?report.publicHistory?.complete===true&&report.cleanup.session.tabClose==="ok"&&report.cleanup.session.sessionClose==="ok":!!report.firstFailureDiagnostic)&&!failure&&!report.forcedCleanup&&report.engineExited;
  await writeFile(join(dir,"report.json"),JSON.stringify(report,null,2),{mode:0o600,flag:"wx"});
  if(!report.eligibleForComparison&&!(diagnostic&&report.diagnosticEvidenceComplete))process.exitCode=1;
 }
