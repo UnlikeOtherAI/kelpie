@@ -834,3 +834,19 @@ The app built and installed on each profile had SHA-256
 APK had SHA-256 eedce88d0c66f821e388325db0c136fcc41148619ad5a0e6d53be0b7530e8116.
 Artifact 13473544679 retains the separate case receipts. This targeted run does
 not establish API 29, full-corpus or cross-platform acceptance.
+
+The opt-in API 29 phone smoke [42156048209](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42156048209)
+used source 40f60708128ec5ebd92d9ac00813d05b926e9f3b. Android build/lint and
+the shipping JNI app/test APK build passed. The actual emulator reported SDK 29
+and Google WebView 74.0.3729.185. Both selected cases failed in common fixture
+loading when canonical tab.ready was refused, before script input, marker,
+PNG, movie or Stop execution. The fixed public refusal code was not retained,
+so its cause is unresolved; neither case establishes capture behavior.
+
+The built and installed app SHA-256 was
+625dfa72baced112e0863d906dc39693ccb6b7cdcd650e0e300e12d45016e861; the test
+APK SHA-256 was 540ad668b50bb8b3c12ce16bf2ad5458721dfb5c5fcd9c1ba0b1c0a857357f26.
+The owned cleanup receipt reports CLEANUP_CONFIRMED. Artifact 13475059069 and
+the retained job log preserve the scoped failure; no unexpected host media
+attempt was reported. This failed phone smoke does not establish API 29
+capture, tablet, physical-device or full-corpus acceptance.
