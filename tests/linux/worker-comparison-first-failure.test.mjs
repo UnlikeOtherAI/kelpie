@@ -42,3 +42,15 @@ test("contradictory success and malformed tab lists are rejected",async()=>{
  assert.equal((await sample({ok:true,error:null})).receipt.firstFailure.category,"malformed_envelope");
  assert.equal((await sample({ok:true,value:null})).receipt.firstFailure.category,"malformed_envelope");
 });
+test("diagnostic reports fixed reference-format category without exposing refs",async()=>{
+ let titleCalls=0;const call=async(method)=>{
+  if(method==="__session_limit")return {ok:false,error:{code:"RESOURCE_LIMIT"}};
+  if(method==="tabs.list")return {ok:true,value:[{}]};
+  if(method==="tab.title")return {ok:true,value:titleCalls++===0?"Worker fixture":"Next fixture"};
+  if(method==="tab.url")return {ok:true,value:"http://fixture/"};
+  if(method==="tab.snapshot")return {ok:true,value:{elements:[{ref:"e1",name:"public"}],text:"public",truncated:true}};
+  return {ok:true,value:null};
+ };
+ const r=await diagnoseChromiumFirstFailure({call,origin:"http://fixture",now:()=>0,sessionStarted:0,timeoutError:Error("t")});
+ assert.equal(r.firstFailure.category,"reference_format");assert.ok(!JSON.stringify(r).includes("e1"));
+});

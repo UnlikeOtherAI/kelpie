@@ -20,6 +20,7 @@ import {queryRendererPidsAtOwnedPort} from "./worker-comparison-cdp-process.mjs"
 import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
 import {observeClientClose,clientCloseWasForced,observeEngineStop,engineStopFailure} from "./worker-comparison-cleanup.mjs";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
+import {classifyListenerFailure} from "./worker-listener-classifier.mjs";
 import {diagnoseChromiumFirstFailure} from "./worker-comparison-first-failure.mjs";
 import {createHistoryProbe} from "./worker-comparison-history-probe.mjs";
 import {createPublicHistoryReport,publicHistoryDiagnostic} from "./public-history-diagnostic.mjs";
@@ -163,7 +164,9 @@ try{
  }
  assert.ok(ready,"ENGINE_NOT_READY");
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
- report.enginePid=engine.pid;report.engineStartTicks=await verifyOwnedListener(engine.pid,port,engineStart);
+ report.enginePid=engine.pid;report.listenerProof={status:"started"};
+ try{report.engineStartTicks=await verifyOwnedListener(engine.pid,port,engineStart);report.listenerProof={status:"passed"};}
+ catch(error){report.listenerProof={status:"failed",category:classifyListenerFailure(error)};throw error;}
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
  const methods=["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload",
   "tab.snapshot","tab.extract","tab.status","tab.ready"];
@@ -257,7 +260,7 @@ try{
   });
   await check(prefix+" reader navigation",async()=>assert.equal((await call("tab.goto",{url:origin+"/readers"})).ok,true));
   await runLightpandaReaderDiagnostics({check:(name,fn)=>check(prefix+" "+name,fn),
-   selected:["snapshot","extract","status","ready"],adversariesInstalled:()=>true,referencePrefix:()=>"e",
+   selected:["snapshot","extract","status","ready"],adversariesInstalled:()=>true,referencePrefix:()=>"e",referenceMode:backend==="playwright"?"managed":"lightpanda",
    read:async(kind,options={})=>{const params={...options};delete params.prefix;
     const r=await call("tab."+kind,params);assert.equal(r.ok,true);return r.value;}});
   const elapsed=performance.now()-begin;

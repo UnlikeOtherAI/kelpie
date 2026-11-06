@@ -132,7 +132,7 @@ jobs:
             [[ "$CHROMIUM_BINARY_SHA256" =~ ^[a-f0-9]{64}$ ]]
           fi
           pnpm install --frozen-lockfile
-          node --test tests/linux/worker-comparison-result.test.mjs tests/linux/worker-comparison-policy.test.mjs tests/linux/worker-comparison-listener.test.mjs tests/linux/worker-comparison-workflow.test.mjs
+          node --test tests/linux/worker-comparison-result.test.mjs tests/linux/worker-comparison-policy.test.mjs tests/linux/worker-comparison-listener.test.mjs tests/linux/worker-comparison-workflow.test.mjs tests/linux/lightpanda-reader-diagnostics.test.mjs tests/linux/worker-comparison-first-failure.test.mjs tests/linux/worker-listener-classifier.test.mjs tests/linux/worker-evidence-allowlist.test.mjs
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/testing/test_extract_worker_chromium.py
           node -e 'const p=require("./node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/browsers.json");const c=p.browsers.find(x=>x.name==="chromium");if(c.revision!=="1234"||c.browserVersion!=="151.0.7922.34")process.exit(1)'
           assets="$RUNNER_TEMP/worker-ab-assets"
@@ -224,13 +224,15 @@ jobs:
         env:
           KELPIE_AB_SANDBOX_ONLY: "true"
         run: bash scripts/testing/run-worker-comparison-hosted.sh
+      - name: Stage allowlisted evidence only
+        if: always()
+        run: node tests/linux/worker-evidence-allowlist.mjs "$RUNNER_TEMP" "$RUNNER_TEMP/worker-ab-upload"
       - name: Retain scoped evidence and failures
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
           name: worker-comparison-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/worker-ab-setup/
-            ${{ runner.temp }}/worker-ab-evidence/
+            ${{ runner.temp }}/worker-ab-upload/
           if-no-files-found: warn
           retention-days: 14
