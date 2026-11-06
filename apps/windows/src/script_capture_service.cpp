@@ -5,6 +5,9 @@
 #include "script_media_encoder.h"
 #include "script_frame_compositor.h"
 #include "script_native_overlay.h"
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+#include "script_test_g08_roi_witness.h"
+#endif
 #include <set>
 #include <deque>
 #include <algorithm>
@@ -22,6 +25,10 @@ class Capture final : public DesktopScriptCapture {
       if(name=="screenshots") screenshots_=true; else codecs.push_back(name=="video"?"mp4":name);
     }
     movies_=!codecs.empty();
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+    if(codecs.size()==1 && codecs.front()=="mp4" && !screenshots_)
+      test_witness_=std::make_unique<TestG08RoiWitness>();
+#endif
     try { encoder_=ScriptMediaEncoder::Create(directory_,codecs,options_.value("fps",15),options_.value("maxBytes",std::size_t(67108864))); }
     catch(...) { std::error_code ignored; std::filesystem::remove(directory_,ignored); throw; }
   }
@@ -40,11 +47,18 @@ class Capture final : public DesktopScriptCapture {
     if(width_&& (frame.width!=width_||frame.height!=height_)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_=frame.width; height_=frame.height; last_elapsed_=elapsed_ms;
     DrawScriptOverlay(frame,presentation);
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+    // Sampler-owned scope is never accepted from the page or public request.
+    if(test_witness_ && !presentation.value("_testG08Scope",false)) test_witness_->Invalidate();
+#endif
     DesktopScriptFrameAdmission committed;
     if(ScriptMovieFrameDue(last_movie_frame_,elapsed_ms,options_.value("fps",15))) {
       // AddFrame emits the prior pending frame to GIF and MP4 before accepting
       // this new pending frame. False/throw never acknowledges either format.
       if(!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+      if(test_witness_ && presentation.value("_testG08Scope",false)) test_witness_->RecordAdmittedFrame(frame);
+#endif
       DesktopScriptFrameAdmission queued;
       if(movies_ && presentation.contains("marker")) {
         const auto& marker=presentation.at("marker");
@@ -82,6 +96,12 @@ class Capture final : public DesktopScriptCapture {
     std::vector<ScriptMediaOutput> outputs;
     try { outputs=encoder_->Finish(std::max(last_elapsed_+1,terminal_elapsed_ms)); }
     catch(...) { failure="CAPTURE_FINALIZE_FAILED"; try { outputs=encoder_->Finish(std::max(last_elapsed_+1,terminal_elapsed_ms)); } catch(...) {} }
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+    // Finish has drained the real MF FIFO. No rows are published here: the
+    // sampler must first prove final authority and the caller must match PTS.
+    if(test_witness_ && (outputs.size()!=1 || !test_witness_->Finalize(partial || !failure.empty(),outputs.front())))
+      test_witness_->Invalidate();
+#endif
     try {
       for(const auto& output:outputs) owned_[output.path]=CaptureFileIdentity(output.path);
       for(const auto& output:outputs) {
@@ -109,6 +129,9 @@ class Capture final : public DesktopScriptCapture {
   std::size_t committed_marker_frames_=0;
   int width_=0,height_=0,source_width_=0,source_height_=0;
   double last_elapsed_=0,last_movie_frame_=-1;
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+  std::unique_ptr<TestG08RoiWitness> test_witness_;
+#endif
 };
 }
 void WindowsScriptService::Configure(DesktopApp::Config& config) {

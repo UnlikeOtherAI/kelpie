@@ -12,6 +12,11 @@ option(KELPIE_TEST_G08_ROI_WITNESS "Build the test-only G08 ROI witness helper" 
 if(KELPIE_TEST_G08_ROI_WITNESS AND (NOT BUILD_TESTING OR NOT WIN32 OR NOT HAS_CEF))
   message(FATAL_ERROR "KELPIE_TEST_G08_ROI_WITNESS requires Windows, CEF and BUILD_TESTING")
 endif()
+if(KELPIE_TEST_G08_ROI_WITNESS)
+  target_sources(kelpie PRIVATE src/script_test_g08_roi_witness.cpp)
+  target_compile_definitions(kelpie PRIVATE KELPIE_TEST_G08_ROI_WITNESS)
+  target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE KELPIE_TEST_G08_ROI_WITNESS)
+endif()
 target_sources(kelpie PRIVATE
   ${KELPIE_SCRIPT_CODEC_SOURCES}
   src/script_capture_service.cpp

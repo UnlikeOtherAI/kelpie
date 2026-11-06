@@ -124,6 +124,11 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       }
       const auto timing_post=stage_timing.Now();
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+      // Fail closed until the runner-owned fixture listener can be proven.
+      // Never inherit a similarly named field from any presentation payload.
+      shown["_testG08Scope"] = false;
+#endif
       const bool terminal=step>=0 && purpose==DesktopScriptFramePurpose::TerminalClear && encoder->SupportsTerminalClear();
       if (terminal) {
         if (!config.revalidate || !config.revalidate(owner)) {
