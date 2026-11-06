@@ -234,6 +234,14 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_keyboard_geometry(line.replace("1,1,1", "2,1,1", 1)))
         self.assertIsNone(fixed_keyboard_geometry(line + ",1"))
 
+    def test_immersive_selection_is_only_setter_and_paired_journey(self):
+        targets, names = DRIVER.selection("immersive")
+        unit = "testChangedViewportRangeWithUnchangedScrollClearance"
+        ui = "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia"
+        self.assertEqual(names, {unit, ui})
+        self.assertEqual(targets, ["KelpieTests/IOSViewportInsetReconciliationTests/" + unit,
+                                   "KelpieUITests/WorkflowCaptureUITests/" + ui])
+
     def test_marker_selection_includes_both_lifetime_controls(self):
         targets, names = DRIVER.selection("marker")
         ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun", "testRetiredMarkerDoesNotReappearAfterTabChange",
