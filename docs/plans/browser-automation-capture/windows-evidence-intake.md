@@ -425,3 +425,33 @@ Oracle input and output SHA-256 values are
 The retained evidence is under
 `D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/production/g08-455-d247-fourcore-c-r1`.
 This one C case is not S-curve, release, or a controlled CPU-affinity comparison.
+
+### Hosted Windows public C export
+
+The single opt-in hosted Windows 2022 run
+[42135727180](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42135727180)
+used source `a70d8a38e0173d8878c0e620df730e6202c44173`. Its Release CEF,
+sandbox, static `/MT` and local-LLM preflight passed. The hosted DLL SHA-256
+was `4cc71d40076eefd7d07da5ac116fb4541b7f3ac69bfe4c33d2fb6277ffdfd922`;
+FFmpeg and ffprobe SHA-256 values were
+`72a489eccd008c2ec2c0a5856c5c75bc3d8bbfa90166c4566865c246445e6aa3` and
+`19202b23c0043f15ad1b7bce2344f406fd52bd6efd8f995ce02e7392a1cec52f`.
+
+The public workflow captured four trusted fixture events with no event loss,
+downloaded both artifacts with verified hashes, and closed through the public
+interface. The owned PID and listener were independently absent afterward.
+Both decoded exports contained 219 frames and reported 315 drops. GIF SHA-256
+`48a8707d128464164b69077fca8e6a678d0c343508c5a19340a193b55d79cfd9`
+(291,387 bytes) had median/p90/max PTS gaps 110/160/220 ms. MP4 SHA-256
+`bc4ba5d62520a627f96cb7d849f492aabcb20cbfcf03d63bb44ab25870a79b9c`
+(89,112 bytes) had gaps 106.15/159.60/215.85 ms. The unchanged single-case
+oracle reported `INSUFFICIENT_EVIDENCE dense motion samples` for both. Its
+input and output hashes were
+`b1261cc963da7adfcb2bdffb42998c654a2f50b02db6b50d5316fc0f18d31d28` and
+`a7d61e9cebaafbaef19603e4d5c44d9fd42b266a7dc22c727ab49633e20587e3`.
+The workflow failed on that oracle result and retained its diagnostic artifact.
+The preceding hosted run 42132391770 failed its overly narrow runtime-cache
+preflight before app launch and produced no capture artifact; it remains a
+separate prelaunch failure.
+This hosted case does not verify WGC, a visible native overlay or Stop control,
+an installed release, an S curve, or Maxis runtime performance.
