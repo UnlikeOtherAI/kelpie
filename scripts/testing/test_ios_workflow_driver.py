@@ -234,6 +234,12 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_keyboard_geometry(line.replace("1,1,1", "2,1,1", 1)))
         self.assertIsNone(fixed_keyboard_geometry(line + ",1"))
 
+    def test_keycontrol_selection_is_one_ipad_simulated_key_journey(self):
+        targets, names = DRIVER.selection("keycontrol")
+        name = "testIPadSimulatedKeyBeforeDuringAndAfterPlayback"
+        self.assertEqual(names, {name})
+        self.assertEqual(targets, ["KelpieUITests/WorkflowCaptureUITests/" + name])
+
     def test_immersive_selection_is_only_setter_and_paired_journey(self):
         targets, names = DRIVER.selection("immersive")
         unit = "testChangedViewportRangeWithUnchangedScrollClearance"

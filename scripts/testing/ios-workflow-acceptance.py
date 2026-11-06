@@ -23,6 +23,9 @@ NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
 
 
 def selection(scope):
+    if scope == "keycontrol":
+        name = "testIPadSimulatedKeyBeforeDuringAndAfterPlayback"
+        return ["KelpieUITests/WorkflowCaptureUITests/" + name], {name}
     if scope == "immersive":
         unit = "testChangedViewportRangeWithUnchangedScrollClearance"
         ui = "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia"
@@ -320,7 +323,7 @@ def run_device(device, product_hashes, scope):
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
         with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + {"navigation": 10, "geometry": 20, "postedit": 10, "keyboard": 10, "marker": 10, "mobilecheck": 20, "immersive": 10}.get(scope, 40) * 60
+            deadline = time.monotonic() + {"navigation": 10, "geometry": 20, "postedit": 10, "keyboard": 10, "marker": 10, "mobilecheck": 20, "immersive": 10, "keycontrol": 10}.get(scope, 40) * 60
             while process.poll() is None and time.monotonic() < deadline:
                 tab = handoff.current_tab()
                 if tab and not cli_started:
@@ -374,7 +377,7 @@ def run_device(device, product_hashes, scope):
             install_report["afterError"] = type(error).__name__
         (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
         missing = sorted(method for method in required if method not in tests)
-        cli_required = scope not in ("navigation", "geometry", "postedit", "keyboard", "marker", "mobilecheck", "immersive")
+        cli_required = scope not in ("navigation", "geometry", "postedit", "keyboard", "marker", "mobilecheck", "immersive", "keycontrol")
         if process.returncode or (cli_required and not cli_started) or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
         if not install_verified:
