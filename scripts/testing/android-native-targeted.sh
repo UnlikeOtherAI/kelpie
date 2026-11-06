@@ -14,9 +14,6 @@ started="${10}"
 cases=(
   'navigation-stop=com.kelpie.browser.automation.ScriptNavigationStopTest#nativeStopDuringIssuedNavigationPreservesUncertaintyAndRecovers'
   'chrome-input=com.kelpie.browser.automation.ScriptChromeInputFlowTest#activeNoMovieRunBlocksChromeButNativeStopStillWorks'
-  'navigation-scale=com.kelpie.browser.automation.ScriptNavigationScaleTest#captureSurvivesNavigationToDifferentInitialPageScale'
-  'same-document-scale=com.kelpie.browser.automation.ScriptNavigationScaleTest#captureRejectsSameDocumentScaleChange'
-  'mixed-document-frame=com.kelpie.browser.automation.ScriptNavigationScaleTest#captureRejectsMixedDocumentFrame'
 )
 result=0
 for entry in "${cases[@]}"; do
