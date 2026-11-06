@@ -238,7 +238,8 @@ try{
   };
   if(publicHistory){
    try{await publicHistoryDiagnostic({call:diagnosticCall,origin,lifecycle:historyProbe,delay,timeoutError:diagnosticTimeout,report:report.publicHistory,
-    noHistoryEvidence:()=>preflightRequests===1?noHistory.result():{status:"insufficient"}});}
+    noHistoryEvidence:()=>{const observed=noHistory.result();return {status:preflightRequests===1?observed.status:"insufficient",
+     preflightRequests:preflightRequests===0?"zero":preflightRequests===1?"one":"multiple",beacon:observed.beacon};}});}
    catch{failure="HISTORY_DIAGNOSTIC_FAILED";}
    const closeStarted=performance.now();
    try{const closed=await diagnosticCall("tabs.close",{});report.cleanup.session.tabClose=closed?.ok===true?"ok":"refused";}

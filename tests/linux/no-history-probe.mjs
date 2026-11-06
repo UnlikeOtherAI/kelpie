@@ -9,6 +9,9 @@ export function createNoHistoryProbe(binding) {
    if (value===binding+':one') one=true;
    else if (value!==binding+':other') invalid=true;
   },
-  result(){return {status:!invalid&&count===1&&one?'one-entry':'insufficient'};},
+  result(){
+   const beacon=invalid?'mismatch':count===0?'missing':count>1?'duplicate':one?'one':'other';
+   return {status:beacon==='one'?'one-entry':'insufficient',beacon};
+  },
  };
 }

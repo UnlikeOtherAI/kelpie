@@ -26,5 +26,6 @@ test('no-history calls follow sandbox proof and require a single preflight fixtu
  const proof=runner.indexOf('assert.ok(report.sessionSandboxEvidence,"CHROMIUM_SANDBOX_NOT_PROVEN")');
  const check=runner.indexOf('await publicHistoryDiagnostic(');
  ok(proof>=0&&check>proof);
- ok(runner.includes('preflightRequests===1?noHistory.result():{status:"insufficient"}'));
+ ok(runner.includes('status:preflightRequests===1?observed.status:"insufficient"'));
+ ok(runner.includes('preflightRequests:preflightRequests===0?"zero":preflightRequests===1?"one":"multiple"'));
 });

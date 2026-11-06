@@ -20,19 +20,22 @@ export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, 
   const ready = value => value?.ready === true && ['interactive', 'complete'].includes(value.documentState);
   try {
     await delay(250);
-    if (noHistoryEvidence().status === 'one-entry') {
+    report.noHistoryObservation = noHistoryEvidence();
+    if (report.noHistoryObservation.status === 'one-entry') {
       await stage('no-history-before-url', 'tab.url', {}, url('/preflight'));
       await stage('no-history-before-ready', 'tab.ready', { state: 'interactive' }, ready);
       await stage('no-history-back', 'tab.back', {});
       await stage('no-history-back-url', 'tab.url', {}, url('/preflight'));
       await stage('no-history-back-ready', 'tab.ready', { state: 'interactive' }, ready);
       await delay(250);
-      if (noHistoryEvidence().status !== 'one-entry') throw stop;
+      report.noHistoryAfterBack = noHistoryEvidence();
+      if (report.noHistoryAfterBack.status !== 'one-entry') throw stop;
       await stage('no-history-forward', 'tab.forward', {});
       await stage('no-history-forward-url', 'tab.url', {}, url('/preflight'));
       await stage('no-history-forward-ready', 'tab.ready', { state: 'interactive' }, ready);
       await delay(250);
-      if (noHistoryEvidence().status !== 'one-entry') throw stop;
+      report.noHistoryAfterForward = noHistoryEvidence();
+      if (report.noHistoryAfterForward.status !== 'one-entry') throw stop;
       report.limitations.noHistory='passed';
     }
     await stage('root', 'tab.goto', { url: origin + '/' });
