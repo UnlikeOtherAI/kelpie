@@ -327,31 +327,35 @@ jobs:
             bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
             2>&1 | tee "${package_root}/candidate-installed-replay.log"
 
+      - name: Summarize safe Linux evidence
+        if: always()
+        run: node scripts/ci/sanitize-linux-evidence.mjs dist/release/${{ matrix.distro.name }}
+
       - name: Upload installed-candidate diagnostics
         uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: ${{ inputs.artifact_prefix || 'linux-native-check' }}-${{ matrix.distro.name }}-diagnostics
           path: |
-            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/
+            dist/release/${{ matrix.distro.name }}/safe-diagnostics.json
+            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/outcome.json
+            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/scope.txt
+            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/installed-sha256.txt
+            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/traced-exit.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke/installed-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke/client-package-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke/cgroup-before.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke/cgroup-after.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.gif
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.mp4
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/*.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/capture/report.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke/alias/report.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke/*.log
-            dist/release/${{ matrix.distro.name }}/installed-smoke/*.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/installed-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/client-package-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/cgroup-before.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/cgroup-after.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/count-mismatch.gif
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/count-mismatch.mp4
-            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/*.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/capture/report.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/alias/report.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.log
-            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.txt
-            dist/release/${{ matrix.distro.name }}/candidate-installed-*.log
-            dist/release/${{ matrix.distro.name }}/candidate-namespace-diagnostic.log
           if-no-files-found: warn
 
       - uses: actions/upload-artifact@v7.0.1

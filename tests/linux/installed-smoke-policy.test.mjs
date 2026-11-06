@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 const workflow = await readFile(new URL("../../.github/workflows/linux-native.yml", import.meta.url), "utf8");
-const script = await readFile(new URL("../../scripts/ci/linux-installed-smoke.sh", import.meta.url), "utf8");
+const script = (await readFile(new URL("../../scripts/ci/linux-installed-smoke.sh", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
 test("installed smoke uses a separate bounded distro container and read-only source", () => {
   const smoke = workflow.slice(workflow.indexOf("      - name: Verify installed Linux candidate"));
   assert.equal((smoke.match(/docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m/g) ?? []).length, 3);
@@ -56,8 +56,8 @@ test("package upload uses an explicit allowlist and never traverses private CLI 
   assert.doesNotMatch(upload,/installed-smoke\/|namespace-diagnostic\/|\*\.txt|\*\.log/);
   for(const name of ["*.deb","*.rpm","checksums.txt","source-revision.txt","binary-sha256.txt"]) assert.ok(upload.includes(name));
   const diagnostics=workflow.split("      - name: Upload installed-candidate diagnostics")[1].split("      - uses: actions/upload-artifact@v7.0.1")[0];
-  assert.match(diagnostics,/installed-smoke\/alias\/report\.json/);
-  assert.match(diagnostics,/installed-smoke\/capture\/media-verification\.json|installed-smoke\/capture\/\*\.json/);
+  assert.match(diagnostics,/safe-diagnostics\.json/);
+  assert.doesNotMatch(diagnostics,/app-logs|\*\.json|\*\.log/);
 });
 
 test("exact Fedora CLI-only replay preserves full-mode policy",async()=>{
