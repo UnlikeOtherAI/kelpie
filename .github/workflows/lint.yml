@@ -179,6 +179,7 @@ jobs:
           path: |
             ${{ runner.temp }}/history-owned/patch-verification.json
             ${{ runner.temp }}/history-owned/receipts/suite.json
+            ${{ runner.temp }}/history-owned/receipts/lint-diagnostic.json
             ${{ runner.temp }}/history-owned/receipts/retirement.json
           if-no-files-found: warn
           retention-days: 14

@@ -14,6 +14,9 @@ mkdir -p "$HISTORY_LOG_DIR" "$HISTORY_RECEIPT_DIR"
 lint=not-run; build=not-run; test=not-run; code=0
 pnpm lint >"$HISTORY_LOG_DIR/lint.log" 2>&1 || code=$?
 lint="$code"
+if [[ "$code" != 0 ]]; then
+ node "$(dirname "$0")/lint-receipt.mjs" "$HISTORY_LOG_DIR/lint.log" "$HISTORY_RECEIPT_DIR/lint-diagnostic.json"
+fi
 if [[ "$code" == 0 ]]; then
  pnpm build >"$HISTORY_LOG_DIR/build.log" 2>&1 || code=$?
  build="$code"
