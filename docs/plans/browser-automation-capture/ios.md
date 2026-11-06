@@ -135,3 +135,33 @@ accessibility target lookup at 1793920737.266 and retained the screenshot at
 result was centered, but this image cannot establish live marker projection.
 The earlier 421190 run passed that same-scene control on both devices. The
 42130731818 geometry replay is separate and its outcome is not included here.
+
+## Hosted geometry check: 42130731818
+
+The focused `geometry` run exercised revision
+`12123d02f4cd53c8b381faa664481bc59de791ab` on the same iPhone 17 and
+iPad Air 13-inch (M4), iOS 26.5 and Xcode 26.6. The iPhone passed seven of
+nine selected methods and the iPad passed five of nine. All methods were
+present, and both simulators were verified shut down. Its retained evidence is
+[hosted geometry 42130731818](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42130731818).
+
+The same-scene native marker projection passed on both devices. The iPhone
+calibrated partial target had a 50 CSS-pixel hit-testable intersection; its
+single tap hit the expected center and its step PNG marker passed. A separate
+clipped, unhittable target returned `TARGET_NOT_FOUND` with no click. The
+iPhone scrollable native pinch control passed. The iPad paired MCP click and
+decoded-media control passed.
+
+All three iPad pinch cases remained at visual and native scroll zoom scale 1.
+The scoped observer on the same native view and document recorded one began,
+18 changed and one ended event, with recognizer scale reaching 1.8605 in the
+scrollable case; this proves gesture recognition but does not establish why
+WebKit did not change page zoom. The standalone observer unit did not arm on
+either device, so its view/document retirement assertions were not proven by
+that fixture. The live observers did arm and bind to the same view/document.
+
+The iPhone paired MCP run failed `CAPTURE_VIEWPORT_CHANGED`. Run-wide
+diagnostics contain one snapshot mismatch from CSS/layout 402x812 to 402x778
+with native bounds 402x874 and unchanged safe/adjusted inset tuples. The
+retained diagnostic is aggregated and cannot establish which test emitted it
+or whether a baseline or target binding existed. No capture fence was changed.
