@@ -42,12 +42,15 @@ export async function diagnoseChromiumFirstFailure({call,origin,now,sessionStart
     const start=now(),age=Math.max(0,start-sessionStarted);
     try{await fn();return true;}catch(error){
      if(error===stop)throw stop;
-     receipt.stages.push({stage:name,category:"assertion_other",startMs:age,durationMs:Math.max(0,now()-start),
+     const referenceCategories={REFERENCE_FORMAT_INVALID:"reference_format",REFERENCE_DUPLICATE:"reference_duplicate",
+      REFERENCE_GENERATION_MIXED:"reference_generation_mixed",REFERENCE_GENERATION_REUSED:"reference_generation_reused"};
+     const category=Object.hasOwn(referenceCategories,error?.message)?referenceCategories[error.message]:"assertion_other";
+     receipt.stages.push({stage:name,category,startMs:age,durationMs:Math.max(0,now()-start),
       sessionAgeUpperBoundMs:age,ttlRemainingLowerBoundMs:Math.max(0,60000-age)});
-     receipt.firstFailure={stage:name,category:"assertion_other"};throw stop;
+     receipt.firstFailure={stage:name,category};throw stop;
     }
    },
-   selected:["snapshot","extract","status","ready"],adversariesInstalled:()=>true,referencePrefix:()=>"e",
+   selected:["snapshot","extract","status","ready"],adversariesInstalled:()=>true,referencePrefix:()=>"e",referenceMode:"managed",
    read:async(kind,options={})=>{
     const params={...options};delete params.prefix;
     return (await stage("reader-"+kind,"tab."+kind,params)).value;

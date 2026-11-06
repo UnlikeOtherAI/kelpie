@@ -8,21 +8,36 @@ function safe(value){
   for(const text of hidden)assert.ok(!serialized.includes(text),"Hidden text escaped");
   return serialized;
 }
-function refs(snapshot,prefix){
-  assert.ok(snapshot.elements.every(element=>element.ref.startsWith(prefix)));
-  assert.equal(new Set(snapshot.elements.map(element=>element.ref)).size,snapshot.elements.length);
+function refs(snapshot,prefix,mode,seenGenerations){
+  assert.ok(Array.isArray(snapshot.elements),"REFERENCE_FORMAT_INVALID");
+  const values=snapshot.elements.map(element=>element?.ref);
+  assert.ok(values.every(ref=>typeof ref==="string"&&ref.length<=128),"REFERENCE_FORMAT_INVALID");
+  assert.ok(new Set(values).size===values.length,"REFERENCE_DUPLICATE");
+  if(mode==="managed"){
+    const matches=values.map(ref=>/^s([1-9][0-9]*)e[1-9][0-9]*$/.exec(ref));
+    assert.ok(matches.every(Boolean),"REFERENCE_FORMAT_INVALID");
+    const generations=new Set(matches.map(match=>match[1]));
+    assert.ok(generations.size<=1,"REFERENCE_GENERATION_MIXED");
+    if(generations.size){
+      const generation=[...generations][0];
+      assert.ok(!seenGenerations.has(generation),"REFERENCE_GENERATION_REUSED");
+      seenGenerations.add(generation);
+    }
+  }else if(mode==="lightpanda")assert.ok(values.every(ref=>/^e[1-9][0-9]*$/.test(ref)),"REFERENCE_FORMAT_INVALID");
+  else assert.ok(values.every(ref=>ref.startsWith(prefix)),"REFERENCE_FORMAT_INVALID");
 }
-
 /** Real fixed-reader observations only; these checks never widen capabilities. */
-export async function runLightpandaReaderDiagnostics({check,read,adversariesInstalled,referencePrefix=value=>value,selected=["snapshot","extract","status","ready"]}){
+export async function runLightpandaReaderDiagnostics({check,read,adversariesInstalled,referencePrefix=value=>value,referenceMode="prefix",selected=["snapshot","extract","status","ready"]}){
   assert.ok(selected.length>0&&new Set(selected).size===selected.length&&selected.every(value=>["snapshot","extract","status","ready"].includes(value)));
+  assert.ok(["prefix","lightpanda","managed"].includes(referenceMode));
+  const seenGenerations=new Set();
   const passed=Object.fromEntries(selected.map(value=>[value,true]));
   const run=async(kind,name,fn)=>{if(!Object.hasOwn(passed,kind))return;const ok=await check(name,fn);passed[kind]=passed[kind]&&ok;};
   const requireFixture=()=>assert.equal(adversariesInstalled(),true,"Adversarial fixture was not installed");
   await run("snapshot","reader bounded priority snapshot",async()=>{
     requireFixture();
     const snapshot=await read("snapshot",{maxElements:20,maxChars:8000,prioritize:true,prefix:"lp-audit-c-"});
-    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-c-"));
+    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-c-"),referenceMode,seenGenerations);
     assert.equal(snapshot.elements.length,20);assert.equal(snapshot.truncated,true);
     assert.deepEqual(snapshot.elements.slice(0,10).map(item=>item.name),
       ["Confirm order","Duplicate action","Duplicate action","Disabled action","Covered action",
@@ -35,7 +50,7 @@ export async function runLightpandaReaderDiagnostics({check,read,adversariesInst
     requireFixture();
     const snapshot=await read("snapshot",{scope:"#catalogue",maxElements:64,maxChars:8000,
       prioritize:true,prefix:"lp-audit-d-"});
-    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-d-"));
+    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-d-"),referenceMode,seenGenerations);
     assert.ok(!snapshot.elements.some(item=>item.name==="Confirm order"));
     for(const name of ["Available products","Green tea","Black tea"])
       assert.ok(snapshot.elements.some(item=>item.name===name),name);
@@ -45,7 +60,7 @@ export async function runLightpandaReaderDiagnostics({check,read,adversariesInst
   await run("snapshot","reader text and element budgets",async()=>{
     requireFixture();
     const snapshot=await read("snapshot",{maxElements:5,maxChars:256,prioritize:true,prefix:"lp-audit-e-"});
-    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-e-"));
+    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-e-"),referenceMode,seenGenerations);
     assert.ok(snapshot.text.length<=256);assert.ok(snapshot.elements.length<=5);
     assert.equal(snapshot.truncated,true);
     return {elements:snapshot.elements.length,chars:snapshot.text.length,truncated:true};

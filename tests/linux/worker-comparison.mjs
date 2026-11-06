@@ -242,7 +242,7 @@ try{
   });
   await check(prefix+" reader navigation",async()=>assert.equal((await call("tab.goto",{url:origin+"/readers"})).ok,true));
   await runLightpandaReaderDiagnostics({check:(name,fn)=>check(prefix+" "+name,fn),
-   selected:["snapshot","extract","status","ready"],adversariesInstalled:()=>true,referencePrefix:()=>"e",
+   selected:["snapshot","extract","status","ready"],adversariesInstalled:()=>true,referencePrefix:()=>"e",referenceMode:backend==="playwright"?"managed":"lightpanda",
    read:async(kind,options={})=>{const params={...options};delete params.prefix;
     const r=await call("tab."+kind,params);assert.equal(r.ok,true);return r.value;}});
   const elapsed=performance.now()-begin;
