@@ -18,9 +18,11 @@ class ScriptRendererKeyFrameTest {
     fun rendererKeysAreBlockedOnlyDuringPlaybackAndSystemKeysAreDelegated() {
         var active = false
         val delivered = mutableListOf<Pair<Int, Int>>()
+        lateinit var frame: ScriptRendererKeyFrame
+        lateinit var child: View
         ui.runOnUiThread {
-            val frame = ScriptRendererKeyFrame(ui.activity) { active }
-            val child =
+            frame = ScriptRendererKeyFrame(ui.activity) { active }
+            child =
                 object : View(ui.activity) {
                     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                         delivered.add(event.keyCode to event.action)
@@ -28,9 +30,15 @@ class ScriptRendererKeyFrameTest {
                     }
                 }
             child.isFocusable = true
+            child.isFocusableInTouchMode = true
             frame.addView(child, FrameLayout.LayoutParams(200, 200))
             ui.activity.setContentView(frame)
+        }
+        ui.waitForIdle()
+        ui.runOnUiThread {
+            assertTrue(child.isAttachedToWindow)
             assertTrue(child.requestFocus())
+            assertTrue(child.hasFocus())
 
             fun send(code: Int) {
                 frame.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
