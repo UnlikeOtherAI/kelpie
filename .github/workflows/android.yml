@@ -73,6 +73,8 @@ jobs:
       - name: Lint, ktlint, build
         working-directory: apps/android
         run: ./gradlew --no-daemon lint ktlintCheck build
+      - name: Verify native expression compatibility
+        run: node --test scripts/native/native-expression.test.mjs
 
   native-test:
     name: Native phone + tablet acceptance
@@ -164,6 +166,7 @@ jobs:
             native-evidence/phone/api29-smoke/one-step-png/exit.txt
             native-evidence/phone/api29-smoke/one-step-png/instrumentation.log
             native-evidence/phone/api29-smoke/one-step-png/pull.log
+            native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-ready-refusal-one-step-png.json
             native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-one-step-result.json
             native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-native-marker.png
             native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-step.png
@@ -172,6 +175,7 @@ jobs:
             native-evidence/phone/api29-smoke/movie-stop/exit.txt
             native-evidence/phone/api29-smoke/movie-stop/instrumentation.log
             native-evidence/phone/api29-smoke/movie-stop/pull.log
+            native-evidence/phone/api29-smoke/movie-stop/script-acceptance/api29-ready-refusal-movie-stop.json
             native-evidence/phone/api29-smoke/movie-stop/script-acceptance/before-native-stop-status.json
             native-evidence/phone/api29-smoke/movie-stop/script-acceptance/stopped-manifest.json
             native-evidence/phone/api29-smoke/movie-stop/script-acceptance/api29-partial.gif

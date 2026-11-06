@@ -40,7 +40,7 @@ for entry in "${cases[@]}"; do
   printf '%s\n' "$test_class" > "$case_dir/case.txt"
   set +e
   timeout 5m adb -s "$serial" shell am instrument -w -r \
-    -e class "$test_class" -e sourceRevision "$revision" -e deviceClass "$profile" -e api29Smoke true \
+    -e class "$test_class" -e sourceRevision "$revision" -e deviceClass "$profile" -e api29Smoke true -e api29Case "$name" \
     com.kelpie.browser.test/androidx.test.runner.AndroidJUnitRunner \
     > "$case_dir/instrumentation.log" 2>&1
   status=$?

@@ -61,6 +61,14 @@ the build directory. Native builds require Node 20+ and pnpm; generated assets
 are never committed. A portable source lock serializes dependency/build generation across concurrent
 Android ABI configurations. CMake regenerates when authoritative sources or lockfiles
 change. Generated UTF-8 byte arrays avoid compiler string-literal limits while preserving identical assets. CI/native release jobs must install those tools before configuring CMake.
+The native generator uses the shared package's installed TypeScript compiler to
+lower only the embedded fixed reader, target and reference function expressions
+to ES2019 for older supported WebViews. It does not change the shared package's
+public JavaScript target or provide missing runtime APIs. CMake tracks the lowering
+helper as a configure dependency. Run `test_native_expression` via CTest for the
+embedded expression syntax and representative behavior; this does not replace
+testing on the supported WebView versions.
+
 Run `test_browser_gateway` via CTest for schema defaults/bounds, malformed requests,
 authorization, cancellation, cross-tab refs, no retries and binary MCP output.
 

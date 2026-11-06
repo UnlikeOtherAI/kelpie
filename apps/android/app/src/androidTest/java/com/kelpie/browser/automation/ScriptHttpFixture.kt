@@ -1,5 +1,6 @@
 package com.kelpie.browser.automation
 
+import androidx.test.platform.app.InstrumentationRegistry
 import com.kelpie.browser.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
@@ -131,8 +132,39 @@ class ScriptHttpFixture : AutoCloseable {
                     .put("tabId", tab)
                     .put("params", params),
             )
+        if (!response.getBoolean("ok") && method == "tab.ready") recordApi29ReadyRefusal(response)
         assertTrue("Canonical " + method + " refused", response.getBoolean("ok"))
         return response
+    }
+
+    private fun recordApi29ReadyRefusal(response: JSONObject) {
+        val args = InstrumentationRegistry.getArguments()
+        if (args.getString("api29Smoke") != "true") return
+        val caseName =
+            when (args.getString("api29Case")) {
+                "one-step-png" -> "one-step-png"
+                "movie-stop" -> "movie-stop"
+                else -> return
+            }
+        val error = response.optJSONObject("error")
+        val code =
+            when (error?.optString("code")) {
+                "COMMAND_FAILED" -> "COMMAND_FAILED"
+                "ACCESS_DENIED" -> "ACCESS_DENIED"
+                "INVALID_ARGUMENTS" -> "INVALID_ARGUMENTS"
+                "UNSUPPORTED" -> "UNSUPPORTED"
+                "TAB_REQUIRED" -> "TAB_REQUIRED"
+                "BUSY" -> "BUSY"
+                else -> "OTHER"
+            }
+        val receipt =
+            JSONObject()
+                .put("stage", "PUBLIC_TAB_READY")
+                .put("code", code)
+                .put("errorObject", error != null)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val folder = java.io.File(context.getExternalFilesDir(null), "script-acceptance").apply { mkdirs() }
+        java.io.File(folder, "api29-ready-refusal-$caseName.json").writeText(receipt.toString(2))
     }
 
     fun script(
