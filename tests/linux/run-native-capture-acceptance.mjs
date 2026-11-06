@@ -11,6 +11,7 @@ import { runFinalizeFault } from "./finalize-fault.mjs";
 import { runAdversaryDiagnostics } from "./adversary-diagnostics.mjs";
 import { runPreinputReplacement } from "./preinput-replacement.mjs";
 import { runArtifactProtocolAcceptance } from "./artifact-protocol-acceptance.mjs";
+import { runSelectedG08 } from "./osr-g08-selected.mjs";
 import { writeGifRuntimeEvidence } from "./gif-runtime-evidence.mjs";
 import { nativeProcessStartTicks } from "./native-resource-snapshot.mjs";
 import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
@@ -87,6 +88,12 @@ try {
       return typeof value.port === "number" && typeof value.token === "string" && value.token ? value : false;
     } catch (error) { if (error?.code === "ENOENT") return false; throw error; }
   }, "owned native readiness", 30000);
+  if (process.env.KELPIE_INSTALLED_OSR_G08 === "1") {
+    const selected = await runSelectedG08({ readiness: readinessPath, binary: executable, output, signal: cancellation.signal });
+    report.checks = selected.results.map(item => ({ name: item.profile + " " + item.curve + " " + item.mimeType, passed: item.status === "passed" }));
+    assert.equal(report.checks.length, 8);
+    assert.ok(report.checks.every(item => item.passed), "Selected OSR G08 evidence did not pass");
+  } else {
   const corpusPath = fileURLToPath(new URL("../windows/run-script-capture-acceptance.mjs", import.meta.url));
   const corpusOutput = join(output, "capture");
   const result = await runCorpus(process.execPath, [corpusPath, readinessPath, corpusOutput],
@@ -122,6 +129,7 @@ try {
   assert.equal(result.code, 0, result.stderr || result.stdout);
   assert.ok(report.checks.length > 0 && report.checks.every(check => check.passed));
   assert.equal(report.supplementFailures.length, 0, JSON.stringify(report.supplementFailures));
+  }
 } finally {
   try {
     if (browser.child.exitCode === null && browser.child.signalCode === null)

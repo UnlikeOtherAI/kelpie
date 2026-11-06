@@ -15,6 +15,10 @@ on:
         description: Scope the prior Fedora candidate replay to installed CLI only
         type: boolean
         default: false
+      linux_native_osr_g08:
+        description: Limit the Linux candidate to the Fedora installed OSR G08 scenario
+        type: boolean
+        default: false
       linux_native_candidate:
         description: Build Linux ABI/package candidates for affected native source (no publication)
         type: boolean
@@ -107,7 +111,7 @@ jobs:
       expected_cli: ${{ inputs.linux_resource_expected_cli }}
 
   linux-native-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_native_candidate
+    if: github.event_name == 'workflow_dispatch' && (inputs.linux_native_candidate || inputs.linux_native_osr_g08)
     uses: ./.github/workflows/linux-native.yml
     permissions:
       contents: read
@@ -115,6 +119,7 @@ jobs:
       force_build: true
       release_tag: ''
       artifact_prefix: linux-native-candidate
+      osr_g08: ${{ inputs.linux_native_osr_g08 }}
 
   lint:
     runs-on: ubuntu-latest

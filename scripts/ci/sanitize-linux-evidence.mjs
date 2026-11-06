@@ -72,6 +72,8 @@ export async function summarize(directory) {
     if (![launch, alias, observations, inner, media, mismatched, idr, frames, pixels].some(Boolean)) continue;
     result.scopes[scope] = {
       native: checks(launch?.checks), alias: checks(alias?.checks),
+      nativeCleanup: launch ? launch.cleanup === "owned app exited and readiness removed" : null,
+      aliasCleanup: alias ? alias.cleanup === "supported public alias stop; readiness removed" : null,
       observations: checks(observations?.checks), cli: checks(inner?.checks),
       mediaArtifacts: count(media?.artifacts), allFramesDecoded: bool(media?.allFramesDecoded),
       continuousMarkerCenterAndFade: bool(media?.continuousMarkerCenterAndFade),

@@ -31,7 +31,8 @@ test("supported native and packaged CLI interfaces plus independent media are ex
     assert.ok(script.includes(name));
   assert.match(script, /runuser -u kelpie-smoke/);
   assert.match(script, /KELPIE_LINUX_FINALIZE_FAULT=1 KELPIE_LINUX_PREINPUT_REPLACEMENT=1/);
-  assert.match(script, /timeout --signal=TERM --kill-after=10 300/);
+  assert.match(script, /timeout --signal=TERM --kill-after=10/);
+  assert.match(script, /echo 900 \|\| echo 300/);
   assert.match(workflow, /pnpm --filter @unlikeotherai\/kelpie build/);
   assert.match(workflow, /npm pack --ignore-scripts/);
 });
@@ -83,7 +84,7 @@ test("exact Fedora CLI-only replay preserves full-mode policy",async()=>{
   assert.doesNotMatch(diagnostic,/--privileged|cap-add|seccomp=unconfined|--no-sandbox/);
 });
 test("resource replay shell blocks parse",async()=>{
-  const text=await readFile(new URL("../../.github/workflows/linux-resource-diagnostic.yml",import.meta.url),"utf8");
+  const text=(await readFile(new URL("../../.github/workflows/linux-resource-diagnostic.yml",import.meta.url),"utf8")).replace(/\r\n/g,"\n");
   const blocks=[...text.matchAll(/        run: \|\r?\n((?:          [^\n]*\r?\n|\r?\n)*)/g)];
   assert.equal(blocks.length,3);
   const bash=process.platform==="win32"?"C:/Program Files/Git/bin/bash.exe":"bash";
@@ -95,7 +96,7 @@ test("resource replay shell blocks parse",async()=>{
 });
 
 test("CLI-only source and digest inputs fail closed",async()=>{
-  const text=await readFile(new URL("../../.github/workflows/linux-resource-diagnostic.yml",import.meta.url),"utf8");
+  const text=(await readFile(new URL("../../.github/workflows/linux-resource-diagnostic.yml",import.meta.url),"utf8")).replace(/\r\n/g,"\n");
   const section=text.split("      - name: Validate source run")[1].split("      - uses: actions/download-artifact")[0];
   const body=section.split("        run: |\n")[1].split("\n").map(line=>line.startsWith("          ")?line.slice(10):line).join("\n");
   const bash=process.platform==="win32"?"C:/Program Files/Git/bin/bash.exe":"bash";
