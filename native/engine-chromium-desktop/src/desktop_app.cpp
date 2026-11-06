@@ -1,4 +1,10 @@
 #include "kelpie/desktop_app.h"
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+#include "startup_test_trace.h"
+#else
+#define KELPIE_STARTUP_TRACE(event) ((void)0)
+#endif
+
 
 #include <chrono>
 #include <memory>
@@ -349,11 +355,15 @@ bool DesktopApp::Start(const Config& config) {
         });
   };
 
+  KELPIE_STARTUP_TRACE(ENGINE_ENTER);
   if (!impl_->engine.Initialize(engine_config)) {
+    KELPIE_STARTUP_TRACE(ENGINE_FAIL);
     impl_->last_error = impl_->engine.last_error();
     return false;
   }
 
+  KELPIE_STARTUP_TRACE(ENGINE_OK);
+  KELPIE_STARTUP_TRACE(HANDLERS_ENTER);
   impl_->RegisterHandlers();
   if (config.register_handlers) config.register_handlers(impl_->router);
 
@@ -387,7 +397,10 @@ bool DesktopApp::Start(const Config& config) {
   server_config.engine = config.engine_name;
   server_config.server_name = config.app_name;
   server_config.server_version = config.app_version;
+  KELPIE_STARTUP_TRACE(HANDLERS_RETURN);
+  KELPIE_STARTUP_TRACE(LISTENER_ENTER);
   if (!impl_->http_server.Start(server_config)) {
+    KELPIE_STARTUP_TRACE(LISTENER_FAIL);
     impl_->last_error = "The loopback control listener did not start";
     if (!impl_->engine.Shutdown()) {
       impl_->last_error = impl_->engine.last_error();
@@ -398,8 +411,13 @@ bool DesktopApp::Start(const Config& config) {
     return false;
   }
 
+  KELPIE_STARTUP_TRACE(LISTENER_OK);
   if (config.mdns != nullptr) {
+    KELPIE_STARTUP_TRACE(MDNS_ENTER);
     config.mdns->Start(impl_->http_server.bound_port(), impl_->BuildTxtRecord());
+    KELPIE_STARTUP_TRACE(MDNS_RETURN);
+  } else {
+    KELPIE_STARTUP_TRACE(MDNS_SKIPPED);
   }
 
   impl_->running = true;

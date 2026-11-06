@@ -1,4 +1,10 @@
 #include "kelpie/desktop_engine.h"
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+#include "startup_test_trace.h"
+#else
+#define KELPIE_STARTUP_TRACE(event) ((void)0)
+#endif
+
 
 #include <algorithm>
 #include <chrono>
@@ -125,7 +131,10 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     CefString(&settings.locales_dir_path) = config.locales_dir_path;
   }
 
+  KELPIE_STARTUP_TRACE(CEF_INIT_ENTER);
   initialized = CefInitialize(main_args, settings, app.get(), config.sandbox_info);
+  if (initialized) { KELPIE_STARTUP_TRACE(CEF_INIT_OK); }
+  else { KELPIE_STARTUP_TRACE(CEF_INIT_FAIL); }
   if (!initialized) {
     last_error = "Chromium framework initialization failed";
     return false;
@@ -191,6 +200,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
       first_partition = entry->id;
     }
   }
+  KELPIE_STARTUP_TRACE(FIRST_BROWSER_ENTER);
   browser = CefBrowserHost::CreateBrowserSync(
       window_info,
       client.get(),
@@ -198,6 +208,8 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
       browser_settings,
       nullptr,
       first_context);
+  if (browser) { KELPIE_STARTUP_TRACE(FIRST_BROWSER_OK); }
+  else { KELPIE_STARTUP_TRACE(FIRST_BROWSER_FAIL); }
   if (browser) {
     Tab initial;
     initial.id = config.restored_tabs.empty() ? "tab-1" : config.restored_tabs.front().id;
