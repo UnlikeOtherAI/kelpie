@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {execFile} from "node:child_process";
-import {readFile,writeFile} from "node:fs/promises";
+import {open,readFile,writeFile} from "node:fs/promises";
 import {promisify} from "node:util";
 import {pathToFileURL} from "node:url";
 
 const MAX_PNG=50_331_648, MAX_RGBA=33_554_432;
+async function readBoundedPng(path){
+ const handle=await open(path,"r");
+ try{
+  const info=await handle.stat();assert.ok(info.isFile()&&info.size>0&&info.size<=MAX_PNG);
+  const bytes=Buffer.alloc(info.size);const {bytesRead}=await handle.read(bytes,0,bytes.length,0);
+  assert.equal(bytesRead,info.size);assert.equal((await handle.stat()).size,info.size);return bytes;
+ }finally{await handle.close();}
+}
 export function compareRgba(control,candidate){
  assert.ok(Buffer.isBuffer(control)&&Buffer.isBuffer(candidate));
  assert.ok(control.length>0&&control.length<=MAX_RGBA&&control.length%4===0);
@@ -30,7 +38,7 @@ async function main(){
  assert.equal(createHash("sha256").update(await readFile(process.env.FFMPEG)).digest("hex"),manifest.ffmpegSha256);
  const exec=promisify(execFile),arms=[];
  for(const arm of [manifest.control,manifest.candidate]){
-  const png=await readFile(arm.file);assert.ok(png.length>0&&png.length<=MAX_PNG);
+  const png=await readBoundedPng(arm.file);
   assert.ok(png.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex")));
   assert.ok(png.length>=24&&png.toString("ascii",12,16)==="IHDR");
   const width=png.readUInt32BE(16),height=png.readUInt32BE(20);
@@ -38,6 +46,7 @@ async function main(){
   const sha256=createHash("sha256").update(png).digest("hex");assert.equal(sha256,arm.sha256);
   const result=await exec(process.env.FFMPEG,["-v","error","-i",arm.file,"-frames:v","1","-f","rawvideo","-pix_fmt","rgba","pipe:1"],
    {encoding:"buffer",maxBuffer:MAX_RGBA,timeout:30000,windowsHide:true});
+  assert.equal(createHash("sha256").update(await readBoundedPng(arm.file)).digest("hex"),sha256);
   assert.equal(result.stdout.length,width*height*4);
   arms.push({sha256,bytes:png.length,width,height,rgba:result.stdout});
  }
