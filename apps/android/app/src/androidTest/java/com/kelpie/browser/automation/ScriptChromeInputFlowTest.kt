@@ -80,7 +80,7 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                     client
                         .call(
                             "evaluate",
-                            JSONObject().put("expression", "({href:location.href, keys:window.__ownedKeyCount || 0})"),
+                            JSONObject().put("expression", "({href:location.href, keys:window.__ownedKeyCount || 0, ups:window.__ownedKeyUpCount || 0})"),
                         ).getJSONObject("result")
 
                 val initialUrl = facts().getString("href")
@@ -88,15 +88,20 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                     "evaluate",
                     JSONObject().put(
                         "expression",
-                        "(()=>{window.__ownedKeyCount=0;document.addEventListener('keydown',e=>{if(e.key==='Enter')window.__ownedKeyCount++});return true})()",
+                        "(()=>{window.__ownedKeyCount=0;window.__ownedKeyUpCount=0;document.addEventListener('keydown',e=>{if(e.key==='Enter')window.__ownedKeyCount++});document.addEventListener('keyup',e=>{if(e.key==='Enter')window.__ownedKeyUpCount++});return true})()",
                     ),
                 )
                 val view = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
                 instrumentation.runOnMainSync { check(view.requestFocus()) }
                 enter()
                 val keyDeadline = System.nanoTime() + 3_000_000_000L
-                while (facts().getInt("keys") == 0 && System.nanoTime() < keyDeadline) Thread.sleep(20)
+                while (System.nanoTime() < keyDeadline) {
+                    val snapshot = facts()
+                    if (snapshot.getInt("keys") >= 1 && snapshot.getInt("ups") >= 1) break
+                    Thread.sleep(20)
+                }
                 assertEquals("Owned Enter did not reach the baseline page", 1, facts().getInt("keys"))
+                assertEquals("Owned Enter up did not reach the baseline page", 1, facts().getInt("ups"))
                 val beforePopup = ownedWindowIds()
                 // Leave the owned popup open: script admission must dismiss it.
                 tapMore()
@@ -130,12 +135,27 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                     val after = facts()
                     assertEquals(initialUrl, after.getString("href"))
                     assertEquals("Active script delivered Enter to the page", 1, after.getInt("keys"))
+                    assertEquals("Active script delivered Enter up to the page", 1, after.getInt("ups"))
+                    instrumentation.runOnMainSync { check(view.requestFocus()) }
+                    enter()
+                    val restoredDeadline = System.nanoTime() + 3_000_000_000L
+                    while (System.nanoTime() < restoredDeadline) {
+                        val snapshot = facts()
+                        if (snapshot.getInt("keys") >= 2 && snapshot.getInt("ups") >= 2) break
+                        Thread.sleep(20)
+                    }
+                    val restored = facts()
+                    assertEquals("Enter was not restored after Stop", 2, restored.getInt("keys"))
+                    assertEquals("Enter up was not restored after Stop", 2, restored.getInt("ups"))
                     File(evidence, "native-chrome-input-result.json").writeText(
                         JSONObject()
                             .put("moreX", moreBounds.center.x.toDouble())
                             .put("moreY", moreBounds.center.y.toDouble())
                             .put("sameUrl", initialUrl == after.getString("href"))
                             .put("keyCount", after.getInt("keys"))
+                            .put("keyUpCount", after.getInt("ups"))
+                            .put("restoredKeyCount", restored.getInt("keys"))
+                            .put("restoredKeyUpCount", restored.getInt("ups"))
                             .put("stopped", stopped)
                             .toString(2),
                     )

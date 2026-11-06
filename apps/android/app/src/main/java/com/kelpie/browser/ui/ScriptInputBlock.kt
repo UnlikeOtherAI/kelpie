@@ -12,7 +12,7 @@ internal fun Modifier.scriptInputBlock(active: Boolean): Modifier =
         this
     } else {
         clearAndSetSemantics { }
-            .onPreviewKeyEvent { true }
+            .onPreviewKeyEvent { blocksScriptBrowserKey(active, it.nativeKeyEvent.isSystem) }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
