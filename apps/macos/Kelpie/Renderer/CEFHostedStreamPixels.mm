@@ -4,7 +4,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 
-BOOL CEFHostedStreamLocateRed(NSData *encoded, int *x, int *y) {
+static BOOL LocateSynthetic(NSData *encoded, int *x, int *y, BOOL yellow) {
     if (encoded.length == 0 || encoded.length > 2 * 1024 * 1024 || x == nullptr || y == nullptr) { return NO; }
     CGImageSourceRef source = CGImageSourceCreateWithData((__bridge CFDataRef)encoded, nullptr);
     if (source == nullptr) { return NO; }
@@ -34,7 +34,9 @@ BOOL CEFHostedStreamLocateRed(NSData *encoded, int *x, int *y) {
     for (size_t row = 0; row < h; ++row) {
         for (size_t column = 0; column < w; ++column) {
             const size_t offset = (row * w + column) * 4;
-            if (rgba[offset] > 180 && rgba[offset + 1] < 140 && rgba[offset + 2] < 150 && rgba[offset + 3] > 200) {
+            const BOOL color = yellow ? (rgba[offset] > 220 && rgba[offset + 1] > 190 && rgba[offset + 2] < 140)
+                                      : (rgba[offset] > 180 && rgba[offset + 1] < 140 && rgba[offset + 2] < 150);
+            if (color && rgba[offset + 3] > 200) {
                 ++count;
                 totalX += column;
                 totalY += row;
@@ -49,4 +51,7 @@ BOOL CEFHostedStreamLocateRed(NSData *encoded, int *x, int *y) {
     *y = static_cast<int>(totalY / count);
     return YES;
 }
+
+BOOL CEFHostedStreamLocateRed(NSData *encoded, int *x, int *y) { return LocateSynthetic(encoded, x, y, NO); }
+BOOL CEFHostedStreamLocateYellow(NSData *encoded, int *x, int *y) { return LocateSynthetic(encoded, x, y, YES); }
 #endif

@@ -282,8 +282,9 @@ static BOOL StreamJSONNumber(id value) {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSData *image = [[NSData alloc] initWithBase64EncodedString:encoded options:0];
         int x = 0, y = 0;
-        const BOOL decoded = image != nil && CEFHostedStreamLocateRed(image, &x, &y) &&
-            (!self->_frameConsumer || CEFHostedStreamHasNonce(image, self->_fixtureNonce,
+        const BOOL located = image != nil && (self->_frameConsumer
+            ? CEFHostedStreamLocateYellow(image, &x, &y) : CEFHostedStreamLocateRed(image, &x, &y));
+        const BOOL decoded = located && (!self->_frameConsumer || CEFHostedStreamHasNonce(image, self->_fixtureNonce,
                 self->_expectedWidth, self->_expectedHeight));
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!decoded) { ++self->_decodeFailed; }

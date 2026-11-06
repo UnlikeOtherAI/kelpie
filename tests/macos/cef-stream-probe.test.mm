@@ -62,6 +62,7 @@ static NSData *redPNG() {
         CGContextFillRect(context, CGRectMake((bit % 4) * 12, 100 - (bit / 4 + 1) * 12, 12, 12));
     }
     CGContextSetRGBFillColor(context, 1, 0.1, 0.1, 1); CGContextFillRect(context, CGRectMake(60, 30, 20, 20));
+    CGContextSetRGBFillColor(context, 0.97, 0.87, 0.27, 1); CGContextFillRect(context, CGRectMake(60, 60, 20, 20));
     CGImageRef image = CGBitmapContextCreateImage(context); CGContextRelease(context);
     CGImageDestinationRef dest = CGImageDestinationCreateWithData((__bridge CFMutableDataRef)data, CFSTR("public.png"), 1, nullptr);
     CGImageDestinationAddImage(dest, image, nullptr); CGImageDestinationFinalize(dest);

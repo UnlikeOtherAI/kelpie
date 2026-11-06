@@ -167,6 +167,10 @@ jobs:
             apps/macos/Kelpie/Renderer/CEFHostedStreamPixels.mm apps/macos/Kelpie/Renderer/CEFHostedStreamNonce.mm -o .cache/macos-ci/cef-stream-probe
           .cache/macos-ci/cef-stream-probe
           xcrun clang++ -std=c++17 -fobjc-arc -fblocks -Wall -Wextra -Werror \
+            -DDEBUG=1 -DKELPIE_HOSTED_STREAM_TEST=1 -framework Foundation -framework ImageIO -framework CoreGraphics \
+            tests/macos/cef-stream-pixels.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamPixels.mm -o .cache/macos-ci/cef-stream-pixels
+          .cache/macos-ci/cef-stream-pixels
+          xcrun clang++ -std=c++17 -fobjc-arc -fblocks -Wall -Wextra -Werror \
             -DDEBUG=1 -DKELPIE_HOSTED_STREAM_TEST=1 \
             -framework AppKit -framework Foundation -framework ImageIO -framework CoreGraphics \
             tests/macos/cef-stream-nonce.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamNonce.mm -o .cache/macos-ci/cef-stream-nonce
@@ -251,6 +255,9 @@ jobs:
             2>&1 | tee .cache/macos-ci/runtime-build.log
           brew install ffmpeg
           pnpm --filter @unlikeotherai/kelpie build
+          if [[ "${{ inputs.runtime_scope }}" == "cef-overlay" ]]; then
+            node --test tests/macos/runtime-media-overlay.test.mjs
+          fi
           bash scripts/testing/macos-sign-test-app.sh
           node scripts/testing/macos-workflow-acceptance.mjs --preparation ready 0
 

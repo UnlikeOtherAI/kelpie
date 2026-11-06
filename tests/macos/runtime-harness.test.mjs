@@ -19,6 +19,15 @@ test("stream fixture renders its own non-auth nonce as sixteen binary cells",asy
   for(let i=0;i<16;i++)assert.equal(cells[i],fixture.streamNonce&(1<<i)?"#ccc":"#fff");
  }finally{await fixture.close();}
 });
+test("overlay fixture selects bright damage while standard stream stays red",async()=>{
+ const standard=await startFixture(),overlay=await startFixture({overlay:true});
+ try{
+  const standardHTML=await (await fetch(standard.url+"/stream")).text();
+  const overlayHTML=await (await fetch(overlay.url+"/stream")).text();
+  assert.ok(standardHTML.includes("background:#f52233;animation:stream"));
+  assert.ok(overlayHTML.includes("background:#f8df45;animation:stream"));
+ }finally{await standard.close();await overlay.close();}
+});
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
  try{

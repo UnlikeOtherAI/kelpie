@@ -1,7 +1,7 @@
 import {createServer} from "node:http";
 import {randomBytes} from "node:crypto";
 export const canary = "KELPIE_NATIVE_Aa b+!_DO_NOT_EXPORT";
-export async function startFixture() {
+export async function startFixture({overlay=false}={}) {
  const events=[]; const sockets=new Set();let streamNavigate=false;
  const streamNonce=randomBytes(2).readUInt16BE();
  const server=createServer(async(req,res)=>{
@@ -91,7 +91,7 @@ export async function startFixture() {
   addEventListener('scroll',()=>send({type:'scroll'}));
   send({type:'document'});
   })();`;
-  const style=stream?`body{margin:0;background:white;overflow:hidden}#stream-marker{position:absolute;left:0;top:0;width:48px;height:48px;display:grid;grid-template-columns:repeat(4,12px);grid-template-rows:repeat(4,12px)}#stream-marker i{display:block}button{position:absolute;border:0;background:white;color:white}#first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}#stream-dot{position:absolute;left:30px;top:120px;width:30px;height:30px;background:#f52233;animation:stream 2s linear infinite alternate}@keyframes stream{to{transform:translateX(500px)}}`:edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
+  const style=stream?`body{margin:0;background:white;overflow:hidden}#stream-marker{position:absolute;left:0;top:0;width:48px;height:48px;display:grid;grid-template-columns:repeat(4,12px);grid-template-rows:repeat(4,12px)}#stream-marker i{display:block}button{position:absolute;border:0;background:white;color:white}#first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}#stream-dot{position:absolute;left:30px;top:120px;width:30px;height:30px;background:${overlay?"#f8df45":"#f52233"};animation:stream 2s linear infinite alternate}@keyframes stream{to{transform:translateX(500px)}}`:edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
    #first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}`:
    bands?`body{margin:0;height:9000px;background:repeating-linear-gradient(to bottom,#f00 0 1000px,#0f0 1000px 2000px,#00f 2000px 3000px,#f0f 3000px 4000px)}`:
    next?"body{background:#ffe881;color:black}":`

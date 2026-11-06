@@ -46,7 +46,7 @@ const report={source,scope,pumpMode,platform:process.platform,
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
 const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[],cefPumpSignals=[],streamSignals=[];
 report.streamSignals=streamSignals;
-if(["cef-stream","cef-overlay"].includes(scope))fixture=await startFixture();
+if(["cef-stream","cef-overlay"].includes(scope))fixture=await startFixture({overlay:scope==="cef-overlay"});
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],
  env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:["cef-stream","cef-overlay"].includes(scope)?"1":"0",
   KELPIE_CEF_OVERLAY_TEST:scope==="cef-overlay"?"1":"0",KELPIE_CEF_OVERLAY_DIRECTORY:privateDir,
