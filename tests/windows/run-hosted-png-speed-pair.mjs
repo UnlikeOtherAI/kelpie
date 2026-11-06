@@ -7,6 +7,10 @@ import {promisify} from "node:util";
 import {pathToFileURL} from "node:url";
 import {runPngSpeedPair} from "./png-speed-serial.mjs";
 
+export function classifyWrapperError(error){
+ assert.ok(!error.killed&&!error.signal,"WRAPPER_INTERRUPTED");
+ assert.ok(error.code===1,"WRAPPER_FAILED");return 1;
+}
 export function classifyOracle(result){
  assert.ok(Array.isArray(result.results)&&result.results.length===2);
  if(result.results.every(item=>item.passed===true))return "pass";
@@ -27,16 +31,19 @@ async function main(){
   const directory=join(root,arm);await mkdir(directory,{recursive:false});
   const env={...process.env,RUNNER_TEMP:directory,KELPIE_HOSTED_PNG_AB:arm};
   let wrapperExit=0;
-  try{await exec("powershell.exe",["-NoProfile","-NonInteractive","-File",script],
-   {env,windowsHide:true,timeout:420000,maxBuffer:1048576});}catch(error){wrapperExit=typeof error.code==="number"?error.code:-1;}
+  try{await exec("pwsh",["-NoProfile","-NonInteractive","-File",script],
+   {env,windowsHide:true,timeout:420000,maxBuffer:1048576});}catch(error){wrapperExit=classifyWrapperError(error);}
   const evidence=join(directory,"kelpie-hosted-g08-evidence");
   const read=async name=>JSON.parse(await readFile(join(evidence,name),"utf8"));
   const [manifest,diagnostic,cleanup]=await Promise.all([read("manifest.json"),read("diagnostic.json"),read("hosted-cleanup.json")]);
   assert.equal(manifest.source,process.env.GITHUB_SHA);assert.equal(manifest.dllSha256,expectedBinary);assert.equal(manifest.exeSha256,expectedExe);
   assert.equal(await sha(dll),expectedBinary);assert.equal(await sha(exe),expectedExe);
   const assets=JSON.stringify(manifest.assets);if(referenceAssets===null)referenceAssets=assets;else assert.equal(assets,referenceAssets);
-  assert.equal(diagnostic.pngArm,arm);assert.equal(diagnostic.identity?.pid,cleanup.spawnPid);
+  assert.equal(diagnostic.pngArm,arm);assert.ok(Number.isSafeInteger(cleanup.spawnPid)&&cleanup.spawnPid>0);
+  assert.equal(diagnostic.identity?.pid,cleanup.spawnPid);
   const oracle=classifyOracle(await read("hosted/oracle-output.json"));
+  assert.ok(wrapperExit===0||wrapperExit===1);
+  assert.equal(wrapperExit===0,oracle==="pass");
   assert.ok(Array.isArray(diagnostic.captureStages)&&diagnostic.captureStages.length>0);
   assert.ok(Array.isArray(diagnostic.pngByteReceipts)&&diagnostic.pngByteReceipts.some(item=>item.count>0));
   return {arm,dllSha256:manifest.dllSha256,exeVerified:true,processAbsent:cleanup.pidPresent===false,

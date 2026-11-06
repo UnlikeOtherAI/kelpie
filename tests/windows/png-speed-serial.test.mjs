@@ -1,7 +1,7 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {runPngSpeedPair} from "./png-speed-serial.mjs";
-import {classifyOracle} from "./run-hosted-png-speed-pair.mjs";
+import {classifyOracle,classifyWrapperError} from "./run-hosted-png-speed-pair.mjs";
 const hash="a".repeat(64);
 const receipt=arm=>({arm,dllSha256:hash,exeVerified:true,processAbsent:true,listenerAbsent:true,
  readinessAbsent:true,closedPublicly:true,caseFinished:true,oracle:"insufficient"});
@@ -19,4 +19,10 @@ test("never hides a failed export behind an insufficient one",()=>{
  assert.equal(classifyOracle({results:[{passed:false,confidence:"insufficient"},{passed:false,confidence:"failed"}]}),"fail");
  assert.equal(classifyOracle({results:[{passed:true},{passed:false,confidence:"insufficient"}]}),"insufficient");
  assert.throws(()=>classifyOracle({results:[]}));
+});
+test("rejects interrupted and nonstandard wrapper exits",()=>{
+ assert.equal(classifyWrapperError({code:1}),1);
+ assert.throws(()=>classifyWrapperError({code:1,killed:true}));
+ assert.throws(()=>classifyWrapperError({code:1,signal:"SIGTERM"}));
+ assert.throws(()=>classifyWrapperError({code:2}));
 });
