@@ -14,6 +14,7 @@ started="${10}"
 cases=(
   'navigation-stop=com.kelpie.browser.automation.ScriptNavigationStopTest#nativeStopDuringIssuedNavigationPreservesUncertaintyAndRecovers'
   'chrome-input=com.kelpie.browser.automation.ScriptChromeInputFlowTest#activeNoMovieRunBlocksChromeButNativeStopStillWorks'
+  'renderer-system-key=com.kelpie.browser.ui.ScriptRendererKeyFrameTest#rendererKeysAreBlockedOnlyDuringPlaybackAndSystemKeysAreDelegated'
 )
 result=0
 for entry in "${cases[@]}"; do
