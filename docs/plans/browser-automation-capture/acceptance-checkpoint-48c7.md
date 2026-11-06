@@ -23,3 +23,48 @@ brief audit, matching changed-state screenshots, final-source builds and real
 user flows, the single integrated PR and required checks, publication, and
 verification of actual installed releases. No final PR or release is claimed.
 Earlier failures and their original receipts remain part of the evidence.
+
+## Current checkpoint at f8343bf1
+
+The following updates the index above for integration source
+`f8343bf1fcf776513fbb747d41e949da563e6eca`. Linked receipts retain their
+own tested revisions; they are not claims that the integrated head has
+passed every native or release gate. Hosted Fedora and macOS PNG experiments
+were pending at this checkpoint and are not counted as results.
+
+- **Pointer speed:** The shared default and native fallbacks specify 350 ms
+  when enabled and omitted; explicit durations remain supported. Windows has
+  scoped live C and S omitted-default measurements, and macOS WebKit has one
+  combined-format 350 ms export pass. Those are separate observations, not
+  final-source cross-platform live/export agreement. Linux, mobile and the
+  remaining macOS and Windows formats still need their named timing evidence.
+  See [Windows](windows-evidence-intake.md), [macOS](macos.md),
+  [Android](android.md) and [iOS](ios.md).
+- **Windows codec control:** The standalone production-writer experiment
+  encoded identical synthetic clean source pixels but found differing decoded
+  MP4 baseline and tail pixels; paired GIFs were identical. This establishes
+  that the writer path can vary decoded pixels, not the cause of an earlier
+  native result or a basis for relaxing its oracle. [Control receipt](windows-hosted-png-speed-421470.md)
+- **iOS:** In [paired simulator run 42156136625](ios.md), iPhone passed the
+  selected MCP capture and decoded four PNGs, a GIF and an MP4; iPad returned
+  `CAPTURE_VIEWPORT_UNSTABLE` before a matched action sample. The iPhone result
+  does not close iPad parity, keyboard, pinch or final-device gates.
+- **Android:** API 35 phone and tablet passed the targeted Enter, system-key
+  delegation and Stop/recovery cases in [42152217154](android.md), without a
+  physical HID claim. The API 29 phone smoke [42156048209](android.md) failed
+  at canonical `tab.ready` during fixture loading, before capture or input;
+  its precise public refusal was not retained. API 29, tablet and full-corpus
+  acceptance remain open.
+- **Lightpanda and managed history:** The pinned opt-in reader's same-host
+  pair [42153661939](lightpanda-analysis.md) passed 63 scoped checks per arm
+  and four additional Lightpanda refusals, with bounded isolation and cleanup;
+  it is not UI or native parity. The managed-history candidate passed hosted
+  portable lint, build and test; public Chromium BFCache and click-created
+  hash Back/Forward passed their scoped checks. A one-entry no-history control
+  remained insufficient, and iframe, replacement and exact raw dispatch-count
+  evidence remain open. [Comparison and history](lightpanda-analysis.md)
+
+Final integrated-source platform flows, physical-device and desktop evidence,
+changed-state screenshots, the single PR and required checks, publication,
+signing, and verification of the actual installed releases remain open. The
+separate platform ledgers above retain the detailed passes and failures.
