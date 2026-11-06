@@ -60,3 +60,18 @@ checks the build source is an ancestor of the test checkout. The manifest is
 evidence supplied by the build workflow, not proof of its own origin. A
 `PUBLISH_RETURNED` marker means only that the publish call returned;
 the separate readiness/listener check establishes external readiness.
+
+A source-only hosted build proposal uses the opt-in
+`linux_gtk_startup_diagnostic` dispatch on the existing lint-to-Linux
+workflow. It selects the pinned Fedora 44 image and existing Fedora dependency
+recipe and CEF bootstrap, builds only the `kelpie-linux` target with the
+trace enabled, and does not package, install or run the app. The fixed artifact
+contains only the executable, diagnostic manifest, verified build options,
+runtime asset hashes, ELF dependencies, lock and CEF identity hashes, and
+checksums. No source archive, page data or credentials are uploaded. Normal
+package/smoke inputs remain independent and default to their existing path.
+
+A later Fedora test may reuse local CEF and runtime assets only after each
+required asset matches the hosted hashes and the system-library ABI is checked;
+otherwise the exact matching assets must be transferred. This proposed build
+has not been dispatched or exercised.

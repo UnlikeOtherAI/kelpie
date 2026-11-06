@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
+      gtk_diagnostic:
+        type: boolean
+        default: false
       force_build:
         type: boolean
         default: false
@@ -34,11 +37,19 @@ jobs:
       - id: scope
         shell: bash
         env:
+          GTK_DIAGNOSTIC: ${{ inputs.gtk_diagnostic }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
           FORCE: ${{ inputs.force_build || github.event_name == 'workflow_dispatch' }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          if [ "${GTK_DIAGNOSTIC}" = true ]; then
+            test "${EVENT_NAME}" = workflow_dispatch
+            test -z "${RELEASE_TAG}"
+            test "${FORCE}" = true
+          fi
           if [ "${FORCE}" = true ]; then
             echo "build=true" >> "${GITHUB_OUTPUT}"
             exit 0
@@ -152,7 +163,37 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Build Fedora GTK startup diagnostic
+        if: ${{ inputs.gtk_diagnostic && matrix.distro.name == 'fedora-44' }}
+        env:
+          DISTRO_INSTALL: ${{ matrix.distro.install }}
+        run: |
+          set -euo pipefail
+          image='fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e'
+          docker pull "${image}"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 --security-opt no-new-privileges=true \
+            -e DISTRO_NAME=fedora-44 -e DISTRO_INSTALL -e DIAGNOSTIC_SOURCE="${GITHUB_SHA}" -e CMAKE_BUILD_PARALLEL_LEVEL=2 \
+            -e NODE_OPTIONS=--max-old-space-size=2048 -v "${PWD}:/workspace" -w /workspace "${image}" \
+            bash scripts/ci/linux-gtk-diagnostic-build.sh
+
+      - name: Upload Fedora GTK diagnostic
+        if: ${{ inputs.gtk_diagnostic && matrix.distro.name == 'fedora-44' }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: linux-gtk-startup-diagnostic-fedora-44
+          path: |
+            dist/gtk-diagnostic/kelpie-linux
+            dist/gtk-diagnostic/manifest.json
+            dist/gtk-diagnostic/build-options.txt
+            dist/gtk-diagnostic/runtime-sha256.txt
+            dist/gtk-diagnostic/elf-dependencies.txt
+            dist/gtk-diagnostic/lock-sha256.txt
+            dist/gtk-diagnostic/cef-identity.txt
+            dist/gtk-diagnostic/checksums.txt
+          if-no-files-found: error
+
       - name: Build Linux packages
+        if: ${{ !inputs.gtk_diagnostic }}
         env:
           DISTRO_NAME: ${{ matrix.distro.name }}
           DISTRO_IMAGE: ${{ matrix.distro.image }}
@@ -266,6 +307,7 @@ jobs:
             ' 2>&1 | tee "${package_root}/candidate-build.log"
 
       - name: Verify installed Linux candidate
+        if: ${{ !inputs.gtk_diagnostic }}
         id: installed_candidate
         timeout-minutes: 15
         env:
@@ -329,7 +371,7 @@ jobs:
 
       - name: Upload installed-candidate diagnostics
         uses: actions/upload-artifact@v7.0.1
-        if: always()
+        if: ${{ always() && !inputs.gtk_diagnostic }}
         with:
           name: ${{ inputs.artifact_prefix || 'linux-native-check' }}-${{ matrix.distro.name }}-diagnostics
           path: |
@@ -355,7 +397,7 @@ jobs:
           if-no-files-found: warn
 
       - uses: actions/upload-artifact@v7.0.1
-        if: always()
+        if: ${{ always() && !inputs.gtk_diagnostic }}
         with:
           name: ${{ inputs.artifact_prefix || 'linux-native-check' }}-${{ matrix.distro.name }}
           path: |
@@ -385,6 +427,7 @@ jobs:
       DETECTION: ${{ needs.changes.result }}
       REQUIRED: ${{ needs.changes.outputs.build }}
       BUILD: ${{ needs.build.result }}
+      GTK_DIAGNOSTIC: ${{ inputs.gtk_diagnostic }}
     steps:
       - shell: bash
         run: |
@@ -394,4 +437,7 @@ jobs:
             echo "Skipped: no Linux app or native build input changed."
           else
             test "${BUILD}" = success
+            if [ "${GTK_DIAGNOSTIC}" = true ]; then
+              echo "Fedora GTK diagnostic build only; no package or installed verification."
+            fi
           fi

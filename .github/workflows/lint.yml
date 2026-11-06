@@ -15,6 +15,10 @@ on:
         description: Scope the prior Fedora candidate replay to installed CLI only
         type: boolean
         default: false
+      linux_gtk_startup_diagnostic:
+        description: Build the Fedora-only test GTK startup diagnostic (no package)
+        type: boolean
+        default: false
       linux_native_candidate:
         description: Build Linux ABI/package candidates for affected native source (no publication)
         type: boolean
@@ -97,6 +101,16 @@ jobs:
       expected_source: ${{ inputs.linux_resource_expected_source }}
       expected_rpm: ${{ inputs.linux_resource_expected_rpm }}
       expected_cli: ${{ inputs.linux_resource_expected_cli }}
+
+  linux-gtk-startup-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_gtk_startup_diagnostic
+    uses: ./.github/workflows/linux-native.yml
+    permissions:
+      contents: read
+    with:
+      force_build: true
+      release_tag: ''
+      gtk_diagnostic: true
 
   linux-native-candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_native_candidate
