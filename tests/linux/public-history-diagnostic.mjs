@@ -1,9 +1,11 @@
 // Public calls only. No raw page data, protocol IDs or endpoint values are retained.
-export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay }) {
-  const report = { version: 1, stages: [], limitations: {
+export function createPublicHistoryReport() {
+  return { version: 1, stages: [], limitations: {
     noHistory: 'insufficient', iframe: 'insufficient', replacement: 'insufficient',
     rawDispatchCount: 'not-observed',
   }, complete: false };
+}
+export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, report = createPublicHistoryReport() }) {
   const stop = Symbol('stop');
   async function stage(name, method, params, check = () => true) {
     let result;
