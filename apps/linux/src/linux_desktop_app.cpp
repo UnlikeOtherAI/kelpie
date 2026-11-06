@@ -1,4 +1,5 @@
 #include "linux_desktop_internal.h"
+#include "startup_test_trace.h"
 #include "gui_shell.h"
 #include "script_capture_service.h"
 #include "headless_shell.h"
@@ -91,9 +92,16 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
     return false;
   });
   impl_->scripts->Configure(runtime);
-  if(!impl_->desktop.Start(runtime)) { ShowToast(impl_->desktop.last_error()); return false; }
+  KELPIE_STARTUP_TRACE("START_ENTER");
+  if(!impl_->desktop.Start(runtime)) {
+    KELPIE_STARTUP_TRACE("START_FAIL");
+    ShowToast(impl_->desktop.last_error()); return false;
+  }
+  KELPIE_STARTUP_TRACE("START_OK");
   impl_->started=true;
+  KELPIE_STARTUP_TRACE("PUBLISH_ENTER");
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
+  KELPIE_STARTUP_TRACE("PUBLISH_OK");
   impl_->account.RestoreSession();
   impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine(),connect::Executor::Infer{},
       [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); },

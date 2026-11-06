@@ -1,4 +1,5 @@
 #include "gtk_browser_view.h"
+#include "startup_test_trace.h"
 
 #include "linux_app.h"
 #if KELPIE_LINUX_HAS_CEF
@@ -63,10 +64,13 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
   ConnectKeyboard();
 
   g_signal_connect(canvas_, "realize", G_CALLBACK(+[](GtkWidget* widget, gpointer user_data) {
+                     KELPIE_STARTUP_TRACE("CANVAS_REALIZE");
                      auto* self = static_cast<GtkBrowserView*>(user_data);
                      const int width = gtk_widget_get_allocated_width(widget);
                      const int height = gtk_widget_get_allocated_height(widget);
+                     KELPIE_STARTUP_TRACE("ATTACH_ENTER");
                      self->attached_ = self->app_.AttachBrowserHost(0, width, height);
+                     KELPIE_STARTUP_TRACE(self->attached_ ? "ATTACH_OK" : "ATTACH_FAIL");
                      if (self->attached_) {
                        gtk_widget_hide(self->label_);
                      }

@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(KELPIE_LINUX_HEADLESS_ONLY "Build Kelpie Linux without GTK UI support" OFF)
 option(KELPIE_LINUX_G08_TEST_OBSERVATION "Enable private test-only G08 backing observation" OFF)
 option(KELPIE_LINUX_ADMISSION_TEST_OBSERVATION "Enable private test-only admission trace" OFF)
+option(KELPIE_LINUX_STARTUP_TEST_TRACE "Enable test-only GTK startup trace" OFF)
 
 include(FetchContent)
 find_package(PkgConfig QUIET)
@@ -79,6 +80,10 @@ if(NOT KELPIE_LINUX_HEADLESS_ONLY)
   endif()
 endif()
 
+if(KELPIE_LINUX_STARTUP_TEST_TRACE AND (NOT BUILD_TESTING OR NOT KELPIE_LINUX_HAS_CEF OR NOT KELPIE_LINUX_HAS_GTK))
+  message(FATAL_ERROR "GTK startup trace requires testing, GTK and CEF")
+endif()
+
 set(KELPIE_LINUX_HAS_FONTCONFIG 0)
 if(PkgConfig_FOUND)
   pkg_check_modules(FONTCONFIG IMPORTED_TARGET fontconfig)
@@ -115,6 +120,7 @@ target_include_directories(kelpie-linux
 
 target_compile_definitions(kelpie-linux
   PRIVATE
+    KELPIE_LINUX_STARTUP_TEST_TRACE=$<BOOL:${KELPIE_LINUX_STARTUP_TEST_TRACE}>
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}

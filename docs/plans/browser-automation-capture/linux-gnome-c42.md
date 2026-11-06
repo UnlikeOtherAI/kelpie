@@ -31,3 +31,23 @@ among them. The window is created as a plain GTK window rather than through a
 GTK application single-instance handoff. The existing GNOME session was local,
 Wayland, active and unlocked, with display and session-bus variables present;
 those facts do not prove successful GTK or CEF initialization.
+
+## Proposed test-only trace
+
+The source-only diagnostic adds `KELPIE_LINUX_STARTUP_TEST_TRACE`, default
+OFF and accepted only with testing, GTK and CEF enabled. An explicitly enabled
+test build emits at most 32 fixed startup markers to its captured stderr, with
+monotonic timestamps and no page, token, profile or error text. The launcher
+keeps raw stderr in bounded memory, validates the fixed ordered prefix and
+retains only event names, offsets and a possible-truncation flag. A missing,
+malformed or truncated sequence cannot establish that a later event did not
+occur. The instrumented executable must be tied to its exact committed source,
+CMake options and executable hash; its results are not measurements of the
+uninstrumented c42 binary.
+
+The markers separate GTK init, show, canvas realization, attachment,
+DesktopApp start and readiness publication. No marker identifies the internal
+cause of a failed or stalled DesktopApp start. A future separately authorized
+owned GNOME run can locate the last observed boundary, with no focus change or
+desktop-wide capture; it does not by itself prove a cause or final visual
+acceptance. No native compilation or runtime has yet exercised this trace.

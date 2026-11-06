@@ -1,4 +1,5 @@
 #include "gui_shell.h"
+#include "startup_test_trace.h"
 #include "browser_chrome.h"
 #include "bookmarks_view.h"
 #include "gtk_browser_view.h"
@@ -18,7 +19,10 @@ namespace kelpie::linuxapp {
 GUIShell::GUIShell(LinuxApp& app):app_(app) {}
 int GUIShell::Run() {
 #if KELPIE_LINUX_HAS_GTK
-  gtk_disable_setlocale(); gtk_init(nullptr,nullptr); ui::InstallTheme();
+  KELPIE_STARTUP_TRACE("GTK_INIT_ENTER");
+  gtk_disable_setlocale(); gtk_init(nullptr,nullptr);
+  KELPIE_STARTUP_TRACE("GTK_INIT_RETURN");
+  ui::InstallTheme();
   auto* window=GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
   gtk_window_set_title(window,"Kelpie"); gtk_window_set_default_size(window,app_.config().width,app_.config().height);
   WindowGeometry geometry(window,app_.config().profile_dir);
@@ -87,7 +91,10 @@ int GUIShell::Run() {
     auto message=c.app.ConsumeToast(); if(!message.empty())c.toast.Show(message);
     return G_SOURCE_CONTINUE;
   },&context);
-  gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(); gtk_main();
+  KELPIE_STARTUP_TRACE("SHOW_ENTER");
+  gtk_widget_show_all(GTK_WIDGET(window));
+  KELPIE_STARTUP_TRACE("SHOW_RETURN");
+  chrome.Sync(); gtk_main();
   g_source_remove(timer); geometry.Save(); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
 #else
   return 1;

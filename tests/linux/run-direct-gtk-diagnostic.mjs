@@ -10,11 +10,13 @@ import { startBrowser, stopBrowser, delay } from "../windows/lib/process.mjs";
 import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from "./native-lifecycle.mjs";
 import { runGtkStop } from "./gtk-stop.mjs";
 import { verifyOwnedListener } from "./worker-comparison-listener.mjs";
+import { parseGtkStartupTrace } from "./gtk-startup-trace.mjs";
 
 const [binaryArg, expectedHash, outputArg] = process.argv.slice(2);
 assert.ok(binaryArg && /^[a-f0-9]{64}$/.test(expectedHash ?? "") && outputArg);
 assert.equal(process.env.GDK_BACKEND, "wayland");
-assert.equal(expectedHash, "6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c");
+const traceRequested = process.env.KELPIE_GTK_STARTUP_TRACE === "1";
+if (!traceRequested) assert.equal(expectedHash, "6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c");
 assert.equal(process.env.KELPIE_CAPTURE_SOURCE, "c42fc68d7fdfa01fae0cbe9cda82dc39bd8c4dc2");
 assert.match(process.env.KELPIE_TEST_REVISION ?? "", /^[a-f0-9]{40}$/);
 assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", timeout: 5000 }).trim(),
@@ -96,6 +98,11 @@ try {
   clearTimeout(deadline);
   if (browser) {
     const logs = browser.logs(), stderr = logs.stderrFirst + logs.stderr;
+    if (traceRequested) {
+      report.startupTrace = parseGtkStartupTrace(logs.stderrFirst);
+      report.startupTrace.stderrMayBeTruncated = logs.stderrFirst.length >= 32768;
+      if (report.startupTrace.state !== "valid-prefix") failed = true;
+    }
     report.stderr = { boundedBytes: Buffer.byteLength(stderr),
       display: /gtk|wayland|display/i.test(stderr), sandbox: /sandbox|zygote/i.test(stderr),
       bindOrPermission: /address already in use|permission denied|eacces|eaddrinuse/i.test(stderr),
