@@ -32,15 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.kelpie.browser.FeatureFlags
 import com.kelpie.browser.browser.BrowserState
 import com.kelpie.browser.browser.KeyboardObserver
-import com.kelpie.browser.browser.SessionStore
 import com.kelpie.browser.browser.TabStore
 import com.kelpie.browser.connect.NessieConnection
 import com.kelpie.browser.device.DeviceInfo
@@ -151,17 +147,7 @@ fun BrowserScreen(
         }
     }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) {
-                    SessionStore.save(context, tabStore.tabs.value, tabStore.activeTabId.value)
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    BrowserSessionPersistenceEffect(context, tabStore)
 
     suspend fun toggle3DInspector() {
         if (handlerContext.isIn3DInspector) {
