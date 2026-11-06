@@ -1,7 +1,7 @@
 import {spawn} from "node:child_process";
 import {readFile,writeFile} from "node:fs/promises";
 import path from "node:path";
-import {comparisonReason} from "../../tests/macos/runtime-png-compare.mjs";
+import {comparisonReason,safeArmFailures} from "../../tests/macos/runtime-png-compare.mjs";
 if(process.env.GITHUB_ACTIONS!=="true"||process.env.RUNNER_OS!=="macOS"||process.env.KELPIE_HOSTED_RUNTIME!=="1")throw new Error("DEDICATED_HOSTED_RUNNER_REQUIRED");
 const arms=[["png-a1","0"],["png-b1","1"],["png-b2","1"],["png-a2","0"]],reports=[];
 for(const [label,mode] of arms){
@@ -16,6 +16,6 @@ for(const [label,mode] of arms){
 }
 const reason=comparisonReason(reports);
 const extract=arm=>arm.report.engines?.find(x=>x.engine==="chromium")?.checks?.filter(x=>x.name.startsWith("png-equivalence-")).map(x=>x.detail);
-const receipt={version:1,scope:"synthetic-composited-export-equivalence",passed:reason===null,reason,sourceAlphaProven:false,arms:reports.map(({label,mode,status,report})=>({label,mode,status,cleanup:!!report?.ownedChildExited&&!!report?.ownedListenersReleased,source:report?.source??null,executableHash:report?.executableHash??null,debugLibraryHash:report?.debugLibraryHash??null,cefFrameworkHash:report?.cefFrameworkHash??null,cases:report?extract({report})??[]:[]}))};
+const receipt={version:1,scope:"synthetic-composited-export-equivalence",passed:reason===null,reason,sourceAlphaProven:false,arms:reports.map(({label,mode,status,report})=>({label,mode,status,cleanup:!!report?.ownedChildExited&&!!report?.ownedListenersReleased,failures:safeArmFailures(report),source:report?.source??null,executableHash:report?.executableHash??null,debugLibraryHash:report?.debugLibraryHash??null,cefFrameworkHash:report?.cefFrameworkHash??null,cases:report?extract({report})??[]:[]}))};
 await writeFile(".cache/macos-runtime/evidence/png-equivalence-comparison.json",JSON.stringify(receipt,null,2),{flag:"wx"});
 if(reason)process.exitCode=1;

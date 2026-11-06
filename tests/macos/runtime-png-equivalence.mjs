@@ -3,6 +3,11 @@ import {execFileSync} from "node:child_process";
 import {unlink} from "node:fs/promises";
 function requireTrue(value,code){if(!value){const error=new Error(code);error.code=code;throw error;}}
 
+const safeCodes=new Set(["FIXTURE_NAVIGATION","LISTENER_IDENTITY","PIXEL_WINDOW","PIXEL_WINDOW_CHANGED","PIXEL_RENDERER_VIEWPORT","PIXEL_RENDERER_VIEWPORT_CHANGED","PIXEL_WORKFLOW","PIXEL_ARTIFACT","PIXEL_SIZE","PIXEL_LENGTH","PIXEL_FIXTURE_MISSING","RESPONSE_LIMIT","CHUNK_IDENTITY","CHUNK_OFFSET","CHUNK_EOF","ARTIFACT_HASH","ARTIFACT_LIMIT","CAPTURE_PIXEL_SOURCE_UNAVAILABLE","CAPTURE_DOCUMENT_CHANGED","CAPTURE_VIEWPORT_CHANGED","CAPTURE_DURATION_LIMIT","CAPTURE_BYTE_LIMIT","CAPTURE_STOPPED","UNAUTHORIZED","SCRIPT_ABORTED"]);
+export async function pixelStage(stage,work){
+ try{return await work();}catch(error){const code=safeCodes.has(error?.code)?error.code:"OTHER";const result=new Error(code);result.code=code;result.pixelStage=stage;throw result;}
+}
+
 // Only the owned fixture's exported PNG is decoded; no page content enters the receipt.
 export function rgbaFacts(bytes,width,height){
  requireTrue(Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0&&width*height<=1920*1920,"PIXEL_SIZE");
@@ -32,25 +37,22 @@ export async function runPngEquivalence({client,engine,base,capture,check,load,p
  const window=(await client.windows()).find(item=>item.isKey);
  requireTrue(window?.id,"PIXEL_WINDOW");
  for(const name of ["static","noisy","layered"])await check("png-equivalence-"+name,async()=>{
-  await load("/pixels-"+name);
-  client.verifyOwnedReveal();client.pin(28420);
-  requireTrue((await client.windows()).some(item=>item.id===window.id&&item.isKey),"PIXEL_WINDOW_CHANGED");
-  const before=await rendererViewport(client,base.tabId);
+  await pixelStage("navigation",()=>load("/pixels-"+name));
+  await pixelStage("identity-before",async()=>{client.verifyOwnedReveal();client.pin(28420);
+   requireTrue((await client.windows()).some(item=>item.id===window.id&&item.isKey),"PIXEL_WINDOW_CHANGED");});
+  const before=await pixelStage("viewport-before",()=>rendererViewport(client,base.tabId));
   const start=process.hrtime.bigint();
-  const result=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"],maxWidth:1280,fps:30},actions:[{action:"screenshot"}]});
+  const result=await pixelStage("screenshot",async()=>{const value=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"],maxWidth:1280,fps:30},actions:[{action:"screenshot"}]});if(!value.success){const code=safeCodes.has(value.error?.code)?value.error.code:"PIXEL_WORKFLOW";requireTrue(false,code);}return value;});
   const elapsedMs=Number(process.hrtime.bigint()-start)/1e6;
-  requireTrue(result.success,"PIXEL_WORKFLOW");
-  const after=await rendererViewport(client,base.tabId);
-  requireTrue(JSON.stringify(before)===JSON.stringify(after),"PIXEL_RENDERER_VIEWPORT_CHANGED");
-  client.verifyOwnedReveal();client.pin(28420);
-  requireTrue((await client.windows()).some(item=>item.id===window.id&&item.isKey),"PIXEL_WINDOW_CHANGED");
-  const images=await client.download(result,"pixel-"+name,privateDir);
-  requireTrue(images.length===1&&images[0].mimeType==="image/png","PIXEL_ARTIFACT");
+  await pixelStage("viewport-after",async()=>{const after=await rendererViewport(client,base.tabId);requireTrue(JSON.stringify(before)===JSON.stringify(after),"PIXEL_RENDERER_VIEWPORT_CHANGED");});
+  await pixelStage("identity-after",async()=>{client.verifyOwnedReveal();client.pin(28420);
+   requireTrue((await client.windows()).some(item=>item.id===window.id&&item.isKey),"PIXEL_WINDOW_CHANGED");});
+  const images=await pixelStage("download",async()=>{const values=await client.download(result,"pixel-"+name,privateDir);requireTrue(values.length===1&&values[0].mimeType==="image/png","PIXEL_ARTIFACT");return values;});
   const item=images[0];
   try{
-   const rgba=execFileSync("ffmpeg",["-v","error","-threads","1","-i",item.file,"-frames:v","1","-f","rawvideo","-pix_fmt","rgba","-"],{maxBuffer:16*1024*1024});
-   const facts=rgbaFacts(rgba,item.width,item.height);requireFixture(name,facts);
+   const facts=await pixelStage("decode",()=>{const rgba=execFileSync("ffmpeg",["-v","error","-threads","1","-i",item.file,"-frames:v","1","-f","rawvideo","-pix_fmt","rgba","-"],{maxBuffer:16*1024*1024});return rgbaFacts(rgba,item.width,item.height);});
+   await pixelStage("pattern",()=>requireFixture(name,facts));
    return {name,elapsedMs,encodedBytes:item.byteLength,viewport:before,...facts,alphaScope:"composited-export"};
-  }finally{await unlink(item.file);}
+  }finally{await pixelStage("cleanup",()=>unlink(item.file));}
  },{continueOnFailure:true});
 }

@@ -13,3 +13,14 @@ export function comparisonReason(reports){
  if(reports.some(arm=>{const facts=extract(arm);return !facts||facts.length!==3||facts.some((x,i)=>!isDeepStrictEqual(comparable(x),comparable(baseline[i])));}))return "PIXEL_MISMATCH";
  return null;
 }
+
+const phases=new Set(["launch","listeners","pairing","chromium","cleanup"]);
+const checks=new Set(["native-renderer-control","strict-capability","public-navigation-from-start-page","png-equivalence-static","png-equivalence-noisy","png-equivalence-layered"]);
+const stages=new Set(["navigation","identity-before","viewport-before","screenshot","viewport-after","identity-after","download","decode","pattern","cleanup"]);
+const codes=new Set(["FIXTURE_NAVIGATION","LISTENER_IDENTITY","PIXEL_WINDOW","PIXEL_WINDOW_CHANGED","PIXEL_RENDERER_VIEWPORT","PIXEL_RENDERER_VIEWPORT_CHANGED","PIXEL_WORKFLOW","PIXEL_ARTIFACT","PIXEL_SIZE","PIXEL_LENGTH","PIXEL_FIXTURE_MISSING","RESPONSE_LIMIT","CHUNK_IDENTITY","CHUNK_OFFSET","CHUNK_EOF","ARTIFACT_HASH","ARTIFACT_LIMIT","CAPTURE_PIXEL_SOURCE_UNAVAILABLE","CAPTURE_DOCUMENT_CHANGED","CAPTURE_VIEWPORT_CHANGED","CAPTURE_DURATION_LIMIT","CAPTURE_BYTE_LIMIT","CAPTURE_STOPPED","UNAUTHORIZED","SCRIPT_ABORTED","PNG_MODE_UNCONFIRMED","HOSTED_RUNTIME_FAILED","FOCUSED_RENDERER","NATIVE_MORE_MISSING","PUBLIC_NAVIGATION","STRICT_CAPABILITY_MISSING","WAIT_TIMEOUT","OWNED_CHILD_TEARDOWN_TIMEOUT"]);
+export function safeArmFailures(report){
+ if(!report)return {phase:"unavailable",failure:"unavailable",checks:[]};
+ const phase=phases.has(report.phaseAtFailure)?report.phaseAtFailure:report.phaseAtFailure?"other":"none";
+ const failures=(report.engines??[]).flatMap(engine=>engine.checks??[]).filter(item=>item.passed===false).slice(0,8).map(item=>({check:checks.has(item.name)?item.name:"other",stage:stages.has(item.pixelStage)?item.pixelStage:"other",code:codes.has(item.code)?item.code:"OTHER"}));
+ return {phase,failure:report.failure?(codes.has(report.failure)?report.failure:"OTHER"):"none",checks:failures};
+}

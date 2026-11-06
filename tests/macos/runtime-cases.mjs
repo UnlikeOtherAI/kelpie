@@ -55,7 +55,7 @@ export async function runEngine(client,fixture,engine,report,scope="full",pumpCo
  catch(error){
   const diagnostic=name==="semantic-label-export"?{stage:semanticStage,...errorFacts(error),
    tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
-  checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});
+  checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(error.pixelStage?{pixelStage:error.pixelStage}:{}),...(diagnostic?{diagnostic}:{})});
   if(!continueOnFailure){
    const first=checks.find(item=>!item.passed);
    if(first?.name!==name)throw new Failure(first.code);
