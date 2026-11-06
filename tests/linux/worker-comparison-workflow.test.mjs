@@ -69,9 +69,9 @@ test("EOF smoke requires the live fixture, natural child exit and distinct engin
  assert.ok(shell.includes('run_arm eof "$assets/lightpanda"'));
  const gate=smoke.indexOf('assert.ok(verified,"PRIVATE_NETWORK_NOT_VERIFIED")');
  const engine=smoke.indexOf('engine=spawn(binary,');
- const identity=smoke.indexOf('fixtureIdentity(before?.targetInfos,url)');
+ const identity=smoke.indexOf('relay.result().stage');
  const eof=smoke.indexOf('child.stdin.end()');
- const disposed=smoke.indexOf('fixtureWasDisposed(after?.targetInfos');
+ const disposed=smoke.indexOf('const witness=relay.result()');
  const term=smoke.indexOf('engine.kill("SIGTERM")');
  assert.ok(gate<engine&&engine<identity&&identity<eof&&eof<disposed&&disposed<term);
  assert.ok(smoke.includes('assert.deepEqual(report.cli.signals,[])'));

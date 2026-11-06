@@ -4,17 +4,17 @@ import assert from "node:assert/strict";
 import {spawn,execFile} from "node:child_process";
 import {createHash} from "node:crypto";
 import {createReadStream} from "node:fs";
-import {mkdir,readFile,writeFile} from "node:fs/promises";
+import {mkdir,readFile,writeFile,unlink} from "node:fs/promises";
 import {createServer as fixtureServer} from "node:http";
 import {createConnection,createServer} from "node:net";
 import {createRequire} from "node:module";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {promisify} from "node:util";
-import {fixtureIdentity,fixtureWasDisposed} from "./worker-comparison-eof-identity.mjs";
+import {startEofRelay,verifyEngineCdp} from "./worker-comparison-eof-relay.mjs";
 import {observePrivateBoundary,validatePrivateProbe} from "./worker-comparison-network.mjs";
 import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
-import {parseBrowserWebSocket} from "./worker-comparison-cdp-process.mjs";
+
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 const require=createRequire(new URL("../../packages/cli/package.json",import.meta.url));
@@ -49,34 +49,13 @@ assert.ok(verified,"PRIVATE_NETWORK_NOT_VERIFIED");
 const timed=async(p,ms)=>{let id;try{return await Promise.race([p,new Promise((_,bad)=>{id=setTimeout(()=>bad(Error("TIMEOUT")),ms);})]);}finally{clearTimeout(id);}};
 function exited(child){if(child.exitCode!==null||child.signalCode!==null)return Promise.resolve({code:child.exitCode,signal:child.signalCode});
  return new Promise(ok=>child.once("exit",(code,signal)=>ok({code,signal})));}
-async function cdp(port,pid,ticks,method){
- await verifyOwnedListener(pid,port,ticks);
- const response=await timed(fetch("http://127.0.0.1:"+port+"/json/version"),3000);assert.equal(response.status,200);
- const reader=response.body.getReader(),chunks=[];let size=0;
- while(true){const part=await timed(reader.read(),3000);if(part.done)break;size+=part.value.length;
-  if(size>8192){await reader.cancel();throw Error("CDP_VERSION_INVALID");}chunks.push(Buffer.from(part.value));}
- const version=JSON.parse(Buffer.concat(chunks,size).toString("utf8")),endpoint=parseBrowserWebSocket(version.webSocketDebuggerUrl,port);
- const ws=new WebSocket("ws://127.0.0.1:"+port+endpoint.path);
- const result=await timed(new Promise((ok,bad)=>{
-  let count=0;
-  ws.addEventListener("open",()=>ws.send(JSON.stringify({id:1,method})),{once:true});
-  ws.addEventListener("error",()=>bad(Error("CDP_CONNECTION_FAILED")),{once:true});
-  ws.addEventListener("close",()=>bad(Error("CDP_CLOSED")),{once:true});
-  ws.addEventListener("message",event=>{
-   if(++count>20||typeof event.data!=="string"||event.data.length>65536)return bad(Error("CDP_INVALID"));
-   let value;try{value=JSON.parse(event.data);}catch{return bad(Error("CDP_INVALID"));}
-   if(value.id!==1)return;if(value.error)return bad(Error("CDP_UNSUPPORTED"));ok(value.result);
-  });
- }),5000).finally(()=>ws.close());
- await verifyOwnedListener(pid,port,ticks);return result;
-}
 const report={version:1,pid:process.pid,uid:process.getuid(),networkProbe,source:process.env.KELPIE_TEST_REVISION,
  engineSHA256:expected,boundary:{memoryMax:memory,cpuMax:cpu,tasksMax:tasks},stage:"setup",outcome:"insufficient",
  cli:{eofSent:false,signals:[],exit:null},engine:{sameIdentity:false,usable:false,termSent:false,exit:null},
- fixture:{identified:false,disposed:false}};
+ fixture:{created:false,disposed:false}};
 const home=join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
 const fixture=fixtureServer((req,res)=>{res.writeHead(200,{"content-type":"text/html"});res.end("<!doctype html><title>EOF fixture</title>");});
-let engine,engineExit,child,failed=false;
+let engine,engineExit,child,relay,config,failed=false;
 try{
  report.stage="fixture";await new Promise(ok=>fixture.listen(0,"127.0.0.1",ok));
  const origin="http://127.0.0.1:"+fixture.address().port,url=origin+"/eof-"+process.env.KELPIE_COMPARISON_ID;
@@ -96,7 +75,8 @@ try{
  }
  assert.ok(ready);await verifyOwnedListener(engine.pid,port,ticks);
  report.engine.pid=engine.pid;report.engine.startTicks=ticks;
- const endpoint="http://127.0.0.1:"+port,config=join(dir,"operator.json");
+ relay=await startEofRelay({port,pid:engine.pid,startTicks:ticks});
+ const endpoint=relay.endpoint;config=join(dir,"..","..","worker-ab-assets","eof-operator.json");
  await writeFile(config,JSON.stringify({version:1,backend:"lightpanda",endpointEnv:"KELPIE_AB_ENDPOINT",allowedOrigins:[origin],
   networkBoundary:"operator-enforced",maxSessions:1,maxTabs:1,maxTtlMs:60000,
   verifiedLightpandaMethods:["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload","tab.snapshot","tab.extract","tab.status","tab.ready"]}),{mode:0o600,flag:"wx"});
@@ -119,21 +99,17 @@ try{
  assert.equal(created.ok,true);const session=created.value;assert.equal(session.ownedTabIds.length,1);
  const moved=await call("kelpie_browser_control",{sessionId:session.sessionId,request:{version:1,method:"tab.goto",params:{url},tabId:session.ownedTabIds[0]}});
  assert.equal(moved.ok,true);
- report.stage="target-identity";
- const before=await cdp(port,engine.pid,ticks,"Target.getTargets"),identity=fixtureIdentity(before?.targetInfos,url);
- const contexts=await cdp(port,engine.pid,ticks,"Target.getBrowserContexts");
- assert.ok(Array.isArray(contexts?.browserContextIds)&&contexts.browserContextIds.includes(identity.browserContextId));
- report.fixture.identified=true;
+ report.stage="witness-ready";assert.equal(relay.result().stage,"dispose");report.fixture.created=true;
  report.stage="stdin-eof";assert.equal(await nativeProcessStartTicks(child.pid),report.cli.startTicks);
- child.stdin.end();report.cli.eofSent=true;report.cli.exit=await timed(childExit,2000);
+ child.stdin.end();report.cli.eofSent=true;assert.equal(relay.markEof(),true);report.cli.exit=await timed(childExit,2000);
  assert.equal(report.cli.exit.code,0);assert.equal(report.cli.exit.signal,null);assert.deepEqual(report.cli.signals,[]);
  report.stage="post-eof";
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
  assert.equal(await nativeProcessStartTicks(engine.pid),ticks);await verifyOwnedListener(engine.pid,port,ticks);
  report.engine.sameIdentity=true;
- const after=await cdp(port,engine.pid,ticks,"Target.getTargets");
- const afterContexts=await cdp(port,engine.pid,ticks,"Target.getBrowserContexts");
- assert.ok(fixtureWasDisposed(after?.targetInfos,afterContexts?.browserContextIds,identity));
+ const witness=relay.result();report.fixture.witness=witness;
+ assert.equal(witness.ok,true);
+ await verifyEngineCdp({port,pid:engine.pid,startTicks:ticks});
  report.fixture.disposed=true;report.engine.usable=true;report.stage="complete";
 }catch(error){
  failed=true;const message=error?.message;
@@ -145,6 +121,8 @@ try{
  }else if(engine){failed=true;report.engine.exit=await engineExit;report.engine.unexpectedExit=true;}
  if(engine&&(!report.engine.termAccepted||!report.engine.exit||
    !((report.engine.exit.code===0&&report.engine.exit.signal===null)||report.engine.exit.signal==="SIGTERM")))failed=true;
+ if(relay){report.fixture.witness=relay.result();await relay.close();}
+ if(config){try{await unlink(config);report.configRetired=true;}catch(error){if(error?.code!=="ENOENT"){report.configRetired=false;failed=true;}}}
  fixture.closeAllConnections?.();if(fixture.listening)await new Promise(ok=>fixture.close(ok));
  if(!failed)report.outcome="passed";
  await writeFile(join(dir,"report.json"),JSON.stringify(report,null,2),{mode:0o600,flag:"wx"});
