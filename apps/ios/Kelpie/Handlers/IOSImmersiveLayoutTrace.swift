@@ -66,11 +66,20 @@ final class IOSImmersiveLayoutTrace {
         let frame = view.window.map { view.convert(view.bounds, to: $0) } ?? .null
         let fields = [rect(view.bounds), rect(frame), inset(view.safeAreaInsets),
                       inset(view.scrollView.adjustedContentInset), inset(view.scrollView.contentInset),
-                      inset(view.minimumViewportInset), inset(view.maximumViewportInset), inset(view.obscuredContentInsets)]
+                      inset(view.minimumViewportInset), inset(view.maximumViewportInset)]
         guard fields.flatMap({ $0 }).allSatisfy({ $0.isFinite && abs($0) <= 100_000 }) else { return [:] }
-        return ["bounds": fields[0], "windowFrame": fields[1], "safe": fields[2], "adjusted": fields[3],
-                "scrollContent": fields[4], "minimumViewport": fields[5], "maximumViewport": fields[6],
-                "obscuredContent": fields[7]]
+        var facts: [String: Any] = [
+            "bounds": fields[0], "windowFrame": fields[1], "safe": fields[2], "adjusted": fields[3],
+            "scrollContent": fields[4], "minimumViewport": fields[5], "maximumViewport": fields[6],
+            "obscuredAvailable": false
+        ]
+        if #available(iOS 26.0, *) {
+            let obscured = inset(view.obscuredContentInsets)
+            guard obscured.allSatisfy({ $0.isFinite && abs($0) <= 100_000 }) else { return [:] }
+            facts["obscuredAvailable"] = true
+            facts["obscuredContent"] = obscured
+        }
+        return facts
     }
 }
 #endif
