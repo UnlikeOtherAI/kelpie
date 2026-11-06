@@ -207,7 +207,8 @@ static BOOL StreamJSONNumber(id value) {
     _observer->api.on_dev_tools_agent_detached = StreamDetached;
     _registration = _host->add_dev_tools_message_observer(_host, &_observer->api);
     if (_registration == nullptr) { [self releaseHandles]; completion(NO); return; }
-    _fence = std::make_unique<CEFHostedStreamFence>(_browserID, _epoch, NSProcessInfo.processInfo.systemUptime * 1000);
+    _fence = std::make_unique<CEFHostedStreamFence>(
+        _browserID, _epoch, NSProcessInfo.processInfo.systemUptime * 1000, _frameConsumer != nil);
     _started = YES;
     _keepAlive = self;
     CEFBridgeSendBrowserControlCommand(_host, @"Page.startScreencast",
@@ -222,7 +223,8 @@ static BOOL StreamJSONNumber(id value) {
             completion(YES);
         });
     __weak CEFHostedStreamProbe *weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+    const int64_t maximumSeconds = _frameConsumer ? 10 : 4;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, maximumSeconds * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         [weakSelf stopWithCompletion:^(BOOL) {}];
     });
 }

@@ -261,6 +261,9 @@ test("hosted stream parser accepts only bounded synthetic numeric events",()=>{
  assert.equal(hostedStreamSignal(facts.replace("metadata=1","metadata=64")),null);
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=sample index=1 receipt=50 protocol=48 x=300 y=120"),
   {event:"sample",index:1,receiptMs:50,protocolMs:48,x:300,y:120});
- assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=sample index=64 receipt=50 protocol=48 x=300 y=120"),null);
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=sample index=255 receipt=10000 protocol=9999 x=300 y=120"),
+  {event:"sample",index:255,receiptMs:10000,protocolMs:9999,x:300,y:120});
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=complete count=256"),{event:"complete",count:256});
+ assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=sample index=256 receipt=50 protocol=48 x=300 y=120"),null);
  assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=sample index=1 receipt=50 protocol=48 x=secret y=120"),null);
 });

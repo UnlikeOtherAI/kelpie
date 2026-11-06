@@ -90,9 +90,8 @@ final class ScriptHostedOverlayCapture {
         } catch { return false }
     }
 
-    func publish() async -> Bool {
+    func publish() -> Bool {
         do {
-            try await tab.check()
             guard let prepared, isCurrent(), !FileManager.default.fileExists(atPath: output.path) else { return false }
             // No suspension between the final authority/identity check and publication.
             try FileManager.default.moveItem(at: prepared, to: output)

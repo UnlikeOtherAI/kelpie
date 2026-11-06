@@ -70,7 +70,7 @@ for(const stream of [child.stdout,child.stderr]){
    const pointerTiming=pointerTimingSignal(line);if(pointerTiming&&pointerTimingSignals.length<32)pointerTimingSignals.push({phase,...pointerTiming});
    const retiree=retireeSignal(line);if(retiree&&retireeSignals.length<32)retireeSignals.push({phase,...retiree});
    const pump=cefPumpSignal(line);if(pump&&cefPumpSignals.length<4)cefPumpSignals.push(pump);
-   const stream=hostedStreamSignal(line);if(stream&&streamSignals.length<140)streamSignals.push(stream);
+   const stream=hostedStreamSignal(line);if(stream&&streamSignals.length<600)streamSignals.push(stream);
   }
  });
 }

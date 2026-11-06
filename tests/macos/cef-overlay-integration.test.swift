@@ -43,7 +43,9 @@ struct ScriptWorkflowFailure: Error { init(_ code: String) {} }
             capture.receive(data, receipt: ProcessInfo.processInfo.systemUptime, context: capture.context()!)
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        guard await capture.prepare(), await capture.publish() else { fatalError("valid output missing") }
+        guard await capture.prepare(), await ScriptHostedOverlayAudit.publish(
+            check: { try await tab.check() }, inspect: { true }, current: { true }, move: { capture.publish() }
+        ) else { fatalError("valid output missing") }
         let output = directory.appendingPathComponent("overlay-" + runID + ".mp4")
         guard FileManager.default.fileExists(atPath: output.path) else { fatalError("not published") }
         capture.discard()
@@ -67,11 +69,38 @@ struct ScriptWorkflowFailure: Error { init(_ code: String) {} }
         }
         guard await late.prepare() else { fatalError("late fixture not prepared") }
         tab.authorized = false
-        guard !(await late.publish()) else { fatalError("late revocation accepted") }
+        let lateAllowed = await ScriptHostedOverlayAudit.publish(
+            check: { try await tab.check() }, inspect: { true }, current: { true }, move: { late.publish() }
+        )
+        guard !lateAllowed else { fatalError("late revocation accepted") }
         late.discard()
         guard !FileManager.default.fileExists(atPath: directory.appendingPathComponent("overlay-" + lateID + ".mp4").path) else {
             fatalError("late revoked output escaped")
         }
-        print("PASS: real compositor/writer publication and early/late revoked-output disposal")
+        tab.authorized = true
+        let viewportID = UUID().uuidString
+        let viewportCapture = try ScriptHostedOverlayCapture(tab: tab, presentation: scene, runID: viewportID, isCurrent: { true })
+        for _ in 0..<3 {
+            viewportCapture.receive(data, receipt: ProcessInfo.processInfo.systemUptime, context: viewportCapture.context()!)
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        guard await viewportCapture.prepare() else { fatalError("viewport fixture not prepared") }
+        var moved = false
+        let viewportAllowed = await ScriptHostedOverlayAudit.publish(
+            check: { try await tab.check() }, inspect: { false }, current: { true },
+            move: { moved = true; return viewportCapture.publish() }
+        )
+        viewportCapture.discard()
+        guard !viewportAllowed, !moved,
+              !FileManager.default.fileExists(atPath: directory.appendingPathComponent("overlay-" + viewportID + ".mp4").path) else {
+            fatalError("changed viewport accepted")
+        }
+        let lateAuthorityAllowed = await ScriptHostedOverlayAudit.publish(
+            check: { try await tab.check() },
+            inspect: { tab.authorized = false; try await tab.check(); return true },
+            current: { true }, move: { moved = true; return true }
+        )
+        guard !lateAuthorityAllowed, !moved else { fatalError("late authority change accepted") }
+        print("PASS: real compositor/writer publication and late viewport/authority disposal")
     }
 }

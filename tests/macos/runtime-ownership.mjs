@@ -115,10 +115,10 @@ export function hostedStreamSignal(line){
  if(probe){const values=probe.slice(1).map(Number); if(values[3]>63)return null;
   const [received,consumed,malformed,metadata,rejected,drop,decode,stop,ackfail,decodefail,overflow,detached,identity,protocol,stopped]=values;
   return {event:"probe",received,consumed,malformed,metadata,rejected,drop,decode,stop,ackfail,decodefail,overflow,detached,identity,protocol,stopped};}
- const complete=/^\[WorkflowHostedStream\] event=complete count=(\d{1,2})$/.exec(line);
- if(complete&&Number(complete[1])<=64)return {event:"complete",count:Number(complete[1])};
- const sample=/^\[WorkflowHostedStream\] event=sample index=(\d{1,2}) receipt=(\d{1,4}) protocol=(\d{1,4}) x=(\d{1,4}) y=(\d{1,4})$/.exec(line);
+ const complete=/^\[WorkflowHostedStream\] event=complete count=(\d{1,3})$/.exec(line);
+ if(complete&&Number(complete[1])<=256)return {event:"complete",count:Number(complete[1])};
+ const sample=/^\[WorkflowHostedStream\] event=sample index=(\d{1,3}) receipt=(\d{1,5}) protocol=(\d{1,5}) x=(\d{1,4}) y=(\d{1,4})$/.exec(line);
  if(!sample)return null;
  const [index,receiptMs,protocolMs,x,y]=sample.slice(1).map(Number);
- return index<64&&receiptMs<=5000&&protocolMs<=5000&&x<=1920&&y<=1920?{event:"sample",index,receiptMs,protocolMs,x,y}:null;
+ return index<256&&receiptMs<=11000&&protocolMs<=11000&&x<=1920&&y<=1920?{event:"sample",index,receiptMs,protocolMs,x,y}:null;
 }

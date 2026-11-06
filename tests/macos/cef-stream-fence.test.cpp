@@ -82,4 +82,15 @@ int main() {
     assert(bounded.stopCause() == Fence::Cause::cap && bounded.failureCause() == Fence::Cause::none);
     assert(bounded.seal(true)->size() == 64);
     assert(!bounded.seal(true));
+
+    Fence overlay(10, 30, 100, true);
+    for (int i = 0; i < 256; ++i) {
+        assert(overlay.admit(10, 30, 1, 101 + i * 25, 1 + i, 100, true, &token) == Fence::Decision::ackDecode);
+        overlay.complete(30, token, true, true, i, i);
+    }
+    assert(overlay.admit(10, 30, 1, 6502, 257, 100, true) == Fence::Decision::ackStop);
+    assert(overlay.stopCause() == Fence::Cause::cap && overlay.seal(true)->size() == 256);
+    Fence overlayDuration(10, 31, 100, true);
+    assert(overlayDuration.admit(10, 31, 1, 10101, 1, 100, true) == Fence::Decision::ackStop);
+    assert(overlayDuration.stopCause() == Fence::Cause::cap);
 }

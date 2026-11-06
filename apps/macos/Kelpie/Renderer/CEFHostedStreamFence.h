@@ -22,8 +22,9 @@ public:
         int y;
     };
 
-    CEFHostedStreamFence(int browserID, uint64_t epoch, double startMs)
-        : browserID_(browserID), epoch_(epoch), startMs_(startMs) {}
+    CEFHostedStreamFence(int browserID, uint64_t epoch, double startMs, bool overlay = false)
+        : browserID_(browserID), epoch_(epoch), startMs_(startMs),
+          maximumFrames_(overlay ? 256 : 64), maximumDurationMs_(overlay ? 10000 : 4000) {}
 
     Decision admit(int browserID, uint64_t epoch, int sessionID, double receiptMs,
                    double protocolMs, size_t encodedBytes, bool identityCurrent, uint64_t *decodeToken = nullptr) {
@@ -110,14 +111,14 @@ private:
         valid_ = false;
         if (failureCause_ == Cause::none) { failureCause_ = cause; }
     }
-    static constexpr size_t maximumFrames_ = 64;
     static constexpr size_t maximumFrameBytes_ = 2 * 1024 * 1024;
     static constexpr size_t maximumTotalBytes_ = 32 * 1024 * 1024;
-    static constexpr double maximumDurationMs_ = 4000;
     mutable std::mutex lock_;
     const int browserID_;
     const uint64_t epoch_;
     const double startMs_;
+    const size_t maximumFrames_;
+    const double maximumDurationMs_;
     Cause stopCause_ = Cause::none;
     Cause failureCause_ = Cause::none;
     bool active_ = true;

@@ -135,7 +135,7 @@ final class ScriptHostedStreamDiagnostic {
             guard isCurrent() else { discard("identity"); return }
             guard state.document == documentID else { discard("document"); return }
             guard state.viewport == viewport else { discard("viewport"); return }
-            guard let samples = probe.seal(afterAudit: true) as? [[String: NSNumber]], samples.count <= 64 else {
+            guard let samples = probe.seal(afterAudit: true) as? [[String: NSNumber]], samples.count <= (overlay == nil ? 64 : 256) else {
                 discard("seal")
                 return
             }
@@ -143,8 +143,8 @@ final class ScriptHostedStreamDiagnostic {
             for sample in samples {
                 guard let receipt = sample["receiptMs"]?.doubleValue, let protocolTime = sample["protocolMs"]?.doubleValue,
                       let x = sample["x"]?.intValue, let y = sample["y"]?.intValue,
-                      receipt.isFinite, protocolTime.isFinite, receipt >= 0, receipt <= 5000,
-                      protocolTime >= 0, protocolTime <= 5000, (0...1920).contains(x), (0...1920).contains(y) else {
+                      receipt.isFinite, protocolTime.isFinite, receipt >= 0, receipt <= (overlay == nil ? 5000 : 11000),
+                      protocolTime >= 0, protocolTime <= (overlay == nil ? 5000 : 11000), (0...1920).contains(x), (0...1920).contains(y) else {
                     discard("sample")
                     return
                 }
@@ -163,20 +163,23 @@ final class ScriptHostedStreamDiagnostic {
         guard let samples = preparedSamples else { return }
         preparedSamples = nil
         guard allowed else { discard("authority"); return }
-        do {
-            try await tab.check()
-            let state = try await tab.hostedFixtureCaptureState(origin: fixtureOrigin)
-            try await tab.check()
-            guard isCurrent(), state.document == documentID, state.viewport == viewport else { discard("audit"); return }
-            if let overlay, !(await overlay.publish()) { discard("overlay"); return }
-            for (index, sample) in samples.enumerated() {
-                print("[WorkflowHostedStream] event=sample index=\(index) receipt=\(sample.receipt) " +
-                      "protocol=\(sample.protocolTime) x=\(sample.x) y=\(sample.y)")
-            }
-            print("[WorkflowHostedStream] event=complete count=\(samples.count)")
-            overlay?.discard()
-            overlay = nil
-        } catch { discard("audit") }
+        let published = await ScriptHostedOverlayAudit.publish(
+            check: { try await self.tab.check() },
+            inspect: {
+                let state = try await self.tab.hostedFixtureCaptureState(origin: self.fixtureOrigin)
+                return state.document == self.documentID && state.viewport == self.viewport
+            },
+            current: { self.isCurrent() },
+            move: { self.overlay?.publish() ?? true }
+        )
+        guard published else { discard("audit"); return }
+        for (index, sample) in samples.enumerated() {
+            print("[WorkflowHostedStream] event=sample index=\(index) receipt=\(sample.receipt) " +
+                  "protocol=\(sample.protocolTime) x=\(sample.x) y=\(sample.y)")
+        }
+        print("[WorkflowHostedStream] event=complete count=\(samples.count)")
+        overlay?.discard()
+        overlay = nil
     }
 
     private func discard(_ reason: String) {

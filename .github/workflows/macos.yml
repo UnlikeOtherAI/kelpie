@@ -184,7 +184,8 @@ jobs:
             tests/macos/cef-overlay-integration.test.swift apps/macos/Kelpie/Handlers/ScriptCaptureError.swift \
             apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift \
             apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift apps/macos/Kelpie/Handlers/ScriptCaptureCompositor.swift \
-            apps/macos/Kelpie/Handlers/ScriptHostedOverlayCapture.swift -o .cache/macos-ci/cef-overlay-integration
+            apps/macos/Kelpie/Handlers/ScriptHostedOverlayCapture.swift apps/macos/Kelpie/Handlers/ScriptHostedOverlayAudit.swift \
+            -o .cache/macos-ci/cef-overlay-integration
           .cache/macos-ci/cef-overlay-integration
 
       - name: Run hosted workflow admission XCTest
