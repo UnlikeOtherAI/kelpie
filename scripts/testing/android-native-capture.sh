@@ -156,7 +156,7 @@ for profile in "${profiles[@]}"; do
   printf 'profile=%s phase=corpus\n' "$profile"
   set +e
   timeout 20m adb -s "$serial" shell am instrument -w -r \
-    -e package com.kelpie.browser.automation -e notClass com.kelpie.browser.automation.ScriptCliBridgeTest -e sourceRevision "$revision" \
+    -e package com.kelpie.browser.automation -e notClass com.kelpie.browser.automation.ScriptCliBridgeTest,com.kelpie.browser.automation.ScriptApi29SmokeTest -e sourceRevision "$revision" \
     -e deviceClass "$profile" \
     com.kelpie.browser.test/androidx.test.runner.AndroidJUnitRunner \
     > "$dir/instrumentation.log" 2>&1
