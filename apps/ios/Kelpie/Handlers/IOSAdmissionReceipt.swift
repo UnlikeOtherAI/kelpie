@@ -104,8 +104,11 @@ enum IOSAdmissionReceipt {
 
     static var result: [String: Any] {
         guard enabled, let runID else { return [:] }
-        var result: [String: Any] = ["runId": runID, "identityValid": identity,
-                                    "count": count]
+        var result: [String: Any] = [
+            "runId": runID,
+            "identityValid": identity,
+            "count": count
+        ]
         if let refusedAt { result["elapsedMs"] = refusedAt }
         if let site { result["site"] = site }
         if let first { result["first"] = first }

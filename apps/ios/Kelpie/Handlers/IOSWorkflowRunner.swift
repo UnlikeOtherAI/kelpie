@@ -134,8 +134,14 @@ final class IOSWorkflowRunner {
             if let settings = workflow.capture {
                 let sink = try IOSWorkflowMedia(runID: id, owner: grant.owner, settings: settings)
                 media = sink
-                let sampler = IOSFrameSampler(tab: tab, presentation: scene, settings: settings, check: check,
-                                              receive: sink.receive, runID: id)
+                let sampler = IOSFrameSampler(
+                    tab: tab,
+                    presentation: scene,
+                    settings: settings,
+                    check: check,
+                    receive: sink.receive,
+                    runID: id
+                )
                 self.sampler = sampler
                 executor.sampler = sampler
                 try await sampler.start()
