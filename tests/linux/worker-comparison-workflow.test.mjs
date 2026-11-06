@@ -10,12 +10,12 @@ test("hosted comparison defaults to identity preparation and explicit hashes gat
  assert.match(workflow,/if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.eof_only == false && inputs\.prepare_only == false/);
  assert.match(workflow,/\[\[ "\$archive_sha" == "\$CHROMIUM_ARCHIVE_SHA256" \]\]/);
  assert.match(workflow,/\[\[ "\$binary_sha" == "\$CHROMIUM_BINARY_SHA256" \]\]/);
- assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' && inputs\.worker_comparison_mode != 'execute-2204' && inputs\.worker_comparison_mode != 'diagnostic-2204' && inputs\.worker_comparison_mode != 'diagnostic-bfcache-off-2204' \}\}/);
+ assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' && inputs\.worker_comparison_mode != 'execute-2204' && inputs\.worker_comparison_mode != 'diagnostic-2204' && inputs\.worker_comparison_mode != 'diagnostic-commit-2204' && inputs\.worker_comparison_mode != 'diagnostic-bfcache-off-2204' \}\}/);
  const input=caller.match(/worker_comparison_mode:\s*\n([\s\S]*?)\n      worker_comparison_archive_sha256:/);
  assert.ok(input);
  const options=[...input[1].matchAll(/^\s*- (?:'([^']+)'|([^\s]+))\s*$/gm)].map(match=>match[1]??match[2]);
- assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","eof-2204","execute-2204","diagnostic-2204","diagnostic-bfcache-off-2204","prepare","execute"]);
- assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- eof-2204\s*\n {10}- execute-2204\s*\n {10}- diagnostic-2204\s*\n {10}- diagnostic-bfcache-off-2204\s*\n {10}- prepare\s*\n {10}- execute/);
+ assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","eof-2204","execute-2204","diagnostic-2204","diagnostic-commit-2204","diagnostic-bfcache-off-2204","prepare","execute"]);
+ assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- eof-2204\s*\n {10}- execute-2204\s*\n {10}- diagnostic-2204\s*\n {10}- diagnostic-commit-2204\s*\n {10}- diagnostic-bfcache-off-2204\s*\n {10}- prepare\s*\n {10}- execute/);
  const [setup,build]=workflow.split("      - name: Build comparison CLI and shared packages");
  assert.ok(build);assert.doesNotMatch(setup,/pnpm --filter @unlikeotherai\/kelpie(?:-shared)? build/);
  assert.match(build,/^\s*if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.eof_only == false && inputs\.prepare_only == false/m);
@@ -99,4 +99,13 @@ test("BFCache switch and lifecycle observations remain diagnostic-only",async()=
  assert.ok(runner.includes('assert.ok(!bfcacheOff||diagnostic'));
  assert.ok(runner.includes('...(bfcacheOff?["--disable-back-forward-cache"]:[])'));
  assert.ok(runner.includes('const historyProbe=diagnostic?createHistoryProbe():null'));
+});
+test("commit-wait experiment patches the disposable CLI only after build in diagnostic mode",async()=>{
+ const workflow=await readFile(new URL("../../.github/workflows/worker-comparison.yml",import.meta.url),"utf8");
+ assert.ok(workflow.includes('"$HISTORY_COMMIT_EXPERIMENT" != true || ( "$DIAGNOSTIC_ONLY" == true && "$BFCACHE_OFF" == false )'));
+ const start=workflow.indexOf("      - name: Build comparison CLI and shared packages");
+ const end=workflow.indexOf("      - name: Compare in separately bounded loopback-only units",start);
+ const build=workflow.slice(start,end);
+ assert.ok(build.indexOf("pnpm --filter @unlikeotherai/kelpie build")<build.indexOf("worker-comparison-history-commit.mjs"));
+ assert.ok(build.includes('if [[ "$HISTORY_COMMIT_EXPERIMENT" == true ]]'));
 });

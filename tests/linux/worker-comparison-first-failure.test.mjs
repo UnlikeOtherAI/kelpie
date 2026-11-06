@@ -42,3 +42,34 @@ test("contradictory success and malformed tab lists are rejected",async()=>{
  assert.equal((await sample({ok:true,error:null})).receipt.firstFailure.category,"malformed_envelope");
  assert.equal((await sample({ok:true,value:null})).receipt.firstFailure.category,"malformed_envelope");
 });
+test("post-back readiness uses only remaining history budget and stops on not-ready",async()=>{
+ let count=0;const calls=[];
+ const call=async(method)=>{
+  calls.push(method);
+  if(method==="__session_limit")return {ok:false,error:{code:"RESOURCE_LIMIT"}};
+  if(method==="tabs.list")return {ok:true,value:[{}]};
+  if(method==="tab.title")return {ok:true,value:"Worker fixture"};
+  if(method==="tab.url")return {ok:true,value:"http://fixture/"};
+  if(method==="tab.ready")return {ok:true,value:{ready:false,documentState:"loading",requestedState:"interactive"}};
+  return {ok:true,value:null};
+ };
+ const receipt=await diagnoseChromiumFirstFailure({call,origin:"http://fixture",now:()=>count+=10,sessionStarted:0,timeoutError:Error("t")});
+ assert.equal(receipt.firstFailure.stage,"ready-after-back");assert.equal(receipt.firstFailure.category,"not_ready");
+ assert.deepEqual(receipt.backReadiness,{ready:false,documentState:"loading",requestedState:"interactive"});
+ assert.equal(calls.filter(method=>method==="tab.back").length,1);assert.equal(calls.includes("tab.forward"),false);
+});
+test("exhausted original history budget never dispatches readiness",async()=>{
+ let time=0;const calls=[];
+ const call=async(method)=>{
+  calls.push(method);
+  if(method==="__session_limit")return {ok:false,error:{code:"RESOURCE_LIMIT"}};
+  if(method==="tabs.list")return {ok:true,value:[{}]};
+  if(method==="tab.title")return {ok:true,value:"Worker fixture"};
+  if(method==="tab.url")return {ok:true,value:"http://fixture/"};
+  if(method==="tab.back")time+=5001;
+  return {ok:true,value:null};
+ };
+ const receipt=await diagnoseChromiumFirstFailure({call,origin:"http://fixture",now:()=>time,sessionStarted:0,timeoutError:Error("t")});
+ assert.equal(receipt.firstFailure.stage,"ready-after-back");assert.equal(receipt.firstFailure.category,"public_timeout");
+ assert.equal(calls.filter(method=>method==="tab.back").length,1);assert.equal(calls.includes("tab.ready"),false);
+});

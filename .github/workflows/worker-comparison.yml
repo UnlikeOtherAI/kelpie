@@ -25,6 +25,9 @@ on:
       bfcache_off:
         type: boolean
         default: false
+      history_commit_experiment:
+        type: boolean
+        default: false
       prepare_only:
         description: Record official Chromium identity without starting benchmark units
         type: boolean
@@ -57,6 +60,9 @@ on:
       bfcache_off:
         type: boolean
         default: false
+      history_commit_experiment:
+        type: boolean
+        default: false
       prepare_only:
         type: boolean
         default: true
@@ -87,6 +93,7 @@ jobs:
       EOF_ONLY: ${{ inputs.eof_only }}
       DIAGNOSTIC_ONLY: ${{ inputs.diagnostic_only }}
       BFCACHE_OFF: ${{ inputs.bfcache_off }}
+      HISTORY_COMMIT_EXPERIMENT: ${{ inputs.history_commit_experiment }}
       CHROMIUM_ARCHIVE_SHA256: ${{ inputs.chromium_archive_sha256 }}
       CHROMIUM_BINARY_SHA256: ${{ inputs.chromium_binary_sha256 }}
     steps:
@@ -96,6 +103,7 @@ jobs:
           [[ "$EOF_ONLY" != true || ( "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == true && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
           [[ "$DIAGNOSTIC_ONLY" != true || ( "$EOF_ONLY" == false && "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == false && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
           [[ "$BFCACHE_OFF" != true || "$DIAGNOSTIC_ONLY" == true ]] || exit 1
+          [[ "$HISTORY_COMMIT_EXPERIMENT" != true || ( "$DIAGNOSTIC_ONLY" == true && "$BFCACHE_OFF" == false ) ]] || exit 1
           case "$REQUESTED_RUNNER" in
             ubuntu-24.04) [[ "$PREPARE_ONLY" == true || "$SANDBOX_ONLY" == true || "$ISOLATION_ONLY" == true ]] || exit 1 ;;
             ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false || "$EOF_ONLY" == true ) ]] || exit 1 ;;
@@ -165,6 +173,9 @@ jobs:
         run: |
           pnpm --filter @unlikeotherai/kelpie-shared build
           pnpm --filter @unlikeotherai/kelpie build
+          if [[ "$HISTORY_COMMIT_EXPERIMENT" == true ]]; then
+            node tests/linux/worker-comparison-history-commit.mjs "$RUNNER_TEMP/worker-ab-setup/history-commit-receipt.json"
+          fi
       - name: Compare in separately bounded loopback-only units
         if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.eof_only == false && inputs.prepare_only == false
         env:

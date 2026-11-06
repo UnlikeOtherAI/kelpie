@@ -6,16 +6,24 @@ const stop=Symbol("diagnostic stop");
 // Report only fixed stages, categories, and monotonic durations; never raw page or error data.
 export async function diagnoseChromiumFirstFailure({call,origin,now,sessionStarted,timeoutError}){
  const receipt={scope:"cold-navigation-and-readers",stages:[],firstFailure:null,complete:false};
- const stage=async(name,method,params,validate=()=>null,expectedRefusal=null)=>{
+ const stage=async(name,method,params,validate=()=>null,expectedRefusal=null,budgetMs=null)=>{
   const start=now(),age=Math.max(0,start-sessionStarted);
   let category="ok",result;
   try{
-   result=await call(method,params);
+   if(budgetMs!==null&&budgetMs<=0)throw timeoutError;
+   let timer;
+   try{result=budgetMs===null?await call(method,params):await Promise.race([
+    call(method,params),new Promise((_,reject)=>{timer=setTimeout(()=>reject(timeoutError),budgetMs);})]);}
+   finally{clearTimeout(timer);}
    if(!result||typeof result!=="object"||typeof result.ok!=="boolean")category="malformed_envelope";
    else if(!result.ok){const code=result.error?.code;category=expectedRefusal&&code===expectedRefusal?"ok":typeof code!=="string"||!code?"malformed_envelope":allowed.has(code)?"public_"+code:"public_other";}
    else if(Object.hasOwn(result,"error"))category="malformed_envelope";
    else if(expectedRefusal)category="expected_refusal_missing";
-   else category=validate(result)??"ok";
+   else if(name==="ready-after-back"){
+    const value=result.value;
+    if(typeof value?.ready!=="boolean"||!["loading","interactive","complete"].includes(value.documentState)||value.requestedState!=="interactive")category="malformed_envelope";
+    else{receipt.backReadiness={ready:value.ready,documentState:value.documentState,requestedState:"interactive"};category=value.ready?"ok":"not_ready";}
+   }else category=validate(result)??"ok";
   }catch(error){category=error===timeoutError?"public_timeout":error instanceof SyntaxError?"malformed_envelope":"transport_failed";}
   const end=now();receipt.stages.push({stage:name,category,startMs:Math.max(0,start-sessionStarted),
    durationMs:Math.max(0,end-start),sessionAgeUpperBoundMs:age,ttlRemainingLowerBoundMs:Math.max(0,60000-age)});
@@ -31,7 +39,11 @@ export async function diagnoseChromiumFirstFailure({call,origin,now,sessionStart
   await stage("title-root","tab.title",{},title("Worker fixture"));
   await stage("url-root","tab.url",{},url(origin+"/"));
   await stage("goto-next","tab.goto",{url:origin+"/next"},expectOk);
+  const backStarted=now();
   await stage("back","tab.back",{},expectOk);
+  await stage("ready-after-back","tab.ready",{state:"interactive"},r=>
+   typeof r.value?.ready!=="boolean"?"malformed_envelope":r.value.ready?null:"not_ready",null,
+   Math.max(0,5000-(now()-backStarted)));
   await stage("url-back","tab.url",{},url(origin+"/"));
   await stage("forward","tab.forward",{},expectOk);
   await stage("title-next","tab.title",{},title("Next fixture"));
