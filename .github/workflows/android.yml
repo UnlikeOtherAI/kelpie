@@ -139,14 +139,34 @@ jobs:
             native-evidence/phone/*.txt
             native-evidence/phone/*.log
             native-evidence/phone/avd-config.ini
-            native-evidence/phone/targeted/**
+            native-evidence/phone/targeted/navigation-stop/case.txt
+            native-evidence/phone/targeted/navigation-stop/exit.txt
+            native-evidence/phone/targeted/navigation-stop/instrumentation.log
+            native-evidence/phone/targeted/chrome-input/case.txt
+            native-evidence/phone/targeted/chrome-input/exit.txt
+            native-evidence/phone/targeted/chrome-input/instrumentation.log
+            native-evidence/phone/targeted/renderer-system-key/case.txt
+            native-evidence/phone/targeted/renderer-system-key/exit.txt
+            native-evidence/phone/targeted/renderer-system-key/instrumentation.log
+            native-evidence/phone/targeted/navigation-stop/script-acceptance/navigation-stop-result.json
+            native-evidence/phone/targeted/chrome-input/script-acceptance/native-chrome-input-result.json
             native-evidence/phone/script-acceptance/**
             native-evidence/phone/script-codec-acceptance/**
             native-evidence/tablet/*.json
             native-evidence/tablet/*.txt
             native-evidence/tablet/*.log
             native-evidence/tablet/avd-config.ini
-            native-evidence/tablet/targeted/**
+            native-evidence/tablet/targeted/navigation-stop/case.txt
+            native-evidence/tablet/targeted/navigation-stop/exit.txt
+            native-evidence/tablet/targeted/navigation-stop/instrumentation.log
+            native-evidence/tablet/targeted/chrome-input/case.txt
+            native-evidence/tablet/targeted/chrome-input/exit.txt
+            native-evidence/tablet/targeted/chrome-input/instrumentation.log
+            native-evidence/tablet/targeted/renderer-system-key/case.txt
+            native-evidence/tablet/targeted/renderer-system-key/exit.txt
+            native-evidence/tablet/targeted/renderer-system-key/instrumentation.log
+            native-evidence/tablet/targeted/navigation-stop/script-acceptance/navigation-stop-result.json
+            native-evidence/tablet/targeted/chrome-input/script-acceptance/native-chrome-input-result.json
             native-evidence/tablet/script-acceptance/**
             native-evidence/tablet/script-codec-acceptance/**
             apps/android/app/build/reports/tests/**
