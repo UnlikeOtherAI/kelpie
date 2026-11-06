@@ -31,3 +31,30 @@ among them. The window is created as a plain GTK window rather than through a
 GTK application single-instance handoff. The existing GNOME session was local,
 Wayland, active and unlocked, with display and session-bus variables present;
 those facts do not prove successful GTK or CEF initialization.
+
+## Instrumented 2447 GNOME run
+
+A separate instrumented build at source
+`2447ac8685aedb6da0b7fe8cea89b33ab5d0d274` used historical base c42,
+ELF SHA-256
+`9eb310b2773d4945b9cb5b39baca68d0ed8bc12e17008f8119448f24a0e9bce9`
+and manifest SHA-256
+`c9045adec1bd82647802f219a79d8f4f5e430e3cb66d3be6d421e41f65e567a3`.
+Before the test, all 70 referenced runtime assets matched the hosted build;
+loader relocation and required capture-factory checks passed. The Fedora
+GNOME Wayland session was active and unlocked.
+
+The fixed, nontruncated trace prefix was GTK_INIT_ENTER, GTK_INIT_RETURN,
+SHOW_ENTER, CANVAS_REALIZE, ATTACH_ENTER and START_ENTER. START_ENTER occurred
+85.650578 ms after the first marker. No start-return or publication marker
+was observed before the 30.023-second readiness timeout. This localizes the
+observed wait inside `DesktopApp::Start` for this instrumented build; it
+does not establish its internal cause or prove identical behavior for the
+uninstrumented c42 executable. No HTTP, MCP or AT-SPI action was attempted.
+
+The bounded unit exited after 35.212 seconds; the owned child was SIGKILLed
+after timeout, its private runtime was removed, the unit was inactive with
+MainPID zero and no cgroup, and the unrelated listener remained present.
+The sanitized receipt SHA-256 is
+`f2abcbaaa97c4218db95620194d79e016ee20ddef4a72ff3e4126b16088e3d7f`.
+No native Stop or physical displayed-pixel pass follows from this run.
