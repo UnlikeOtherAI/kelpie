@@ -26,4 +26,5 @@ file(LOCK "${KELPIE_REPO_ROOT}/.build-browser-contract.lock" RELEASE)
 file(GLOB_RECURSE browser_sources CONFIGURE_DEPENDS "${KELPIE_REPO_ROOT}/packages/shared/src/*.ts")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${browser_sources}
   "${KELPIE_REPO_ROOT}/packages/shared/package.json" "${KELPIE_REPO_ROOT}/packages/shared/scripts/build.mjs"
-  "${KELPIE_REPO_ROOT}/pnpm-lock.yaml" "${KELPIE_REPO_ROOT}/scripts/native/generate-browser-contract.mjs")
+  "${KELPIE_REPO_ROOT}/pnpm-lock.yaml" "${KELPIE_REPO_ROOT}/scripts/native/generate-browser-contract.mjs"
+  "${KELPIE_REPO_ROOT}/scripts/native/native-expression.mjs")
