@@ -6,6 +6,7 @@ import { createManagedSessionRegistry } from "../browser/automation-sessions.js"
 import { createWorkerMcpServer } from "./mcp.js";
 import { loadWorkerConfig, workerEndpoint } from "./config.js";
 import { createWorkerSessionAllocator } from "./allocation.js";
+import { closeWorkerTransportOnEof, reportWorkerCleanupFailure } from "./stdio-eof.js";
 
 /** Explicit operator launch authorizes one local stdio principal, not a new human account. */
 export async function startWorkerMcp(path: string, version: string): Promise<void> {
@@ -34,12 +35,18 @@ export async function startWorkerMcp(path: string, version: string): Promise<voi
     })();
     return stopping;
   };
-  server.server.onclose = () => { void shutdown().catch(() => { process.stderr.write("Worker cleanup failed.\n"); }); };
-  const onSignal = (): void => { void shutdown().then(() => process.exit(0), () => { process.stderr.write("Worker cleanup failed.\n"); process.exit(1); }); };
+  const transport = new StdioServerTransport();
+  const detachInputEnd = closeWorkerTransportOnEof(process.stdin, transport, () => {
+    reportWorkerCleanupFailure();
+    void shutdown().catch(reportWorkerCleanupFailure);
+  });
+  server.server.onclose = () => { detachInputEnd(); void shutdown().catch(reportWorkerCleanupFailure); };
+  const onSignal = (): void => { void shutdown().then(() => process.exit(process.exitCode ? 1 : 0), () => { reportWorkerCleanupFailure(); process.exit(1); }); };
   process.once("SIGINT", onSignal);
   process.once("SIGTERM", onSignal);
-  try { await server.connect(new StdioServerTransport()); }
+  try { await server.connect(transport); }
   catch {
+    detachInputEnd();
     await shutdown().catch(() => undefined);
     throw new Error("The worker stdio transport could not start.");
   }
