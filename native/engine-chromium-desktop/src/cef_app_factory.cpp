@@ -1,4 +1,10 @@
 #include "kelpie/cef_app_factory.h"
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+#include "startup_test_trace.h"
+#else
+#define KELPIE_STARTUP_AUX(event) ((void)0)
+#endif
+
 
 #include "include/cef_browser_process_handler.h"
 #include "include/cef_command_line.h"
@@ -39,7 +45,12 @@ class DesktopCefApp final : public CefApp, public CefBrowserProcessHandler {
 #endif
   }
 
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+  void OnContextInitialized() override { KELPIE_STARTUP_AUX(CONTEXT_INITIALIZED); }
+#endif
+
   void OnScheduleMessagePumpWork(int64_t delay_ms) override {
+    KELPIE_STARTUP_AUX(SCHEDULE_FIRST);
     std::lock_guard<std::mutex> lock(scheduler_mutex);
     if (message_pump_scheduler) message_pump_scheduler(delay_ms);
   }

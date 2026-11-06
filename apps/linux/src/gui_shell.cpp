@@ -74,7 +74,9 @@ int GUIShell::Run() {
     static_cast<LinuxApp*>(raw)->ReportFullscreenState(event->new_window_state&GDK_WINDOW_STATE_FULLSCREEN); return FALSE;
   }),&app_);
   const auto timer=g_timeout_add(16,+[](gpointer raw)->gboolean {
-    auto& c=*static_cast<Context*>(raw); c.app.PumpBrowser();
+    auto& c=*static_cast<Context*>(raw);
+    KELPIE_STARTUP_AUX(GTK_PUMP_FIRST);
+    c.app.PumpBrowser();
     if(!c.app.IsRunning()) { if(c.app.FinishShutdown())gtk_main_quit(); return G_SOURCE_CONTINUE; }
     if(c.app.WantsFullscreen()!=c.app.IsFullscreen()) { if(c.app.WantsFullscreen())gtk_window_fullscreen(c.window); else gtk_window_unfullscreen(c.window); }
     auto [width,height]=c.app.TakeResizeRequest();

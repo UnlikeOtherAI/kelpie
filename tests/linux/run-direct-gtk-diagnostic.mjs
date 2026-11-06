@@ -11,6 +11,7 @@ import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from 
 import { runGtkStop } from "./gtk-stop.mjs";
 import { verifyOwnedListener } from "./worker-comparison-listener.mjs";
 import { parseGtkStartupTrace } from "./gtk-startup-trace.mjs";
+import { parseGtkStartupAux } from "./gtk-startup-aux.mjs";
 import { verifyGtkDiagnosticManifest } from "./gtk-diagnostic-manifest.mjs";
 import { installHeadlessEnvironment } from "./headless-control-environment.mjs";
 
@@ -19,6 +20,8 @@ assert.ok(binaryArg && /^[a-f0-9]{64}$/.test(expectedHash ?? "") && outputArg);
 const mode = process.env.KELPIE_STARTUP_CONTROL_MODE ?? "windowed";
 assert.ok(mode === "windowed" || mode === "headless");
 const traceRequested = process.env.KELPIE_GTK_STARTUP_TRACE === "1";
+const auxRequested = process.env.KELPIE_GTK_AUX_TRACE === "1";
+if (auxRequested) assert.ok(traceRequested);
 if (mode === "windowed") assert.equal(process.env.GDK_BACKEND, "wayland");
 else {
   assert.ok(traceRequested);
@@ -126,6 +129,10 @@ try {
     if (traceRequested) {
       report.startupTrace = parseGtkStartupTrace(logs.stderrFirst, mode);
       report.startupTrace.stderrMayBeTruncated = logs.stderrFirst.length >= 32768;
+      if (auxRequested) {
+        report.auxiliaryTrace = parseGtkStartupAux(logs.stderrFirst, report.startupTrace, report.startupTrace.stderrMayBeTruncated);
+        if (report.auxiliaryTrace.state !== "observed") failed = true;
+      }
       if (report.startupTrace.state !== "valid-prefix" || (mode === "headless" && report.startupTrace.stderrMayBeTruncated)) failed = true;
       if (mode === "headless" && readiness && !report.startupTrace.events.some(event => event.name === "PUBLISH_RETURNED")) failed = true;
     }
