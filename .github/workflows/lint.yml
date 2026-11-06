@@ -114,11 +114,11 @@ jobs:
       - name: Verify fixed candidate before package scripts
         env:
           HISTORY_PATCH_B64: ${{ inputs.history_verify_patch_b64 }}
-          HISTORY_PATCH_SHA: 7d008b497dcaca54e615cedc1c2403367df9fcbe338ed1780d21dc67e63366e3
+          HISTORY_PATCH_SHA: 4201044e5128fbb75850de684bccec4078a1f88315ca84535ae264d5b85ef210
           HISTORY_DOC_SHA: 565bc1a888f175a33b16fb37bd2bf009cd4edfcbd67ff3500d53455879b883c0
           HISTORY_SESSION_SHA: 5e7008602972d04db4fdb0f1497e36bba9786cbf944a414ce7bddf0b6009751d
           HISTORY_PLAYWRIGHT_SHA: f069d59df2e1abe38d5dfc822348a6daba7e8c209829f65bab1d5fc59863dd84
-          HISTORY_IMPL_SHA: 048297a16163b1befac1eecb4a30ac4d033d585dbb50c8a0bdf74f2e550bdd78
+          HISTORY_IMPL_SHA: fcc1cedc10c16342096ee6ff5121d9e3b716335479b18c29c1453d7f659c8de4
           HISTORY_TEST_SHA: a085d4a9d018dce864cc668e236be1f96e53bb0a3d56186afa16643f866f4740
         run: node verifier/scripts/testing/verify-history-patch.mjs "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/history-owned"
       - uses: pnpm/action-setup@v6.0.8
