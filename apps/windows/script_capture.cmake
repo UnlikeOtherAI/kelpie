@@ -8,6 +8,10 @@ set(KELPIE_SCRIPT_CODEC_SOURCES
 set(KELPIE_SCRIPT_SYSTEM_LIBRARIES
   ole32 windowscodecs mfplat mfreadwrite mfuuid wmcodecdspuuid propsys
 )
+option(KELPIE_TEST_G08_ROI_WITNESS "Build the test-only G08 ROI witness helper" OFF)
+if(KELPIE_TEST_G08_ROI_WITNESS AND (NOT BUILD_TESTING OR NOT WIN32 OR NOT HAS_CEF))
+  message(FATAL_ERROR "KELPIE_TEST_G08_ROI_WITNESS requires Windows, CEF and BUILD_TESTING")
+endif()
 target_sources(kelpie PRIVATE
   ${KELPIE_SCRIPT_CODEC_SOURCES}
   src/script_capture_service.cpp
@@ -21,6 +25,19 @@ target_link_libraries(kelpie PRIVATE
 )
 
 if(BUILD_TESTING AND WIN32)
+  if(KELPIE_TEST_G08_ROI_WITNESS)
+    add_executable(kelpie_windows_test_g08_roi_witness
+      tests/script_test_g08_roi_witness_test.cpp src/script_test_g08_roi_witness.cpp)
+    target_include_directories(kelpie_windows_test_g08_roi_witness PRIVATE src)
+    target_compile_definitions(kelpie_windows_test_g08_roi_witness PRIVATE
+      KELPIE_TEST_G08_ROI_WITNESS WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(kelpie_windows_test_g08_roi_witness PRIVATE bcrypt)
+    kelpie_enable_test_assertions(kelpie_windows_test_g08_roi_witness)
+    if(MSVC)
+      target_compile_options(kelpie_windows_test_g08_roi_witness PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME kelpie_windows_test_g08_roi_witness COMMAND kelpie_windows_test_g08_roi_witness)
+  endif()
   add_executable(kelpie_windows_script_media_test
     tests/script_media_encoder_test.cpp
     ${KELPIE_SCRIPT_CODEC_SOURCES}
