@@ -6,6 +6,9 @@ isolation_only="${KELPIE_AB_ISOLATION_ONLY:-false}"
 sandbox_only="${KELPIE_AB_SANDBOX_ONLY:-false}"
 eof_only="${KELPIE_AB_EOF_ONLY:-false}"
 diagnostic_only="${KELPIE_AB_DIAGNOSTIC_ONLY:-false}"
+bfcache_off="${KELPIE_AB_BFCACHE_OFF:-false}"
+[[ "$bfcache_off" == true || "$bfcache_off" == false ]]
+[[ "$bfcache_off" != true || "$diagnostic_only" == true ]]
 [[ "$diagnostic_only" == true || "$diagnostic_only" == false ]]
 [[ "$diagnostic_only" != true || ( "$eof_only" == false && "$sandbox_only" == false && "$isolation_only" == false ) ]]
 [[ "$eof_only" == true || "$eof_only" == false ]]
@@ -68,6 +71,7 @@ run_arm() {
   --setenv="KELPIE_AB_CANARY_PORT=$port" --setenv="KELPIE_CHROMIUM_ARCHIVE=$assets/chrome.zip" \
   --setenv="KELPIE_CHROMIUM_ARCHIVE_SHA256=${CHROMIUM_ARCHIVE_SHA256:-}" \
   --setenv="KELPIE_AB_DIAGNOSTIC_ONLY=$diagnostic_only" \
+  --setenv="KELPIE_AB_BFCACHE_OFF=$bfcache_off" \
   "${command[@]}" >"$dir/unit.log" 2>&1 &
  local launcher=$! active=0
  for _ in $(seq 1 100); do
