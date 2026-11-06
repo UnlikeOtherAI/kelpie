@@ -16,7 +16,7 @@ test('public history is an opt-in default-BFCache Chromium diagnostic', async ()
   ok(runner.includes('assert.ok(!diagnostic||backend==="playwright"'));
   ok(runner.includes('await bounded(client.callTool({name,arguments:arguments_}),5000)'));
   ok(runner.includes('report.publicHistory=createPublicHistoryReport()'));
-  ok(runner.includes('report.cleanup.session.tabClose="error"'));
+  ok(runner.includes('report.cleanup.session.tabClose=error===diagnosticTimeout?"timeout":"transport-error"'));
   ok(runner.includes('report.cleanup.session.sessionClose="error"'));
   strictEqual((lint.match(/^          - public-history-2204$/gm) ?? []).length, 1);
 });

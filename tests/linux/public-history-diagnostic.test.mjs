@@ -8,6 +8,7 @@ test('one public mutation per history case and fixed insufficient limits', async
   const call = async (method, params) => {
     calls.push(method);
     if (method === 'tab.goto') url = params.url;
+    if (method === 'locator.click') url = origin + (params.locator[0].value === '#hash-one' ? '/next#one' : '/next#two');
     if (method === 'tab.back') url = url.endsWith('#two') ? origin + '/next#one' : origin + '/';
     if (method === 'tab.forward') url = url.endsWith('#one') ? origin + '/next#two' : origin + '/next';
     if (method === 'tab.url') return { ok: true, value: url };
@@ -27,10 +28,17 @@ test('failed public call is not retried', async () => {
   strictEqual(count, 1); strictEqual(result.complete, false);
 });
 
+test('records fixed timeout and elapsed time without exposing error content', async () => {
+  const timeoutError = new Error('private'); let t = 0;
+  const result = await publicHistoryDiagnostic({ call: async () => { throw timeoutError; }, timeoutError, now: () => (t += 5), origin: 'http://127.0.0.1:1234', lifecycle: {}, delay: async () => undefined });
+  deepStrictEqual(result.stages, [{ name: 'root', status: 'timeout', elapsedMs: 5 }]);
+});
+
 test('missing BFCache evidence cannot pass', async () => {
   const origin = 'http://127.0.0.1:1234'; let url = '';
   const call = async (method, params) => {
     if (method === 'tab.goto') url = params.url;
+    if (method === 'locator.click') url = origin + (params.locator[0].value === '#hash-one' ? '/next#one' : '/next#two');
     if (method === 'tab.back') url = url.endsWith('#two') ? origin + '/next#one' : origin + '/';
     if (method === 'tab.forward') url = url.endsWith('#one') ? origin + '/next#two' : origin + '/next';
     return { ok: true, value: method === 'tab.url' ? url : method === 'tab.ready' ? { ready: true, documentState: 'complete' } : null };

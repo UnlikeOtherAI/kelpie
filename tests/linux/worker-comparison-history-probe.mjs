@@ -12,10 +12,10 @@ export function createHistoryProbe(){
    events.push(body);
   },
   mark(){return events.length;},
-  hashResult(mark,expected){
+  hashResult(mark,expected,requireBoth=true){
    if(invalid||!Number.isInteger(mark)||mark<0||mark>events.length||!["h1","h2"].includes(expected))return {status:"insufficient"};
    const before=events.slice(0,mark),after=events.slice(mark),hash=after.filter(x=>x==="h1"||x==="h2");
-   if(!before.includes("h1")||!before.includes("h2"))return {status:"insufficient"};
+   if(!before.some(x=>x[0]==="n")||(requireBoth&&(!before.includes("h1")||!before.includes("h2"))))return {status:"insufficient"};
    return {status:hash.length===1&&hash[0]===expected?"observed":"insufficient"};
   },
   result(mark,page="root"){

@@ -5,16 +5,16 @@ export function createPublicHistoryReport() {
     rawDispatchCount: 'not-observed',
   }, complete: false };
 }
-export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, report = createPublicHistoryReport() }) {
+export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, timeoutError, now = () => performance.now(), report = createPublicHistoryReport() }) {
   const stop = Symbol('stop');
   async function stage(name, method, params, check = () => true) {
-    let result;
+    let result; const start = now();
     try { result = await call(method, params); }
-    catch { report.stages.push({ name, status: 'call-failed' }); throw stop; }
+    catch (error) { report.stages.push({ name, status: error === timeoutError ? 'timeout' : 'transport-error', elapsedMs: Math.max(0, now() - start) }); throw stop; }
     if (!result || result.ok !== true || Object.hasOwn(result, 'error') || !check(result.value)) {
-      report.stages.push({ name, status: 'invalid-or-refused' }); throw stop;
+      report.stages.push({ name, status: 'invalid-or-refused', elapsedMs: Math.max(0, now() - start) }); throw stop;
     }
-    report.stages.push({ name, status: 'passed' });
+    report.stages.push({ name, status: 'passed', elapsedMs: Math.max(0, now() - start) });
   }
   const url = expected => value => value === origin + expected;
   const ready = value => value?.ready === true && ['interactive', 'complete'].includes(value.documentState);
@@ -35,9 +35,18 @@ export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, 
     await stage('forward-ready', 'tab.ready', { state: 'interactive' }, ready);
     await delay(250);
     report.forwardLifecycle = lifecycle.result(mark, 'next');
-    await stage('hash-one', 'tab.goto', { url: origin + '/next#one' });
-    await stage('hash-two', 'tab.goto', { url: origin + '/next#two' });
+    mark = lifecycle.mark();
+    await stage('hash-one', 'locator.click', { locator: [{ kind: 'css', value: '#hash-one' }] });
+    await stage('hash-one-url', 'tab.url', {}, url('/next#one'));
     await delay(250);
+    report.hashOne = lifecycle.hashResult(mark, 'h1', false);
+    if (report.hashOne.status !== 'observed') throw stop;
+    mark = lifecycle.mark();
+    await stage('hash-two', 'locator.click', { locator: [{ kind: 'css', value: '#hash-two' }] });
+    await stage('hash-two-url', 'tab.url', {}, url('/next#two'));
+    await delay(250);
+    report.hashTwo = lifecycle.hashResult(mark, 'h2', false);
+    if (report.hashTwo.status !== 'observed') throw stop;
     mark = lifecycle.mark();
     await stage('hash-back', 'tab.back', {});
     await stage('hash-back-url', 'tab.url', {}, url('/next#one'));

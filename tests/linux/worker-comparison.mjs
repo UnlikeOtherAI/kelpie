@@ -77,6 +77,7 @@ const fixture=httpServer((req,res)=>{
  if(route==="/readers")res.end(html.replace(anchor,anchor+extra));
  else {const page=route==="/"?"root":route==="/next"?"next":null;
   res.end("<!doctype html><title>"+(route==="/next"?"Next fixture":"Worker fixture")+"</title><h1>Public fixture</h1>"+
+   (publicHistory&&route==="/next"?'<a id="hash-one" href="#one">One</a><a id="hash-two" href="#two">Two</a>':"")+
    (historyProbe&&page?historyProbe.script(page):""));}
 });
 const reserve=createServer();await new Promise(ok=>reserve.listen(0,"127.0.0.1",ok));
@@ -222,10 +223,12 @@ try{
    return method==="__session_limit"?lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}}):tool("kelpie_browser_control",{sessionId:session.sessionId,request:{version:1,method,params,tabId:session.ownedTabIds[0]}});
   };
   if(publicHistory){
-   try{await publicHistoryDiagnostic({call:diagnosticCall,origin,lifecycle:historyProbe,delay,report:report.publicHistory});}
+   try{await publicHistoryDiagnostic({call:diagnosticCall,origin,lifecycle:historyProbe,delay,timeoutError:diagnosticTimeout,report:report.publicHistory});}
    catch{failure="HISTORY_DIAGNOSTIC_FAILED";}
+   const closeStarted=performance.now();
    try{const closed=await diagnosticCall("tabs.close",{});report.cleanup.session.tabClose=closed?.ok===true?"ok":"refused";}
-   catch{report.cleanup.session.tabClose="error";}
+   catch(error){report.cleanup.session.tabClose=error===diagnosticTimeout?"timeout":"transport-error";}
+   report.cleanup.session.tabCloseMs=Math.max(0,performance.now()-closeStarted);
    try{const retired=await lifecycle({action:"close",sessionId:session.sessionId});report.cleanup.session.sessionClose=retired?.ok===true?"ok":"refused";}
    catch{report.cleanup.session.sessionClose="error";}
    if(report.cleanup.session.tabClose!=="ok"||report.cleanup.session.sessionClose!=="ok")failure="SESSION_CLEANUP_FAILED";
