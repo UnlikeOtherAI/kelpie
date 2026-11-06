@@ -243,23 +243,31 @@ final class WorkflowCaptureUITests: XCTestCase {
             await attachFixtureGeometry(tab: tab)
             let status = try await probe.call("kelpie_get_script_status", [:])
             let error = status["runError"] as? Body ?? [:]
-            try await attachImmersiveLayoutTrace(runID: XCTUnwrap(status["runId"] as? String))
-            if ["CAPTURE_VIEWPORT_CHANGED", "CAPTURE_VIEWPORT_UNSTABLE"].contains(WorkflowCaptureProbe.errorCode(["error": error])) {
-                let diagnostic = try await probe.request("/v1/debug-screens", [:])
-                let receipt = try XCTUnwrap(diagnostic["testCaptureEvidence"] as? Body)
-                XCTAssertEqual(try XCTUnwrap(receipt["runId"] as? String), try XCTUnwrap(status["runId"] as? String))
-                let snapshot = receipt["viewportRefusal"] as? Body ?? ["site": "unavailable"]
-                let data = try JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys])
+            let run = status["runId"] as? String
+            let code = WorkflowCaptureProbe.errorCode(["error": error])
+            let terminal = XCTAttachment(string: "MCP terminal code: " + code)
+            terminal.name = "Paired run terminal failure"
+            terminal.lifetime = .keepAlways
+            add(terminal)
+            let trace = await collectImmersiveLayoutTrace(runID: run)
+            if ["CAPTURE_VIEWPORT_CHANGED", "CAPTURE_VIEWPORT_UNSTABLE"].contains(code) {
+                let diagnostic = try? await probe.request("/v1/debug-screens", [:])
+                let receipt = diagnostic?["testCaptureEvidence"] as? Body
+                let sameRun = run != nil && (receipt?["runId"] as? String) == run
+                let snapshot = sameRun ? receipt?["viewportRefusal"] as? Body : nil
+                let data = try JSONSerialization.data(withJSONObject: snapshot ?? ["site": "unavailable"], options: [.sortedKeys])
                 let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
                 attachment.name = "Paired run exact viewport refusal"
                 attachment.lifetime = .keepAlways
                 add(attachment)
             }
-            XCTFail("MCP play failed; terminal code: " + WorkflowCaptureProbe.errorCode(["error": error]))
+            assertImmersiveLayoutTrace(trace, runID: run)
+            XCTFail("MCP play failed; terminal code: " + code)
             return
         }
         let result = try XCTUnwrap(envelope["value"] as? Body)
-        try await attachImmersiveLayoutTrace(runID: XCTUnwrap(result["runId"] as? String))
+        let run = try XCTUnwrap(result["runId"] as? String)
+        let trace = await collectImmersiveLayoutTrace(runID: run)
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
         let geometry = try XCTUnwrap((result["outputs"] as? Body)?["tapGeometry"] as? Body)
@@ -271,35 +279,45 @@ final class WorkflowCaptureUITests: XCTestCase {
         evidence.lifetime = .keepAlways
         add(evidence)
         XCTAssertEqual(actual["centered"] as? Bool, true)
-        let run = try XCTUnwrap(result["runId"] as? String)
         let manifests = try XCTUnwrap(result["artifacts"] as? [Body])
         XCTAssertEqual(manifests.filter { $0["mimeType"] as? String == "image/png" }.count, steps.count)
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: run) }
         XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
+        assertImmersiveLayoutTrace(trace, runID: run)
     }
 
     @MainActor
-    private func attachImmersiveLayoutTrace(runID: String) async throws {
+    private func collectImmersiveLayoutTrace(runID: String?) async -> Body? {
         let after = XCTAttachment(screenshot: app.screenshot())
         after.name = "Paired capture after immersive layout"
         after.lifetime = .keepAlways
         add(after)
-        let diagnostic = try await probe.request("/v1/debug-screens", [:])
-        let receipt = try XCTUnwrap(diagnostic["testImmersiveLayout"] as? Body)
-        XCTAssertEqual(try XCTUnwrap(receipt["runId"] as? String), runID)
-        XCTAssertEqual(receipt["fixedNativePolicy"] as? Bool,
-                       testLaunchArguments.contains("--test-fixed-native-safe-area"))
-        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]),
+        let diagnostic = try? await probe.request("/v1/debug-screens", [:])
+        let candidate = diagnostic?["testImmersiveLayout"] as? Body
+        let receipt = runID != nil && (candidate?["runId"] as? String) == runID ? candidate : nil
+        var report = receipt ?? ["site": "unavailable"]
+        report["fixture"] = "fresh loopback and tab"
+        report["profile"] = "shared simulator app profile"
+        report["ordering"] = "test runner determined"
+        guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]) else { return receipt }
+        let attachment = XCTAttachment(data: data,
                                        uniformTypeIdentifier: "public.json")
         attachment.name = "Paired run immersive layout receipt"
         attachment.lifetime = .keepAlways
         add(attachment)
-        let postRunState = try XCTUnwrap(receipt["postRunState"] as? String)
-        XCTAssertTrue(["current", "retired"].contains(postRunState))
+        return receipt
+    }
+
+    @MainActor
+    private func assertImmersiveLayoutTrace(_ receipt: Body?, runID: String?) {
+        XCTAssertNotNil(runID)
+        XCTAssertEqual(receipt?["runId"] as? String, runID)
+        XCTAssertEqual(receipt?["fixedNativePolicy"] as? Bool,
+                       testLaunchArguments.contains("--test-fixed-native-safe-area"))
+        XCTAssertTrue(["current", "retired"].contains(receipt?["postRunState"] as? String ?? ""))
         for phase in ["request", "application", "baseline"] {
-            let facts = try XCTUnwrap(receipt[phase] as? Body)
-            XCTAssertEqual(facts["identityValid"] as? Bool, true, phase)
+            XCTAssertEqual((receipt?[phase] as? Body)?["identityValid"] as? Bool, true, phase)
         }
     }
 
