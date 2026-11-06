@@ -26,5 +26,6 @@ printf '{"version":1,"memoryBytes":%s,"cpuQuota":"%s","tasks":%s,"lint":"%s","bu
  "$memory" "$cpu" "$tasks" "$lint" "$build" "$test" "$code" >"$HISTORY_RECEIPT_DIR/suite.json"
 if [[ "$lint" != 0 ]]; then
  node "$(dirname "$0")/lint-receipt.mjs" "$HISTORY_LOG_DIR/lint.log" "$HISTORY_RECEIPT_DIR/lint-diagnostic.json" || true
+ node "$(dirname "$0")/lint-structured.mjs" "$HISTORY_RECEIPT_DIR/lint-structured.json" || true
 fi
 exit "$code"

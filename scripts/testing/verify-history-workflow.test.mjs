@@ -15,6 +15,12 @@ test("hosted verifier is opt-in, pinned, capped and retains only receipts",async
  assert.ok(job.includes("--uid=\"$uid\"")&&job.includes("--property=NoNewPrivileges=yes"));
  const upload=job.slice(job.indexOf("      - name: Retain bounded verification receipts"));
  assert.ok(upload.includes("patch-verification.json")&&upload.includes("suite.json")&&upload.includes("retirement.json"));
+ assert.ok(upload.includes("lint-structured.json"));
  assert.ok(!upload.includes("candidate.patch")&&!upload.includes("logs/"));
  assert.ok(text.includes("if: github.event_name != 'workflow_dispatch' || inputs.history_verify_patch_b64 == ''"));
+});
+test("authoritative suite receipt precedes optional lint diagnostics",async()=>{
+ const script=await readFile(new URL("./run-history-portable.sh",import.meta.url),"utf8");
+ assert.ok(script.indexOf('>"$HISTORY_RECEIPT_DIR/suite.json"') < script.indexOf('lint-structured.mjs'));
+ assert.ok(script.includes('lint-structured.json" || true'));
 });
