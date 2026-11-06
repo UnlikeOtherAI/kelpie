@@ -804,3 +804,18 @@ dispatch on child.requestFocus(); it establishes no system-key delegation
 result. Both cleanup receipts report CLEANUP_CONFIRMED. Artifact 13472040144
 retains the individual logs and receipts. The overall native job failed, and
 this scoped result does not establish API 29 or full-corpus acceptance.
+
+The opt-in hosted run [42152217154](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42152217154)
+passed build/lint and all three selected cases separately on API 35 phone and
+tablet at source ffeaf3ec2c33af0055f2bd0e8ad52b625e265307. Each profile
+passed public navigation Stop with SCRIPT_ABORTED and mayHaveCompleted true,
+followed by recovery; the owned WebView Enter down/up counts remained 1 during
+playback and reached 2 after Stop, with the same URL. The focused native child
+test passed its before/during/after Enter and system-key delegation assertions;
+this is not a physical HID test. Both cleanup receipts say CLEANUP_CONFIRMED.
+
+The app built and installed on each profile had SHA-256
+eabac321de5dae3283afd15415cadd6ab178cb627155265f1d58b61578ba6dfb; the test
+APK had SHA-256 ba38cee6864418ee24afa2ccd209a99525de567bced3f834fb9349927c7b8648.
+Artifact 13473018753 retains the individual receipts. These targeted results
+do not establish API 29, full-corpus or cross-platform acceptance.
