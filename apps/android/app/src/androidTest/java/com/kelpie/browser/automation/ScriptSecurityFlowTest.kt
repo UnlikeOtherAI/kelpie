@@ -2,6 +2,7 @@ package com.kelpie.browser.automation
 
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.test.platform.app.InstrumentationRegistry
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONArray
 import org.json.JSONObject
@@ -136,7 +137,11 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                         val artifact = artifacts.getJSONObject(index)
                         assertTrue(artifact.getBoolean("partial"))
                         val file = retrieve(client, stopped.getString("runId"), artifact)
-                        if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("api29Smoke") == "true") {
+                        val api29Smoke =
+                            InstrumentationRegistry
+                                .getArguments()
+                                .getString("api29Smoke") == "true"
+                        if (api29Smoke) {
                             val name =
                                 when (artifact.getString("mimeType")) {
                                     "image/gif" -> "api29-partial.gif"
