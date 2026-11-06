@@ -106,3 +106,27 @@ This is a failed control, not a headless pass or a diagnosis of the GNOME
 wait. The native `--headless` path selects Ozone headless; the test launcher
 removed display and session-bus references. More than GTK context therefore
 differs between the two attempts.
+
+## Instrumented 720 GNOME run
+
+A separate GNOME Wayland diagnostic used source
+`72003c1502da153dbab6305c63ba214e536d6213`, ELF SHA-256
+`3671d816e5c87282300d1383a8d3184fa6df3ecbbb8a0daeded9938a76007251`
+and manifest SHA-256
+`712999bce1e2d6e1c04524be6441acac3d891a152d7b36c760c355ad890e5780`.
+All 70 referenced runtime assets matched; relocation and required
+capture-factory checks passed before launch.
+
+The valid nontruncated core prefix reached FIRST_BROWSER_ENTER, with no return
+marker before the 30.033-second readiness timeout. The separately bounded
+auxiliary trace observed SCHEDULE_FIRST 55.927546 ms and CONTEXT_INITIALIZED
+1.235540 ms before FIRST_BROWSER_ENTER. GTK_PUMP_FIRST was not observed;
+a missing marker does not prove callback absence or establish a cause. No
+HTTP, MCP or AT-SPI action was attempted.
+
+The owned child was SIGKILLed after timeout, its private runtime was removed,
+the unit was inactive with MainPID zero and no cgroup, and the unrelated
+listener remained present. The unit ran 35.218 seconds. Sanitized receipt
+SHA-256:
+`47e8555724c309cdbe7ee092b38b71466752093392cc87c4b89fc1d109c8efc1`.
+No native Stop or physical displayed-pixel pass follows from this run.
