@@ -14,6 +14,10 @@ final class WorkflowCaptureUITests: XCTestCase {
     func ready() async throws -> (WorkflowLoopbackPage, String) {
         let fixture = try WorkflowLoopbackPage()
         let url = try await fixture.start()
+        if testLaunchArguments.contains("--test-pinch-content-mode") {
+            let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+            testLaunchArguments += ["--test-pinch-fixture-port", String(port)]
+        }
         let tab = try await openOwnedTab(url: "about:blank")
         try await waitForBlankFixtureAdmission(tab: tab)
         let navigated = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab,

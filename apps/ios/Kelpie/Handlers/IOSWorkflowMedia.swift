@@ -124,10 +124,10 @@ final class IOSWorkflowMedia {
 
     #if DEBUG
     static func recordSnapshotRefusal(
-        before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport, hasBaseline: Bool, targetBound: Bool
+        runID: String, before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport, hasBaseline: Bool, targetBound: Bool
     ) {
         guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt"),
-              testEvidence["runId"] is String else { return }
+              testEvidence["runId"] as? String == runID else { return }
         func values(_ viewport: IOSWorkflowTab.Viewport) -> [Double] {
             [viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
              viewport.visible.width, viewport.visible.height, viewport.scale, viewport.pixelRatio].map(Double.init)

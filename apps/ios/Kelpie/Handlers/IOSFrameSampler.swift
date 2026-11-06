@@ -6,6 +6,7 @@ import WebKit
 final class IOSFrameSampler {
     typealias Receiver = (CGImage, TimeInterval, Int?, String, IOSWorkflowTab.Viewport) throws -> Bool
     private let tab: IOSWorkflowTab
+    private let runID: String
     private let presentation: IOSWorkflowPresentation
     private let check: () async throws -> Void
     private let receive: Receiver
@@ -30,12 +31,14 @@ final class IOSFrameSampler {
 
     init(
         tab: IOSWorkflowTab,
+        runID: String,
         presentation: IOSWorkflowPresentation,
         settings: [String: Any],
         check: @escaping () async throws -> Void,
         receive: @escaping Receiver
     ) {
         self.tab = tab
+        self.runID = runID
         self.presentation = presentation
         self.check = check
         self.receive = receive
@@ -310,7 +313,7 @@ final class IOSFrameSampler {
         guard scrolled else {
             #if DEBUG
             IOSWorkflowMedia.recordSnapshotRefusal(
-                before: before, after: after, hasBaseline: hasBaseline, targetBound: expected != nil
+                runID: runID, before: before, after: after, hasBaseline: hasBaseline, targetBound: expected != nil
             )
             #endif
             Self.diagnostic("snapshot-" + Self.resizeReason(initial: before, viewport: after))

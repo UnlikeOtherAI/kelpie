@@ -266,12 +266,13 @@ struct TabWebViewContainer: UIViewRepresentable {
             preferences: WKWebpagePreferences,
             decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
         ) {
-            if ProcessInfo.processInfo.arguments.contains("--test-pinch-content-mode"),
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("--test-pinch-content-mode"),
+               let index = args.firstIndex(of: "--test-pinch-fixture-port"), index + 1 < args.count,
+               args.filter({ $0 == "--test-pinch-fixture-port" }).count == 1,
+               let port = UInt16(args[index + 1]), port > 0,
                webView === currentWebView, navigationAction.targetFrame?.isMainFrame == true,
-               let url = navigationAction.request.url, url.host == "127.0.0.1", url.path == "/pinch-scroll",
-               URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(
-                   where: { $0.name == "case" && $0.value == "mobile" }
-               ) == true {
+               navigationAction.request.url?.absoluteString == "http://127.0.0.1:\(port)/pinch-scroll?case=mobile" {
                 preferences.preferredContentMode = .mobile
                 IOSPinchObservation.noteMobilePolicy(view: webView)
             }
