@@ -214,8 +214,6 @@ struct BrowserView: View {
             migrateLegacyTabletViewportSelectionIfNeeded()
             layoutLoading = browserState.isLoading
         }
-        .ignoresSafeArea(.container, edges: serverState.isScriptImmersive ? [.top, .bottom] : [])
-        .statusBarHidden(serverState.isScriptImmersive)
         .onChange(of: browserState.currentURL) { _ in
             externalDisplayManager.triggerSyncPass()
             updateChromeSample()

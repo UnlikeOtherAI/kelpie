@@ -38,6 +38,7 @@ extension WorkflowCaptureUITests {
         for (name, formats, explicit, movie) in modes {
             let viewport = application.webViews.firstMatch
             let initial = viewport.frame
+            let statusVisibleBefore = application.statusBars.firstMatch.exists
             let beforeImage = XCTAttachment(screenshot: application.screenshot())
             beforeImage.name = name + " before script"
             beforeImage.lifetime = .keepAlways
@@ -53,6 +54,7 @@ extension WorkflowCaptureUITests {
             let chrome = application.buttons["browser.more"]
             if movie {
                 XCTAssertFalse(chrome.exists, name)
+                XCTAssertEqual(application.statusBars.firstMatch.exists, statusVisibleBefore, name)
             } else {
                 if chrome.exists { XCTAssertFalse(chrome.isEnabled, name) }
                 chromeCoordinate.tap()

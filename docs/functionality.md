@@ -511,7 +511,10 @@ moves continuously while the surrounding controls and material fade away.
 Editing locks the bar open above a docked keyboard; floating iPad keyboards leave
 the bar at the bottom. iPad tabs remain visible throughout. Programmatic scrolling does not
 collapse chrome. WebView geometry and staged viewport selection stay stable
-during collapse. Script recording hides all browser chrome.
+during collapse. Movie capture and legacy script playback hide browser chrome
+while keeping the existing system status bar and safe-area policy. Other
+strict workflows keep normal browser chrome visible but disabled while Stop is
+available.
 
 
 ### Mobile accounts

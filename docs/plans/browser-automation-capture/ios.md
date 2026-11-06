@@ -82,8 +82,9 @@ At integration base `419bc2cad3a5b72d1e25a032bfb4e5a4aaaf209f`, the app rebuilt 
 ## Active scripts and viewport layout
 
 An active script retains the existing Stop control, input blocking, orientation
-lock and lifecycle checks. GIF or video capture and legacy playback use the existing immersive
-viewport. No-capture workflows, automatic screenshots and explicit PNG actions
+lock and lifecycle checks. GIF or video capture and legacy playback hide browser
+chrome while preserving the normal system status bar and safe-area policy.
+No-capture workflows, automatic screenshots and explicit PNG actions
 keep the normal browser viewport and chrome while the existing Stop control
 is visible. Normal chrome is disabled and hidden from accessibility during the
 run, and existing address focus is retired. Loading and scroll-driven chrome
@@ -92,7 +93,7 @@ the same hierarchy while its active clip is square.
 
 The hosted presentation-mode test checks native Stop, disabled chrome and the
 WebView frame before, during and after each non-movie mode, and checks that GIF
-and video still use the immersive state. Additional controls cover address focus,
+and video hide browser chrome without changing system status visibility. Additional controls cover address focus,
 real delayed loading, scroll, and the iPad staged viewport. It retains screenshots
 for both device families. Device results are pending; source checks alone do not establish these
 behaviors or the keyboard transition policy.
