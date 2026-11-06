@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -48,7 +48,49 @@ test("summary never copies arbitrary output or errors", async () => {
       corpus: { stderr: "private-canary" },
     }));
     const result = await summarize(dir);
-    assert.deepEqual(result.scopes["installed-smoke"].native, { total: 2, passed: 1, failed: 1 });
+    assert.deepEqual(result.scopes["installed-smoke"].native, { total: 2, passed: 1, failed: 1, unknown: 0 });
     assert.doesNotMatch(JSON.stringify(result), /private-canary/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("retains validated media evidence and rejects unexpected fields", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "kelpie-media-"));
+  try {
+    const path = join(dir, "installed-smoke", "capture");
+    await mkdir(path, { recursive: true });
+    const sha256 = "a".repeat(64);
+    await writeFile(join(path, "all-frame-decode.json"), JSON.stringify({ artifacts: [
+      { sha256, mimeType: "video/mp4", decodedFrames: 2, timestamps: [0, 0.05], secret: "private-canary" },
+    ] }));
+    await writeFile(join(path, "continuous-marker-pixels.json"), JSON.stringify({
+      evidence: [{ mimeType: "video/mp4", markerPixels: [0, 100, 0], centers: [null, {x: 2, y: 3}, null],
+        expected: {x: 2, y: 3} }], violations: [] }));
+    await writeFile(join(path, "terminal-idr.json"), JSON.stringify({
+      results: [{ sha256, frames: 2, finalPTS: 0.05, packetSize: 10, nalLengthSize: 4, idr: true }],
+    }));
+    const result = (await summarize(dir)).scopes["installed-smoke"];
+    assert.deepEqual(result.decoded[0], { sha256, mimeType: "video/mp4", decodedFrames: 2, timestamps: [0, 0.05] });
+    assert.deepEqual(result.markers[0].markerPixels, [0, 100, 0]);
+    assert.equal(result.markerViolations, 0);
+    assert.equal(result.terminalIDR[0].idr, true);
+    assert.equal(result.terminalIDR[0].finalPTS, 0.05);
+    assert.doesNotMatch(JSON.stringify(result), /private-canary/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+test("rejects oversized inputs and symlinks", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "kelpie-evidence-bound-"));
+  try {
+    const path = join(dir, "installed-smoke", "capture");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "launch-report.json"), Buffer.alloc(8 * 1024 * 1024 + 1, 32));
+    assert.deepEqual((await summarize(dir)).scopes, {});
+    const outside = join(dir, "outside.json");
+    await writeFile(outside, JSON.stringify({ checks: [{ passed: true }] }));
+    try { await symlink(outside, join(path, "media-verification.json"), "file"); }
+    catch (error) {
+      if (["EPERM", "EACCES"].includes(error.code)) { t.diagnostic("Symlink creation unavailable on this host"); return; }
+      throw error;
+    }
+    assert.deepEqual((await summarize(dir)).scopes, {});
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
