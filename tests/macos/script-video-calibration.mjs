@@ -6,11 +6,11 @@ import {execFileSync,spawn,spawnSync} from "node:child_process";
 import path from "node:path";
 import {consumeG08Frames} from "../capture/g08-frame-stream.mjs";
 import {ffmpegPassthrough} from "../capture/ffmpeg-passthrough.mjs";
-import {validateCalibrationCase,decodedTicksAt600} from "./script-video-calibration-check.mjs";
+import {validateCalibrationCase,decodedTicksAt600,redExcess,classifyMarkerRegime,markerControls,caseNames} from "./script-video-calibration-check.mjs";
 
 const [inputName,outputName]=process.argv.slice(2);
 assert.ok(inputName&&outputName&&process.argv.length===4,"CALIBRATION_ARGUMENTS");
-assert.ok((await stat(inputName)).size<=32768,"CALIBRATION_MANIFEST_SIZE");
+assert.ok((await stat(inputName)).size<=65536,"CALIBRATION_MANIFEST_SIZE");
 const inputBytes=await readFile(inputName),input=JSON.parse(inputBytes.toString("utf8")),directory=await realpath(path.dirname(inputName));
 const inputSHA256=createHash("sha256").update(inputBytes).digest("hex");
 const command=(file,args)=>execFileSync(file,args,{encoding:"utf8",timeout:15000,maxBuffer:1048576}).trim();
@@ -26,10 +26,21 @@ const identity={source,node:process.version,architecture:process.arch,
  sdk:command("xcrun",["--sdk","macosx","--show-sdk-version"]),
  ffmpeg:{version:command(ffmpegPath,["-version"]).split("\n")[0],sha256:await hashFile(ffmpegPath)},
  ffprobe:{version:command(ffprobePath,["-version"]).split("\n")[0],sha256:await hashFile(ffprobePath)}};
-assert.equal(input.version,1);assert.equal(input.width,640);assert.equal(input.height,496);
+assert.equal(input.version,2);assert.equal(input.width,640);assert.equal(input.height,496);
 assert.deepEqual(input.roi,[432,200,97,97]);assert.equal(input.timeBase,"1/600");
-assert.ok(Array.isArray(input.cases)&&input.cases.length===2,"CALIBRATION_CASES");
-assert.deepEqual(input.cases.map(item=>item.name),["stable","varying"]);
+assert.ok(Array.isArray(input.cases)&&input.cases.length===caseNames.length,"CALIBRATION_CASES");
+assert.deepEqual(input.cases.map(item=>item.name),caseNames);
+assert.match(input.cleanROIHash,/^[a-f0-9]{64}$/);assert.match(input.varyingROIHash,/^[a-f0-9]{64}$/);
+assert.notEqual(input.cleanROIHash,input.varyingROIHash);
+assert.ok(Array.isArray(input.markerControls)&&input.markerControls.length===markerControls.length);
+const sourceHashes={clean:input.cleanROIHash,varying:input.varyingROIHash};
+for(let i=0;i<markerControls.length;i++){
+ const expected=markerControls[i],actual=input.markerControls[i];
+ assert.equal(actual.name,expected.name);assert.equal(actual.radiusPx,expected.radiusPx);assert.equal(actual.alpha,expected.alpha);
+ assert.equal(actual.color,expected.color);assert.equal(actual.anchor,expected.anchor);
+ assert.match(actual.sourceROIHash,/^[a-f0-9]{64}$/);assert.notEqual(actual.sourceROIHash,input.cleanROIHash);
+ sourceHashes[actual.name]=actual.sourceROIHash;
+}
 const results=[];let totalBytes=0;
 for(const item of input.cases){
  assert.equal(item.file,item.name+".mp4","CALIBRATION_FILENAME");
@@ -52,20 +63,28 @@ for(const item of input.cases){
   ...ffmpegPassthrough(ffmpegPath),"-f","rawvideo","-pix_fmt","rgb24","-"],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let stderr="";child.stderr.on("data",bytes=>{if(stderr.length<4096)stderr+=bytes.toString().slice(0,4096-stderr.length);});
  const exited=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",code=>code===0?resolve():reject(Error("CALIBRATION_DECODER "+stderr)));});
- void exited.catch(()=>{});const timer=setTimeout(()=>child.kill(),30000),decodedHashes=[];
+ void exited.catch(()=>{});const timer=setTimeout(()=>child.kill(),30000),decodedHashes=[],scores=[];
  try{
   const count=await consumeG08Frames(child.stdout,640,496,(frame,index)=>{
-   assert.ok(index<40,"CALIBRATION_FRAME_LIMIT");const hash=createHash("sha256");
-   for(let y=200;y<297;y++)hash.update(frame.subarray((y*640+432)*3,(y*640+529)*3));
-   decodedHashes.push(hash.digest("hex"));
+   assert.ok(index<40,"CALIBRATION_FRAME_LIMIT");const roi=Buffer.allocUnsafe(97*97*3);
+   for(let y=200;y<297;y++)frame.copy(roi,(y-200)*97*3,(y*640+432)*3,(y*640+529)*3);
+   decodedHashes.push(createHash("sha256").update(roi).digest("hex"));scores.push(redExcess(roi));
   });
   await exited;assert.equal(count,frames.length,"CALIBRATION_DECODE_COUNT");
  }finally{clearTimeout(timer);if(child.exitCode===null)child.kill();await exited.catch(()=>{});}
- results.push({...validateCalibrationCase(item,decodedTicks,decodedHashes),trackTimeBase:stream.time_base,trackPTS,artifactSHA256,bytes:info.size});
+ results.push({...validateCalibrationCase(item,decodedTicks,decodedHashes,sourceHashes),scores,trackTimeBase:stream.time_base,trackPTS,artifactSHA256,bytes:info.size});
 }
-const output={version:1,scope:"synthetic-identical-source-writer-calibration",inputSHA256,identity,width:640,height:496,
- roi:[432,200,97,97],writerTimeBase:"1/600",results};
+const training=results.find(result=>result.name==="stable").scores;
+const holdout=results.find(result=>result.name==="holdout").scores;
+const regimes=markerControls.map(control=>{
+ const result=results.find(value=>value.name===control.name);
+ const marker=result.scores.filter((_,index)=>result.sourceKinds[index]==="alternate");
+ const tail=result.scores.filter((_,index)=>result.sourceKinds[index]==="clean");
+ return {...control,...classifyMarkerRegime(training,holdout,marker,tail)};
+});
+const output={version:2,scope:"synthetic-encoded-visible-marker-calibration",inputSHA256,identity,width:640,height:496,
+ roi:[432,200,97,97],writerTimeBase:"1/600",metric:"sum-max-zero-red-minus-max-green-blue",regimes,results};
 const outputBytes=Buffer.from(JSON.stringify(output,null,2)+"\n");
 assert.ok(outputBytes.length<=65536,"CALIBRATION_OUTPUT_LIMIT");
 await writeFile(outputName,outputBytes,{flag:"wx"});
-console.log(JSON.stringify(results.map(({name,accepted,sourceUnique,decodedUnique,observation})=>({name,accepted,sourceUnique,decodedUnique,observation}))));
+console.log(JSON.stringify({cases:results.map(({name,accepted,sourceUnique,decodedUnique,observation})=>({name,accepted,sourceUnique,decodedUnique,observation})),regimes}));

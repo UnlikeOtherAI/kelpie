@@ -12,7 +12,7 @@ import Foundation
         let roiSHA256: String
     }
 
-    @MainActor static func fixture(offset: Int) throws -> Fixture {
+    @MainActor static func fixture(offset: Int, markerRadius: CGFloat = 0, markerAlpha: CGFloat = 0) throws -> Fixture {
         guard let graphics = CGContext(
             data: nil,
             width: width,
@@ -32,6 +32,11 @@ import Foundation
         graphics.addLine(to: CGPoint(x: CGFloat(494 + offset), y: 241))
         graphics.closePath()
         graphics.fillPath()
+        if markerRadius > 0 {
+            graphics.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: markerAlpha))
+            graphics.fillEllipse(in: CGRect(x: 480 - markerRadius, y: 248 - markerRadius,
+                                            width: markerRadius * 2, height: markerRadius * 2))
+        }
         guard let base = graphics.data, let image = graphics.makeImage() else { throw ScriptCaptureError.image }
         let bytes = base.assumingMemoryBound(to: UInt8.self)
         var cropped = Data(capacity: Int(roi.width * roi.height) * 4)
@@ -54,10 +59,12 @@ import Foundation
         var accepted: [[String: Any]] = []
         var rejected = 0
         for index in 0..<40 {
-            let chosen = (index / 5).isMultiple(of: 2) ? stable : (alternate ?? stable)
+            let useAlternate = alternate != nil && (name == "varying" ? !(index / 5).isMultiple(of: 2) : index < 20)
+            let chosen = useAlternate ? alternate! : stable
             let tick = (index + 1) * 30 // Exact 20 fps in the writer's 1/600 time base.
             if try writer.append(chosen.image, seconds: Double(tick) / 600) {
-                accepted.append(["tick": tick, "sourceROIHash": chosen.roiSHA256])
+                accepted.append(["tick": tick, "sourceROIHash": chosen.roiSHA256,
+                                 "sourceKind": useAlternate ? "alternate" : "clean"])
             } else {
                 rejected += 1
             }
@@ -82,14 +89,30 @@ import Foundation
         guard !FileManager.default.fileExists(atPath: directory.path) else { throw ScriptCaptureError.image }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         let first = try fixture(offset: 0), shifted = try fixture(offset: 8)
-        guard first.roiSHA256 != shifted.roiSHA256 else { throw ScriptCaptureError.image }
+        let smallFaint = try fixture(offset: 0, markerRadius: 3, markerAlpha: 0.02)
+        let smallVisible = try fixture(offset: 0, markerRadius: 3, markerAlpha: 0.10)
+        let mediumFaint = try fixture(offset: 0, markerRadius: 8, markerAlpha: 0.02)
+        guard [shifted, smallFaint, smallVisible, mediumFaint].allSatisfy({ $0.roiSHA256 != first.roiSHA256 }) else {
+            throw ScriptCaptureError.image
+        }
         let budget = ScriptCaptureBudget(directory: directory, maximumBytes: limit)
-        let stable = try await runCase(directory: directory, name: "stable", stable: first, alternate: nil, budget: budget)
-        let varying = try await runCase(directory: directory, name: "varying", stable: first, alternate: shifted, budget: budget)
-        let manifest: [String: Any] = ["version": 1, "width": width, "height": height,
-                                       "roi": [432, 200, 97, 97], "timeBase": "1/600", "cases": [stable, varying]]
+        var cases: [[String: Any]] = []
+        cases.append(try await runCase(directory: directory, name: "stable", stable: first, alternate: nil, budget: budget))
+        cases.append(try await runCase(directory: directory, name: "varying", stable: first, alternate: shifted, budget: budget))
+        cases.append(try await runCase(directory: directory, name: "holdout", stable: first, alternate: nil, budget: budget))
+        cases.append(try await runCase(directory: directory, name: "small-faint", stable: first, alternate: smallFaint, budget: budget))
+        cases.append(try await runCase(directory: directory, name: "small-visible", stable: first, alternate: smallVisible, budget: budget))
+        cases.append(try await runCase(directory: directory, name: "medium-faint", stable: first, alternate: mediumFaint, budget: budget))
+        let manifest: [String: Any] = ["version": 2, "width": width, "height": height,
+            "roi": [432, 200, 97, 97], "timeBase": "1/600", "cases": cases,
+            "cleanROIHash": first.roiSHA256, "varyingROIHash": shifted.roiSHA256,
+            "markerControls": [
+                ["name": "small-faint", "radiusPx": 3, "alpha": 0.02, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": smallFaint.roiSHA256],
+                ["name": "small-visible", "radiusPx": 3, "alpha": 0.10, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": smallVisible.roiSHA256],
+                ["name": "medium-faint", "radiusPx": 8, "alpha": 0.02, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": mediumFaint.roiSHA256]
+            ]]
         let data = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
-        guard data.count <= 32768 else { throw ScriptCaptureError.image }
+        guard data.count <= 65536 else { throw ScriptCaptureError.image }
         try data.write(to: directory.appendingPathComponent("input.json"), options: .withoutOverwriting)
     }
 }

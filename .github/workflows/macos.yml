@@ -303,3 +303,7 @@ jobs:
             .cache/writer-calibration/output/result.json
             .cache/writer-calibration/output/stable.mp4
             .cache/writer-calibration/output/varying.mp4
+            .cache/writer-calibration/output/holdout.mp4
+            .cache/writer-calibration/output/small-faint.mp4
+            .cache/writer-calibration/output/small-visible.mp4
+            .cache/writer-calibration/output/medium-faint.mp4
