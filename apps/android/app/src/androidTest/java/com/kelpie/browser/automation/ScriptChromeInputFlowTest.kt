@@ -38,19 +38,21 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                     return try {
                         info.flags = previousFlags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
                         automation.serviceInfo = info
-                        automation.windows.mapNotNull { window ->
-                            val root = window.root
-                            try {
-                                window.id.takeIf { root?.packageName?.toString() == instrumentation.targetContext.packageName }
-                            } finally {
-                                root?.recycle()
-                            }
-                        }.toSet()
+                        automation.windows
+                            .mapNotNull { window ->
+                                val root = window.root
+                                try {
+                                    window.id.takeIf { root?.packageName?.toString() == instrumentation.targetContext.packageName }
+                                } finally {
+                                    root?.recycle()
+                                }
+                            }.toSet()
                     } finally {
                         info.flags = previousFlags
                         automation.serviceInfo = info
                     }
                 }
+
                 fun tapMore() {
                     instrumentation.runOnMainSync {
                         check(decor.isAttachedToWindow)
@@ -81,7 +83,6 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                             JSONObject().put("expression", "({href:location.href, keys:window.__ownedKeyCount || 0})"),
                         ).getJSONObject("result")
 
-
                 val initialUrl = facts().getString("href")
                 client.call(
                     "evaluate",
@@ -111,7 +112,10 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                     assertTrue(client.call("get-script-status").optBoolean("playing"))
                     assertTrue("Script admission did not dismiss the baseline menu", ui.onAllNodesWithText("Settings").fetchSemanticsNodes().isEmpty())
                     assertTrue("Original popup window remained", (ownedWindowIds() intersect popupIds).isEmpty())
-                    assertTrue("Activity or window changed", ui.activity === activity && !activity.isFinishing && !activity.isDestroyed && decor.isAttachedToWindow && decor.windowToken === windowToken)
+                    assertTrue(
+                        "Activity or window changed",
+                        ui.activity === activity && !activity.isFinishing && !activity.isDestroyed && decor.isAttachedToWindow && decor.windowToken === windowToken,
+                    )
                     assertTrue("Active WebView changed", ScriptPinchProbe(instrumentation, activity.window.decorView).view === view)
                     assertTrue(ui.onAllNodesWithContentDescription("More").fetchSemanticsNodes().isEmpty())
                     tapMore()
