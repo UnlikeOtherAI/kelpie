@@ -49,19 +49,21 @@ class DesktopTestStreamGate {
     return {Decision::kAckDecode, ack, pending_decode_};
   }
 
-  void Ack(std::uint64_t token, bool success) {
+  bool Ack(std::uint64_t token, bool success) {
     std::lock_guard lock(mutex_);
-    if (pending_acks_.erase(token) != 1 || !success) InvalidateLocked();
+    if (pending_acks_.erase(token) != 1 || !success) { InvalidateLocked(); return false; }
+    return true;
   }
-  void Decoded(std::uint64_t epoch, std::uint64_t token, bool identity_current,
+  bool Decoded(std::uint64_t epoch, std::uint64_t token, bool identity_current,
                bool success, int x, int y) {
     std::lock_guard lock(mutex_);
-    if (!pending_decode_ || epoch != epoch_ || token != pending_decode_) { InvalidateLocked(); return; }
+    if (!pending_decode_ || epoch != epoch_ || token != pending_decode_) { InvalidateLocked(); return false; }
     pending_decode_ = 0;
     if (!active_ || !valid_ || !identity_current || !success || x < 0 || y < 0 || x > 1920 || y > 1920) {
-      InvalidateLocked(); return;
+      InvalidateLocked(); return false;
     }
     samples_.push_back({decode_receipt_, decode_protocol_, x, y});
+    return true;
   }
   void Invalidate() { std::lock_guard lock(mutex_); InvalidateLocked(); }
   std::optional<std::vector<Sample>> Seal(bool stop_succeeded, bool final_identity_current) {
