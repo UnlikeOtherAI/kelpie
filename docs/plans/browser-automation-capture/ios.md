@@ -269,3 +269,36 @@ weakly and queried identity after playback had returned; normal tab-wrapper
 retirement is a possible reporting explanation and does not establish an actual
 view or document change. The exact cause must be verified with phase-bound
 identity evidence.
+
+## Hosted safe-area comparison: 42147649193
+
+The focused comparison used revision `9f327d15c9221a1ca6f789a773d3e05c708e7e96`,
+source tree `4f1737361d6a0b1454793eb6916213cb2c202f2e`, Xcode 26.6 (17F113)
+and iOS 26.5 on iPhone 17 and iPad Air 13-inch (M4). The simulator executable
+SHA-256 was `e9a0b1b2fac00cf5f11f4205048e126e799b4760a9ab2e0ec431eae474e7ee8d`
+and the debug dylib SHA-256 was
+`ea5b989e97b51978dfb40683f21ddbce2eb5e49352f236f8ce7c1bd5261dc66c`.
+[The hosted run](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42147649193)
+retains the evidence. All three selected methods ran on each device; both
+simulators were verified shut down. Each comparison used a fresh loopback
+fixture and tab on the same build, but reused the simulator app profile and
+test-runner ordering.
+
+The iPhone passed the independent viewport inset setter unit and the test-only
+fixed safe-area/status policy journey. The default policy journey returned
+`CAPTURE_VIEWPORT_CHANGED`: its exact run-bound receipt shows a coherent
+same-document baseline before a snapshot changed from CSS height 812 to 778.
+Its native bounds remained 402x874; the capture fence correctly refused the
+change. With the fixed native policy the first baseline was native 402x812 and
+CSS 402x778. The fixed-policy journey completed its centered click, native
+marker and Stop check, four PNGs, GIF and MP4 downloads, and XCTest decoder
+checks. It does not prove which of the two coupled policy changes was causal.
+
+The iPad passed the setter unit and both paired journeys, including centered
+clicks, native marker and Stop checks, four PNGs, GIF and MP4 downloads, and
+XCTest decoder checks in each policy. Default baseline native/CSS sizes were
+1024x1366 and 1024x1346; fixed-policy sizes were 1024x1334 and 1024x1314.
+The trace recorded valid view/window/document identity at request, application
+and baseline and separately reported normal post-run tab-wrapper retirement.
+The fixed policy was a DEBUG-only control, not a released behavior or full
+cross-platform acceptance.
