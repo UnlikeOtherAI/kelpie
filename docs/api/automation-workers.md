@@ -211,3 +211,5 @@ node tests/native/worker-stdio-acceptance.mjs. It uses the actual
 packages/cli/bin/kelpie.js worker entrypoint, two shared sibling sessions and their
 popups, isolated storage, public observations, explicit WebMCP grants/refusals,
 borrowed-endpoint survival and stdout JSON protocol integrity. The Maxis corpus passed on sandbox-enabled headless Chromium151.0.7922.34; see the exact candidate, versions, hashes and limits in the desktop/backend ledger.
+
+When the stdio client closes its input, the worker closes the transport and runs the same owned-session and browser-connection cleanup used for transport shutdown. It does not terminate the external browser.
