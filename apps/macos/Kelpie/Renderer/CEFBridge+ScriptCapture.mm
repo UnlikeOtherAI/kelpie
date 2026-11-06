@@ -23,6 +23,13 @@
         cef_browser_host_t *host = CEFBridgeCopyBrowserHost([self activeBrowser]);
         if (host == nullptr) { completion(nil); return; }
         NSDictionary *params = @{@"format": @"png", @"fromSurface": @YES, @"captureBeyondViewport": @NO};
+#if DEBUG && defined(KELPIE_HOSTED_PNG_EQUIVALENCE_TEST)
+        // Compiled only for the isolated hosted equivalence experiment.
+        if ([NSProcessInfo.processInfo.environment[@"KELPIE_CEF_PNG_SPEED_TEST"] isEqualToString:@"1"]) {
+            params = @{@"format": @"png", @"fromSurface": @YES, @"captureBeyondViewport": @NO,
+                       @"optimizeForSpeed": @YES};
+        }
+#endif
         CEFBridgeSendBrowserControlCommand(host, @"Page.captureScreenshot", params, ^(BOOL success, NSDictionary *result) {
             NSString *encoded = success && [result[@"data"] isKindOfClass:NSString.class] ? result[@"data"] : nil;
             if (encoded.length == 0 || encoded.length > kelpie_mac_capture::kMaximumBase64Characters) { completion(nil); return; }
