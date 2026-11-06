@@ -1,10 +1,20 @@
 #include "../src/desktop_test_stream_gate.h"
 #include "../src/desktop_test_stream_collector.h"
+#include "../src/desktop_test_stream_event.h"
 #include <cassert>
 #include <limits>
 
 using Gate = kelpie::DesktopTestStreamGate;
 int main() {
+  {
+    using kelpie::ParseDesktopTestStreamEvent;
+    const auto valid = ParseDesktopTestStreamEvent(R"({"sessionId":4,"metadata":{"timestamp":1.25},"data":"AA=="})");
+    assert(valid && valid->session == 4 && valid->timestamp == 1.25 && valid->encoded == "AA==");
+    assert(!ParseDesktopTestStreamEvent(R"({"sessionId":0,"metadata":{"timestamp":1},"data":"AA=="})"));
+    assert(!ParseDesktopTestStreamEvent(R"({"sessionId":4,"metadata":{"timestamp":-1},"data":"AA=="})"));
+    assert(!ParseDesktopTestStreamEvent(R"({"sessionId":4,"metadata":{},"data":"AA=="})"));
+    assert(!ParseDesktopTestStreamEvent(std::string(3 * 1024 * 1024 + 1, 'x')));
+  }
   {
     Gate gate(7, 12, 1000);
     const auto first = gate.Admit(7, 12, 1, 1001, 10, 128, true);
