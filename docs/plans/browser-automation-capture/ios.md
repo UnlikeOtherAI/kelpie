@@ -236,3 +236,36 @@ fixture variants; native and visual scale remained 1. The separate default
 versus test-only mobile content-mode comparison likewise stayed at scale 1.
 These controls do not prove positive iPad page zoom and did not change app
 viewport policy.
+
+## Hosted immersive check: 42144385113
+
+The focused run exercised revision `6b1f6040a1a5f84c9c6b07a4acd945e34d4ad5bb`
+on an iPhone 17 and iPad Air 13-inch (M4), both iOS 26.5, with Xcode 26.6
+(17F113). The simulator executable SHA-256 was
+`e9a0b1b2fac00cf5f11f4205048e126e799b4760a9ab2e0ec431eae474e7ee8d` and its
+debug dylib SHA-256 was
+`c5e33caa9a815c96d93aa4549c364f5d610fbb20c276f3a167fd7671bae2ed8d`.
+[The hosted run](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42144385113)
+retains the results. Each device passed the unchanged-clearance viewport inset
+range unit and failed the paired UI method's post-run `identityValid`
+assertion. Both simulators were verified shut down.
+
+The iPhone paired run's exact refusal was a snapshot mismatch after a baseline,
+without a target binding: native bounds stayed 402x874 while CSS height changed
+812 to 778 and derived content changed from [0,62,402,812] to [0,62,402,778].
+The run-bound layout receipt recorded request, immersive application and first
+baseline. The immersive range was zero at application and baseline, while the
+first application still had the pre-transition window frame. The first
+baseline used the expanded native frame and CSS height 812. These observations
+do not establish why WebKit later reported height 778; the conservative
+post-baseline refusal remains intact.
+
+The iPad reached the successful MCP response branch, a centered fixture click,
+and a native green marker over Submit with Stop visible. The exported manifest
+does not retain the PNG, GIF or MP4 downloads, so this run does not prove their
+download or decode. Its layout receipt also recorded request, application and
+baseline, but reported post-run `identityValid: false`. The trace held the tab
+weakly and queried identity after playback had returned; normal tab-wrapper
+retirement is a possible reporting explanation and does not establish an actual
+view or document change. The exact cause must be verified with phase-bound
+identity evidence.
