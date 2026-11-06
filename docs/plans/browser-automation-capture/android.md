@@ -696,3 +696,50 @@ marker publication; the first screenshot was acquired 1.62–1.97 s after
 publication and the marker expired at its original five-second deadline.
 This diagnostic adds instrumentation and does not explain the earlier 2d8
 tablet failure. Tablet PNG, Stop and movie checks remain open.
+
+The hosted API 35 KVM phone and tablet acceptance run
+[42129812351](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42129812351)
+used source 2c1ac38d11536fa90c6f38acdf87211bba1e428a and the same installed
+app APK SHA-256
+8ab4a84eeb1927b6d9e27cdf9811c0a11a9847b948c8c334fa94632b334244cf
+on both profiles. The test APK hash was not retained by this workflow.
+Build and lint passed. The phone instrumentation reported 58 tests and five
+failures; the tablet reported 58 tests and four failures. These are emulator
+results, not physical-device or signed-release acceptance.
+
+Both native navigation Stop receipts report SCRIPT_ABORTED and
+mayHaveCompleted: true; their test bodies reached recovery, but both cases
+failed when the delayed-response MockWebServer timed out during shutdown. The
+receipt SHA-256 values are
+616aaa80525c101aa4ab373ec551a76c0d73be159c3195fcd0ef4f0c3ee4d510
+(phone) and
+acca301fc2a195359110165dbcaff9116c15862cb7252cb6961bcec6f50e430e
+(tablet). The real chrome-input case opened More before playback, then failed
+while dismissing that popup; active input blocking was not exercised. The
+PNG next-run marker case detected the original marker but could not exclude
+natural expiry before its next screenshot. Neither outcome proves a product
+input-blocking or retirement failure.
+
+Both navigation-scale cases returned VIEWPORT_CHANGED when the physical
+WebView size remained fixed and the destination document changed native page
+scale. The run-wide scale guard is inconsistent with this observed navigation;
+the exact guard site was not instrumented. The phone address-editing screenshot
+also returned VIEWPORT_CHANGED, with cause unresolved.
+
+Authenticated CLI pairing, run, status and artifact download succeeded on both
+profiles. Both CLI bridge cases nevertheless received complete:1 because
+their later host capture checks failed. Phone C/S GIF and MP4 checks reported
+insufficient dense samples or a missing pre-dispatch baseline; tablet capture
+ended with CAPTURE_DURATION_LIMIT before verification. Dense capture, short
+motion and the full public corpus therefore remain open.
+
+Artifact 13465656715 has GitHub-reported SHA-256
+33a3028019c5e82065f19c6380a63d669d40d26b24b52cc17f96a0de3fc00bbd.
+All 180 phone and 187 tablet exports listed in its report were present and
+matched their recorded hashes. Report SHA-256 is
+9eb111096b97d2c2b6f7454d03b36a5f839897916bc0288394a4b6d6737a5003;
+phone and tablet instrumentation logs are respectively
+f2ab740b7432d205dd53c194b66a6e3775d03d08b1af2461d0b67d1d85d3f16d and
+7abbae1a41bacb0b93e6c8da5b38c578ca60c24d3a20deaf7a6cc4bc6265a5ec.
+The hosted job ended and retained its logs; independent post-job process
+cleanup was not observed.
