@@ -165,3 +165,38 @@ diagnostics contain one snapshot mismatch from CSS/layout 402x812 to 402x778
 with native bounds 402x874 and unchanged safe/adjusted inset tuples. The
 retained diagnostic is aggregated and cannot establish which test emitted it
 or whether a baseline or target binding existed. No capture fence was changed.
+
+## Hosted geometry check: 42134918643
+
+The focused `geometry` run exercised revision
+`9cd08d9e834a07aa067ca85ef04c3ad87fd9fd3c`, source tree
+`6d32a50a198b6e5f2a7ee054aa819934f5b72f1d`, on iPhone 17 and iPad Air
+13-inch (M4), iOS 26.5, system WebKit and Xcode 26.6 (17F113). The simulator
+executable SHA-256 was
+`e9a0b1b2fac00cf5f11f4205048e126e799b4760a9ab2e0ec431eae474e7ee8d`;
+its debug dylib was
+`54cb0ca55b1ec04167a41d41e6f843fc5b3550a2560cdc7b1184d6e013cd9b16`.
+The AppReveal source revision was `5d6d16d67a7cd08069f3d69c2d484249e2ed8485`.
+[The hosted run](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42134918643)
+retains the device evidence.
+
+The iPhone passed nine of ten selected methods: the observer unit, three
+viewport units, live marker projection, calibrated partial target and step
+PNG, clipped target refusal, and scrollable pinch passed. The iPad-only
+comparison method returns early on iPhone. The paired MCP capture failed
+`CAPTURE_VIEWPORT_CHANGED`. The run-bound failure attachment contained
+`non-snapshot-or-unavailable`, not a baseline or target-bound snapshot
+tuple. One run-wide `native-insets` event recorded 402x812 to 402x778 CSS
+geometry with native bounds 402x874; it is not bound to that paired run.
+
+The iPad passed seven of ten selected methods, including the same-scene
+marker, paired MCP and decoded media, four unit controls, and the scoped
+content-mode comparison. The three ordinary default-mode pinch methods stayed
+at visual and native scale 1; the clipped-refusal method also recorded test
+termination. Both default and test-only mobile content modes used exactly
+`width=device-width,initial-scale=1`; the mobile preference was confirmed
+applied only to the owned loopback navigation. In each mode the owned
+recognizer began, changed 18 times, ended, and reached scale 1.8605 while the
+native and visual page scales stayed 1. This comparison does not justify
+changing the app's default content mode or prove positive iPad page zoom.
+All required methods were present and both simulators were verified shut down.
