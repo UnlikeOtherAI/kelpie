@@ -8,6 +8,8 @@ root="$(git rev-parse --show-toplevel)"
 out="$(realpath -m "$1")"
 app="$(realpath "$2")"
 tests="$(realpath "$3")"
+mode="${4:-full}"
+[[ "$mode" == full || "$mode" == targeted ]] || { echo INVALID_NATIVE_TEST_MODE >&2; exit 1; }
 mkdir -p "$out"
 printf 'GITHUB_ACTIONS=%s\nRUNNER_ENVIRONMENT=%s\nRUNNER_OS=%s\n' "$(printenv GITHUB_ACTIONS)" "$(printenv RUNNER_ENVIRONMENT)" "$(printenv RUNNER_OS)" > "$out/runner-environment.txt"
 export ANDROID_AVD_HOME="$out/avd"
@@ -117,6 +119,28 @@ for profile in phone tablet; do
     exit 1
   }
   adb -s "$serial" shell dumpsys package com.kelpie.browser | grep -E 'versionCode=|versionName=' > "$dir/installed-version.txt"
+  if [[ "$mode" == targeted ]]; then
+    printf 'targeted\n' > "$out/scope.txt"
+    installed_test="$(adb -s "$serial" shell pm path com.kelpie.browser.test | head -1 | tr -d '\r' | cut -d: -f2-)"
+    adb -s "$serial" shell sha256sum "$installed_test" > "$dir/installed-test-apk-sha256.txt"
+    [[ "$(cut -d ' ' -f1 "$dir/installed-test-apk-sha256.txt")" == "$(sha256sum "$tests" | cut -d ' ' -f1)" ]] || {
+      echo INSTALLED_TEST_APK_HASH_MISMATCH > "$dir/blocker.txt"
+      exit 1
+    }
+    if ! bash "$script_dir/android-native-targeted.sh" "$serial" "$dir" "$revision" "$profile" \
+      "$ownership" "$pid" "$owned_avd" "$owned_port" "$sdk" "$owned_started"; then result=1; fi
+    verify_device
+    finished_pid="$pid"
+    cleanup
+    if kill -0 "$finished_pid" 2>/dev/null || ! node "$ownership" ports "$port" "$((port + 1))"; then
+      echo CLEANUP_UNVERIFIED > "$dir/cleanup.txt"
+      result=1
+    else
+      echo CLEANUP_CONFIRMED > "$dir/cleanup.txt"
+    fi
+    continue
+  fi
+
   # Supported AndroidX instrumentation performs pairing/native UI assertions.
   # No adb input, desktop input or screen-control service is used.
   printf 'profile=%s phase=corpus\n' "$profile"
@@ -174,5 +198,5 @@ for profile in phone tablet; do
     grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed' "$dir/instrumentation.log"; then result=1; fi
   cleanup
 done
-node "$root/scripts/testing/android-native-report.mjs" "$out"
+if [[ "$mode" == full ]]; then node "$root/scripts/testing/android-native-report.mjs" "$out"; fi
 exit "$result"
