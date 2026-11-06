@@ -37,7 +37,14 @@ final class IOSWorkflowRunner {
         if requested == nil, !isRunning {
             if method == "get-script-status", host.playbackState.statusResponse()["playing"] as? Bool != true,
                let grant, authorized, let latest = terminal.last(where: { $0.owner == grant.owner }) {
+                #if DEBUG
+                var value = latest.value
+                let receipt = IOSAdmissionReceipt.result
+                if receipt["runId"] as? String == latest.id { value["testAdmissionReceipt"] = receipt }
+                return value
+                #else
                 return latest.value
+                #endif
             }
             return legacy()
         }
@@ -115,8 +122,11 @@ final class IOSWorkflowRunner {
         var actions: IOSWorkflowActions?
         var outputs: Body = [:]
         let check = { @MainActor [self] in try await requireCurrent(tab: tab, grant: grant) }
+        #if DEBUG
+        IOSAdmissionReceipt.begin(id, tab: tab)
+        #endif
         do {
-            try await tab.waitForRecordingLayout(check: check)
+            try await tab.waitForRecordingLayout(check: check, runID: id)
             let scene = try IOSWorkflowPresentation(tab: tab)
             presentation = scene
             let executor = IOSWorkflowActions(workflow: workflow, tab: tab, presentation: scene, router: host.router, check: check)
@@ -124,7 +134,8 @@ final class IOSWorkflowRunner {
             if let settings = workflow.capture {
                 let sink = try IOSWorkflowMedia(runID: id, owner: grant.owner, settings: settings)
                 media = sink
-                let sampler = IOSFrameSampler(tab: tab, presentation: scene, settings: settings, check: check, receive: sink.receive)
+                let sampler = IOSFrameSampler(tab: tab, presentation: scene, settings: settings, check: check,
+                                              receive: sink.receive, runID: id)
                 self.sampler = sampler
                 executor.sampler = sampler
                 try await sampler.start()

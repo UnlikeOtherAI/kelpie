@@ -5,6 +5,7 @@ import WebKit
 @MainActor
 final class IOSFrameSampler {
     typealias Receiver = (CGImage, TimeInterval, Int?, String, IOSWorkflowTab.Viewport) throws -> Bool
+    private let runID: String
     private let tab: IOSWorkflowTab
     private let presentation: IOSWorkflowPresentation
     private let check: () async throws -> Void
@@ -33,8 +34,10 @@ final class IOSFrameSampler {
         presentation: IOSWorkflowPresentation,
         settings: [String: Any],
         check: @escaping () async throws -> Void,
-        receive: @escaping Receiver
+        receive: @escaping Receiver,
+        runID: String
     ) {
+        self.runID = runID
         self.tab = tab
         self.presentation = presentation
         self.check = check
@@ -246,31 +249,46 @@ final class IOSFrameSampler {
             firstSceneGeneration = generation
             firstSceneDeadline = ProcessInfo.processInfo.systemUptime + 2
         }
-        let viewport = try await IOSCaptureViewportStability.wait(
-            deadline: firstSceneDeadline,
-            check: { [self] in try await check(); try checkTime() },
-            read: { [self] in
-                guard generation == tab.document else { return nil }
-                let viewport = try await tab.viewport()
-                try requirePinnedNativeViewport(viewport)
-                guard generation == tab.document else { return nil }
-                return viewport
-            },
-            admissible: { [self] viewport in
-                let insets = tab.view.scrollView.adjustedContentInset
-                let admitted = IOSCaptureViewportStability.matchesInsets(
-                    viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
-                )
-                #if DEBUG
-                let values = [viewport.bounds.width, viewport.bounds.height, viewport.visible.width, viewport.visible.height,
-                              viewport.scale, insets.top, insets.bottom, insets.left, insets.right, admitted ? 1 : 0]
-                if admissionFirst == nil { admissionFirst = values }
-                admissionLast = values
-                admissionCount += 1
-                #endif
-                return admitted
+        let viewport: IOSWorkflowTab.Viewport?
+        do {
+            viewport = try await IOSCaptureViewportStability.wait(
+                deadline: firstSceneDeadline,
+                check: { [self] in try await check(); try checkTime() },
+                read: { [self] in
+                    guard generation == tab.document else { return nil }
+                    let viewport = try await tab.viewport()
+                    try requirePinnedNativeViewport(viewport)
+                    guard generation == tab.document else { return nil }
+                    return viewport
+                },
+                admissible: { [self] viewport in
+                    let insets = tab.view.scrollView.adjustedContentInset
+                    let admitted = IOSCaptureViewportStability.matchesInsets(
+                        viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
+                    )
+                    #if DEBUG
+                    IOSAdmissionReceipt.observe(runID, tab: tab, phase: "first-scene", values: [
+                        viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
+                        viewport.visible.minX, viewport.visible.minY, viewport.visible.width, viewport.visible.height,
+                        viewport.scale, viewport.pixelRatio, insets.top, insets.bottom, insets.left, insets.right, admitted ? 1 : 0
+                    ])
+                    let values = [viewport.bounds.width, viewport.bounds.height, viewport.visible.width, viewport.visible.height,
+                                  viewport.scale, insets.top, insets.bottom, insets.left, insets.right, admitted ? 1 : 0]
+                    if admissionFirst == nil { admissionFirst = values }
+                    admissionLast = values
+                    admissionCount += 1
+                    #endif
+                    return admitted
+                }
+            )
+        } catch {
+            #if DEBUG
+            if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_UNSTABLE" {
+                IOSAdmissionReceipt.refuse(runID, tab: tab, site: "first-scene")
             }
-        )
+            #endif
+            throw error
+        }
         guard let viewport else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
             dropped += 1
@@ -302,6 +320,17 @@ final class IOSFrameSampler {
             return true
         }
         if !hasBaseline && expected == nil && now >= firstSceneDeadline {
+            #if DEBUG
+            IOSAdmissionReceipt.observe(runID, tab: tab, phase: "snapshot-changed", values: [
+                before.bounds.width, before.bounds.height, before.layout.width, before.layout.height,
+                before.visible.minX, before.visible.minY, before.visible.width, before.visible.height, before.scale, before.pixelRatio
+            ])
+            IOSAdmissionReceipt.observe(runID, tab: tab, phase: "snapshot-changed", values: [
+                after.bounds.width, after.bounds.height, after.layout.width, after.layout.height,
+                after.visible.minX, after.visible.minY, after.visible.width, after.visible.height, after.scale, after.pixelRatio
+            ])
+            IOSAdmissionReceipt.refuse(runID, tab: tab, site: "snapshot-changed")
+            #endif
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
         }
         let scrolled = after.bounds == before.bounds && after.content == before.content &&
@@ -387,6 +416,14 @@ final class IOSFrameSampler {
         if discarded { return false }
         if !hasBaseline {
             guard ProcessInfo.processInfo.systemUptime < firstSceneDeadline else {
+                #if DEBUG
+                IOSAdmissionReceipt.observe(runID, tab: tab, phase: "snapshot-deadline", values: [
+                    viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
+                    viewport.visible.minX, viewport.visible.minY, viewport.visible.width, viewport.visible.height,
+                    viewport.scale, viewport.pixelRatio
+                ])
+                IOSAdmissionReceipt.refuse(runID, tab: tab, site: "snapshot-deadline")
+                #endif
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
             }
             try pinViewport(viewport, generation: generation)

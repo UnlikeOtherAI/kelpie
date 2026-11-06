@@ -71,7 +71,7 @@ final class IOSWorkflowTab {
 
     var document: String { ConnectDocument.version(view) + ":" + (Self.commits.object(forKey: view) as String? ?? "initial") }
 
-    func waitForRecordingLayout(check: () async throws -> Void) async throws {
+    func waitForRecordingLayout(check: () async throws -> Void, runID: String) async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 2
         var last = CGRect.null
         var parent: UIView?
@@ -80,6 +80,11 @@ final class IOSWorkflowTab {
             try await check()
             view.window?.layoutIfNeeded()
             let frame = view.convert(view.bounds, to: view.window)
+            #if DEBUG
+            IOSAdmissionReceipt.observe(runID, tab: self, phase: "native-layout", values: [
+                frame.minX, frame.minY, frame.width, frame.height
+            ])
+            #endif
             let now = ProcessInfo.processInfo.systemUptime
             if !frame.isEmpty, let current = view.superview, last == frame, current === parent {
                 if now - stableSince >= 0.08 { return }
@@ -90,6 +95,9 @@ final class IOSWorkflowTab {
             }
             try await Task.sleep(nanoseconds: 16_000_000)
         } while ProcessInfo.processInfo.systemUptime < deadline
+        #if DEBUG
+        IOSAdmissionReceipt.refuse(runID, tab: self, site: "native-layout")
+        #endif
         throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
     }
 

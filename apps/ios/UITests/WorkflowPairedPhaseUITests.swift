@@ -3,6 +3,7 @@ import XCTest
 extension WorkflowCaptureUITests {
     @MainActor
     func testPairedMCPWithBoundedPhaseObservation() async throws {
+        testLaunchArguments = ["--test-paired-admission-receipt"]
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let steps: [Body] = [
@@ -58,6 +59,17 @@ extension WorkflowCaptureUITests {
             observations: matches ? observation.samples : [],
             limitation: "bounded read-only polling may affect timing; native marker and Stop are tested separately"
         )
+        var admissionAttached = false
+        if let status = try? await probe.request("/v1/get-script-status", [:], timeout: 3),
+           let receipt = status["testAdmissionReceipt"] as? Body,
+           let receiptRun = receipt["runId"] as? String, receiptRun == run,
+           let data = try? JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]) {
+            let admission = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            admission.name = "Paired run admission receipt"
+            admission.lifetime = .keepAlways
+            add(admission)
+            admissionAttached = true
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let attachment: XCTAttachment
@@ -83,5 +95,6 @@ extension WorkflowCaptureUITests {
         XCTAssertEqual(manifests.filter { $0["mimeType"] as? String == "image/png" }.count, steps.count)
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: runID) }
+        XCTAssertTrue(admissionAttached, "Expected an exact-run admission receipt")
     }
 }
