@@ -26,8 +26,31 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                 pair(client)
                 val tab = load(client, server)
                 val moreBounds = ui.onNodeWithContentDescription("More").fetchSemanticsNode().boundsInWindow
-                val decor = ui.activity.window.decorView
+                val activity = ui.activity
+                val decor = activity.window.decorView
+                val windowToken = checkNotNull(decor.windowToken)
 
+                @Suppress("DEPRECATION")
+                fun ownedWindowIds(): Set<Int> {
+                    val automation = instrumentation.uiAutomation
+                    val info = automation.serviceInfo
+                    val previousFlags = info.flags
+                    return try {
+                        info.flags = previousFlags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                        automation.serviceInfo = info
+                        automation.windows.mapNotNull { window ->
+                            val root = window.root
+                            try {
+                                window.id.takeIf { root?.packageName?.toString() == instrumentation.targetContext.packageName }
+                            } finally {
+                                root?.recycle()
+                            }
+                        }.toSet()
+                    } finally {
+                        info.flags = previousFlags
+                        automation.serviceInfo = info
+                    }
+                }
                 fun tapMore() {
                     instrumentation.runOnMainSync {
                         check(decor.isAttachedToWindow)
@@ -58,12 +81,7 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                             JSONObject().put("expression", "({href:location.href, keys:window.__ownedKeyCount || 0})"),
                         ).getJSONObject("result")
 
-                tapMore()
-                ui.waitForIdle()
-                assertTrue("Owned touch did not open the baseline menu", ui.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
-                ui.runOnUiThread { ui.activity.onBackPressedDispatcher.onBackPressed() }
-                ui.waitForIdle()
-                assertTrue(ui.onAllNodesWithText("Settings").fetchSemanticsNodes().isEmpty())
+
                 val initialUrl = facts().getString("href")
                 client.call(
                     "evaluate",
@@ -78,12 +96,23 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                 val keyDeadline = System.nanoTime() + 3_000_000_000L
                 while (facts().getInt("keys") == 0 && System.nanoTime() < keyDeadline) Thread.sleep(20)
                 assertEquals("Owned Enter did not reach the baseline page", 1, facts().getInt("keys"))
+                val beforePopup = ownedWindowIds()
+                // Leave the owned popup open: script admission must dismiss it.
+                tapMore()
+                ui.waitForIdle()
+                assertTrue("Owned touch did not open the baseline menu", ui.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty())
+                val popupIds = ownedWindowIds() - beforePopup
+                assertTrue("Owned popup window was not identified", popupIds.isNotEmpty())
                 val executor = Executors.newSingleThreadExecutor()
                 try {
                     val script = client.script(tab, client.action("wait").put("ms", 20_000))
                     val pending = executor.submit<JSONObject> { client.request("/v1/play-script", script).second }
                     awaitRecordingUi(pending)
                     assertTrue(client.call("get-script-status").optBoolean("playing"))
+                    assertTrue("Script admission did not dismiss the baseline menu", ui.onAllNodesWithText("Settings").fetchSemanticsNodes().isEmpty())
+                    assertTrue("Original popup window remained", (ownedWindowIds() intersect popupIds).isEmpty())
+                    assertTrue("Activity or window changed", ui.activity === activity && !activity.isFinishing && !activity.isDestroyed && decor.isAttachedToWindow && decor.windowToken === windowToken)
+                    assertEquals("Active tab changed", tab, client.call("get-tabs").getString("activeTab"))
                     assertTrue(ui.onAllNodesWithContentDescription("More").fetchSemanticsNodes().isEmpty())
                     tapMore()
                     enter()

@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class ScriptNavigationStopTest : ScriptPublicFixture() {
     @Test
     fun nativeStopDuringIssuedNavigationPreservesUncertaintyAndRecovers() {
+        val releaseResponse = CountDownLatch(1)
         MockWebServer().use { server ->
             server.start()
             ScriptHttpFixture().use { client ->
@@ -33,10 +34,11 @@ class ScriptNavigationStopTest : ScriptPublicFixture() {
                             if (request.path != "/slow") return MockResponse().setResponseCode(404)
                             requests.incrementAndGet()
                             issued.countDown()
+                            check(releaseResponse.await(30, TimeUnit.SECONDS))
                             return MockResponse()
                                 .setHeader("Content-Type", "text/html")
                                 .setBody("<!doctype html><title>Delayed destination</title>")
-                                .setBodyDelay(8, TimeUnit.SECONDS)
+
                         }
                     }
                 val executor = Executors.newSingleThreadExecutor()
@@ -55,6 +57,7 @@ class ScriptNavigationStopTest : ScriptPublicFixture() {
                     assertEquals(1, requests.get())
                     assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
                 } finally {
+                    releaseResponse.countDown()
                     executor.shutdownNow()
                 }
             }
