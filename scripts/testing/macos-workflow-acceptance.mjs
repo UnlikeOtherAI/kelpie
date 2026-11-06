@@ -24,7 +24,7 @@ if(process.argv[2]==="--preparation"){
 }
 requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
 const scope=process.env.KELPIE_RUNTIME_SCOPE??"full";
-requireTrue(["full","cef-timing","cef-stream"].includes(scope),"RUNTIME_SCOPE");
+requireTrue(["full","cef-timing","cef-stream","cef-overlay"].includes(scope),"RUNTIME_SCOPE");
 const root=await realpath("."),app=await realpath("apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app");
 requireTrue(app.startsWith(root+"/apps/macos/.build-runtime/"),"CANDIDATE_PATH");
 const label=process.env.KELPIE_EVIDENCE_LABEL??"";
@@ -46,9 +46,10 @@ const report={source,scope,pumpMode,platform:process.platform,
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
 const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[],cefPumpSignals=[],streamSignals=[];
 report.streamSignals=streamSignals;
-if(scope==="cef-stream")fixture=await startFixture();
+if(["cef-stream","cef-overlay"].includes(scope))fixture=await startFixture();
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],
- env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:scope==="cef-stream"?"1":"0",
+ env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:["cef-stream","cef-overlay"].includes(scope)?"1":"0",
+  KELPIE_CEF_OVERLAY_TEST:scope==="cef-overlay"?"1":"0",KELPIE_CEF_OVERLAY_DIRECTORY:privateDir,
   KELPIE_CEF_STREAM_ORIGIN:fixture?.url??"",KELPIE_CEF_STREAM_NONCE:fixture?String(fixture.streamNonce):""}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
@@ -75,7 +76,7 @@ for(const stream of [child.stdout,child.stderr]){
 }
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
- report.pid=child.pid;client=new Client(child.pid,out,executable);phase="listeners";
+ report.pid=child.pid;client=new Client(child.pid,out,executable);client.overlayDir=privateDir;phase="listeners";
  await waitFor(()=>client.ready(),30000);
  phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
  fixture??=await startFixture();
@@ -88,7 +89,7 @@ try{
    ...(error.code==="LISTENER_IDENTITY"?{listenerFailure:client.listenerFailure}:{}),
   }));
  }
- if(scope==="cef-timing"||scope==="cef-stream"){
+ if(["cef-timing","cef-stream","cef-overlay"].includes(scope)){
   await independent("chromium",()=>runEngine(client,fixture,"chromium",report,scope,Boolean(label)));
  }else{
   await independent("webkit",()=>runEngine(client,fixture,"webkit",report));

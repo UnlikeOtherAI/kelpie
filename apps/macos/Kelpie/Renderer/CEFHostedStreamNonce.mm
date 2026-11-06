@@ -39,9 +39,9 @@ BOOL CEFHostedStreamHasNonce(NSData *encoded, uint16_t nonce, double viewportWid
         const size_t topY = static_cast<size_t>((bit / 4 * 12 + 6) * height / viewportHeight);
         if (x >= width || topY >= height) { matches = false; break; }
         const size_t offset = (topY * width + x) * 4;
-        const bool black = (nonce & (1u << bit)) != 0;
+        const bool gray = (nonce & (1u << bit)) != 0;
         for (unsigned channel = 0; channel < 3; ++channel) {
-            if (black ? rgba[offset + channel] > 16 : rgba[offset + channel] < 239) { matches = false; }
+            if (gray ? (rgba[offset + channel] < 184 || rgba[offset + channel] > 224) : rgba[offset + channel] < 239) { matches = false; }
         }
         if (rgba[offset + 3] < 250) { matches = false; }
     }

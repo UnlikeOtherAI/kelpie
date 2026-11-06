@@ -19,6 +19,7 @@ on:
           - cef-timing
           - cef-pump-compare
           - cef-stream
+          - cef-overlay
         default: full
 
 permissions:
@@ -127,7 +128,7 @@ jobs:
           run_xcodebuild() {
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
-            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" ]]; then
+            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" || "${{ inputs.runtime_scope }}" == "cef-overlay" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) DEBUG=1 KELPIE_HOSTED_STREAM_TEST=1' \
                 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG KELPIE_HOSTED_STREAM_TEST' \
                 'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DDEBUG=1 -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
@@ -153,7 +154,7 @@ jobs:
           .cache/macos-ci/cef-pump-scheduler-test
 
       - name: Test hosted CEF stream controls
-        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && inputs.runtime_scope == 'cef-stream'
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && (inputs.runtime_scope == 'cef-stream' || inputs.runtime_scope == 'cef-overlay')
         timeout-minutes: 2
         run: |
           set -euo pipefail
@@ -170,6 +171,21 @@ jobs:
             -framework AppKit -framework Foundation -framework ImageIO -framework CoreGraphics \
             tests/macos/cef-stream-nonce.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamNonce.mm -o .cache/macos-ci/cef-stream-nonce
           .cache/macos-ci/cef-stream-nonce
+          xcrun swiftc -warnings-as-errors -DDEBUG -DKELPIE_HOSTED_STREAM_TEST -parse-as-library \
+            tests/macos/cef-overlay-disposal.test.swift apps/macos/Kelpie/Handlers/ScriptHostedOverlayCapture.swift \
+            -o .cache/macos-ci/cef-overlay-disposal
+          .cache/macos-ci/cef-overlay-disposal
+          xcrun swiftc -suppress-warnings -parse-as-library tests/macos/cef-overlay-writer.test.swift \
+            apps/macos/Kelpie/Handlers/ScriptCaptureError.swift apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift \
+            apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift \
+            -o .cache/macos-ci/cef-overlay-writer
+          .cache/macos-ci/cef-overlay-writer
+          xcrun swiftc -suppress-warnings -DDEBUG -DKELPIE_HOSTED_STREAM_TEST -parse-as-library \
+            tests/macos/cef-overlay-integration.test.swift apps/macos/Kelpie/Handlers/ScriptCaptureError.swift \
+            apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift \
+            apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift apps/macos/Kelpie/Handlers/ScriptCaptureCompositor.swift \
+            apps/macos/Kelpie/Handlers/ScriptHostedOverlayCapture.swift -o .cache/macos-ci/cef-overlay-integration
+          .cache/macos-ci/cef-overlay-integration
 
       - name: Run hosted workflow admission XCTest
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
@@ -216,7 +232,7 @@ jobs:
           run_xcodebuild() {
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
-            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" ]]; then
+            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" || "${{ inputs.runtime_scope }}" == "cef-overlay" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) DEBUG=1 KELPIE_HOSTED_STREAM_TEST=1' \
                 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG KELPIE_HOSTED_STREAM_TEST' \
                 'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DDEBUG=1 -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"

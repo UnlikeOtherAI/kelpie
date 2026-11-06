@@ -77,6 +77,13 @@ final class ScriptVideoWriter {
         return true
     }
 
+    /// Cancel and remove all unpublished fragments when a capture loses authority.
+    func discard() {
+        pending = nil
+        writer.cancelWriting()
+        sink.discard()
+    }
+
     func finish(endSeconds: Double? = nil) async throws -> URL {
         let end = endSeconds ?? lastAcceptedSeconds + 1 / 30
         guard end.isFinite, end <= 300, end > lastAcceptedSeconds, pending != nil || submittedFrames > 0 else {

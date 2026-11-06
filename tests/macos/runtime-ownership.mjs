@@ -109,7 +109,7 @@ export function hostedStreamSignal(line){
  if(line==="[WorkflowHostedStream] event=discarded")return {event:"discarded"};
  const fence=/^\[WorkflowHostedStream\] event=fence stop=(\d{1,2}) failure=(\d{1,2}) stale=(\d{1,3})$/.exec(line);
  if(fence){const stop=Number(fence[1]),failure=Number(fence[2]),stale=Number(fence[3]);return stop<=10&&failure<=10?{event:"fence",stop,failure,stale}:null;}
- const refusal=/^\[WorkflowHostedStream\] event=refusal reason=(stop|authority|fixture|identity|document|viewport|seal|sample|audit)$/.exec(line);
+ const refusal=/^\[WorkflowHostedStream\] event=refusal reason=(stop|authority|fixture|identity|document|viewport|seal|sample|audit|overlay)$/.exec(line);
  if(refusal)return {event:"refusal",reason:refusal[1]};
  const probe=/^\[WorkflowHostedStream\] event=probe received=(\d{1,3}) consumed=(\d{1,3}) malformed=(\d{1,3}) metadata=(\d{1,2}) rejected=(\d{1,3}) drop=(\d{1,3}) decode=(\d{1,3}) stop=(\d{1,3}) ackfail=(\d{1,3}) decodefail=(\d{1,3}) overflow=(\d{1,3}) detached=(\d{1,3}) identity=(\d{1,3}) protocol=(\d{1,3}) stopped=([01])$/.exec(line);
  if(probe){const values=probe.slice(1).map(Number); if(values[3]>63)return null;

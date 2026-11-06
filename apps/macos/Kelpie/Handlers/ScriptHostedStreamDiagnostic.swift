@@ -14,6 +14,10 @@ final class ScriptHostedStreamDiagnostic {
     private let documentID: String
     private let fixtureOrigin: String
     private var probe: CEFHostedStreamProbe?
+    private var overlay: ScriptHostedOverlayCapture?
+    private let presentation: ScriptPresentation
+    private let runID: String
+    private var preparedSamples: [(receipt: Int, protocolTime: Int, x: Int, y: Int)]?
 
     static var requested: Bool {
         let env = ProcessInfo.processInfo.environment
@@ -21,7 +25,7 @@ final class ScriptHostedStreamDiagnostic {
             env["KELPIE_HOSTED_RUNTIME"] == "1" && env["KELPIE_CEF_STREAM_TEST"] == "1"
     }
 
-    init(tab: ScriptWorkflowTab) async throws {
+    init(tab: ScriptWorkflowTab, presentation: ScriptPresentation, runID: String) async throws {
         try await tab.check()
         guard let origin = ProcessInfo.processInfo.environment["KELPIE_CEF_STREAM_ORIGIN"],
               let parts = URLComponents(string: origin), parts.scheme == "http", parts.host == "127.0.0.1",
@@ -35,6 +39,8 @@ final class ScriptHostedStreamDiagnostic {
         guard state.viewport.scale == 1, state.viewport.pageOrigin == .zero,
               state.viewport.visible.origin == .zero else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         self.tab = tab
+        self.presentation = presentation
+        self.runID = runID
         self.renderer = renderer
         self.bridge = bridge
         self.window = window
@@ -66,6 +72,21 @@ final class ScriptHostedStreamDiagnostic {
             }
         )
         self.probe = probe
+        if ProcessInfo.processInfo.environment["KELPIE_CEF_OVERLAY_TEST"] == "1" {
+            guard let raw = ProcessInfo.processInfo.environment["KELPIE_CEF_STREAM_NONCE"],
+                  let nonce = UInt16(raw) else { throw ScriptWorkflowFailure("INVALID_PARAM") }
+            let overlay = try ScriptHostedOverlayCapture(
+                tab: tab,
+                presentation: presentation,
+                runID: runID,
+                isCurrent: { [weak self] in self?.isCurrent() == true }
+            )
+            self.overlay = overlay
+            probe.setFixtureNonce(nonce, context: { [weak overlay] in overlay?.context() }, frame: { [weak overlay] data, receipt, context in
+                guard let context = context as? ScriptHostedOverlayCapture.Context else { return }
+                overlay?.receive(data, receipt: receipt, context: context)
+            })
+        }
         do {
             let started = try await ScriptRendererDeadline.run(
                 renderer: renderer,
@@ -80,6 +101,8 @@ final class ScriptHostedStreamDiagnostic {
             guard started else { throw ScriptWorkflowFailure("CAPTURE_FAILED") }
             print("[WorkflowHostedStream] event=started")
         } catch {
+            overlay?.discard()
+            overlay = nil
             Task { _ = await probe.stop() }
             throw error
         }
@@ -127,18 +150,39 @@ final class ScriptHostedStreamDiagnostic {
                 }
                 validated.append((Int(receipt), Int(protocolTime), x, y))
             }
-            for (index, sample) in validated.enumerated() {
-                print("[WorkflowHostedStream] event=sample index=\(index) receipt=\(sample.receipt) " +
-                      "protocol=\(sample.protocolTime) x=\(sample.x) y=\(sample.y)")
-            }
-            print("[WorkflowHostedStream] event=complete count=\(samples.count)")
+            if let overlay, !(await overlay.prepare()) { discard("overlay"); return }
+            preparedSamples = validated
         } catch {
             Task { _ = await probe.stop() }
             discard("audit")
         }
     }
 
+    /// Called only after the ordinary capture writer and artifact registration have finished.
+    func commit(allowed: Bool) async {
+        guard let samples = preparedSamples else { return }
+        preparedSamples = nil
+        guard allowed else { discard("authority"); return }
+        do {
+            try await tab.check()
+            let state = try await tab.hostedFixtureCaptureState(origin: fixtureOrigin)
+            try await tab.check()
+            guard isCurrent(), state.document == documentID, state.viewport == viewport else { discard("audit"); return }
+            if let overlay, !(await overlay.publish()) { discard("overlay"); return }
+            for (index, sample) in samples.enumerated() {
+                print("[WorkflowHostedStream] event=sample index=\(index) receipt=\(sample.receipt) " +
+                      "protocol=\(sample.protocolTime) x=\(sample.x) y=\(sample.y)")
+            }
+            print("[WorkflowHostedStream] event=complete count=\(samples.count)")
+            overlay?.discard()
+            overlay = nil
+        } catch { discard("audit") }
+    }
+
     private func discard(_ reason: String) {
+        preparedSamples = nil
+        overlay?.discard()
+        overlay = nil
         print("[WorkflowHostedStream] event=refusal reason=\(reason)")
         print("[WorkflowHostedStream] event=discarded")
     }

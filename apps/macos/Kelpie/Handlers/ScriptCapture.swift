@@ -64,7 +64,7 @@ final class ScriptCapture {
         started = ProcessInfo.processInfo.systemUptime
         #if DEBUG && KELPIE_HOSTED_STREAM_TEST
         if hasMovies, fps == 30, ScriptHostedStreamDiagnostic.requested {
-            let diagnostic = try await ScriptHostedStreamDiagnostic(tab: tab)
+            let diagnostic = try await ScriptHostedStreamDiagnostic(tab: tab, presentation: presentation, runID: runID)
             try await diagnostic.start()
             streamDiagnostic = diagnostic
         }
@@ -144,7 +144,6 @@ final class ScriptCapture {
         frameTask = nil
         #if DEBUG && KELPIE_HOSTED_STREAM_TEST
         await streamDiagnostic?.finish(allowed: !partial && !discard && failure == nil)
-        streamDiagnostic = nil
         #endif
         let end = min(max(stoppedAt ?? now, 1 / Double(fps)), maximumDuration)
         var candidates = screenshots.map { ($0.0, "image/png", $0.1) }
@@ -199,10 +198,24 @@ final class ScriptCapture {
             } catch { failure = Self.code(error) }
         }
         if discard {
+            #if DEBUG && KELPIE_HOSTED_STREAM_TEST
+            await finishDiagnostic(allowed: false)
+            #endif
             try? FileManager.default.removeItem(at: rawDirectory)
             try? FileManager.default.removeItem(at: directory)
             return []
         }
+        register(candidates, partial: partial)
+        try? FileManager.default.removeItem(at: rawDirectory)
+        ScriptCaptureOutputCleanup.prune(directory: directory, retaining: candidates.map { $0.0 })
+        #if DEBUG && KELPIE_HOSTED_STREAM_TEST
+        await finishDiagnostic(allowed: !partial && failure == nil && !manifests.isEmpty)
+        #endif
+        if manifests.isEmpty { try? FileManager.default.removeItem(at: directory) }
+        return manifests
+    }
+
+    private func register(_ candidates: [(URL, String, [String: Any])], partial: Bool) {
         for (url, mime, extra) in candidates {
             do {
                 var extra = extra
@@ -211,11 +224,14 @@ final class ScriptCapture {
                     url: url, runID: runID, mimeType: mime, owner: tab.grant.owner, extra: extra))
             } catch { failure = "CAPTURE_ARTIFACT_FAILED"; try? FileManager.default.removeItem(at: url) }
         }
-        try? FileManager.default.removeItem(at: rawDirectory)
-        ScriptCaptureOutputCleanup.prune(directory: directory, retaining: candidates.map { $0.0 })
-        if manifests.isEmpty { try? FileManager.default.removeItem(at: directory) }
-        return manifests
     }
+
+    #if DEBUG && KELPIE_HOSTED_STREAM_TEST
+    private func finishDiagnostic(allowed: Bool) async {
+        await streamDiagnostic?.commit(allowed: allowed)
+        streamDiagnostic = nil
+    }
+    #endif
 
     private var now: Double { ProcessInfo.processInfo.systemUptime - started }
     private var metadata: [String: Any] {

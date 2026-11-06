@@ -16,7 +16,7 @@ test("stream fixture renders its own non-auth nonce as sixteen binary cells",asy
   assert.ok(marker);
   const cells=[...marker.matchAll(/<i style="background:(#[0-9a-f]{3})"><\/i>/g)].map(m=>m[1]);
   assert.equal(cells.length,16);
-  for(let i=0;i<16;i++)assert.equal(cells[i],fixture.streamNonce&(1<<i)?"#000":"#fff");
+  for(let i=0;i<16;i++)assert.equal(cells[i],fixture.streamNonce&(1<<i)?"#ccc":"#fff");
  }finally{await fixture.close();}
 });
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
@@ -255,6 +255,7 @@ test("hosted stream parser accepts only bounded synthetic numeric events",()=>{
  assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=11 failure=0 stale=0"),null);
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=refusal reason=viewport"),{event:"refusal",reason:"viewport"});
  assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=refusal reason=private"),null);
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=refusal reason=overlay"),{event:"refusal",reason:"overlay"});
  const facts="[WorkflowHostedStream] event=probe received=4 consumed=3 malformed=0 metadata=1 rejected=0 drop=2 decode=1 stop=0 ackfail=0 decodefail=0 overflow=1 detached=0 identity=0 protocol=0 stopped=1";
  assert.deepEqual(hostedStreamSignal(facts),{event:"probe",received:4,consumed:3,malformed:0,metadata:1,rejected:0,drop:2,decode:1,stop:0,ackfail:0,decodefail:0,overflow:1,detached:0,identity:0,protocol:0,stopped:1});
  assert.equal(hostedStreamSignal(facts.replace("metadata=1","metadata=64")),null);

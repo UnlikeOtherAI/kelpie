@@ -12,7 +12,7 @@ static NSData *fixture(uint16_t nonce) {
     CGContextSetRGBFillColor(context, 1, 1, 1, 1); CGContextFillRect(context, CGRectMake(0, 0, 100, 100));
     for (unsigned bit = 0; bit < 16; ++bit) {
         if ((nonce & (1u << bit)) == 0) { continue; }
-        CGContextSetRGBFillColor(context, 0, 0, 0, 1);
+        CGContextSetRGBFillColor(context, 0.8, 0.8, 0.8, 1);
         CGContextFillRect(context, CGRectMake((bit % 4) * 12, 100 - (bit / 4 + 1) * 12, 12, 12));
     }
     CGImageRef image = CGBitmapContextCreateImage(context); CGContextRelease(context);
