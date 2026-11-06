@@ -18,6 +18,7 @@ import {observePrivateBoundary,validatePrivateProbe} from "./worker-comparison-n
 import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
 import {queryRendererPidsAtOwnedPort} from "./worker-comparison-cdp-process.mjs";
 import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
+import {observeClientClose,clientCloseWasForced,observeEngineStop,engineStopFailure} from "./worker-comparison-cleanup.mjs";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
@@ -93,6 +94,7 @@ const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBind
  boundary:{memoryMax,cpuMax,tasksMax},uid:process.getuid(),pid:process.pid,networkProbe,startupMs:null,warm:[],checks:[],toolCalls:0,responseBytes:0,
  unsupported:[],notProbed:["shared sessions","concurrent contexts"],unitCostScope:"memory peak covers the whole unit including hash/version preflight, fixture, CLI and browser; CPU covers engine run and teardown",
  startupScope:"engine spawn through isolated session and common preflight navigation; fixture setup and separately reported sandbox validation excluded",
+ cleanup:{session:{tabClose:"not-attempted",tabList:"not-attempted",sessionClose:"not-attempted"},client:null,engine:null},
  networkBoundary:"external systemd policy verification required",sessionSandboxEvidence:null,sandboxAuditStatus:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
 let engine,transport,client,failure,session;
 const started=performance.now();
@@ -229,16 +231,22 @@ try{
   }
  }
  await check("owned tab and session close",async()=>{
-  assert.equal((await call("tabs.close")).ok,true);
-  assert.equal((await call("tabs.list")).value.length,0);
-  assert.equal((await lifecycle({action:"close",sessionId:session.sessionId})).ok,true);
+  const record=async(name,fn)=>{
+   try{const value=await fn();report.cleanup.session[name]=value.ok?"ok":"refused";return value;}
+   catch{report.cleanup.session[name]="error";throw Error("SESSION_CLEANUP_FAILED");}
+  };
+  assert.equal((await record("tabClose",()=>call("tabs.close"))).ok,true);
+  assert.equal((await record("tabList",()=>call("tabs.list"))).value.length,0);
+  assert.equal((await record("sessionClose",()=>lifecycle({action:"close",sessionId:session.sessionId}))).ok,true);
  });
 }catch{failure="COMPARISON_RUN_FAILED";}finally{
- if(client)await bounded(client.close(),2000).catch(()=>{report.forcedCleanup=true;});
- if(engine&&engine.exitCode===null&&engine.signalCode===null){
-  const exited=new Promise(ok=>engine.once("exit",ok));engine.kill("SIGTERM");
-  try{await bounded(exited,1500);}catch{report.forcedCleanup=true;engine.kill("SIGKILL");await bounded(exited,1500).catch(()=>{});}
+ if(client){
+  report.cleanup.client=await observeClientClose(client,transport);
+  if(clientCloseWasForced(report.cleanup.client))report.forcedCleanup=true;
  }
+ report.cleanup.engine=await observeEngineStop(engine);
+ report.cleanup.engine.failure=engineStopFailure(report.cleanup.engine);
+ if(report.cleanup.engine.failure)report.forcedCleanup=true;
  fixture.closeAllConnections?.();if(fixture.listening)await new Promise(ok=>fixture.close(ok));
  report.engineExited=!engine||engine.exitCode!==null||engine.signalCode!==null;
  clearInterval(rssTimer);await rssPending;
