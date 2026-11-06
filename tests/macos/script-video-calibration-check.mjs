@@ -1,5 +1,19 @@
 import assert from "node:assert/strict";
 
+// Convert the declared track time base exactly; never round a decoded timestamp.
+export function decodedTicksAt600(values,timeBase){
+ assert.ok(typeof timeBase==="string"&&/^[1-9]\d{0,8}\/[1-9]\d{0,8}$/.test(timeBase),"CALIBRATION_TIME_BASE");
+ const [numerator,denominator]=timeBase.split("/").map(BigInt);
+ return values.map(value=>{
+  assert.ok(Number.isSafeInteger(value)&&value>=0,"CALIBRATION_OUTPUT_PTS");
+  const scaled=BigInt(value)*numerator*600n;
+  assert.equal(scaled%denominator,0n,"CALIBRATION_PTS_ROUNDING");
+  const ticks=scaled/denominator;
+  assert.ok(ticks<=BigInt(Number.MAX_SAFE_INTEGER),"CALIBRATION_OUTPUT_PTS");
+  return Number(ticks);
+ });
+}
+
 // This verifies accounting only. It never tolerates a missing, rounded or unmatched output frame.
 export function validateCalibrationCase(item, decodedTicks, decodedHashes){
  assert.ok(item&&["stable","varying"].includes(item.name),"CALIBRATION_CASE");

@@ -1,0 +1,52 @@
+name: macOS standalone writer calibration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibration:
+    name: Synthetic writer calibration (no app)
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 20
+      - name: Install decoder tools
+        run: brew install ffmpeg
+      - name: Check bounded verifier
+        run: node --test tests/macos/script-video-calibration-check.test.mjs
+      - name: Compile and run standalone synthetic writer
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --quiet HEAD -- tests/macos apps/macos/Kelpie/Handlers
+          mkdir -p .cache/writer-calibration
+          test ! -e .cache/writer-calibration/output
+          xcrun swiftc -parse-as-library tests/macos/script-video-identical-frame.swift \
+            apps/macos/Kelpie/Handlers/ScriptCaptureError.swift apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift \
+            apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift \
+            -o .cache/writer-calibration/calibration
+          .cache/writer-calibration/calibration "$(pwd)/.cache/writer-calibration/output"
+      - name: Verify decoded ROI and exact PTS
+        run: |
+          set -euo pipefail
+          node tests/macos/script-video-calibration.mjs \
+            .cache/writer-calibration/output/input.json .cache/writer-calibration/output/result.json
+      - name: Retain bounded synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-writer-calibration
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            .cache/writer-calibration/output/input.json
+            .cache/writer-calibration/output/result.json
+            .cache/writer-calibration/output/stable.mp4
+            .cache/writer-calibration/output/varying.mp4

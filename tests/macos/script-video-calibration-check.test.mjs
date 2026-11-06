@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {validateCalibrationCase} from "./script-video-calibration-check.mjs";
+import {validateCalibrationCase,decodedTicksAt600} from "./script-video-calibration-check.mjs";
 const a="a".repeat(64),b="b".repeat(64),c="c".repeat(64);
 const make=name=>({name,accepted:Array.from({length:40},(_,i)=>({tick:(i+1)*30,sourceROIHash:name==="varying"&&i>=20?b:a})),appendRejected:0,encodedFrames:40});
 const ticks=item=>item.accepted.map(record=>record.tick);
@@ -17,4 +17,12 @@ test("calibration fails closed on missing, reordered or ambiguous evidence",()=>
  assert.throws(()=>validateCalibrationCase({...stable,encodedFrames:39},t,same),/CALIBRATION_COMMITTED_COUNT/);
  assert.throws(()=>validateCalibrationCase({...stable,accepted:stable.accepted.map(x=>({...x,tick:30}))},t,same),/CALIBRATION_INPUT_TICKS/);
  assert.throws(()=>validateCalibrationCase(make("varying"),t,same),/CALIBRATION_NEGATIVE_DECODED/);
+});
+
+test("track time base converts to writer ticks only when rationally exact",()=>{
+ assert.deepEqual(decodedTicksAt600([60,120],"1/1200"),[30,60]);
+ assert.deepEqual(decodedTicksAt600([50,100],"1/1000"),[30,60]);
+ assert.throws(()=>decodedTicksAt600([51],"1/1000"),/CALIBRATION_PTS_ROUNDING/);
+ assert.throws(()=>decodedTicksAt600([30],"0/600"),/CALIBRATION_TIME_BASE/);
+ assert.throws(()=>decodedTicksAt600([1.5],"1/600"),/CALIBRATION_OUTPUT_PTS/);
 });

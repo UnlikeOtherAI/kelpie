@@ -2,16 +2,30 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {createReadStream} from "node:fs";
 import {readFile,realpath,stat,writeFile} from "node:fs/promises";
-import {spawn,spawnSync} from "node:child_process";
+import {execFileSync,spawn,spawnSync} from "node:child_process";
 import path from "node:path";
 import {consumeG08Frames} from "../capture/g08-frame-stream.mjs";
 import {ffmpegPassthrough} from "../capture/ffmpeg-passthrough.mjs";
-import {validateCalibrationCase} from "./script-video-calibration-check.mjs";
+import {validateCalibrationCase,decodedTicksAt600} from "./script-video-calibration-check.mjs";
 
 const [inputName,outputName]=process.argv.slice(2);
 assert.ok(inputName&&outputName&&process.argv.length===4,"CALIBRATION_ARGUMENTS");
 assert.ok((await stat(inputName)).size<=32768,"CALIBRATION_MANIFEST_SIZE");
-const input=JSON.parse(await readFile(inputName,"utf8")),directory=await realpath(path.dirname(inputName));
+const inputBytes=await readFile(inputName),input=JSON.parse(inputBytes.toString("utf8")),directory=await realpath(path.dirname(inputName));
+const inputSHA256=createHash("sha256").update(inputBytes).digest("hex");
+const command=(file,args)=>execFileSync(file,args,{encoding:"utf8",timeout:15000,maxBuffer:1048576}).trim();
+const executable=async value=>realpath(value.includes(path.sep)?value:command("/usr/bin/which",[value]));
+const hashFile=async file=>{const hash=createHash("sha256");for await(const bytes of createReadStream(file))hash.update(bytes);return hash.digest("hex");};
+const swiftc=await executable(command("xcrun",["--find","swiftc"]));
+const ffmpegPath=await executable(process.env.FFMPEG??"ffmpeg"),ffprobePath=await executable(process.env.FFPROBE??"ffprobe");
+const source=command("git",["rev-parse","HEAD"]);
+assert.match(source,/^[a-f0-9]{40}$/);
+if(process.env.GITHUB_SHA)assert.equal(source,process.env.GITHUB_SHA,"CALIBRATION_SOURCE_MISMATCH");
+const identity={source,node:process.version,architecture:process.arch,
+ compiler:{version:command("xcrun",["swiftc","--version"]),sha256:await hashFile(swiftc)},
+ sdk:command("xcrun",["--sdk","macosx","--show-sdk-version"]),
+ ffmpeg:{version:command(ffmpegPath,["-version"]).split("\n")[0],sha256:await hashFile(ffmpegPath)},
+ ffprobe:{version:command(ffprobePath,["-version"]).split("\n")[0],sha256:await hashFile(ffprobePath)}};
 assert.equal(input.version,1);assert.equal(input.width,640);assert.equal(input.height,496);
 assert.deepEqual(input.roi,[432,200,97,97]);assert.equal(input.timeBase,"1/600");
 assert.ok(Array.isArray(input.cases)&&input.cases.length===2,"CALIBRATION_CASES");
@@ -25,18 +39,17 @@ for(const item of input.cases){
  totalBytes+=info.size;assert.ok(totalBytes<=8*1024*1024,"CALIBRATION_BYTE_LIMIT");
  const digest=createHash("sha256");for await(const bytes of createReadStream(file))digest.update(bytes);
  const artifactSHA256=digest.digest("hex");
- const ffprobe=process.env.FFPROBE??"ffprobe";
- const probe=spawnSync(ffprobe,["-v","error","-select_streams","v:0","-show_frames","-show_entries",
+ const probe=spawnSync(ffprobePath,["-v","error","-select_streams","v:0","-show_frames","-show_entries",
   "frame=best_effort_timestamp:stream=width,height,time_base","-of","json",file],
  {windowsHide:true,maxBuffer:1048576,timeout:30000});
  assert.equal(probe.status,0,"CALIBRATION_PROBE");
  const metadata=JSON.parse(probe.stdout.toString());assert.equal(metadata.streams?.length,1);
- const stream=metadata.streams[0];assert.equal(stream.width,640);assert.equal(stream.height,496);assert.equal(stream.time_base,"1/600");
+ const stream=metadata.streams[0];assert.equal(stream.width,640);assert.equal(stream.height,496);
  const frames=metadata.frames??[];assert.ok(frames.length<=40,"CALIBRATION_FRAME_LIMIT");
- const decodedTicks=frames.map(frame=>{const value=Number(frame.best_effort_timestamp);assert.ok(Number.isSafeInteger(value));return value;});
- const ffmpeg=process.env.FFMPEG??"ffmpeg";
- const child=spawn(ffmpeg,["-v","error","-threads","1","-filter_threads","1","-i",file,"-map","0:v:0",
-  ...ffmpegPassthrough(ffmpeg),"-f","rawvideo","-pix_fmt","rgb24","-"],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
+ const trackPTS=frames.map(frame=>Number(frame.best_effort_timestamp));
+ const decodedTicks=decodedTicksAt600(trackPTS,stream.time_base);
+ const child=spawn(ffmpegPath,["-v","error","-threads","1","-filter_threads","1","-i",file,"-map","0:v:0",
+  ...ffmpegPassthrough(ffmpegPath),"-f","rawvideo","-pix_fmt","rgb24","-"],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let stderr="";child.stderr.on("data",bytes=>{if(stderr.length<4096)stderr+=bytes.toString().slice(0,4096-stderr.length);});
  const exited=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",code=>code===0?resolve():reject(Error("CALIBRATION_DECODER "+stderr)));});
  void exited.catch(()=>{});const timer=setTimeout(()=>child.kill(),30000),decodedHashes=[];
@@ -48,9 +61,11 @@ for(const item of input.cases){
   });
   await exited;assert.equal(count,frames.length,"CALIBRATION_DECODE_COUNT");
  }finally{clearTimeout(timer);if(child.exitCode===null)child.kill();await exited.catch(()=>{});}
- results.push({...validateCalibrationCase(item,decodedTicks,decodedHashes),artifactSHA256,bytes:info.size});
+ results.push({...validateCalibrationCase(item,decodedTicks,decodedHashes),trackTimeBase:stream.time_base,trackPTS,artifactSHA256,bytes:info.size});
 }
-const output={version:1,scope:"synthetic-identical-source-writer-calibration",width:640,height:496,
- roi:[432,200,97,97],timeBase:"1/600",results};
-await writeFile(outputName,JSON.stringify(output,null,2)+"\n",{flag:"wx"});
+const output={version:1,scope:"synthetic-identical-source-writer-calibration",inputSHA256,identity,width:640,height:496,
+ roi:[432,200,97,97],writerTimeBase:"1/600",results};
+const outputBytes=Buffer.from(JSON.stringify(output,null,2)+"\n");
+assert.ok(outputBytes.length<=65536,"CALIBRATION_OUTPUT_LIMIT");
+await writeFile(outputName,outputBytes,{flag:"wx"});
 console.log(JSON.stringify(results.map(({name,accepted,sourceUnique,decodedUnique,observation})=>({name,accepted,sourceUnique,decodedUnique,observation}))));
