@@ -208,3 +208,5 @@ The permanent run-owned-api-acceptance.mjs driver keeps the public CLI-launched 
 ### Independently reviewed native spatial/Stop state
 
 The exact f188 attempt4 native Canvas/Stop files passed root independent visual review, UIA Stop/aborted partial retrieval/recovery and all owned cleanup. Actual DPR2 trusted center and unchanged alpha were verified. Four additional valid partials passed complete independent decoding (41 f188 artifacts total across API and this UI case). See [native attempt4 receipt and limits](windows-native-ui-attempt4.md). This spatial still does not close animation/foreground/modal/browser-zoom or final G07-source gates. All prior failed attempts remain immutable.
+
+The separate hosted PNG encoding experiment and its strict media limitations are recorded in [the hosted comparison receipt](windows-hosted-png-speed-421470.md).
