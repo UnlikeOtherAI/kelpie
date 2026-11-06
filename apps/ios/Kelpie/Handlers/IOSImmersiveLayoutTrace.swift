@@ -47,7 +47,13 @@ final class IOSImmersiveLayoutTrace {
     static var evidence: [String: Any] {
         guard let trace = active else { return [:] }
         var result = trace.receipt
-        result["identityValid"] = trace.view.map(trace.valid) ?? false
+        if trace.tab == nil {
+            result["postRunState"] = "retired"
+        } else if let view = trace.view, trace.valid(view) {
+            result["postRunState"] = "current"
+        } else {
+            result["postRunState"] = "changed"
+        }
         return result
     }
 
@@ -71,7 +77,7 @@ final class IOSImmersiveLayoutTrace {
         var facts: [String: Any] = [
             "bounds": fields[0], "windowFrame": fields[1], "safe": fields[2], "adjusted": fields[3],
             "scrollContent": fields[4], "minimumViewport": fields[5], "maximumViewport": fields[6],
-            "obscuredAvailable": false
+            "obscuredAvailable": false, "identityValid": true
         ]
         if #available(iOS 26.0, *) {
             let obscured = inset(view.obscuredContentInsets)

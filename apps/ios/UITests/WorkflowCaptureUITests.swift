@@ -274,10 +274,12 @@ final class WorkflowCaptureUITests: XCTestCase {
         attachment.name = "Paired run immersive layout receipt"
         attachment.lifetime = .keepAlways
         add(attachment)
-        XCTAssertEqual(receipt["identityValid"] as? Bool, true)
-        XCTAssertNotNil(receipt["request"])
-        XCTAssertNotNil(receipt["application"])
-        XCTAssertNotNil(receipt["baseline"])
+        let postRunState = try XCTUnwrap(receipt["postRunState"] as? String)
+        XCTAssertTrue(["current", "retired"].contains(postRunState))
+        for phase in ["request", "application", "baseline"] {
+            let facts = try XCTUnwrap(receipt[phase] as? Body)
+            XCTAssertEqual(facts["identityValid"] as? Bool, true, phase)
+        }
     }
 
     @MainActor
