@@ -59,17 +59,35 @@ extension WorkflowCaptureUITests {
             observations: matches ? observation.samples : [],
             limitation: "bounded read-only polling may affect timing; native marker and Stop are tested separately"
         )
-        var admissionAttached = false
-        if let status = try? await probe.request("/v1/get-script-status", [:], timeout: 3),
-           let receipt = status["testAdmissionReceipt"] as? Body,
-           let receiptRun = receipt["runId"] as? String, receiptRun == run,
-           let data = try? JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]) {
-            let admission = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
-            admission.name = "Paired run admission receipt"
-            admission.lifetime = .keepAlways
-            add(admission)
-            admissionAttached = true
+        let admissionStatus = try? await probe.request("/v1/get-script-status", [:], timeout: 3)
+        let receipt = admissionStatus?["testAdmissionReceipt"] as? Body
+        let receiptRun = receipt?["runId"] as? String
+        let absence: String?
+        if run == nil {
+            absence = "terminal-run-unavailable"
+        } else if admissionStatus == nil {
+            absence = "status-unavailable"
+        } else if admissionStatus?["runId"] as? String != run {
+            absence = "status-run-mismatch"
+        } else if receipt == nil {
+            absence = "receipt-unavailable"
+        } else if receiptRun != run {
+            absence = "receipt-run-mismatch"
+        } else {
+            absence = nil
         }
+        var admissionAttached = false
+        let admissionValue: Body = absence.map { ["reason": $0 as Any] } ?? receipt ?? ["reason": "receipt-unavailable"]
+        let admission: XCTAttachment
+        if let data = try? JSONSerialization.data(withJSONObject: admissionValue, options: [.sortedKeys]) {
+            admission = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            admissionAttached = absence == nil
+        } else {
+            admission = XCTAttachment(string: "receipt-encoding-failed")
+        }
+        admission.name = "Paired run admission receipt"
+        admission.lifetime = .keepAlways
+        add(admission)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let attachment: XCTAttachment

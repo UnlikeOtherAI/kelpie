@@ -41,16 +41,28 @@ enum IOSAdmissionReceipt {
         identity = window != nil
     }
 
-    private static func owns(_ id: String, tab: IOSWorkflowTab) -> Bool {
-        guard enabled, runID == id else { return false }
-        let matches = view === tab.view && window != nil && window === tab.view.window && document == tab.document &&
+    private static func clearObservations() {
+        first = nil
+        last = nil
+        firstAt = nil
+        lastAt = nil
+        count = 0
+    }
+
+    private static func sameRunAndView(_ id: String, tab: IOSWorkflowTab) -> Bool {
+        enabled && runID == id && view === tab.view
+    }
+
+    private static func attest(_ tab: IOSWorkflowTab) -> Bool {
+        let matches = window != nil && window === tab.view.window && document == tab.document &&
             (try? tab.requireCurrent()) != nil
         identity = identity && matches
-        return matches
+        if !identity { clearObservations() }
+        return identity
     }
 
     static func observe(_ id: String, tab: IOSWorkflowTab, phase value: String, values: [CGFloat]) {
-        guard owns(id, tab: tab), site == nil, count < 1000 else { return }
+        guard sameRunAndView(id, tab: tab), site == nil, count < 1000, attest(tab) else { return }
         if phase != value {
             phase = value
             first = nil
@@ -62,6 +74,7 @@ enum IOSAdmissionReceipt {
         let numbers = values.map(Double.init)
         guard numbers.allSatisfy({ $0.isFinite && abs($0) <= 100_000 }) else {
             identity = false
+            clearObservations()
             return
         }
         let elapsed = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
@@ -75,8 +88,9 @@ enum IOSAdmissionReceipt {
     }
 
     static func refuse(_ id: String, tab: IOSWorkflowTab, site value: String) {
-        guard owns(id, tab: tab), site == nil,
+        guard sameRunAndView(id, tab: tab), site == nil,
               ["native-layout", "first-scene", "snapshot-changed", "snapshot-deadline"].contains(value) else { return }
+        _ = attest(tab)
         site = value
         refusedAt = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
         if phase != value {
