@@ -17,10 +17,10 @@ namespace kelpie {
 class TestG08Scope {
  public:
   TestG08Scope() {
-    const char* url = std::getenv("KELPIE_TEST_G08_URL");
-    const char* pid = std::getenv("KELPIE_TEST_G08_FIXTURE_PID");
-    const char* path = std::getenv("KELPIE_TEST_G08_FIXTURE_EXE");
-    if (!url || !pid || !path) return;
+    const auto url = Environment("KELPIE_TEST_G08_URL");
+    const auto pid = Environment("KELPIE_TEST_G08_FIXTURE_PID");
+    const auto path = Environment("KELPIE_TEST_G08_FIXTURE_EXE");
+    if (url.empty() || pid.empty() || path.empty()) return;
     expected_url_ = url;
     std::smatch match;
     if (!std::regex_match(expected_url_, match,
@@ -31,10 +31,10 @@ class TestG08Scope {
       if (port > 65535 || process == 0 || process > std::numeric_limits<DWORD>::max()) return;
       port_ = static_cast<unsigned short>(port); pid_ = static_cast<DWORD>(process);
     } catch (...) { return; }
-    const auto needed = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, nullptr, 0);
+    const auto needed = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(), -1, nullptr, 0);
     if (needed <= 1 || needed > 32768) return;
     std::wstring wide(static_cast<std::size_t>(needed), L'\0');
-    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide.data(), needed)) return;
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(), -1, wide.data(), needed)) return;
     wide.pop_back();
     process_ = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, pid_);
     if (!process_) return;
@@ -73,6 +73,14 @@ class TestG08Scope {
   }
   bool MatchesUrl(const std::string& url) const { return initialized_ && url == expected_url_; }
  private:
+  static std::string Environment(const char* name) {
+    char* value = nullptr; std::size_t size = 0;
+    if (_dupenv_s(&value, &size, name) != 0 || !value) return {};
+    std::string result;
+    if (size > 1 && size <= 32768) result.assign(value, size - 1);
+    std::free(value);
+    return result;
+  }
   std::string expected_url_;
   HANDLE process_ = nullptr;
   DWORD pid_ = 0;
