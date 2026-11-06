@@ -31,11 +31,11 @@ function fixture({leak=false,badReady=false}={}){
     return {ready:badReady};
   };
 }
-async function run(read,installed=true){
+async function run(read,installed=true,referenceMode="prefix"){
   const checks=[];
   const check=async(name,fn)=>{try{await fn();checks.push({name,passed:true});return true}
     catch(error){checks.push({name,passed:false});return false}};
-  return {result:await runLightpandaReaderDiagnostics({check,read,adversariesInstalled:()=>installed}),checks};
+  return {result:await runLightpandaReaderDiagnostics({check,read,adversariesInstalled:()=>installed,referenceMode}),checks};
 }
 test("reader qualification requires all positive and refusal checks",async()=>{
   const {result,checks}=await run(fixture());
@@ -53,4 +53,28 @@ test("qualification reports only explicitly selected candidates",async()=>{
   const result=await runLightpandaReaderDiagnostics({check,read:fixture(),adversariesInstalled:()=>true,selected:["status"]});
   assert.deepEqual(result,{status:true});assert.equal(checks.length,1);
   await assert.rejects(()=>runLightpandaReaderDiagnostics({check,read:fixture(),adversariesInstalled:()=>true,selected:["snapshot","snapshot"]}));
+});
+
+function managedFixture(fault){
+ const read=fixture();let generation=0;
+ return async(kind,options)=>{
+  const value=await read(kind,options);if(kind!=="snapshot")return value;
+  generation++;
+  if(fault==="empty")value.elements=[];
+  value.elements=value.elements.map((element,index)=>({...element,
+   ref:fault==="format"?"e"+(index+1):
+    fault==="duplicate"?"s"+generation+"e1":
+    fault==="mixed"?"s"+(index%2+1)+"e"+(index+1):
+    "s"+(fault==="reused"?1:generation)+"e"+(index+1)}));
+  return value;
+ };
+}
+test("managed snapshots require one valid unique fresh generation",async()=>{
+ assert.equal((await run(managedFixture(),true,"managed")).result.snapshot,true);
+ for(const fault of ["format","duplicate","mixed","reused","empty"])
+  assert.equal((await run(managedFixture(fault),true,"managed")).result.snapshot,false,fault);
+});
+test("restricted reader refs retain anchored e-plus-positive-index format",async()=>{
+ assert.equal((await run(managedFixture("format"),true,"lightpanda")).result.snapshot,true);
+ assert.equal((await run(managedFixture(),true,"lightpanda")).result.snapshot,false);
 });
