@@ -1,6 +1,14 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+$preflightDir = Join-Path $env:RUNNER_TEMP "kelpie-hosted-g08-preflight"
+if (-not (Test-Path -LiteralPath $preflightDir)) { New-Item -ItemType Directory $preflightDir | Out-Null }
+$preflightFile = Join-Path $preflightDir "preflight.json"
+$preflight = [ordered]@{stage="preflight";status="started";code=$null;sourceMatched=$false;runtime=$null;buildType=$null;targetRuntime="unverified"}
+function Save-Preflight { [IO.File]::WriteAllText($preflightFile,($preflight | ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false)) }
+Save-Preflight
+try {
+. (Join-Path $PSScriptRoot "hosted-windows-build-check.ps1")
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $build = Join-Path $repo ".cache\windows-release3"
 $private = Join-Path $env:RUNNER_TEMP "kelpie-hosted-g08-private"
@@ -11,18 +19,21 @@ foreach ($path in @($private,$evidence,$manifestFile)) {
 }
 $source = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $source -ne $env:GITHUB_SHA) { throw "HOSTED_SOURCE_MISMATCH" }
+$preflight.sourceMatched = $true
 $exe = Join-Path $build "kelpie.exe"
 $dll = Join-Path $build "kelpie.dll"
 $ffmpeg = $env:FFMPEG
 $ffprobe = $env:FFPROBE
-if (-not (Test-Path -LiteralPath $ffmpeg) -or -not (Test-Path -LiteralPath $ffprobe)) { throw "HOSTED_MEDIA_MISSING" }
+if ([string]::IsNullOrWhiteSpace($ffmpeg) -or [string]::IsNullOrWhiteSpace($ffprobe) -or -not (Test-Path -LiteralPath $ffmpeg) -or -not (Test-Path -LiteralPath $ffprobe)) { throw "HOSTED_MEDIA_MISSING" }
 $cache = Get-Content (Join-Path $build "CMakeCache.txt") -Raw
-if ($cache -notmatch '(?m)^KELPIE_LOCAL_LLM:BOOL=ON\r?$') { throw "HOSTED_LLM_DISABLED" }
-if ($cache -notmatch '(?m)^CEF_ROOT:PATH=.+\r?$' -or $cache -notmatch '(?m)^CMAKE_MSVC_RUNTIME_LIBRARY:(STRING|UNINITIALIZED)=MultiThreaded\r?$') { throw "HOSTED_CEF_CONFIGURATION_MISMATCH" }
 $wrapperCache = Get-Content (Join-Path $repo ".cache\cef-windows-build\wrapper\CMakeCache.txt") -Raw
-if ($wrapperCache -notmatch '(?m)^USE_SANDBOX:BOOL=ON\r?$' -or $wrapperCache -notmatch '(?m)^CEF_RUNTIME_LIBRARY_FLAG:STRING=/MT\r?$') { throw "HOSTED_CEF_SANDBOX_MISMATCH" }
 $ninja = Get-Content (Join-Path $build "build.ninja") -Raw
-if (-not $ninja.Contains("HAS_CEF=1") -or -not $ninja.Contains("CEF_USE_BOOTSTRAP=1")) { throw "HOSTED_CEF_DEFINITIONS_MISSING" }
+$runtime = Get-HostedCacheValue $cache 'CMAKE_MSVC_RUNTIME_LIBRARY'
+$preflight.runtime = if ($runtime -ceq 'MultiThreaded') { 'MultiThreaded' } elseif ($runtime -ceq 'MultiThreaded$<$<CONFIG:Debug>:Debug>') { 'MultiThreaded-Release-expression' } else { 'other' }
+$preflight.buildType = if ((Get-HostedCacheValue $cache 'CMAKE_BUILD_TYPE') -ceq 'Release') { 'Release' } else { 'other' }
+$buildCheck = Test-HostedWindowsBuild $cache $wrapperCache $ninja
+if ($buildCheck -ne 'OK') { throw $buildCheck }
+$preflight.targetRuntime = 'all-kelpie-objects-MT'
 $files = @(Get-ChildItem $build -File | Where-Object { ($_.Extension -in @('.dll','.pak','.bin','.dat') -and $_.Name -ne 'kelpie.dll') -or $_.Name -eq 'vk_swiftshader_icd.json' }) +
   @(Get-ChildItem (Join-Path $build "locales") -Recurse -File)
 $assets = @($files | Sort-Object FullName | ForEach-Object {
@@ -38,6 +49,16 @@ $manifest = [ordered]@{
   assets=$assets;scope="hosted-public-export-only";wgc="not-run"
 }
 [IO.File]::WriteAllText($manifestFile,($manifest | ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
+$preflight.stage = 'ready'; $preflight.status = 'passed'; Save-Preflight
+} catch {
+  $known = @('HOSTED_OUTPUT_EXISTS','HOSTED_SOURCE_MISMATCH','HOSTED_MEDIA_MISSING','HOSTED_CEF_ROOT_MISSING',
+    'HOSTED_BUILD_NOT_RELEASE','HOSTED_LLM_DISABLED','HOSTED_RUNTIME_CACHE_MISMATCH','HOSTED_CEF_SANDBOX_MISMATCH',
+    'HOSTED_TARGET_OBJECTS_MISSING','HOSTED_CEF_DEFINITIONS_MISSING','HOSTED_RUNTIME_FLAGS_MISMATCH')
+  $preflight.status = 'failed'
+  $preflight.code = if ($known -contains $_.Exception.Message) { $_.Exception.Message } else { 'HOSTED_PREFLIGHT_IO_FAILURE' }
+  Save-Preflight
+  throw $preflight.code
+}
 $env:FFMPEG = $ffmpeg
 $env:FFPROBE = $ffprobe
 $env:KELPIE_HOSTED_PUBLIC_G08 = "1"
