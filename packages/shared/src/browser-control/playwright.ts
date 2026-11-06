@@ -3,6 +3,7 @@ import { BrowserControlError, browserControlMutates } from "./protocol.js";
 import type { BrowserControlBackend, BrowserControlRequest, BrowserLocator, BrowserTextMatcher, BrowserTabInfo } from "./protocol.js";
 import { browserControlCapabilities } from "./proxy.js";
 import { fixedObservationExpression } from "./observation-source.js";
+import { navigateHistory } from "./history.js";
 import type { BrowserSnapshot } from "./protocol.js";
 
 const matcher = (value: BrowserTextMatcher): string | RegExp => typeof value === "string" ? value : new RegExp(value.source, value.flags);
@@ -46,7 +47,7 @@ export interface PlaywrightBrowserBinding {
 }
 
 /** Browserbase, local Chromium and test browsers use the same page implementation. Allocation stays outside it. */
-export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding): BrowserControlBackend {
+export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding, options: { managedHistory?: boolean } = {}): BrowserControlBackend {
   const capabilities = browserControlCapabilities();
   // Typed catalogue membership grants no page-tool authority. Managed bindings own grants and actual API probes.
   capabilities.methods = capabilities.methods.filter((method) => !method.startsWith("tab.webmcp."));
@@ -106,13 +107,13 @@ export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding
           return null;
         } finally { await clear(request.tabId); }
       }
-      try { return await executePlaywrightPage(page, request); }
+      try { return await executePlaywrightPage(page, request, options.managedHistory === true); }
       finally { if (browserControlMutates(request.method)) await clear(request.tabId); }
     },
   };
 }
 
-export async function executePlaywrightPage(page: Page, request: BrowserControlRequest): Promise<unknown> {
+export async function executePlaywrightPage(page: Page, request: BrowserControlRequest, managedHistory = false): Promise<unknown> {
   const params = request.params;
   const timeout = "timeoutMs" in params ? params.timeoutMs ?? 10_000 : 10_000;
   if ("locator" in params) {
@@ -140,8 +141,14 @@ export async function executePlaywrightPage(page: Page, request: BrowserControlR
   }
   switch (request.method) {
     case "tab.goto": await page.goto(request.params.url, { waitUntil: "domcontentloaded", timeout }); return null;
-    case "tab.back": await page.goBack({ waitUntil: "domcontentloaded", timeout }); return null;
-    case "tab.forward": await page.goForward({ waitUntil: "domcontentloaded", timeout }); return null;
+    case "tab.back":
+      if (managedHistory) await navigateHistory(page, "back", timeout);
+      else await page.goBack({ waitUntil: "domcontentloaded", timeout });
+      return null;
+    case "tab.forward":
+      if (managedHistory) await navigateHistory(page, "forward", timeout);
+      else await page.goForward({ waitUntil: "domcontentloaded", timeout });
+      return null;
     case "tab.reload": await page.reload({ waitUntil: "domcontentloaded", timeout }); return null;
     case "tab.url": return page.url();
     case "tab.title": return page.title();

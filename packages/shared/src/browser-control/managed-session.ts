@@ -129,7 +129,7 @@ export async function allocateManagedBrowserSession(input: ManagedBrowserSession
   // Validate the capability profile before allocating any browser resources.
   const underlying = input.backend === "lightpanda"
     ? createLightpandaBrowserBackend(binding, input.verifiedLightpandaMethods)
-    : createPlaywrightBrowserBackend(binding);
+    : createPlaywrightBrowserBackend(binding, { managedHistory: true });
   const baseMethods = underlying.capabilities.methods.filter(method => method !== "tab.webmcp.discover" && method !== "tab.webmcp.call");
   const capabilities: BrowserControlBackend["capabilities"] = { ...underlying.capabilities, methods: baseMethods };
   if (input.backend === "lightpanda" && input.webMcp?.origins.length) throw new BrowserControlError("UNSUPPORTED", "Site tools have not been verified for this worker backend.");
