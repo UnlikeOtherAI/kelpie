@@ -8,9 +8,10 @@ const setup = ['playwright-archive-sha256.txt', 'google-archive-sha256.txt', 'pl
  'source.txt', 'lightpanda-sha256.txt'];
 const armFiles = ['report.json', 'retirement.json', 'policy-observed.json', 'policy-verified.json',
  'namespace-verified.json', 'namespace-query-status.json', 'outside-probe.json', 'network-observation.json',
- 'host-sandbox-result.json', 'bpf-status.txt'];
+ 'host-sandbox-result.json', 'browser-identity.json', 'process-diagnostic.json', 'bpf-status.txt', 'bpf-effective.json',
+ 'net-address.json', 'net-routes4.json', 'net-routes6.json'];
 export const allowedEvidence = Object.freeze([
- ...setup.map(name => `worker-ab-setup/${name}`), 'worker-ab-evidence/comparison.json',
+ ...setup.map(name => `worker-ab-setup/${name}`), 'worker-ab-evidence/comparison.json', 'worker-ab-evidence/outside-probe.json',
  ...['lightpanda', 'playwright', 'probe', 'sandbox', 'eof'].flatMap(arm => armFiles.map(name => `worker-ab-evidence/${arm}/${name}`)),
 ]);
 
@@ -24,7 +25,7 @@ export async function copyReviewedEvidence(source, destination) {
   try { info = await lstat(file); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
   if (!info.isFile() || info.size > 1_000_000) throw new Error('EVIDENCE_INVALID');
   const actual = await realpath(file);
-  if (!actual.startsWith(root + sep)) throw new Error('EVIDENCE_INVALID');
+  if (actual !== resolve(file) || !actual.startsWith(root + sep)) throw new Error('EVIDENCE_INVALID');
   const out = join(target, name);
   await mkdir(dirname(out), {recursive: true, mode: 0o700});
   await copyFile(actual, out, constants.COPYFILE_EXCL);
