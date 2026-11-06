@@ -7,6 +7,18 @@ import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
 import {waitForRendererTransition} from "./runtime-renderer-transition.mjs";
+test("stream fixture renders its own non-auth nonce as sixteen binary cells",async()=>{
+ const fixture=await startFixture();
+ try{
+  assert.ok(Number.isInteger(fixture.streamNonce)&&fixture.streamNonce>=0&&fixture.streamNonce<=65535);
+  const html=await (await fetch(fixture.url+"/stream")).text();
+  const marker=html.match(/<div id="stream-marker">(.*?)<\/div>/)?.[1];
+  assert.ok(marker);
+  const cells=[...marker.matchAll(/<i style="background:(#[0-9a-f]{3})"><\/i>/g)].map(m=>m[1]);
+  assert.equal(cells.length,16);
+  for(let i=0;i<16;i++)assert.equal(cells[i],fixture.streamNonce&(1<<i)?"#000":"#fff");
+ }finally{await fixture.close();}
+});
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
  try{

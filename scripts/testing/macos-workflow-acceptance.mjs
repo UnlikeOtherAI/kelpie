@@ -49,7 +49,7 @@ report.streamSignals=streamSignals;
 if(scope==="cef-stream")fixture=await startFixture();
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],
  env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:scope==="cef-stream"?"1":"0",
-  KELPIE_CEF_STREAM_ORIGIN:fixture?.url??""}});
+  KELPIE_CEF_STREAM_ORIGIN:fixture?.url??"",KELPIE_CEF_STREAM_NONCE:fixture?String(fixture.streamNonce):""}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
  const decoder=new StringDecoder("utf8");let text="";
