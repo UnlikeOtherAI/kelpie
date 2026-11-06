@@ -328,27 +328,9 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
     }
 
     private func compose(_ source: NSImage, maximumWidth: Int, overlay: ScriptPresentation.Frame?) throws -> CGImage {
-        var rect = CGRect(origin: .zero, size: source.size)
-        guard let image = source.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { throw ScriptCaptureError.image }
-        let scale = min(Double(maximumWidth) / Double(image.width), 1920 / Double(image.height), 1)
-        let width = max(2, Int(Double(image.width) * scale) / 2 * 2)
-        let height = max(2, Int(Double(image.height) * scale) / 2 * 2)
-        let size = CGSize(width: width, height: height)
-        if outputSize != .zero, outputSize != size { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
-        outputSize = size
-guard let graphics = CGContext(
-    data: nil,
-    width: width,
-    height: height,
-    bitsPerComponent: 8,
-    bytesPerRow: width * 4,
-    space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-) else { throw ScriptCaptureError.image }
-        graphics.draw(image, in: CGRect(origin: .zero, size: size))
-        if let overlay { overlay.draw(in: graphics, size: size) } else { presentation.draw(in: graphics, size: size) }
-        guard let composed = graphics.makeImage() else { throw ScriptCaptureError.image }
-        return composed
+        try ScriptCaptureCompositor.compose(source, maximumWidth: maximumWidth, outputSize: &outputSize) { graphics, size in
+            if let overlay { overlay.draw(in: graphics, size: size) } else { presentation.draw(in: graphics, size: size) }
+        }
     }
 
     private static func code(_ error: Error) -> String {

@@ -4,6 +4,32 @@ import XCTest
 
 final class ScriptCaptureTests: XCTestCase {
     @MainActor
+    func testCompositorPreservesOutputSizeAndInvokesOverlay() throws {
+        let sourceContext = try XCTUnwrap(CGContext(
+            data: nil,
+            width: 100,
+            height: 80,
+            bitsPerComponent: 8,
+            bytesPerRow: 400,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        let original = try XCTUnwrap(sourceContext.makeImage())
+        let source = NSImage(cgImage: original, size: CGSize(width: 100, height: 80))
+        var size = CGSize.zero
+        var drew = false
+        let result = try ScriptCaptureCompositor.compose(source, maximumWidth: 50, outputSize: &size) { _, canvas in
+            drew = true
+            XCTAssertEqual(canvas, CGSize(width: 50, height: 40))
+        }
+        XCTAssertTrue(drew)
+        XCTAssertEqual(result.width, 50)
+        XCTAssertEqual(result.height, 40)
+        XCTAssertEqual(size, CGSize(width: 50, height: 40))
+        XCTAssertThrowsError(try ScriptCaptureCompositor.compose(source, maximumWidth: 40, outputSize: &size) { _, _ in })
+    }
+
+    @MainActor
     func testArtifactChunksRequireAdmittedOwnerAndExactRun() throws {
         let store = ScriptArtifactStore()
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

@@ -183,6 +183,7 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath apps/macos/.build \
             -only-testing:KelpieTests/ScriptWorkflowAdmissionTests \
+            -only-testing:KelpieTests/ScriptCaptureTests/testCompositorPreservesOutputSizeAndInvokesOverlay \
             -skip-testing:KelpieTests/ScriptWorkflowAdmissionTests/testBonjourTXTReplacementKeepsSameHTTPListenerReachable \
             -resultBundlePath .cache/macos-ci/workflow-admission.xcresult \
             test-without-building CODE_SIGNING_ALLOWED=NO \
