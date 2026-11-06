@@ -23,7 +23,7 @@ test("diagnostic uploads reject unknown or private paths", async () => {
     ...smoke("installed-smoke-replay"), ...media("installed-smoke-replay"),
     "installed-smoke/capture/safe-osr-g08.json",
     ...["dense", "default"].flatMap(profile => ["c", "s"].flatMap(curve => ["gif", "mp4"].map(ext =>
-      "installed-smoke/capture/" + profile + "-" + curve + "." + ext)))];
+      "installed-smoke/capture/" + profile + "/published/" + curve + "." + ext)))];
   const expectedResource = ["safe-diagnostics.json", "resource-expected.txt", "resource-scope.txt",
     "resource-test-revision.txt", "resource-image.txt", "resource-hook-diff.patch",
     ...smoke("installed-smoke-cli-only"), ...smoke("installed-smoke-resource"),

@@ -316,7 +316,7 @@ jobs:
             2>&1 | tee "${package_root}/candidate-namespace-diagnostic.log"
 
       - name: Replay failed installed candidate without tracing
-        if: failure() && steps.installed_candidate.outcome == 'failure'
+        if: failure() && !inputs.osr_g08 && steps.installed_candidate.outcome == 'failure'
         continue-on-error: true
         timeout-minutes: 15
         env:
@@ -357,14 +357,14 @@ jobs:
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.gif
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.mp4
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/safe-osr-g08.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense-c.gif
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense-c.mp4
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense-s.gif
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense-s.mp4
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default-c.gif
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default-c.mp4
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default-s.gif
-            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default-s.mp4
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense/published/c.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense/published/c.mp4
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense/published/s.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/dense/published/s.mp4
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default/published/c.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default/published/c.mp4
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default/published/s.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/default/published/s.mp4
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/outcome.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/installed-sha256.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/client-package-sha256.txt

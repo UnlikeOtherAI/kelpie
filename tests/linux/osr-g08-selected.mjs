@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFile, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 
@@ -20,10 +20,10 @@ export async function runSelectedG08({ readiness, binary, output, signal, invoke
     const dir = join(output, profile), input = join(dir, "input.json"), analysis = join(dir, "analysis.json");
     try {
       await invoke(process.execPath, ["tests/linux/run-g08.mjs", readiness, binary, dir, "linux-osr-cef", profile],
-        { signal, timeout: 180000, maxBuffer: 262144 });
+        { signal, timeout: 120000, maxBuffer: 262144 });
       try {
         await invoke(process.execPath, [profile === "dense" ? "tests/capture/g08-verify.mjs" : "tests/linux/verify-g08-fast.mjs", input, analysis],
-          { signal, timeout: 360000, maxBuffer: 262144 });
+          { signal, timeout: 240000, maxBuffer: 262144 });
       } catch (error) { if (signal.aborted) throw error; }
       const parsed = JSON.parse(await readFile(analysis, "utf8"));
       assert.equal(parsed.results.length, 4);
@@ -41,11 +41,18 @@ export async function runSelectedG08({ readiness, binary, output, signal, invoke
         row.metrics = Object.fromEntries(keys.filter(key => Number.isFinite(metric?.[key])).map(key => [key, metric[key]]));
       }
       const joined = JSON.parse(await readFile(input, "utf8"));
+      assert.equal(joined.source, source);
+      assert.equal(joined.testSource, testSource);
+      assert.equal(joined.binarySHA256, binarySHA256);
+      assert.equal(joined.runtime, "linux-osr-cef");
+      assert.equal(joined.profile, profile);
       assert.equal(joined.eventsDropped, 0);
       assert.equal(joined.cases.length, 2);
-      const root = await realpath(dir);
+      const root = await realpath(dir), validated = [], seen = new Set();
       for (const item of joined.cases) for (const artifact of item.artifacts) {
         assert.ok(["c", "s"].includes(item.curve) && ["image/gif", "video/mp4"].includes(artifact.mimeType));
+        const key = item.curve + "/" + artifact.mimeType;
+        assert.ok(!seen.has(key)); seen.add(key);
         const path = await realpath(artifact.file), rel = relative(root, path);
         assert.ok(rel && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel));
         const info = await stat(path);
@@ -62,13 +69,24 @@ export async function runSelectedG08({ readiness, binary, output, signal, invoke
         assert.ok(events.every(event => event && Number.isFinite(event.timeMs) &&
           Number.isFinite(event.center?.x) && Number.isFinite(event.center?.y) &&
           Number.isFinite(event.viewport?.width) && Number.isFinite(event.viewport?.height) &&
-          typeof event.trusted === "boolean"));
+          event.trusted === true && typeof event.documentId === "string" && event.documentId.length > 0 && event.documentId.length <= 128));
         row.scene = events.map(event => ({ timeMs: event.timeMs, x: event.center.x, y: event.center.y,
           viewportWidth: event.viewport.width, viewportHeight: event.viewport.height, trusted: event.trusted }));
         row.sameDocument = events.every(event => event.documentId === events[0].documentId);
         assert.equal(row.sameDocument, true);
-        await copyFile(path, join(output, profile + "-" + item.curve + (artifact.mimeType === "image/gif" ? ".gif" : ".mp4")), 1);
+        validated.push({ path, hash: artifact.sha256, name: item.curve + (artifact.mimeType === "image/gif" ? ".gif" : ".mp4") });
       }
+      assert.equal(validated.length, 4);
+      const staging = join(dir, ".validated"), published = join(dir, "published");
+      await mkdir(staging, { mode: 0o700 });
+      for (const item of validated) {
+        signal.throwIfAborted();
+        const destination = join(staging, item.name);
+        await copyFile(item.path, destination, 1);
+        assert.equal(createHash("sha256").update(await readFile(destination)).digest("hex"), item.hash);
+      }
+      signal.throwIfAborted();
+      await rename(staging, published);
     } catch (error) {
       if (signal.aborted) throw error;
       for (const row of expected) row.status = "failed";
