@@ -20,8 +20,9 @@ export async function startFixture() {
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
   const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"].includes(mode)?mode:"";
   const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":mode==="/paced-final-delay"?"Delayed X fixture":"Hosted Mac fixture";
+  const pixels=["/pixels-static","/pixels-noisy","/pixels-layered"].includes(mode);
   const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge";
-  const body=edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
+  const body=pixels?'<canvas id="pixels" width="600" height="400"></canvas>':edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
    <label>Draft message<textarea id="entry">Draft seed</textarea></label>
    <label>Account password<input id="password" type="password"></label>
@@ -37,7 +38,7 @@ export async function startFixture() {
    <button id="moving">Moving</button><button id="start">Start motion</button>
    <section id="catalogue"><h3>Green tea</h3><h3>Black tea</h3></section>
    <button id="scroll-target">Scrolled target</button>`;
-  const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)},pacedMode=${JSON.stringify(pacedMode)};const documentId=crypto.randomUUID();let sequence=0;
+  const script=`(()=>{const pixelMode=${JSON.stringify(pixels?mode:"")};if(pixelMode){const c=document.querySelector('#pixels'),g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,600,400);if(pixelMode==='/pixels-static'){g.fillStyle='#248ac2';g.fillRect(30,40,300,180)}else if(pixelMode==='/pixels-noisy'){const d=g.createImageData(600,400);let n=123456789;for(let i=0;i<d.data.length;i+=4){n=(Math.imul(n,1664525)+1013904223)>>>0;d.data[i]=n>>>24;d.data[i+1]=n>>>16;d.data[i+2]=n>>>8;d.data[i+3]=255}g.putImageData(d,0,0)}else{g.fillStyle='rgba(255,0,0,0.2)';g.fillRect(20,20,300,280);g.fillStyle='rgba(0,40,255,0.4)';g.fillRect(150,80,300,220)}}const privacyMode=${JSON.stringify(privacyMode)},pacedMode=${JSON.stringify(pacedMode)};const documentId=crypto.randomUUID();let sequence=0;
   const send=(value,synchronous=false)=>{const body=JSON.stringify({
    documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight,clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,pixelRatio:devicePixelRatio},
    visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}});
@@ -85,7 +86,7 @@ export async function startFixture() {
   addEventListener('scroll',()=>send({type:'scroll'}));
   send({type:'document'});
   })();`;
-  const style=edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
+  const style=pixels?`body{margin:0;background:white}canvas{display:block}`:edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
    #first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}`:
    bands?`body{margin:0;height:9000px;background:repeating-linear-gradient(to bottom,#f00 0 1000px,#0f0 1000px 2000px,#00f 2000px 3000px,#f0f 3000px 4000px)}`:
    next?"body{background:#ffe881;color:black}":`

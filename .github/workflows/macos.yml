@@ -18,6 +18,7 @@ on:
           - full
           - cef-timing
           - cef-pump-compare
+          - cef-png-equivalence
         default: full
 
 permissions:
@@ -126,6 +127,8 @@ jobs:
           run_xcodebuild() {
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
+            elif [[ "${{ inputs.runtime_scope }}" == "cef-png-equivalence" ]]; then
+              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PNG_EQUIVALENCE_TEST=1' "$@"
             else
               xcodebuild "$@"
             fi
@@ -192,6 +195,8 @@ jobs:
           run_xcodebuild() {
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
+            elif [[ "${{ inputs.runtime_scope }}" == "cef-png-equivalence" ]]; then
+              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PNG_EQUIVALENCE_TEST=1' "$@"
             else
               xcodebuild "$@"
             fi
@@ -218,6 +223,8 @@ jobs:
         run: |
           if [[ "$KELPIE_RUNTIME_SCOPE" == "cef-pump-compare" ]]; then
             node scripts/testing/macos-pump-comparison.mjs
+          elif [[ "$KELPIE_RUNTIME_SCOPE" == "cef-png-equivalence" ]]; then
+            node scripts/testing/macos-png-equivalence.mjs
           else
             node scripts/testing/macos-workflow-acceptance.mjs
           fi

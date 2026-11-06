@@ -24,11 +24,11 @@ if(process.argv[2]==="--preparation"){
 }
 requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
 const scope=process.env.KELPIE_RUNTIME_SCOPE??"full";
-requireTrue(["full","cef-timing"].includes(scope),"RUNTIME_SCOPE");
+requireTrue(["full","cef-timing","cef-png-equivalence"].includes(scope),"RUNTIME_SCOPE");
 const root=await realpath("."),app=await realpath("apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app");
 requireTrue(app.startsWith(root+"/apps/macos/.build-runtime/"),"CANDIDATE_PATH");
 const label=process.env.KELPIE_EVIDENCE_LABEL??"";
-requireTrue(["","legacy-before","scheduled","legacy-after"].includes(label),"EVIDENCE_LABEL");
+requireTrue(["","legacy-before","scheduled","legacy-after","png-a1","png-b1","png-b2","png-a2"].includes(label),"EVIDENCE_LABEL");
 const out=path.join(root,".cache/macos-runtime/evidence",label),privateDir=path.join(root,".cache/macos-runtime/private",label);
 await mkdir(out,{recursive:true});await mkdir(privateDir,{recursive:true,mode:0o700});
 requireTrue(listeners(28420).length===0&&listeners(8421).length===0,"OCCUPIED_LISTENER");
@@ -44,6 +44,7 @@ const report={source,scope,pumpMode,platform:process.platform,
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
+const pngModes=[];
 const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[],cefPumpSignals=[];
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],env:{...process.env,NSUnbufferedIO:"YES"}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
@@ -54,6 +55,7 @@ for(const stream of [child.stdout,child.stderr]){
   text=(text+decoder.write(bytes)).slice(-16384);let index;
   while((index=text.indexOf("\n"))>=0){const line=text.slice(0,index).trim();text=text.slice(index+1);
    if(["launch","listeners"].includes(phase)){const signal=startupSignal(line);if(signal&&!startupSignals.includes(signal))startupSignals.push(signal);}
+   if(line==="[PNGEquivalence] mode=speed"||line==="[PNGEquivalence] mode=default"){if(pngModes.length<16)pngModes.push(line.endsWith("speed")?"speed":"default");}
    const navigation=navigationSignal(line);if(navigation&&navigationSignals.length<32)navigationSignals.push(navigation);
    const focus=editFocusSignal(line);if(focus&&editFocusSignals.length<32)editFocusSignals.push(focus);
    const viewport=viewportSignal(line);if(viewport&&viewportSignals.length<32)viewportSignals.push(viewport);
@@ -70,7 +72,7 @@ for(const stream of [child.stdout,child.stderr]){
 }
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
- report.pid=child.pid;client=new Client(child.pid,out,executable);phase="listeners";
+ report.pid=child.pid;client=new Client(child.pid,scope==="cef-png-equivalence"?privateDir:out,executable);client.privateDir=privateDir;phase="listeners";
  await waitFor(()=>client.ready(),30000);
  phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
  fixture=await startFixture();
@@ -83,7 +85,7 @@ try{
    ...(error.code==="LISTENER_IDENTITY"?{listenerFailure:client.listenerFailure}:{}),
   }));
  }
- if(scope==="cef-timing"){
+ if(scope==="cef-timing"||scope==="cef-png-equivalence"){
   await independent("chromium",()=>runEngine(client,fixture,"chromium",report,scope,Boolean(label)));
  }else{
   await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
@@ -101,7 +103,12 @@ try{
    report.cefCLI=await publicCLI(client,fixture,privateDir,"chromium");
   });
  }
- if(label && !cefPumpSignals.includes(pumpMode)){
+ if(scope==="cef-png-equivalence"){
+  const expected=label.startsWith("png-b")?"speed":"default";
+  if(pngModes.length!==3||pngModes.some(mode=>mode!==expected))failures.push({phase:"png-mode",code:"PNG_MODE_UNCONFIRMED"});
+  report.pngModes=pngModes;
+ }
+ if(scope!=="cef-png-equivalence" && label && !cefPumpSignals.includes(pumpMode)){
   failures.push({phase:"pump-mode",code:"PUMP_MODE_UNCONFIRMED",childExitAtFailure:childExit,childAliveAtFailure:!childExited});
  }
  if(failures.length){
@@ -145,6 +152,6 @@ finally{
  report.childExit=childExit;report.readiness=client?.readiness??[];
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
  report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;report.editFocusSignals=editFocusSignals;report.viewportSignals=viewportSignals;report.workflowVisibilitySignals=workflowVisibilitySignals;report.serverLifecycleSignals=serverLifecycleSignals;report.listenerTransitionSignals=listenerTransitionSignals;report.captureCoherenceSignals=captureCoherenceSignals;report.captureTimingSignals=captureTimingSignals;report.pointerTimingSignals=pointerTimingSignals;report.retireeSignals=retireeSignals;report.cefPumpSignals=cefPumpSignals;
- report.artifacts=client?.artifacts??[];
+ report.artifacts=scope==="cef-png-equivalence"?[]:client?.artifacts??[];
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
 }

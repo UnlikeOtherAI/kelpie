@@ -1,3 +1,4 @@
+import {runPngEquivalence} from "./runtime-png-equivalence.mjs";
 import {writeFile} from "node:fs/promises";
 import path from "node:path";
 import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture.mjs";
@@ -104,6 +105,11 @@ export async function runEngine(client,fixture,engine,report,scope="full",pumpCo
   return {success:true};
  });
  await load();
+ if(scope==="cef-png-equivalence"){
+  await runPngEquivalence({client,engine,base,capture,check,load,privateDir:client.privateDir});
+  const failed=checks.find(item=>!item.passed);if(failed)throw new Failure(failed.code);
+  return;
+ }
  if(scope==="cef-timing"){
   requireTrue(engine==="chromium","FOCUSED_RENDERER");
   await runRetiree({client,engine,base,capture,check,load,report});

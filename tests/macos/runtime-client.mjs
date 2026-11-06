@@ -135,13 +135,13 @@ export class Client {
   requireTrue(typeof approved.token==="string","PAIR_TOKEN_MISSING");
   this.secrets.push(approved.token);return approved.token;
  }
- async download(run,label){
+ async download(run,label,destination=this.out){
   requireTrue(typeof run.runId==="string","RUN_ID_MISSING");
   const records=[];
   for(const raw of run.artifacts??[]){
    this.artifactFacts=artifactFacts(raw);
    const item=scriptArtifactSchema.parse(raw);const extension={"image/png":"png","image/gif":"gif","video/mp4":"mp4"}[item.mimeType];
-   const file=path.join(this.out,label+"-"+this.artifacts.length+"."+extension);let offset=0;const chunks=[];
+   const file=path.join(destination,label+"-"+this.artifacts.length+"."+extension);let offset=0;const chunks=[];
    requireTrue(item.byteLength<=64*1024*1024,"ARTIFACT_LIMIT");
    while(offset<item.byteLength){
     const rawChunk=await this.api("get-script-artifact",{runId:run.runId,artifactId:item.id,offset,length:262144});

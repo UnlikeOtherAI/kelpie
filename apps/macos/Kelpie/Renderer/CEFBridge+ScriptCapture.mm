@@ -2,6 +2,7 @@
 #import "CEFBridge+ScriptCapture.h"
 #import "ScriptCaptureSourceLimits.h"
 #import <ImageIO/ImageIO.h>
+#include <stdio.h>
 
 // No clip: CDP must capture the current compositor surface without viewport emulation.
 @implementation CEFBridge (ScriptCapture)
@@ -25,7 +26,9 @@
         NSDictionary *params = @{@"format": @"png", @"fromSurface": @YES, @"captureBeyondViewport": @NO};
 #if DEBUG && defined(KELPIE_HOSTED_PNG_EQUIVALENCE_TEST)
         // Compiled only for the isolated hosted equivalence experiment.
-        if ([NSProcessInfo.processInfo.environment[@"KELPIE_CEF_PNG_SPEED_TEST"] isEqualToString:@"1"]) {
+        BOOL speedTest = [NSProcessInfo.processInfo.environment[@"KELPIE_CEF_PNG_SPEED_TEST"] isEqualToString:@"1"];
+        fprintf(stderr, "[PNGEquivalence] mode=%s\n", speedTest ? "speed" : "default");
+        if (speedTest) {
             params = @{@"format": @"png", @"fromSurface": @YES, @"captureBeyondViewport": @NO,
                        @"optimizeForSpeed": @YES};
         }
