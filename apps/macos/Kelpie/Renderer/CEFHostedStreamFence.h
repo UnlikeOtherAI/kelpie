@@ -34,7 +34,7 @@ public:
         if (!identityCurrent) { failure = Cause::identity; }
         else if (!std::isfinite(receiptMs) || receiptMs < startMs_ || receiptMs < lastReceiptMs_) {
             failure = Cause::receipt;
-        } else if (!std::isfinite(protocolMs) || protocolMs < lastProtocolMs_) { failure = Cause::protocol; }
+        } else if (!std::isfinite(protocolMs)) { failure = Cause::protocol; }
         else if (encodedBytes == 0 || encodedBytes > maximumFrameBytes_) { failure = Cause::size; }
         if (failure != Cause::none) {
             invalidateLocked(failure);
@@ -43,7 +43,6 @@ public:
             return Decision::ackStop;
         }
         lastReceiptMs_ = receiptMs;
-        lastProtocolMs_ = protocolMs;
         if (receiptMs - startMs_ > maximumDurationMs_ || observed_ >= maximumFrames_ ||
             encodedBytes > maximumTotalBytes_ - totalBytes_) {
             stopRequested_ = true;
@@ -52,6 +51,10 @@ public:
         }
         ++observed_;
         totalBytes_ += encodedBytes;
+        // CDP can deliver an older encoded frame after a newer one. ACK and count it,
+        // but never decode it or move the protocol high-water mark backwards.
+        if (protocolMs < lastProtocolMs_) { ++stale_; return Decision::ackDrop; }
+        lastProtocolMs_ = protocolMs;
         if (decodePending_) { ++dropped_; return Decision::ackDrop; }
         decodePending_ = true;
         pendingDecodeToken_ = ++nextDecodeToken_;
@@ -92,6 +95,11 @@ public:
     Cause stopCause() const { std::lock_guard<std::mutex> guard(lock_); return stopCause_; }
     Cause failureCause() const { std::lock_guard<std::mutex> guard(lock_); return failureCause_; }
 
+    size_t stale() const {
+        std::lock_guard<std::mutex> guard(lock_);
+        return stale_;
+    }
+
     size_t dropped() const {
         std::lock_guard<std::mutex> guard(lock_);
         return dropped_;
@@ -121,6 +129,7 @@ private:
     size_t observed_ = 0;
     size_t totalBytes_ = 0;
     size_t dropped_ = 0;
+    size_t stale_ = 0;
     double lastReceiptMs_ = 0;
     double lastProtocolMs_ = 0;
     double pendingReceiptMs_ = 0;

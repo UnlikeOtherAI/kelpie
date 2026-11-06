@@ -39,10 +39,27 @@ int main() {
     Fence regress(10, 27, 100);
     assert(regress.admit(10, 27, 1, 101, 10, 100, true, &token) == Fence::Decision::ackDecode);
     regress.complete(27, token, true, true, 1, 1);
-    assert(regress.admit(10, 27, 1, 102, 9, 100, true) == Fence::Decision::ackStop);
-    assert(regress.failureCause() == Fence::Cause::protocol);
-    regress.invalidate(); // first cause is preserved
-    assert(regress.failureCause() == Fence::Cause::protocol);
+    assert(regress.admit(10, 27, 1, 102, 9, 100, true) == Fence::Decision::ackDrop);
+    assert(regress.admit(10, 27, 1, 103, 9.5, 100, true) == Fence::Decision::ackDrop);
+    assert(regress.stale() == 2);
+    assert(regress.admit(10, 27, 1, 104, 11, 100, true, &token) == Fence::Decision::ackDecode);
+    regress.complete(27, token, true, true, 2, 2);
+    assert(regress.seal(true)->size() == 2);
+
+    Fence badIdentity(10, 28, 100);
+    assert(badIdentity.admit(10, 28, 1, 101, 10, 100, true, &token) == Fence::Decision::ackDecode);
+    badIdentity.complete(28, token, true, true, 1, 1);
+    assert(badIdentity.admit(10, 28, 1, 102, 9, 100, false) == Fence::Decision::ackStop);
+    assert(badIdentity.stale() == 0 && badIdentity.failureCause() == Fence::Cause::identity);
+    assert(!badIdentity.seal(true));
+
+    Fence staleCount(10, 29, 100);
+    assert(staleCount.admit(10, 29, 1, 101, 10, 100, true, &token) == Fence::Decision::ackDecode);
+    staleCount.complete(29, token, true, true, 1, 1);
+    for (int i = 0; i < 63; ++i)
+        assert(staleCount.admit(10, 29, 1, 102 + i, 9, 100, true) == Fence::Decision::ackDrop);
+    assert(staleCount.admit(10, 29, 1, 165, 9, 100, true) == Fence::Decision::ackStop);
+    assert(staleCount.stale() == 63 && staleCount.stopCause() == Fence::Cause::cap);
 
     Fence repeatedSession(10, 26, 100);
     uint64_t first = 0, second = 0;

@@ -239,8 +239,8 @@ test("pump experiment signal accepts only fixed modes",()=>{
 
 test("hosted stream parser accepts only bounded synthetic numeric events",()=>{
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=started"),{event:"started"});
- assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=1 failure=4"),{event:"fence",stop:1,failure:4});
- assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=11 failure=0"),null);
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=1 failure=4 stale=2"),{event:"fence",stop:1,failure:4,stale:2});
+ assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=11 failure=0 stale=0"),null);
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=refusal reason=viewport"),{event:"refusal",reason:"viewport"});
  assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=refusal reason=private"),null);
  const facts="[WorkflowHostedStream] event=probe received=4 consumed=3 malformed=0 metadata=1 rejected=0 drop=2 decode=1 stop=0 ackfail=0 decodefail=0 overflow=1 detached=0 identity=0 protocol=0 stopped=1";
