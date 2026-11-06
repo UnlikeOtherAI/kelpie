@@ -35,10 +35,15 @@ bool DesktopDevToolsSession::WaitTestStreamDrained(std::chrono::milliseconds tim
 }
 
 bool DesktopDevToolsSession::ReleaseTestStream() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (test_stream_accepting_ || test_stream_ingress_ || !test_stream_acks_.empty() || test_stream_completions_) return false;
-  test_stream_event_ = nullptr;
-  test_stream_detached_ = nullptr;
+  TestStreamEventSink event;
+  TestStreamDetachSink detached;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (test_stream_accepting_ || test_stream_ingress_ || !test_stream_acks_.empty() || test_stream_completions_) return false;
+    event = std::move(test_stream_event_);
+    detached = std::move(test_stream_detached_);
+  }
+  (void)event; (void)detached; // Destroy callbacks only after releasing mutex_.
   return true;
 }
 
@@ -50,18 +55,20 @@ void DesktopDevToolsSession::CompleteTestStreamCallback(std::function<void(bool)
 }
 
 void DesktopDevToolsSession::ClearTestStream() {
+  TestStreamEventSink event;
   TestStreamDetachSink detached;
   std::vector<std::function<void(bool)>> completions;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     test_stream_accepting_ = false;
     detached = std::move(test_stream_detached_);
-    test_stream_event_ = nullptr;
+    event = std::move(test_stream_event_);
     for (auto& [_, completion] : test_stream_acks_) completions.push_back(std::move(completion));
     test_stream_acks_.clear();
     test_stream_completions_ += completions.size() + (detached ? 1 : 0);
     test_stream_drained_.notify_all();
   }
+  (void)event; // Destroy the replaced event sink outside mutex_.
   for (auto& completion : completions) CompleteTestStreamCallback(std::move(completion), false);
   if (detached) CompleteTestStreamCallback([detached = std::move(detached)](bool) { detached(); }, false);
 }
