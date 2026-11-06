@@ -200,3 +200,39 @@ recognizer began, changed 18 times, ended, and reached scale 1.8605 while the
 native and visual page scales stayed 1. This comparison does not justify
 changing the app's default content mode or prove positive iPad page zoom.
 All required methods were present and both simulators were verified shut down.
+
+## Hosted geometry check: 42139243267
+
+The hosted `geometry` run used revision
+`11310fe3c3bf7cefc8071f3fc34782c645b80edf`, source tree
+`09d4e98a8d75ce67f806a784d27ac5ee4f69b2ca`, Xcode 26.6 (17F113) and
+iOS 26.5 on iPhone 17 and iPad Air 13-inch (M4). The simulator executable
+SHA-256 was `e9a0b1b2fac00cf5f11f4205048e126e799b4760a9ab2e0ec431eae474e7ee8d`
+and its debug dylib SHA-256 was
+`1dc209ad5dd8f7f7b0d6ba3a98104697161eb0f97ca72ddff6f9e7ceef162387`.
+The AppReveal source revision was `5d6d16d67a7cd08069f3d69c2d484249e2ed8485`.
+[The hosted run](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42139243267)
+retains the evidence. All 12 selected methods were present on each device,
+and both simulators were verified shut down.
+
+The iPhone passed 11 of 12 methods. Five viewport, observer and evidence
+ownership units, same-scene live marker, calibrated partial pinch and PNG,
+unhittable target refusal, and scrollable pinch passed; the two iPad-only
+comparison methods return early on iPhone. Paired MCP capture failed
+`CAPTURE_VIEWPORT_CHANGED`. Its exact run-bound receipt reported site
+`native-viewport`, an established same-document baseline, and no target
+binding. Before and after native bounds were 402x874, DPR 3 and scale 1;
+layout/visual height changed 812 to 778 and derived content rect changed
+[0,62,402,812] to [0,62,402,778]. The receipt did not bind raw adjusted
+inset values. The same-document post-baseline refusal remains in force.
+
+The iPad passed nine of 12 methods: the same five units, same-scene marker,
+paired MCP and decoded media, and both diagnostic comparisons. All three
+ordinary pinch cases remained at page scale 1. On the same owned view and
+document, a recognizer began, changed 18 times, ended, and reached 1.8605 in
+each of the no-viewport-meta and explicit
+`width=device-width,initial-scale=1,user-scalable=yes,maximum-scale=5`
+fixture variants; native and visual scale remained 1. The separate default
+versus test-only mobile content-mode comparison likewise stayed at scale 1.
+These controls do not prove positive iPad page zoom and did not change app
+viewport policy.
