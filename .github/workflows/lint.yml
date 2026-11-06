@@ -40,6 +40,11 @@ on:
         type: string
         default: ""
 
+      history_verify_patch_b64:
+        description: Fixed reviewed history candidate patch for portable verification
+        type: string
+        default: ""
+
       worker_comparison_mode:
         description: Probe isolation, prepare Chromium identity, or execute reviewed comparison
         type: choice
@@ -67,8 +72,119 @@ permissions:
   contents: read
 
 jobs:
+  history-portable-verification:
+    if: github.event_name == 'workflow_dispatch' && inputs.history_verify_patch_b64 != ''
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Enforce exclusive diagnostic dispatch
+        shell: bash
+        env:
+          WORKER_MODE: ${{ inputs.worker_comparison_mode }}
+          LINUX_NATIVE: ${{ inputs.linux_native_candidate }}
+          LINUX_MUX: ${{ inputs.linux_mux_probe }}
+          LINUX_TERMINAL: ${{ inputs.linux_resource_terminal_idr }}
+          LINUX_CLI: ${{ inputs.linux_resource_cli_only }}
+          LINUX_RUN: ${{ inputs.linux_resource_source_run }}
+          LINUX_SOURCE: ${{ inputs.linux_resource_expected_source }}
+          LINUX_RPM: ${{ inputs.linux_resource_expected_rpm }}
+          LINUX_ARCHIVE: ${{ inputs.linux_resource_expected_cli }}
+          CHROMIUM_ARCHIVE: ${{ inputs.worker_comparison_archive_sha256 }}
+          CHROMIUM_BINARY: ${{ inputs.worker_comparison_binary_sha256 }}
+        run: |
+          [[ "$WORKER_MODE" == off && "$LINUX_NATIVE" == false && "$LINUX_MUX" == false ]]
+          [[ "$LINUX_TERMINAL" == false && "$LINUX_CLI" == false ]]
+          [[ -z "$LINUX_RUN$LINUX_SOURCE$LINUX_RPM$LINUX_ARCHIVE$CHROMIUM_ARCHIVE$CHROMIUM_BINARY" ]]
+      - name: Checkout reviewed verifier
+        uses: actions/checkout@v6.0.3
+        with:
+          persist-credentials: false
+          path: verifier
+      - name: Checkout exact candidate base
+        uses: actions/checkout@v6.0.3
+        with:
+          ref: 22e616cfed21074cffef1e0d557645db6e895a28
+          persist-credentials: false
+          path: candidate
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 24.17.0
+      - name: Verify fixed candidate before package scripts
+        env:
+          HISTORY_PATCH_B64: ${{ inputs.history_verify_patch_b64 }}
+          HISTORY_PATCH_SHA: 7d008b497dcaca54e615cedc1c2403367df9fcbe338ed1780d21dc67e63366e3
+          HISTORY_DOC_SHA: 565bc1a888f175a33b16fb37bd2bf009cd4edfcbd67ff3500d53455879b883c0
+          HISTORY_SESSION_SHA: 5e7008602972d04db4fdb0f1497e36bba9786cbf944a414ce7bddf0b6009751d
+          HISTORY_PLAYWRIGHT_SHA: f069d59df2e1abe38d5dfc822348a6daba7e8c209829f65bab1d5fc59863dd84
+          HISTORY_IMPL_SHA: 048297a16163b1befac1eecb4a30ac4d033d585dbb50c8a0bdf74f2e550bdd78
+          HISTORY_TEST_SHA: a085d4a9d018dce864cc668e236be1f96e53bb0a3d56186afa16643f866f4740
+        run: node verifier/scripts/testing/verify-history-patch.mjs "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/history-owned"
+      - uses: pnpm/action-setup@v6.0.8
+        with:
+          version: 10.22.0
+      - name: Install exact dependencies after verification
+        working-directory: candidate
+        shell: bash
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/history-owned/temp"
+          if ! pnpm install --frozen-lockfile --store-dir "$RUNNER_TEMP/history-owned/store" >"$RUNNER_TEMP/history-owned/install.log" 2>&1; then
+            echo 'DEPENDENCY_INSTALL_FAILED'
+            exit 1
+          fi
+      - name: Run capped portable suite and verify retirement
+        shell: bash
+        run: |
+          set -euo pipefail
+          uid="$(id -u)"; gid="$(id -g)"
+          [[ "$uid" != 0 && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          unit="kelpie-history-portable-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          receipts="$RUNNER_TEMP/history-owned/receipts"
+          mkdir -m 700 "$receipts"
+          sudo -n systemd-run --quiet --wait --pipe --unit="$unit" --uid="$uid" --gid="$gid" \
+            --property="WorkingDirectory=$GITHUB_WORKSPACE/candidate" --property=CPUQuota=100% \
+            --property=MemoryMax=2G --property=TasksMax=256 --property=RuntimeMaxSec=1800 \
+            --property=NoNewPrivileges=yes --property=KillMode=control-group \
+            --setenv="PATH=$PATH" --setenv="HOME=$HOME" --setenv="TMPDIR=$RUNNER_TEMP/history-owned/temp" \
+            --setenv="CI=true" --setenv="npm_config_workspace_concurrency=1" \
+            --setenv="VITEST_MAX_THREADS=1" --setenv="VITEST_MIN_THREADS=1" \
+            --setenv="HISTORY_RECEIPT_DIR=$receipts" --setenv="HISTORY_LOG_DIR=$RUNNER_TEMP/history-owned/logs" \
+            /usr/bin/bash "$GITHUB_WORKSPACE/verifier/scripts/testing/run-history-portable.sh" >"$RUNNER_TEMP/history-owned/unit.log" 2>&1 &
+          launcher=$!; group=""
+          for _ in $(seq 1 100); do
+            group="$(sudo -n systemctl show "$unit" --value --property=ControlGroup 2>/dev/null || true)"
+            [[ "$group" == "/system.slice/${unit}.service" ]] && break
+            kill -0 "$launcher" 2>/dev/null || break
+            sleep 0.1
+          done
+          status=0; wait "$launcher" || status=$?
+          state="$(sudo -n systemctl show "$unit" --value --property=ActiveState)"
+          [[ "$state" == inactive || "$state" == failed ]]
+          [[ "$group" == "/system.slice/${unit}.service" ]]
+          cg="/sys/fs/cgroup$group"; retired=absent
+          if [[ -d "$cg" ]]; then
+            [[ -r "$cg/cgroup.procs" && -r "$cg/cgroup.events" ]]
+            [[ -z "$(cat "$cg/cgroup.procs")" ]]
+            [[ "$(grep -cx 'populated 0' "$cg/cgroup.events")" == 1 ]]
+            retired=empty
+          fi
+          printf '{"version":1,"state":"%s","cgroup":"%s","launcherExit":%s}\n' "$state" "$retired" "$status" >"$receipts/retirement.json"
+          [[ "$status" == 0 ]]
+      - name: Retain bounded verification receipts
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: history-portable-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/history-owned/patch-verification.json
+            ${{ runner.temp }}/history-owned/receipts/suite.json
+            ${{ runner.temp }}/history-owned/receipts/retirement.json
+          if-no-files-found: warn
+          retention-days: 14
+
   worker-comparison:
-    if: github.event_name == 'workflow_dispatch' && inputs.worker_comparison_mode != 'off'
+    if: github.event_name == 'workflow_dispatch' && inputs.history_verify_patch_b64 == '' && inputs.worker_comparison_mode != 'off'
     uses: ./.github/workflows/worker-comparison.yml
     permissions:
       contents: read
@@ -84,14 +200,14 @@ jobs:
       chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
 
   linux-mux-probe:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_mux_probe
+    if: github.event_name == 'workflow_dispatch' && inputs.history_verify_patch_b64 == '' && inputs.linux_mux_probe
     uses: ./.github/workflows/linux-mux-probe.yml
     permissions:
       contents: read
       actions: read
 
   linux-resource-diagnostic:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_resource_source_run != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.history_verify_patch_b64 == '' && inputs.linux_resource_source_run != ''
     uses: ./.github/workflows/linux-resource-diagnostic.yml
     permissions:
       contents: read
@@ -105,7 +221,7 @@ jobs:
       expected_cli: ${{ inputs.linux_resource_expected_cli }}
 
   linux-native-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_native_candidate
+    if: github.event_name == 'workflow_dispatch' && inputs.history_verify_patch_b64 == '' && inputs.linux_native_candidate
     uses: ./.github/workflows/linux-native.yml
     permissions:
       contents: read
@@ -115,6 +231,7 @@ jobs:
       artifact_prefix: linux-native-candidate
 
   lint:
+    if: github.event_name != 'workflow_dispatch' || inputs.history_verify_patch_b64 == ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

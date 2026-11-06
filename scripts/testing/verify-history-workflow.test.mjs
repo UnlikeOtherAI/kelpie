@@ -1,0 +1,20 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+test("hosted verifier is opt-in, pinned, capped and retains only receipts",async()=>{
+ const text=await readFile(new URL("../../.github/workflows/lint.yml",import.meta.url),"utf8");
+ const start=text.indexOf("  history-portable-verification:"),end=text.indexOf("  worker-comparison:",start);
+ assert.ok(start>=0&&end>start);const job=text.slice(start,end);
+ assert.ok(job.includes("inputs.history_verify_patch_b64 != ''"));
+ assert.ok(job.includes("ref: 22e616cfed21074cffef1e0d557645db6e895a28"));
+ assert.ok(job.includes("HISTORY_PATCH_SHA: 7d008b497dcaca54e615cedc1c2403367df9fcbe338ed1780d21dc67e63366e3"));
+ assert.equal((job.match(/persist-credentials: false/g)??[]).length,2);
+ const verify=job.indexOf("verify-history-patch.mjs"),install=job.indexOf("pnpm install");
+ assert.ok(verify>=0&&install>verify);
+ assert.ok(job.includes("--property=CPUQuota=100%")&&job.includes("--property=MemoryMax=2G")&&job.includes("--property=TasksMax=256"));
+ assert.ok(job.includes("--uid=\"$uid\"")&&job.includes("--property=NoNewPrivileges=yes"));
+ const upload=job.slice(job.indexOf("      - name: Retain bounded verification receipts"));
+ assert.ok(upload.includes("patch-verification.json")&&upload.includes("suite.json")&&upload.includes("retirement.json"));
+ assert.ok(!upload.includes("candidate.patch")&&!upload.includes("logs/"));
+ assert.ok(text.includes("if: github.event_name != 'workflow_dispatch' || inputs.history_verify_patch_b64 == ''"));
+});
