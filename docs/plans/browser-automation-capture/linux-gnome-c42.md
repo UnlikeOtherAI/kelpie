@@ -85,3 +85,24 @@ listener remained present. The bounded unit ran 35.255 seconds. Sanitized
 receipt SHA-256:
 `1e231140c7c22efdec40e39ab2dbe4428dc9d24bfcf80b65dd9fe81b791610da`.
 No native Stop or physical displayed-pixel pass follows from this run.
+
+## Same-binary headless control
+
+A separate no-display headless control used the same 0732 diagnostic ELF
+(`cf23a2f1da2e335f03c001e17fa58d3d736e982d80851695f6f97e0de718df0c`),
+manifest (`4d692268ef3ab5673aad76d3177e3a100a5959e86b29ec36709d5cecd32ff9eb`)
+and test harness source
+`7ea903315e1a8b09015c56add648fd8311534a7d`. All 70 referenced runtime
+assets matched, and loader and required capture-factory checks passed.
+
+The nontruncated trace reached START_ENTER, ENGINE_ENTER and CEF_INIT_ENTER,
+then the owned process exited with SIGTRAP after 712 ms, before a CEF init
+return or browser creation. No readiness, HTTP, MCP or acknowledged public
+close was reached. The owned unit retired, its private runtime was removed,
+and the unrelated listener remained present. Sanitized receipt SHA-256:
+`3b4ef6828114163bcaad78bd79caaad8990255b7fc73dcc11c843cd69f6ad665`.
+
+This is a failed control, not a headless pass or a diagnosis of the GNOME
+wait. The native `--headless` path selects Ozone headless and removes
+display and session-bus references, so more than GTK context differs between
+the two attempts.
