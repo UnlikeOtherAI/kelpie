@@ -5,10 +5,12 @@ import {readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {promisify} from "node:util";
 
-const [directoryArg,binaryArg,source]=process.argv.slice(2);
+const [directoryArg,binaryArg,source,outputName="analysis.json"]=process.argv.slice(2);
 assert.ok(directoryArg&&binaryArg&&/^[a-f0-9]{40}$/.test(source));
+assert.match(outputName,/^analysis(?:\.[a-z0-9-]+)?\.json$/);
 assert.ok(process.env.FFMPEG&&process.env.FFPROBE);
 const directory=resolve(directoryArg),binary=resolve(binaryArg),exec=promisify(execFile);
+assert.equal((await exec("git",["rev-parse","HEAD"],{timeout:10000,windowsHide:true})).stdout.trim(),source);
 const hash=async file=>createHash("sha256").update(await readFile(file)).digest("hex");
 const rawClean=join(directory,"clean.bgra"),rawMarked=join(directory,"marked.bgra");
 const clean=await readFile(rawClean),marked=await readFile(rawMarked);
@@ -51,4 +53,4 @@ for(const name of ["clean-only","marker-then-clean"]){
    baselineToMiddle:compare(frame(0),frame(1)),baselineToTail:compare(frame(0),frame(2))});
  }
 }
-await writeFile(join(directory,"analysis.json"),JSON.stringify(report,null,2),{flag:"wx"});
+await writeFile(join(directory,outputName),JSON.stringify(report,null,2),{flag:"wx"});
