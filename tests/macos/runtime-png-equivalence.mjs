@@ -21,7 +21,7 @@ export async function runPngEquivalence({client,engine,base,capture,check,load,p
   client.verifyOwnedReveal();client.pin(28420);
   requireTrue((await client.windows()).some(item=>item.id===window.id&&item.isKey),"PIXEL_WINDOW_CHANGED");
   const start=process.hrtime.bigint();
-  const result=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"],maxWidth:1280},actions:[{action:"screenshot"}]});
+  const result=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"],maxWidth:1280,fps:30},actions:[{action:"screenshot"}]});
   const elapsedMs=Number(process.hrtime.bigint()-start)/1e6;
   requireTrue(result.success,"PIXEL_WORKFLOW");
   client.verifyOwnedReveal();client.pin(28420);
