@@ -272,25 +272,47 @@ jobs:
       - name: Install decoder tools
         run: brew install ffmpeg
       - name: Check bounded verifier
-        run: node --test tests/macos/script-video-calibration-check.test.mjs
-      - name: Compile and run standalone synthetic writer
+        run: |
+          node --test tests/macos/script-video-calibration-check.test.mjs \
+            tests/macos/script-video-intra-source.test.mjs tests/macos/script-video-intra-compare-check.test.mjs
+      - name: Compile and run serial synthetic arms
         run: |
           set -euo pipefail
           test "$(uname -m)" = arm64
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --quiet HEAD -- tests/macos apps/macos/Kelpie/Handlers
-          mkdir -p .cache/writer-calibration
-          test ! -e .cache/writer-calibration/output
-          xcrun swiftc -parse-as-library tests/macos/script-video-identical-frame.swift \
-            apps/macos/Kelpie/Handlers/ScriptCaptureError.swift apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift \
-            apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift \
-            -o .cache/writer-calibration/calibration
-          .cache/writer-calibration/calibration "$(pwd)/.cache/writer-calibration/output"
-      - name: Verify decoded ROI and exact PTS
+          mkdir -p .cache/writer-calibration/source
+          test ! -e .cache/writer-calibration/default
+          test ! -e .cache/writer-calibration/intra
+          node tests/macos/script-video-intra-source.mjs \
+            .cache/writer-calibration/source/ScriptVideoWriter.swift .cache/writer-calibration/source/transform.json
+          common=(tests/macos/script-video-identical-frame.swift
+            apps/macos/Kelpie/Handlers/ScriptCaptureError.swift apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift
+            apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift)
+          xcrun swiftc -parse-as-library "${common[@]}" apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift \
+            -o .cache/writer-calibration/default-binary
+          xcrun swiftc -parse-as-library "${common[@]}" .cache/writer-calibration/source/ScriptVideoWriter.swift \
+            -o .cache/writer-calibration/intra-binary
+          { /usr/bin/time -l .cache/writer-calibration/default-binary "$(pwd)/.cache/writer-calibration/default"; } \
+            2> .cache/writer-calibration/default-time.txt
+          { /usr/bin/time -l .cache/writer-calibration/intra-binary "$(pwd)/.cache/writer-calibration/intra"; } \
+            2> .cache/writer-calibration/intra-time.txt
+      - name: Verify decoded ROI, exact PTS and frame types
         run: |
           set -euo pipefail
-          node tests/macos/script-video-calibration.mjs \
-            .cache/writer-calibration/output/input.json .cache/writer-calibration/output/result.json
+          KELPIE_CALIBRATION_PROFILE=default KELPIE_CALIBRATION_BINARY=.cache/writer-calibration/default-binary \
+            KELPIE_CALIBRATION_TIME=.cache/writer-calibration/default-time.txt \
+            node tests/macos/script-video-calibration.mjs \
+            .cache/writer-calibration/default/input.json .cache/writer-calibration/default/result.json
+          KELPIE_CALIBRATION_PROFILE=all-intra KELPIE_CALIBRATION_BINARY=.cache/writer-calibration/intra-binary \
+            KELPIE_CALIBRATION_TIME=.cache/writer-calibration/intra-time.txt \
+            KELPIE_INTRA_SOURCE=.cache/writer-calibration/source/ScriptVideoWriter.swift \
+            KELPIE_INTRA_RECEIPT=.cache/writer-calibration/source/transform.json \
+            node tests/macos/script-video-calibration.mjs \
+            .cache/writer-calibration/intra/input.json .cache/writer-calibration/intra/result.json
+          node tests/macos/script-video-intra-compare.mjs \
+            .cache/writer-calibration/default/result.json .cache/writer-calibration/intra/result.json \
+            .cache/writer-calibration/comparison.json
       - name: Retain bounded synthetic evidence
         if: always()
         uses: actions/upload-artifact@v7.0.1
@@ -299,11 +321,20 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
           path: |
-            .cache/writer-calibration/output/input.json
-            .cache/writer-calibration/output/result.json
-            .cache/writer-calibration/output/stable.mp4
-            .cache/writer-calibration/output/varying.mp4
-            .cache/writer-calibration/output/holdout.mp4
-            .cache/writer-calibration/output/small-faint.mp4
-            .cache/writer-calibration/output/small-visible.mp4
-            .cache/writer-calibration/output/medium-faint.mp4
+            .cache/writer-calibration/default/input.json
+            .cache/writer-calibration/default/result.json
+            .cache/writer-calibration/default/stable.mp4
+            .cache/writer-calibration/default/varying.mp4
+            .cache/writer-calibration/default/holdout.mp4
+            .cache/writer-calibration/default/small-faint.mp4
+            .cache/writer-calibration/default/small-visible.mp4
+            .cache/writer-calibration/default/medium-faint.mp4
+            .cache/writer-calibration/intra/input.json
+            .cache/writer-calibration/intra/result.json
+            .cache/writer-calibration/intra/stable.mp4
+            .cache/writer-calibration/intra/varying.mp4
+            .cache/writer-calibration/intra/holdout.mp4
+            .cache/writer-calibration/intra/small-faint.mp4
+            .cache/writer-calibration/intra/small-visible.mp4
+            .cache/writer-calibration/intra/medium-faint.mp4
+            .cache/writer-calibration/comparison.json

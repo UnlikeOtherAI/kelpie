@@ -7,10 +7,11 @@ import path from "node:path";
 import {consumeG08Frames} from "../capture/g08-frame-stream.mjs";
 import {ffmpegPassthrough} from "../capture/ffmpeg-passthrough.mjs";
 import {validateCalibrationCase,decodedTicksAt600,redExcess,classifyMarkerRegime,markerControls,caseNames} from "./script-video-calibration-check.mjs";
+import {intraWriterSource} from "./script-video-intra-source.mjs";
 
 const [inputName,outputName]=process.argv.slice(2);
 assert.ok(inputName&&outputName&&process.argv.length===4,"CALIBRATION_ARGUMENTS");
-assert.ok((await stat(inputName)).size<=65536,"CALIBRATION_MANIFEST_SIZE");
+assert.ok((await stat(inputName)).size<=131072,"CALIBRATION_MANIFEST_SIZE");
 const inputBytes=await readFile(inputName),input=JSON.parse(inputBytes.toString("utf8")),directory=await realpath(path.dirname(inputName));
 const inputSHA256=createHash("sha256").update(inputBytes).digest("hex");
 const command=(file,args)=>execFileSync(file,args,{encoding:"utf8",timeout:15000,maxBuffer:1048576}).trim();
@@ -26,20 +27,51 @@ const identity={source,node:process.version,architecture:process.arch,
  sdk:command("xcrun",["--sdk","macosx","--show-sdk-version"]),
  ffmpeg:{version:command(ffmpegPath,["-version"]).split("\n")[0],sha256:await hashFile(ffmpegPath)},
  ffprobe:{version:command(ffprobePath,["-version"]).split("\n")[0],sha256:await hashFile(ffprobePath)}};
+const profile=process.env.KELPIE_CALIBRATION_PROFILE??"default";
+assert.ok(["default","all-intra"].includes(profile),"CALIBRATION_PROFILE");
+const writerPath="apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift",writerSource=await readFile(writerPath);
+identity.writerSourceSHA256=createHash("sha256").update(writerSource).digest("hex");
+if(process.env.KELPIE_CALIBRATION_BINARY)identity.calibrationBinarySHA256=await hashFile(await realpath(process.env.KELPIE_CALIBRATION_BINARY));
+if(process.env.KELPIE_CALIBRATION_TIME){
+ const timing=await readFile(process.env.KELPIE_CALIBRATION_TIME,"utf8");assert.ok(timing.length<=8192,"CALIBRATION_TIMING_SIZE");
+ const match=/^\s*([0-9.]+)\s+real\s+([0-9.]+)\s+user\s+([0-9.]+)\s+sys/m.exec(timing);
+ const rss=/^\s*(\d+)\s+maximum resident set size/m.exec(timing);
+ assert.ok(match&&rss,"CALIBRATION_TIMING_FORMAT");
+ const [elapsedSeconds,userSeconds,systemSeconds]=match.slice(1).map(Number),maxResidentBytes=Number(rss[1]);
+ assert.ok([elapsedSeconds,userSeconds,systemSeconds,maxResidentBytes].every(Number.isFinite)&&elapsedSeconds>0&&
+  userSeconds>=0&&systemSeconds>=0&&maxResidentBytes>0,"CALIBRATION_TIMING_VALUES");
+ identity.process={elapsedSeconds,userSeconds,systemSeconds,maxResidentBytes};
+}
+if(profile==="all-intra"){
+ assert.ok(process.env.KELPIE_INTRA_SOURCE&&process.env.KELPIE_INTRA_RECEIPT,"INTRA_PROVENANCE_MISSING");
+ const transformed=await readFile(process.env.KELPIE_INTRA_SOURCE),receipt=JSON.parse(await readFile(process.env.KELPIE_INTRA_RECEIPT,"utf8"));
+ const expected=Buffer.from(intraWriterSource(writerSource.toString("utf8")));
+ assert.ok(transformed.equals(expected),"INTRA_SOURCE_MISMATCH");
+ assert.equal(receipt.version,1);assert.equal(receipt.source,"apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift");
+ assert.equal(receipt.insertion,"AVVideoMaxKeyFrameIntervalKey: 1");
+ assert.equal(receipt.sourceSHA256,identity.writerSourceSHA256);
+ assert.equal(receipt.transformedSHA256,createHash("sha256").update(transformed).digest("hex"));
+ identity.intraTransform=receipt;
+}
 assert.equal(input.version,2);assert.equal(input.width,640);assert.equal(input.height,496);
 assert.deepEqual(input.roi,[432,200,97,97]);assert.equal(input.timeBase,"1/600");
 assert.ok(Array.isArray(input.cases)&&input.cases.length===caseNames.length,"CALIBRATION_CASES");
 assert.deepEqual(input.cases.map(item=>item.name),caseNames);
 assert.match(input.cleanROIHash,/^[a-f0-9]{64}$/);assert.match(input.varyingROIHash,/^[a-f0-9]{64}$/);
 assert.notEqual(input.cleanROIHash,input.varyingROIHash);
+assert.match(input.cleanImageHash,/^[a-f0-9]{64}$/);assert.match(input.varyingImageHash,/^[a-f0-9]{64}$/);
+assert.notEqual(input.cleanImageHash,input.varyingImageHash);
 assert.ok(Array.isArray(input.markerControls)&&input.markerControls.length===markerControls.length);
 const sourceHashes={clean:input.cleanROIHash,varying:input.varyingROIHash};
+const imageHashes={clean:input.cleanImageHash,varying:input.varyingImageHash};
 for(let i=0;i<markerControls.length;i++){
  const expected=markerControls[i],actual=input.markerControls[i];
  assert.equal(actual.name,expected.name);assert.equal(actual.radiusPx,expected.radiusPx);assert.equal(actual.alpha,expected.alpha);
  assert.equal(actual.color,expected.color);assert.equal(actual.anchor,expected.anchor);
  assert.match(actual.sourceROIHash,/^[a-f0-9]{64}$/);assert.notEqual(actual.sourceROIHash,input.cleanROIHash);
  sourceHashes[actual.name]=actual.sourceROIHash;
+ assert.match(actual.sourceImageHash,/^[a-f0-9]{64}$/);assert.notEqual(actual.sourceImageHash,input.cleanImageHash);
+ imageHashes[actual.name]=actual.sourceImageHash;
 }
 const results=[];let totalBytes=0;
 for(const item of input.cases){
@@ -51,13 +83,15 @@ for(const item of input.cases){
  const digest=createHash("sha256");for await(const bytes of createReadStream(file))digest.update(bytes);
  const artifactSHA256=digest.digest("hex");
  const probe=spawnSync(ffprobePath,["-v","error","-select_streams","v:0","-show_frames","-show_entries",
-  "frame=best_effort_timestamp:stream=width,height,time_base","-of","json",file],
+  "frame=best_effort_timestamp,key_frame,pict_type:stream=width,height,time_base","-of","json",file],
  {windowsHide:true,maxBuffer:1048576,timeout:30000});
  assert.equal(probe.status,0,"CALIBRATION_PROBE");
  const metadata=JSON.parse(probe.stdout.toString());assert.equal(metadata.streams?.length,1);
  const stream=metadata.streams[0];assert.equal(stream.width,640);assert.equal(stream.height,496);
  const frames=metadata.frames??[];assert.ok(frames.length<=40,"CALIBRATION_FRAME_LIMIT");
  const trackPTS=frames.map(frame=>Number(frame.best_effort_timestamp));
+ const frameTypes=frames.map(frame=>({key:Number(frame.key_frame),type:frame.pict_type}));
+ assert.ok(frameTypes.every(frame=>[0,1].includes(frame.key)&&["I","P","B"].includes(frame.type)),"CALIBRATION_FRAME_TYPES");
  const decodedTicks=decodedTicksAt600(trackPTS,stream.time_base);
  const child=spawn(ffmpegPath,["-v","error","-threads","1","-filter_threads","1","-i",file,"-map","0:v:0",
   ...ffmpegPassthrough(ffmpegPath),"-f","rawvideo","-pix_fmt","rgb24","-"],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
@@ -72,7 +106,7 @@ for(const item of input.cases){
   });
   await exited;assert.equal(count,frames.length,"CALIBRATION_DECODE_COUNT");
  }finally{clearTimeout(timer);if(child.exitCode===null)child.kill();await exited.catch(()=>{});}
- results.push({...validateCalibrationCase(item,decodedTicks,decodedHashes,sourceHashes),scores,trackTimeBase:stream.time_base,trackPTS,artifactSHA256,bytes:info.size});
+ results.push({...validateCalibrationCase(item,decodedTicks,decodedHashes,sourceHashes,imageHashes),scores,trackTimeBase:stream.time_base,trackPTS,frameTypes,artifactSHA256,bytes:info.size});
 }
 const training=results.find(result=>result.name==="stable").scores;
 const holdout=results.find(result=>result.name==="holdout").scores;
@@ -82,9 +116,9 @@ const regimes=markerControls.map(control=>{
  const tail=result.scores.filter((_,index)=>result.sourceKinds[index]==="clean");
  return {...control,...classifyMarkerRegime(training,holdout,marker,tail)};
 });
-const output={version:2,scope:"synthetic-encoded-visible-marker-calibration",inputSHA256,identity,width:640,height:496,
+const output={version:2,scope:"synthetic-encoded-visible-marker-calibration",profile,inputSHA256,identity,width:640,height:496,
  roi:[432,200,97,97],writerTimeBase:"1/600",metric:"sum-max-zero-red-minus-max-green-blue",regimes,results};
 const outputBytes=Buffer.from(JSON.stringify(output,null,2)+"\n");
-assert.ok(outputBytes.length<=65536,"CALIBRATION_OUTPUT_LIMIT");
+assert.ok(outputBytes.length<=131072,"CALIBRATION_OUTPUT_LIMIT");
 await writeFile(outputName,outputBytes,{flag:"wx"});
 console.log(JSON.stringify({cases:results.map(({name,accepted,sourceUnique,decodedUnique,observation})=>({name,accepted,sourceUnique,decodedUnique,observation})),regimes}));

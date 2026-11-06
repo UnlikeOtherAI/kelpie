@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
+import {readFile,stat,writeFile} from "node:fs/promises";
+import {compareArms} from "./script-video-intra-compare-check.mjs";
+const [defaultPath,intraPath,outputPath]=process.argv.slice(2);
+assert.ok(defaultPath&&intraPath&&outputPath&&process.argv.length===5,"INTRA_COMPARE_ARGUMENTS");
+for(const file of [defaultPath,intraPath])assert.ok((await stat(file)).size<=131072,"INTRA_RESULT_SIZE");
+const defaultBytes=await readFile(defaultPath),intraBytes=await readFile(intraPath);
+const result=compareArms(JSON.parse(defaultBytes),JSON.parse(intraBytes));
+const digest=bytes=>createHash("sha256").update(bytes).digest("hex");
+const receipt={version:1,defaultResultSHA256:digest(defaultBytes),intraResultSHA256:digest(intraBytes),...result};
+const bytes=Buffer.from(JSON.stringify(receipt,null,2)+"\n");assert.ok(bytes.length<=32768,"INTRA_COMPARE_SIZE");
+await writeFile(outputPath,bytes,{flag:"wx"});
+console.log(JSON.stringify({status:result.status,reasons:result.reasons,cases:result.cases,defaultRegimes:result.defaultRegimes,intraRegimes:result.intraRegimes}));

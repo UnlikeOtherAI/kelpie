@@ -22,7 +22,7 @@ export function decodedTicksAt600(values,timeBase){
 }
 
 // This verifies accounting only. No missing, rounded or unmatched output frame is tolerated.
-export function validateCalibrationCase(item,decodedTicks,decodedHashes,sourceHashes){
+export function validateCalibrationCase(item,decodedTicks,decodedHashes,sourceHashes,imageHashes){
  assert.ok(item&&caseNames.includes(item.name),"CALIBRATION_CASE");
  assert.ok(Array.isArray(item.accepted)&&item.accepted.length>=16&&item.accepted.length<=40,"CALIBRATION_ACCEPTED");
  assert.ok(Number.isInteger(item.appendRejected)&&item.appendRejected>=0&&item.appendRejected<=24,"CALIBRATION_REJECTED");
@@ -34,18 +34,21 @@ export function validateCalibrationCase(item,decodedTicks,decodedHashes,sourceHa
  assert.deepEqual(decodedTicks,ticks,"CALIBRATION_PTS_MISMATCH");
  const source=item.accepted.map(record=>record.sourceROIHash);
  assert.ok(source.every(hash=>/^[a-f0-9]{64}$/.test(hash))&&decodedHashes.every(hash=>/^[a-f0-9]{64}$/.test(hash)),"CALIBRATION_HASH");
+ const sourceImages=item.accepted.map(record=>record.sourceImageHash);
+ assert.ok(sourceImages.every(hash=>/^[a-f0-9]{64}$/.test(hash)),"CALIBRATION_IMAGE_HASH");
  const kinds=item.accepted.map(record=>record.sourceKind);
  for(let i=0;i<ticks.length;i++){
   const index=ticks[i]/30-1;
   const alternate=item.name==="varying"?Math.floor(index/5)%2===1:markerControls.some(control=>control.name===item.name)&&index<20;
   assert.equal(kinds[i],alternate?"alternate":"clean","CALIBRATION_SOURCE_KIND");
   assert.equal(source[i],alternate?sourceHashes[item.name]:sourceHashes.clean,"CALIBRATION_SOURCE_IDENTITY");
+  assert.equal(sourceImages[i],alternate?imageHashes[item.name]:imageHashes.clean,"CALIBRATION_IMAGE_IDENTITY");
  }
  const sourceUnique=new Set(source).size,decodedUnique=new Set(decodedHashes).size;
  if(item.name==="stable"||item.name==="holdout")assert.equal(sourceUnique,1,"CALIBRATION_SOURCE_UNSTABLE");
  if(item.name==="varying"){assert.ok(sourceUnique>=2,"CALIBRATION_NEGATIVE_SOURCE");assert.ok(decodedUnique>=2,"CALIBRATION_NEGATIVE_DECODED");}
  return {name:item.name,accepted:source.length,appendRejected:item.appendRejected,sourceUnique,decodedUnique,
-  acceptedTicks:ticks,sourceROIHashes:source,sourceKinds:kinds,decodedROIHashes:decodedHashes,
+  acceptedTicks:ticks,sourceROIHashes:source,sourceImageHashes:sourceImages,sourceKinds:kinds,decodedROIHashes:decodedHashes,
   observation:item.name==="stable"?(decodedUnique>1?"decoded-variation-after-input":"decoded-identical"):item.name};
 }
 

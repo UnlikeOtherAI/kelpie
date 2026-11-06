@@ -10,6 +10,7 @@ import Foundation
     struct Fixture {
         let image: CGImage
         let roiSHA256: String
+        let imageSHA256: String
     }
 
     @MainActor static func fixture(offset: Int, markerRadius: CGFloat = 0, markerAlpha: CGFloat = 0) throws -> Fixture {
@@ -44,7 +45,9 @@ import Foundation
             cropped.append(bytes.advanced(by: (row * width + Int(roi.minX)) * 4), count: Int(roi.width) * 4)
         }
         let hash = SHA256.hash(data: cropped).map { String(format: "%02x", $0) }.joined()
-        return Fixture(image: image, roiSHA256: hash)
+        let full = Data(bytes: base, count: width * height * 4)
+        let fullHash = SHA256.hash(data: full).map { String(format: "%02x", $0) }.joined()
+        return Fixture(image: image, roiSHA256: hash, imageSHA256: fullHash)
     }
 
     @MainActor static func runCase(
@@ -63,7 +66,7 @@ import Foundation
             let chosen = useAlternate ? alternate! : stable
             let tick = (index + 1) * 30 // Exact 20 fps in the writer's 1/600 time base.
             if try writer.append(chosen.image, seconds: Double(tick) / 600) {
-                accepted.append(["tick": tick, "sourceROIHash": chosen.roiSHA256,
+                accepted.append(["tick": tick, "sourceROIHash": chosen.roiSHA256, "sourceImageHash": chosen.imageSHA256,
                                  "sourceKind": useAlternate ? "alternate" : "clean"])
             } else {
                 rejected += 1
@@ -106,13 +109,14 @@ import Foundation
         let manifest: [String: Any] = ["version": 2, "width": width, "height": height,
             "roi": [432, 200, 97, 97], "timeBase": "1/600", "cases": cases,
             "cleanROIHash": first.roiSHA256, "varyingROIHash": shifted.roiSHA256,
+            "cleanImageHash": first.imageSHA256, "varyingImageHash": shifted.imageSHA256,
             "markerControls": [
-                ["name": "small-faint", "radiusPx": 3, "alpha": 0.02, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": smallFaint.roiSHA256],
-                ["name": "small-visible", "radiusPx": 3, "alpha": 0.10, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": smallVisible.roiSHA256],
-                ["name": "medium-faint", "radiusPx": 8, "alpha": 0.02, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": mediumFaint.roiSHA256]
+                ["name": "small-faint", "radiusPx": 3, "alpha": 0.02, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": smallFaint.roiSHA256, "sourceImageHash": smallFaint.imageSHA256],
+                ["name": "small-visible", "radiusPx": 3, "alpha": 0.10, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": smallVisible.roiSHA256, "sourceImageHash": smallVisible.imageSHA256],
+                ["name": "medium-faint", "radiusPx": 8, "alpha": 0.02, "color": "#ff0000", "anchor": "pointer-tip", "sourceROIHash": mediumFaint.roiSHA256, "sourceImageHash": mediumFaint.imageSHA256]
             ]]
         let data = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys, .prettyPrinted])
-        guard data.count <= 65536 else { throw ScriptCaptureError.image }
+        guard data.count <= 131072 else { throw ScriptCaptureError.image }
         try data.write(to: directory.appendingPathComponent("input.json"), options: .withoutOverwriting)
     }
 }

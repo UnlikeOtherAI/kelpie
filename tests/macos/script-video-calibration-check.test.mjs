@@ -4,25 +4,25 @@ import {validateCalibrationCase,decodedTicksAt600,classifyMarkerRegime,redExcess
 const a="a".repeat(64),b="b".repeat(64),c="c".repeat(64),hashes={clean:a,varying:b,"small-faint":b};
 const make=name=>({name,accepted:Array.from({length:40},(_,i)=>{
  const alternate=name==="varying"?Math.floor(i/5)%2===1:name==="small-faint"&&i<20;
- return {tick:(i+1)*30,sourceROIHash:alternate?b:a,sourceKind:alternate?"alternate":"clean"};
+ return {tick:(i+1)*30,sourceROIHash:alternate?b:a,sourceImageHash:alternate?b:a,sourceKind:alternate?"alternate":"clean"};
 }),appendRejected:0,encodedFrames:40});
 const ticks=item=>item.accepted.map(record=>record.tick);
 test("calibration retains exact matching PTS and observes rather than assumes codec stability",()=>{
  const stable=make("stable"),same=Array(40).fill(a),varied=same.map((x,i)=>i>=20?c:x);
- assert.equal(validateCalibrationCase(stable,ticks(stable),same,hashes).observation,"decoded-identical");
- assert.equal(validateCalibrationCase(stable,ticks(stable),varied,hashes).observation,"decoded-variation-after-input");
- const negative=make("varying");assert.equal(validateCalibrationCase(negative,ticks(negative),varied,hashes).observation,"varying");
- const marker=make("small-faint");assert.equal(validateCalibrationCase(marker,ticks(marker),varied,hashes).sourceUnique,2);
+ assert.equal(validateCalibrationCase(stable,ticks(stable),same,hashes,hashes).observation,"decoded-identical");
+ assert.equal(validateCalibrationCase(stable,ticks(stable),varied,hashes,hashes).observation,"decoded-variation-after-input");
+ const negative=make("varying");assert.equal(validateCalibrationCase(negative,ticks(negative),varied,hashes,hashes).observation,"varying");
+ const marker=make("small-faint");assert.equal(validateCalibrationCase(marker,ticks(marker),varied,hashes,hashes).sourceUnique,2);
 });
 test("calibration fails closed on missing, reordered, ambiguous or mislabeled evidence",()=>{
  const stable=make("stable"),same=Array(40).fill(a),t=ticks(stable);
- assert.throws(()=>validateCalibrationCase(stable,t.slice(1),same,hashes),/CALIBRATION_OUTPUT_COUNT/);
- assert.throws(()=>validateCalibrationCase(stable,[...t.slice(0,1),...t.slice(2),t[1]],same,hashes),/CALIBRATION_PTS_MISMATCH/);
- assert.throws(()=>validateCalibrationCase({...stable,encodedFrames:39},t,same,hashes),/CALIBRATION_COMMITTED_COUNT/);
- assert.throws(()=>validateCalibrationCase({...stable,accepted:stable.accepted.map(x=>({...x,tick:30}))},t,same,hashes),/CALIBRATION_INPUT_TICKS/);
- assert.throws(()=>validateCalibrationCase(make("varying"),t,same,hashes),/CALIBRATION_NEGATIVE_DECODED/);
+ assert.throws(()=>validateCalibrationCase(stable,t.slice(1),same,hashes,hashes),/CALIBRATION_OUTPUT_COUNT/);
+ assert.throws(()=>validateCalibrationCase(stable,[...t.slice(0,1),...t.slice(2),t[1]],same,hashes,hashes),/CALIBRATION_PTS_MISMATCH/);
+ assert.throws(()=>validateCalibrationCase({...stable,encodedFrames:39},t,same,hashes,hashes),/CALIBRATION_COMMITTED_COUNT/);
+ assert.throws(()=>validateCalibrationCase({...stable,accepted:stable.accepted.map(x=>({...x,tick:30}))},t,same,hashes,hashes),/CALIBRATION_INPUT_TICKS/);
+ assert.throws(()=>validateCalibrationCase(make("varying"),t,same,hashes,hashes),/CALIBRATION_NEGATIVE_DECODED/);
  const marker=make("small-faint");marker.accepted[0].sourceKind="clean";
- assert.throws(()=>validateCalibrationCase(marker,t,same,hashes),/CALIBRATION_SOURCE_KIND/);
+ assert.throws(()=>validateCalibrationCase(marker,t,same,hashes,hashes),/CALIBRATION_SOURCE_KIND/);
 });
 test("track time base converts to writer ticks only when rationally exact",()=>{
  assert.deepEqual(decodedTicksAt600([60,120],"1/1200"),[30,60]);
