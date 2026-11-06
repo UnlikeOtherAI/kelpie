@@ -973,3 +973,5 @@ This is a single Fedora candidate path, not final installed Fedora or Ubuntu
 package verification. The previously failed 421022 media receipts are retained.
 
 [Installed candidate receipts for run 42122562425](linux-installed-421225.md).
+
+[c42 GNOME launch diagnostics](linux-gnome-c42.md).
