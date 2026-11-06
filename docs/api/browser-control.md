@@ -49,6 +49,13 @@ Navigation uses `tab.goto/back/forward/reload`; observation uses `tab.url/title`
 `tab.screenshot`; page input uses `page.press/scroll`. Key press support depends on actual advertised platform capabilities. Rich semantic locators, fill/check/select and frame scopes
 are implemented by Playwright only; the native adapter does not advertise them.
 Native extensions keep their own platform/input guarantees.
+Managed Playwright sessions dispatch Back or Forward once and, after an observed
+main-frame navigation, check the resulting document's interactive readiness within
+the same timeout. A null result with no observed main-frame transition returns
+without a readiness wait. Subsequent observed main-frame replacement is refused.
+The event identifies a transition; it does not prove an unrelated concurrent
+navigation was caused by the history request. Restricted Lightpanda sessions keep
+their existing DOMContentLoaded history wait.
 
 Playwright wraps only session-authorized pages supplied by its binding; it never
 launches or attaches to a model-provided endpoint. Semantic locator actions use
