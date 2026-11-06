@@ -1,6 +1,9 @@
 // DesktopEngine page operations that go through the tab's DevTools session:
 // JavaScript evaluation, screenshots, cookies and the raw passthrough.
 #include "desktop_engine_control_support.h"
+#if defined(KELPIE_TEST_SCRIPT_PNG_SPEED)
+#include "desktop_test_script_png_speed.h"
+#endif
 
 #include <chrono>
 #include <memory>
@@ -81,8 +84,11 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot
   if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
   Json options = {{"format", image->format}};
   if (image->quality) options["quality"] = *image->quality;
-  const auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(options);
+  auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(options);
   if (!screenshot_params) return BrowserControlResult::Failure("INVALID_PARAMS", "Screenshot format or quality is invalid");
+#if defined(KELPIE_TEST_SCRIPT_PNG_SPEED)
+  ApplyTestScriptPngSpeed(*screenshot_params);
+#endif
   const auto started_at = std::chrono::steady_clock::now();
   auto pending = std::make_shared<PendingDevTools>();
   const auto started = impl->RunOnUi([impl, lease, pending, screenshot_params] {

@@ -2,6 +2,9 @@
 #include "desktop_script_coordinates.h"
 #include "desktop_script_capture_state.h"
 #include "desktop_capture_stage_timing.h"
+#if defined(KELPIE_TEST_SCRIPT_PNG_SPEED)
+#include "desktop_test_script_png_speed.h"
+#endif
 #include <stdexcept>
 #include <algorithm>
 #include <cstdio>
@@ -104,7 +107,12 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
       const auto timing_pre=stage_timing.Now();
       BrowserScreenshot image;
-      result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
+      {
+#if defined(KELPIE_TEST_SCRIPT_PNG_SPEED)
+        TestScriptPngSpeedScope speed_scope(movies, std::getenv("KELPIE_TEST_SCRIPT_PNG_SPEED"));
+#endif
+        result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
+      }
       const auto timing_screenshot=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
       result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
