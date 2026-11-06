@@ -226,6 +226,16 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_keyboard_geometry(line.replace("1,1,1", "2,1,1", 1)))
         self.assertIsNone(fixed_keyboard_geometry(line + ",1"))
 
+    def test_pairedcheck_selection_is_three_owned_cases(self):
+        targets, names = DRIVER.selection("pairedcheck")
+        unit = "testChangedViewportRangeWithUnchangedScrollClearance"
+        paired = "testPairedMCPWithBoundedPhaseObservation"
+        layout = "testScriptStopPreservesNonMovieViewportAndMovieImmersion"
+        self.assertEqual(names, {unit, paired, layout})
+        self.assertEqual(targets, ["KelpieTests/IOSViewportInsetReconciliationTests/" + unit,
+                                   "KelpieUITests/WorkflowCaptureUITests/" + paired,
+                                   "KelpieUITests/WorkflowCaptureUITests/" + layout])
+
     def test_marker_selection_includes_both_lifetime_controls(self):
         targets, names = DRIVER.selection("marker")
         ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun", "testRetiredMarkerDoesNotReappearAfterTabChange",

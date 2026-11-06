@@ -10,9 +10,9 @@ final class WorkflowCaptureProbe {
     var token: String?
     init(port: Int) { self.port = port }
 
-    func request(_ path: String, _ body: Body? = nil, method: String = "POST") async throws -> Body {
+    func request(_ path: String, _ body: Body? = nil, method: String = "POST", timeout: TimeInterval = 90) async throws -> Body {
         let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)" + path))
-        var request = URLRequest(url: url, timeoutInterval: 90)
+        var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = method
         if let token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         if let body {

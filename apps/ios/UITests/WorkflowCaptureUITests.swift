@@ -153,6 +153,16 @@ final class WorkflowCaptureUITests: XCTestCase {
 
     @MainActor
     func testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia() async throws {
+        try await pairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia(recordPhases: false)
+    }
+
+    @MainActor
+    func testPairedMCPWithBoundedPhaseObservation() async throws {
+        try await pairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia(recordPhases: true)
+    }
+
+    @MainActor
+    private func pairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia(recordPhases: Bool) async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let steps: [Body] = [
@@ -165,9 +175,21 @@ final class WorkflowCaptureUITests: XCTestCase {
                             "capture": ["formats": ["gif", "video", "screenshots"], "fps": 8, "maxWidth": 384],
                             "tapIndicator": ["color": "#00FF00", "radius": 25, "durationMs": 2500],
                             "pointer": ["enabled": true, "curve": "s", "durationMs": 400]]
-        let playback = Task.detached { [probe] in try await probe.toolEnvelope("kelpie_play_script", script) }
+        let started = ProcessInfo.processInfo.systemUptime
+        let playback = Task.detached { [probe] in
+            do {
+                let envelope = try await probe.toolEnvelope("kelpie_play_script", script)
+                return (envelope as Body?, ProcessInfo.processInfo.systemUptime, "response")
+            } catch {
+                return (nil as Body?, ProcessInfo.processInfo.systemUptime, "request-error")
+            }
+        }
+        let phaseMonitor = recordPhases ? Task.detached { [probe] in
+            await WorkflowPairedPhaseRecorder.observe(probe: probe, started: started)
+        } : nil
         let stop = app.buttons["browser.recording.stop"]
-        XCTAssertTrue(stop.waitForExistence(timeout: 15))
+        let stopSeen = stop.waitForExistence(timeout: 15)
+        let stopMs = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
         let deadline = Date().addingTimeInterval(10)
         var visible = false
         var pollCount = 0
@@ -216,12 +238,47 @@ final class WorkflowCaptureUITests: XCTestCase {
             geometry.lifetime = .keepAlways
             add(geometry)
         }
-        let envelope = try await playback.value
+        let (response, responseTime, transport) = await playback.value
+        phaseMonitor?.cancel()
+        let phases = await phaseMonitor?.value
+        let envelope = response ?? [:]
+        let terminal: Body?
+        if envelope["ok"] as? Bool == true {
+            terminal = envelope["value"] as? Body
+        } else if recordPhases {
+            terminal = try? await probe.request("/v1/get-script-status", [:], timeout: 3)
+        } else {
+            terminal = try? await probe.call("kelpie_get_script_status", [:])
+        }
+        if recordPhases {
+            let run = terminal?["runId"] as? String
+            let matches = run != nil && phases?.0 == run
+            let error = terminal?["runError"] as? Body ?? terminal?["error"] as? Body ?? [:]
+            let known = ["TIMEOUT", "INPUT_UNCERTAIN", "CAPTURE_VIEWPORT_CHANGED", "CAPTURE_VIEWPORT_UNSTABLE",
+                         "SCRIPT_ABORTED", "AUTHORIZATION_REVOKED", "TAB_CHANGED", "WEBVIEW_ERROR"]
+            let code = error["code"] as? String ?? "NONE"
+            var facts: Body = ["requestStartMs": 0, "stopObserved": stopSeen, "stopObservedMs": stopMs,
+                               "responseMs": Int((responseTime - started) * 1000), "transport": transport, "runMatched": matches,
+                               "terminalCode": known.contains(code) ? code : (code == "NONE" ? "NONE" : "OTHER"),
+                               "observations": matches ? phases?.1 ?? [] : [],
+                               "limitation": "bounded read-only polling may affect timing"]
+            if let mayHaveCompleted = terminal?["mayHaveCompleted"] as? Bool { facts["mayHaveCompleted"] = mayHaveCompleted }
+            if let count = terminal?["actionsExecuted"] as? Int, count >= 0, count <= 1_000_000 {
+                facts["actionsExecuted"] = count
+            }
+            let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: facts, options: [.sortedKeys]),
+                                           uniformTypeIdentifier: "public.json")
+            attachment.name = "Paired run bounded phase observation"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        XCTAssertTrue(stopSeen)
+        guard response != nil else { XCTFail("Paired MCP request failed before a response"); return }
         if envelope["ok"] as? Bool != true {
             // The click may have completed before later capture failed. Read the
             // synthetic fixture's geometry without repeating or mutating input.
             await attachFixtureGeometry(tab: tab)
-            let status = try await probe.call("kelpie_get_script_status", [:])
+            let status = try XCTUnwrap(terminal)
             let error = status["runError"] as? Body ?? [:]
             XCTFail("MCP play failed; terminal code: " + WorkflowCaptureProbe.errorCode(["error": error]))
             return
