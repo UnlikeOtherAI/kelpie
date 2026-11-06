@@ -291,14 +291,15 @@ same-document baseline before a snapshot changed from CSS height 812 to 778.
 Its native bounds remained 402x874; the capture fence correctly refused the
 change. With the fixed native policy the first baseline was native 402x812 and
 CSS 402x778. The fixed-policy journey completed its centered click, native
-marker and Stop check, four PNGs, GIF and MP4 downloads, and XCTest decoder
+marker and Stop visibility check, four PNGs, GIF and MP4 downloads, and XCTest decoder
 checks. It does not prove which of the two coupled policy changes was causal.
 
 The iPad passed the setter unit and both paired journeys, including centered
-clicks, native marker and Stop checks, four PNGs, GIF and MP4 downloads, and
+clicks, native marker and Stop visibility checks, four PNGs, GIF and MP4 downloads, and
 XCTest decoder checks in each policy. Default baseline native/CSS sizes were
 1024x1366 and 1024x1346; fixed-policy sizes were 1024x1334 and 1024x1314.
 The trace recorded valid view/window/document identity at request, application
 and baseline and separately reported normal post-run tab-wrapper retirement.
 The fixed policy was a DEBUG-only control, not a released behavior or full
-cross-platform acceptance.
+cross-platform acceptance. These paired journeys did not press Stop; dedicated
+Stop tests are recorded separately.
