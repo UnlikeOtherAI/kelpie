@@ -34,7 +34,7 @@ jobs:
         run: ./scripts/hosted-windows-build-check.test.ps1
       - name: Verify harness process handling
         shell: pwsh
-        run: node --test tests/windows/process.test.mjs
+        run: node --test tests/windows/process.test.mjs tests/windows/hosted-upload-allowlist.test.mjs
       - name: Build CEF wrapper and Windows release
         shell: pwsh
         run: ./scripts/build-windows.ps1
@@ -58,8 +58,17 @@ jobs:
         with:
           name: kelpie-windows-hosted-public-g08
           path: |
-            ${{ runner.temp }}/kelpie-hosted-g08-preflight
-            ${{ runner.temp }}/kelpie-hosted-g08-evidence
+            ${{ runner.temp }}/kelpie-hosted-g08-preflight/preflight.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/manifest.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/diagnostic.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted-spawn.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted-cleanup.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/c-events.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/capture-failure.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/oracle-input.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/oracle-output.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/*.gif
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/*.mp4
           if-no-files-found: warn
       - name: Package release candidate
         if: ${{ !inputs.hosted_g08 }}
