@@ -115,8 +115,18 @@ final class IOSWorkflowRunner {
         var actions: IOSWorkflowActions?
         var outputs: Body = [:]
         let check = { @MainActor [self] in try await requireCurrent(tab: tab, grant: grant) }
+        #if DEBUG
+        IOSWorkflowMedia.beginDiagnosticRun(id)
+        #endif
         do {
-            try await tab.waitForRecordingLayout(check: check)
+            do { try await tab.waitForRecordingLayout(check: check) } catch {
+                #if DEBUG
+                if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_UNSTABLE" {
+                    IOSWorkflowMedia.recordViewportRefusal(runID: id, site: "layout", hasBaseline: false, targetBound: false)
+                }
+                #endif
+                throw error
+            }
             let scene = try IOSWorkflowPresentation(tab: tab)
             presentation = scene
             let executor = IOSWorkflowActions(workflow: workflow, tab: tab, presentation: scene, router: host.router, check: check)

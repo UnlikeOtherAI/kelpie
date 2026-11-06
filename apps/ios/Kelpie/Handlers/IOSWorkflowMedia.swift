@@ -123,20 +123,31 @@ final class IOSWorkflowMedia {
     }
 
     #if DEBUG
-    static func recordSnapshotRefusal(
-        runID: String, before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport, hasBaseline: Bool, targetBound: Bool
+    static func beginDiagnosticRun(_ runID: String) {
+        guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt") else { return }
+        testEvidence = ["runId": runID]
+    }
+
+    static func recordViewportRefusal(
+        runID: String, site: String, before: IOSWorkflowTab.Viewport? = nil, after: IOSWorkflowTab.Viewport? = nil,
+        hasBaseline: Bool, targetBound: Bool
     ) {
         guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt"),
-              testEvidence["runId"] as? String == runID else { return }
+              testEvidence["runId"] as? String == runID, testEvidence["viewportRefusal"] == nil,
+              ["layout", "stability", "document-resize", "native-viewport", "snapshot", "presentation-parent"].contains(site)
+        else { return }
         func values(_ viewport: IOSWorkflowTab.Viewport) -> [Double] {
             [viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
              viewport.visible.width, viewport.visible.height, viewport.scale, viewport.pixelRatio].map(Double.init)
         }
-        let first = values(before), second = values(after)
-        guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }) else { return }
-        testEvidence["snapshotRefusal"] = [
-            "hasBaseline": hasBaseline, "targetBound": targetBound, "before": first, "after": second
-        ]
+        var receipt: Body = ["site": site, "hasBaseline": hasBaseline, "targetBound": targetBound]
+        if let before, let after {
+            let first = values(before), second = values(after)
+            guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }) else { return }
+            receipt["before"] = first
+            receipt["after"] = second
+        }
+        testEvidence["viewportRefusal"] = receipt
     }
 
     private static func recordTestEvidence(entry: Body, runID: String, projection: Any?, geometry: Any?) {

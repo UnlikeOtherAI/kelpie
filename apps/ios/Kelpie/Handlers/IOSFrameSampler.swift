@@ -137,11 +137,15 @@ final class IOSFrameSampler {
     }
 
     // Pin dimensions, scale and zoom; scrolling may move the visible rectangle without resizing it.
-    private func pinViewport(_ viewport: IOSWorkflowTab.Viewport, generation: String) throws {
-        try requirePinnedNativeViewport(viewport)
+    private func pinViewport(_ viewport: IOSWorkflowTab.Viewport, generation: String, targetBound: Bool) throws {
+        try requirePinnedNativeViewport(viewport, targetBound: targetBound)
         if let initial, initialDocument == generation {
             let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
             if documentResize {
+                #if DEBUG
+                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "document-resize", before: initial,
+                                                       after: viewport, hasBaseline: true, targetBound: targetBound)
+                #endif
                 Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
                 Self.geometryDiagnostic(before: initial, after: viewport)
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
@@ -153,9 +157,13 @@ final class IOSFrameSampler {
         }
     }
 
-    private func requirePinnedNativeViewport(_ viewport: IOSWorkflowTab.Viewport) throws {
+    private func requirePinnedNativeViewport(_ viewport: IOSWorkflowTab.Viewport, targetBound: Bool) throws {
         guard let initial else { return }
         guard initial.bounds == viewport.bounds, initial.content == viewport.content, initial.pixelRatio == viewport.pixelRatio else {
+            #if DEBUG
+            IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "native-viewport", before: initial,
+                                                   after: viewport, hasBaseline: true, targetBound: targetBound)
+            #endif
             Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
             Self.geometryDiagnostic(before: initial, after: viewport)
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
@@ -249,31 +257,42 @@ final class IOSFrameSampler {
             firstSceneGeneration = generation
             firstSceneDeadline = ProcessInfo.processInfo.systemUptime + 2
         }
-        let viewport = try await IOSCaptureViewportStability.wait(
-            deadline: firstSceneDeadline,
-            check: { [self] in try await check(); try checkTime() },
-            read: { [self] in
-                guard generation == tab.document else { return nil }
-                let viewport = try await tab.viewport()
-                try requirePinnedNativeViewport(viewport)
-                guard generation == tab.document else { return nil }
-                return viewport
-            },
-            admissible: { [self] viewport in
-                let insets = tab.view.scrollView.adjustedContentInset
-                let admitted = IOSCaptureViewportStability.matchesInsets(
-                    viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
-                )
-                #if DEBUG
-                let values = [viewport.bounds.width, viewport.bounds.height, viewport.visible.width, viewport.visible.height,
-                              viewport.scale, insets.top, insets.bottom, insets.left, insets.right, admitted ? 1 : 0]
-                if admissionFirst == nil { admissionFirst = values }
-                admissionLast = values
-                admissionCount += 1
-                #endif
-                return admitted
+        let viewport: IOSWorkflowTab.Viewport?
+        do {
+            viewport = try await IOSCaptureViewportStability.wait(
+                deadline: firstSceneDeadline,
+                check: { [self] in try await check(); try checkTime() },
+                read: { [self] in
+                    guard generation == tab.document else { return nil }
+                    let viewport = try await tab.viewport()
+                    try requirePinnedNativeViewport(viewport, targetBound: expected != nil)
+                    guard generation == tab.document else { return nil }
+                    return viewport
+                },
+                admissible: { [self] viewport in
+                    let insets = tab.view.scrollView.adjustedContentInset
+                    let admitted = IOSCaptureViewportStability.matchesInsets(
+                        viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
+                    )
+                    #if DEBUG
+                    let values = [viewport.bounds.width, viewport.bounds.height, viewport.visible.width, viewport.visible.height,
+                                  viewport.scale, insets.top, insets.bottom, insets.left, insets.right, admitted ? 1 : 0]
+                    if admissionFirst == nil { admissionFirst = values }
+                    admissionLast = values
+                    admissionCount += 1
+                    #endif
+                    return admitted
+                }
+            )
+        } catch {
+            #if DEBUG
+            if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_UNSTABLE" {
+                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "stability",
+                                                       hasBaseline: initial != nil, targetBound: expected != nil)
             }
-        )
+            #endif
+            throw error
+        }
         guard let viewport else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
             dropped += 1
@@ -305,6 +324,10 @@ final class IOSFrameSampler {
             return true
         }
         if !hasBaseline && expected == nil && now >= firstSceneDeadline {
+            #if DEBUG
+            IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "stability", before: before,
+                                                   after: after, hasBaseline: false, targetBound: false)
+            #endif
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
         }
         let scrolled = after.bounds == before.bounds && after.content == before.content &&
@@ -312,8 +335,8 @@ final class IOSFrameSampler {
             after.visible.size == before.visible.size && after.scale == before.scale && after.pixelRatio == before.pixelRatio
         guard scrolled else {
             #if DEBUG
-            IOSWorkflowMedia.recordSnapshotRefusal(
-                runID: runID, before: before, after: after, hasBaseline: hasBaseline, targetBound: expected != nil
+            IOSWorkflowMedia.recordViewportRefusal(
+                runID: runID, site: "snapshot", before: before, after: after, hasBaseline: hasBaseline, targetBound: expected != nil
             )
             #endif
             Self.diagnostic("snapshot-" + Self.resizeReason(initial: before, viewport: after))
@@ -354,9 +377,9 @@ final class IOSFrameSampler {
         guard let viewport = try await viewportForSample(generation: generation, expected: expected) else { return false }
         let hasBaseline = initialDocument == generation
         if hasBaseline {
-            try pinViewport(viewport, generation: generation)
+            try pinViewport(viewport, generation: generation, targetBound: expected != nil)
         } else {
-            try requirePinnedNativeViewport(viewport)
+            try requirePinnedNativeViewport(viewport, targetBound: expected != nil)
         }
         guard generation == tab.document else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
@@ -364,7 +387,16 @@ final class IOSFrameSampler {
             return false
         }
         prepare?()
-        let state = try presentation.latch()
+        let state: IOSWorkflowPresentation.State
+        do { state = try presentation.latch() } catch {
+            #if DEBUG
+            if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_CHANGED" {
+                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "presentation-parent",
+                                                       hasBaseline: hasBaseline, targetBound: expected != nil)
+            }
+            #endif
+            throw error
+        }
         lastRequest = state.time
         defer { presentation.releaseLatch() }
         let output = canvas(viewport)
@@ -395,9 +427,13 @@ final class IOSFrameSampler {
         if discarded { return false }
         if !hasBaseline {
             guard ProcessInfo.processInfo.systemUptime < firstSceneDeadline else {
+                #if DEBUG
+                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "stability",
+                                                       hasBaseline: false, targetBound: expected != nil)
+                #endif
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
             }
-            try pinViewport(viewport, generation: generation)
+            try pinViewport(viewport, generation: generation, targetBound: expected != nil)
         }
         let frame = try Self.composite(source: source, state: state, output: output)
         lastAdmitted = try receive(frame, max(0, state.time - startTime), step, generation, viewport)
