@@ -143,8 +143,14 @@ final class IOSFrameSampler {
             let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
             if documentResize {
                 #if DEBUG
-                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "document-resize", before: initial,
-                                                       after: viewport, hasBaseline: true, targetBound: targetBound)
+                IOSWorkflowMedia.recordViewportRefusal(
+                    runID: runID,
+                    site: "document-resize",
+                    before: initial,
+                    after: viewport,
+                    hasBaseline: true,
+                    targetBound: targetBound
+                )
                 #endif
                 Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
                 Self.geometryDiagnostic(before: initial, after: viewport)
@@ -161,9 +167,15 @@ final class IOSFrameSampler {
         guard let initial else { return }
         guard initial.bounds == viewport.bounds, initial.content == viewport.content, initial.pixelRatio == viewport.pixelRatio else {
             #if DEBUG
-            IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "native-viewport", before: initial,
-                                                   after: viewport, hasBaseline: true, targetBound: targetBound,
-                                                   sameDocumentBaseline: initialDocument == tab.document)
+            IOSWorkflowMedia.recordViewportRefusal(
+                runID: runID,
+                site: "native-viewport",
+                before: initial,
+                after: viewport,
+                hasBaseline: true,
+                targetBound: targetBound,
+                sameDocumentBaseline: initialDocument == tab.document
+            )
             #endif
             Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
             Self.geometryDiagnostic(before: initial, after: viewport)
@@ -288,8 +300,12 @@ final class IOSFrameSampler {
         } catch {
             #if DEBUG
             if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_UNSTABLE" {
-                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "stability",
-                                                       hasBaseline: initial != nil, targetBound: expected != nil)
+                IOSWorkflowMedia.recordViewportRefusal(
+                    runID: runID,
+                    site: "stability",
+                    hasBaseline: initial != nil,
+                    targetBound: expected != nil
+                )
             }
             #endif
             throw error
@@ -326,8 +342,14 @@ final class IOSFrameSampler {
         }
         if !hasBaseline && expected == nil && now >= firstSceneDeadline {
             #if DEBUG
-            IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "stability", before: before,
-                                                   after: after, hasBaseline: false, targetBound: false)
+            IOSWorkflowMedia.recordViewportRefusal(
+                runID: runID,
+                site: "stability",
+                before: before,
+                after: after,
+                hasBaseline: false,
+                targetBound: false
+            )
             #endif
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
         }
@@ -337,7 +359,12 @@ final class IOSFrameSampler {
         guard scrolled else {
             #if DEBUG
             IOSWorkflowMedia.recordViewportRefusal(
-                runID: runID, site: "snapshot", before: before, after: after, hasBaseline: hasBaseline, targetBound: expected != nil
+                runID: runID,
+                site: "snapshot",
+                before: before,
+                after: after,
+                hasBaseline: hasBaseline,
+                targetBound: expected != nil
             )
             #endif
             Self.diagnostic("snapshot-" + Self.resizeReason(initial: before, viewport: after))
@@ -360,6 +387,22 @@ final class IOSFrameSampler {
         }
         guard let frame = image.cgImage else { throw IOSWorkflowFailure("CAPTURE_FRAME_FAILED") }
         return frame
+    }
+
+    private func latch(hasBaseline: Bool, targetBound: Bool) throws -> IOSWorkflowPresentation.State {
+        do { return try presentation.latch() } catch {
+            #if DEBUG
+            if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_CHANGED" {
+                IOSWorkflowMedia.recordViewportRefusal(
+                    runID: runID,
+                    site: "presentation-parent",
+                    hasBaseline: hasBaseline,
+                    targetBound: targetBound
+                )
+            }
+            #endif
+            throw error
+        }
     }
 
     private func sample(step: Int?, document expected: String?, prepare: (() -> Void)? = nil) async throws -> Bool {
@@ -388,16 +431,7 @@ final class IOSFrameSampler {
             return false
         }
         prepare?()
-        let state: IOSWorkflowPresentation.State
-        do { state = try presentation.latch() } catch {
-            #if DEBUG
-            if (error as? IOSWorkflowFailure)?.code == "CAPTURE_VIEWPORT_CHANGED" {
-                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "presentation-parent",
-                                                       hasBaseline: hasBaseline, targetBound: expected != nil)
-            }
-            #endif
-            throw error
-        }
+        let state = try latch(hasBaseline: hasBaseline, targetBound: expected != nil)
         lastRequest = state.time
         defer { presentation.releaseLatch() }
         let output = canvas(viewport)
@@ -429,8 +463,12 @@ final class IOSFrameSampler {
         if !hasBaseline {
             guard ProcessInfo.processInfo.systemUptime < firstSceneDeadline else {
                 #if DEBUG
-                IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "stability",
-                                                       hasBaseline: false, targetBound: expected != nil)
+                IOSWorkflowMedia.recordViewportRefusal(
+                    runID: runID,
+                    site: "stability",
+                    hasBaseline: false,
+                    targetBound: expected != nil
+                )
                 #endif
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
             }

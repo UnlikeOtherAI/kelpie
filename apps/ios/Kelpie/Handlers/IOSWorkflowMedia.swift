@@ -141,8 +141,13 @@ final class IOSWorkflowMedia {
     }
 
     static func recordViewportRefusal(
-        runID: String, site: String, before: IOSWorkflowTab.Viewport? = nil, after: IOSWorkflowTab.Viewport? = nil,
-        hasBaseline: Bool, targetBound: Bool, sameDocumentBaseline: Bool? = nil
+        runID: String,
+        site: String,
+        before: IOSWorkflowTab.Viewport? = nil,
+        after: IOSWorkflowTab.Viewport? = nil,
+        hasBaseline: Bool,
+        targetBound: Bool,
+        sameDocumentBaseline: Bool? = nil
     ) {
         guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt"),
               testEvidence["runId"] as? String == runID, testEvidence["viewportRefusal"] == nil,
