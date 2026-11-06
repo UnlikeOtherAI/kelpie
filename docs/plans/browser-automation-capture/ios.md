@@ -91,6 +91,11 @@ run, and existing address focus is retired. Loading and scroll-driven chrome
 changes cannot resize an active non-movie viewport. A staged iPad view stays in
 the same hierarchy while its active clip is square.
 
+The system status bar can remain visible in the native playback window; the
+renderer-only export excludes it. This deliberately differs from the historical
+[April recording design](../2026-04-06-scripted-video-recording.md), which
+described hiding the native status-bar area during playback.
+
 The hosted presentation-mode test checks native Stop, disabled chrome and the
 WebView frame before, during and after each non-movie mode, and checks that GIF
 and video hide browser chrome without changing system status visibility. Additional controls cover address focus,

@@ -514,7 +514,8 @@ collapse chrome. WebView geometry and staged viewport selection stay stable
 during collapse. Movie capture and legacy script playback hide browser chrome
 while keeping the existing system status bar and safe-area policy. Other
 strict workflows keep normal browser chrome visible but disabled while Stop is
-available.
+available. The system status bar may remain visible in the native playback
+window; exported page captures contain the renderer and workflow overlays only.
 
 
 ### Mobile accounts
