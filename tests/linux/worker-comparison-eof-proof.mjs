@@ -55,7 +55,7 @@ const report={version:1,pid:process.pid,uid:process.getuid(),networkProbe,source
  fixture:{created:false,disposed:false}};
 const home=join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
 const fixture=fixtureServer((req,res)=>{res.writeHead(200,{"content-type":"text/html"});res.end("<!doctype html><title>EOF fixture</title>");});
-let engine,engineExit,child,relay,config,failed=false;
+let engine,engineExit,child,relay,config,configOwned=false,failed=false;
 try{
  report.stage="fixture";await new Promise(ok=>fixture.listen(0,"127.0.0.1",ok));
  const origin="http://127.0.0.1:"+fixture.address().port,url=origin+"/eof-"+process.env.KELPIE_COMPARISON_ID;
@@ -79,7 +79,7 @@ try{
  const endpoint=relay.endpoint;config=join(dir,"..","..","worker-ab-assets","eof-operator.json");
  await writeFile(config,JSON.stringify({version:1,backend:"lightpanda",endpointEnv:"KELPIE_AB_ENDPOINT",allowedOrigins:[origin],
   networkBoundary:"operator-enforced",maxSessions:1,maxTabs:1,maxTtlMs:60000,
-  verifiedLightpandaMethods:["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload","tab.snapshot","tab.extract","tab.status","tab.ready"]}),{mode:0o600,flag:"wx"});
+  verifiedLightpandaMethods:["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload","tab.snapshot","tab.extract","tab.status","tab.ready"]}),{mode:0o600,flag:"wx"});configOwned=true;
  report.cliBundleSHA256=await hashFile(join(root,"packages/cli/dist/index.js"));
  report.sharedBundleSHA256=await hashFile(join(root,"packages/shared/dist/browser-control/managed-session.js"));
  report.stage="client-connect";
@@ -121,8 +121,9 @@ try{
  }else if(engine){failed=true;report.engine.exit=await engineExit;report.engine.unexpectedExit=true;}
  if(engine&&(!report.engine.termAccepted||!report.engine.exit||
    !((report.engine.exit.code===0&&report.engine.exit.signal===null)||report.engine.exit.signal==="SIGTERM")))failed=true;
- if(relay){report.fixture.witness=relay.result();await relay.close();}
- if(config){try{await unlink(config);report.configRetired=true;}catch(error){if(error?.code!=="ENOENT"){report.configRetired=false;failed=true;}}}
+ if(relay){try{report.fixture.witness=await relay.close();if(!report.fixture.witness.ok){report.fixture.disposed=false;failed=true;}}
+  catch{report.fixture.witness={ok:false,category:"RELAY_CLOSE_FAILED"};report.fixture.disposed=false;failed=true;}}
+ if(configOwned){try{await unlink(config);report.configRetired=true;}catch(error){if(error?.code!=="ENOENT"){report.configRetired=false;failed=true;}}}
  fixture.closeAllConnections?.();if(fixture.listening)await new Promise(ok=>fixture.close(ok));
  if(!failed)report.outcome="passed";
  await writeFile(join(dir,"report.json"),JSON.stringify(report,null,2),{mode:0o600,flag:"wx"});

@@ -11,7 +11,7 @@ export function createEofWitness(){
    if(++count>4096){fail("MESSAGE_LIMIT");return;}
    const method=value?.method;
    if(!["Target.createBrowserContext","Target.createTarget","Target.disposeBrowserContext"].includes(method))return;
-   if(!validRequest(value.id)||pending){fail("REQUEST_INVALID");return;}
+   if(Object.hasOwn(value,"sessionId")||!validRequest(value.id)||pending){fail("REQUEST_INVALID");return;}
    if(method==="Target.createBrowserContext"&&stage==="create"&&!eof)pending={id:value.id,kind:"create"};
    else if(method==="Target.createTarget"&&stage==="target"&&!eof&&value.params?.browserContextId===context)pending={id:value.id,kind:"target"};
    else if(method==="Target.disposeBrowserContext"&&stage==="dispose"&&eof&&value.params?.browserContextId===context)pending={id:value.id,kind:"dispose"};
@@ -21,7 +21,7 @@ export function createEofWitness(){
    if(bad)return;
    if(++count>4096){fail("MESSAGE_LIMIT");return;}
    if(!pending||value?.id!==pending.id)return;
-   if(Object.hasOwn(value,"error")||!value.result||typeof value.result!=="object"||Array.isArray(value.result)){
+   if(Object.hasOwn(value,"sessionId")||Object.hasOwn(value,"error")||!value.result||typeof value.result!=="object"||Array.isArray(value.result)){
     fail("RESPONSE_ERROR");return;
    }
    if(pending.kind==="create"){

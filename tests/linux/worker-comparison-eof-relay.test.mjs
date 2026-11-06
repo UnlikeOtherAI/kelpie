@@ -6,7 +6,10 @@ import {startEofRelay,verifyEngineCdp} from "./worker-comparison-eof-relay.mjs";
 const require=createRequire(new URL("../../packages/cli/package.json",import.meta.url));
 const {ws:WebSocket,wsServer:WebSocketServer}=require("playwright-core/lib/utilsBundle");
 async function setup(){
- const server=createServer((req,res)=>res.end(JSON.stringify({webSocketDebuggerUrl:"ws://127.0.0.1:"+server.address().port+"/"})));
+ let redirect=false,redirectHits=0;
+ const server=createServer((req,res)=>{if(req.url==="/redirected"){redirectHits++;res.end("{}");return;}
+  if(redirect){res.writeHead(302,{location:"/redirected"}).end();return;}
+  res.end(JSON.stringify({webSocketDebuggerUrl:"ws://127.0.0.1:"+server.address().port+"/"}));});
  const wss=new WebSocketServer({server});let replyMode="ok";
  wss.on("connection",socket=>socket.on("message",data=>{
   const req=JSON.parse(data.toString()),result=req.method==="Target.createBrowserContext"?{browserContextId:"ctx"}:
@@ -26,7 +29,8 @@ async function setup(){
   await send({id:1,method:"Target.createBrowserContext"});
   await send({id:2,method:"Target.createTarget",params:{browserContextId:"ctx"}});
  };
- return {relay,client,checks,send,prepare,port:server.address().port,setMode:x=>{replyMode=x;},close:async()=>{
+ return {relay,client,checks,send,prepare,port:server.address().port,setMode:x=>{replyMode=x;},
+  setRedirect:()=>{redirect=true;},redirectHits:()=>redirectHits,close:async()=>{
   client.terminate();await relay.close();wss.close();server.closeAllConnections?.();await new Promise(ok=>server.close(ok));}};
 }
 test("relay preserves a real matching disposal exchange and verifies upstream identity",async()=>{
@@ -44,5 +48,20 @@ test("relay rejects disposal errors and records incomplete upstream closure",asy
  t=await setup();try{await t.prepare();t.relay.markEof();t.setMode("close");
   await new Promise(ok=>{t.client.once("close",ok);t.client.send(JSON.stringify({id:3,method:"Target.disposeBrowserContext",params:{browserContextId:"ctx"}}));});
   assert.equal(t.relay.result().ok,false);
+ }finally{await t.close();}
+});
+
+test("final settled receipt rejects a late invalid exchange",async()=>{
+ const t=await setup();try{await t.prepare();t.relay.markEof();
+  await t.send({id:3,method:"Target.disposeBrowserContext",params:{browserContextId:"ctx"}});
+  assert.equal(t.relay.result().ok,true);
+  await new Promise(ok=>{t.client.once("close",ok);t.client.send(JSON.stringify({id:4,method:"Target.createBrowserContext"}));});
+  assert.equal((await t.relay.close()).ok,false);
+ }finally{await t.close();}
+});
+test("version fetch denies redirects without contacting the redirect destination",async()=>{
+ const t=await setup();try{t.setRedirect();
+  const result=await fetch(t.relay.endpoint+"/json/version");
+  assert.equal(result.status,502);assert.equal(t.redirectHits(),0);
  }finally{await t.close();}
 });

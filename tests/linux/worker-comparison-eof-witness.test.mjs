@@ -21,3 +21,11 @@ test("early disposal, incomplete creation, and truncated relay cannot pass",()=>
 test("unrelated replies cannot satisfy pending request",()=>{
  const w=ready();w.markEof();dispose(w);w.response({id:999,result:{}});assert.equal(w.result().ok,false);
 });
+
+test("tracked requests and replies with a sessionId are refused",()=>{
+ let w=createEofWitness();w.request({id:1,sessionId:"nested",method:"Target.createBrowserContext"});
+ assert.equal(w.result().ok,false);assert.equal(w.result().category,"REQUEST_INVALID");
+ w=createEofWitness();w.request({id:1,method:"Target.createBrowserContext"});
+ w.response({id:1,sessionId:"nested",result:{browserContextId:"ctx"}});
+ assert.equal(w.result().category,"RESPONSE_ERROR");
+});

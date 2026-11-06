@@ -10,6 +10,7 @@ const {ws:WebSocket,wsServer:WebSocketServer}=require("playwright-core/lib/utils
 export async function startEofRelay({port,pid,startTicks,verifyListener=verifyOwnedListener}){
  const witness=createEofWitness(),server=createServer(),wss=new WebSocketServer({noServer:true,maxPayload:1048576});
  let used=false,downstream,upstream,bytes=0,closed=false;
+ const pending=new Set();
  const fail=reason=>{witness.fail(reason);downstream?.terminate();upstream?.terminate();};
  const checkUrl=value=>{
   const url=new URL(value);
@@ -19,7 +20,7 @@ export async function startEofRelay({port,pid,startTicks,verifyListener=verifyOw
   if(req.method!=="GET"||!["/json/version","/json/version/"].includes(req.url)){res.writeHead(404).end();return;}
   try{
    await verifyListener(pid,port,startTicks);
-   const response=await fetch("http://127.0.0.1:"+port+"/json/version",{signal:AbortSignal.timeout(3000)});
+   const response=await fetch("http://127.0.0.1:"+port+"/json/version",{signal:AbortSignal.timeout(3000),redirect:"error"});
    assert.equal(response.status,200);const reader=response.body.getReader(),chunks=[];let size=0;
    while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;
     if(size>8192){await reader.cancel();throw Error("VERSION_LIMIT");}chunks.push(Buffer.from(part.value));}
@@ -47,7 +48,9 @@ export async function startEofRelay({port,pid,startTicks,verifyListener=verifyOw
      if(!value||typeof value!=="object"||Array.isArray(value)){fail("FRAME_INVALID");return;}
      if(direction==="request")witness.request(value);else witness.response(value);
      if(witness.result().category!=="incomplete"&&witness.result().category!=="complete"){fail("WITNESS_INVALID");return;}
-     to.send(data,{binary:false},error=>{if(error)fail("FORWARD_FAILED");});
+     let done;const delivery=new Promise(ok=>{done=ok;});pending.add(delivery);
+     try{to.send(data,{binary:false},error=>{if(error)fail("FORWARD_FAILED");pending.delete(delivery);done();});}
+     catch{pending.delete(delivery);done();fail("FORWARD_FAILED");}
     };
     downstream.on("message",forward(downstream,upstream,"request"));
     upstream.on("message",forward(upstream,downstream,"response"));
@@ -61,8 +64,19 @@ export async function startEofRelay({port,pid,startTicks,verifyListener=verifyOw
  return {
   endpoint:"http://127.0.0.1:"+server.address().port,
   markEof:()=>witness.markEof(),result:()=>witness.result(),
-  close:async()=>{closed=true;downstream?.terminate();upstream?.terminate();wss.close();server.closeAllConnections?.();
-   if(server.listening)await new Promise(ok=>server.close(ok));},
+  close:async()=>{
+   closed=true;
+   if(pending.size){
+    let timer;await Promise.race([Promise.all([...pending]),new Promise(ok=>{timer=setTimeout(ok,1000);})]);clearTimeout(timer);
+    if(pending.size)fail("FORWARD_TIMEOUT");
+   }
+   const waitClose=socket=>!socket||socket.readyState===WebSocket.CLOSED?Promise.resolve():new Promise(ok=>socket.once("close",ok));
+   const downstreamClosed=waitClose(downstream),upstreamClosed=waitClose(upstream);
+   downstream?.terminate();upstream?.terminate();wss.close();server.closeAllConnections?.();
+   await Promise.all([downstreamClosed,upstreamClosed]);
+   if(server.listening)await new Promise(ok=>server.close(ok));
+   return witness.result();
+  },
  };
 }
 
