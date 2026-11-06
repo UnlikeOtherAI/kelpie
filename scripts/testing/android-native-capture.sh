@@ -8,6 +8,14 @@ root="$(git rev-parse --show-toplevel)"
 out="$(realpath -m "$1")"
 app="$(realpath "$2")"
 tests="$(realpath "$3")"
+mode="${4:-full}"
+[[ "$mode" == full || "$mode" == api29-smoke ]] || { echo INVALID_NATIVE_TEST_MODE >&2; exit 1; }
+image='system-images;android-35;google_apis;x86_64'
+profiles=(phone tablet)
+if [[ "$mode" == api29-smoke ]]; then
+  image='system-images;android-29;google_apis;x86_64'
+  profiles=(phone)
+fi
 mkdir -p "$out"
 printf 'GITHUB_ACTIONS=%s\nRUNNER_ENVIRONMENT=%s\nRUNNER_OS=%s\n' "$(printenv GITHUB_ACTIONS)" "$(printenv RUNNER_ENVIRONMENT)" "$(printenv RUNNER_OS)" > "$out/runner-environment.txt"
 export ANDROID_AVD_HOME="$out/avd"
@@ -22,7 +30,7 @@ revision="$(git -C "$root" rev-parse HEAD)"
 printf '%s\n' "$revision" > "$out/source-revision.txt"
 sha256sum "$app" "$tests" "$root/packages/cli/dist/index.js" > "$out/build-sha256.txt"
 unzip -p "$app" lib/x86_64/libkelpie_jni.so | sha256sum > "$out/packaged-native-sha256.txt"
-sdkmanager 'platform-tools' 'emulator' 'system-images;android-35;google_apis;x86_64' > "$out/sdk-install.log" 2>&1
+sdkmanager 'platform-tools' 'emulator' "$image" > "$out/sdk-install.log" 2>&1
 adb start-server >/dev/null
 serial=''
 pid=''
@@ -64,13 +72,13 @@ verify_device() {
 }
 trap cleanup EXIT INT TERM
 result=0
-for profile in phone tablet; do
+for profile in "${profiles[@]}"; do
   case "$profile" in phone) device=pixel_7; port=5584;; tablet) device=pixel_tablet; port=5586;; esac
   printf 'profile=%s phase=prepare source=%s\n' "$profile" "$revision"
   dir="$out/$profile"
   mkdir -p "$dir"
   name="kelpie-capture-$profile"
-  printf 'no\n' | avdmanager create avd --name "$name" --package 'system-images;android-35;google_apis;x86_64' --device "$device" > "$dir/avd-create.log" 2>&1
+  printf 'no\n' | avdmanager create avd --name "$name" --package "$image" --device "$device" > "$dir/avd-create.log" 2>&1
   candidate="emulator-$port"
   if adb devices | awk 'NR > 1 {print $1}' | grep -Fxq "$candidate"; then
     echo PROPOSED_EMULATOR_SERIAL_IN_USE > "$dir/blocker.txt"
@@ -117,6 +125,32 @@ for profile in phone tablet; do
     exit 1
   }
   adb -s "$serial" shell dumpsys package com.kelpie.browser | grep -E 'versionCode=|versionName=' > "$dir/installed-version.txt"
+  if [[ "$mode" == api29-smoke ]]; then
+    printf 'api29-smoke\n' > "$out/scope.txt"
+    sdk_level="$(adb -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')"
+    printf '%s\n' "$sdk_level" > "$dir/api-level.txt"
+    [[ "$sdk_level" == 29 ]] || { echo API_LEVEL_MISMATCH > "$dir/blocker.txt"; exit 1; }
+    installed_test="$(adb -s "$serial" shell pm path com.kelpie.browser.test | head -1 | tr -d '\r' | cut -d: -f2-)"
+    adb -s "$serial" shell sha256sum "$installed_test" > "$dir/installed-test-apk-sha256.txt"
+    [[ "$(cut -d ' ' -f1 "$dir/installed-test-apk-sha256.txt")" == "$(sha256sum "$tests" | cut -d ' ' -f1)" ]] || {
+      echo INSTALLED_TEST_APK_HASH_MISMATCH > "$dir/blocker.txt"; exit 1;
+    }
+    if ! bash "$script_dir/android-native-api29-smoke.sh" "$serial" "$dir" "$revision" "$profile" \
+      "$ownership" "$pid" "$owned_avd" "$owned_port" "$sdk" "$owned_started"; then result=1; fi
+    verify_device
+    finished_pid="$pid"
+    finished_serial="$serial"
+    cleanup
+    if kill -0 "$finished_pid" 2>/dev/null || ! node "$ownership" ports "$port" "$((port + 1))" ||
+      adb devices | awk 'NR > 1 {print $1}' | grep -Fxq "$finished_serial"; then
+      echo CLEANUP_UNVERIFIED > "$dir/cleanup.txt"
+      result=1
+    else
+      echo CLEANUP_CONFIRMED > "$dir/cleanup.txt"
+    fi
+    continue
+  fi
+
   # Supported AndroidX instrumentation performs pairing/native UI assertions.
   # No adb input, desktop input or screen-control service is used.
   printf 'profile=%s phase=corpus\n' "$profile"
@@ -174,5 +208,5 @@ for profile in phone tablet; do
     grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed' "$dir/instrumentation.log"; then result=1; fi
   cleanup
 done
-node "$root/scripts/testing/android-native-report.mjs" "$out"
+if [[ "$mode" == full ]]; then node "$root/scripts/testing/android-native-report.mjs" "$out"; fi
 exit "$result"

@@ -32,6 +32,10 @@ on:
         description: Run sequential API35 phone/tablet native acceptance on hosted KVM
         type: boolean
         default: false
+      api29_smoke:
+        description: Run only the API 29 phone capture smoke (requires native_test)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -118,7 +122,7 @@ jobs:
         run: |
           bash scripts/testing/android-native-capture.sh "$PWD/native-evidence" \
             apps/android/app/build/intermediates/apk/debug/app-debug.apk \
-            apps/android/app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk
+            apps/android/app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk "${{ inputs.api29_smoke && 'api29-smoke' || 'full' }}"
       - name: Retain curated evidence for seven days
         if: always()
         uses: actions/upload-artifact@v7.0.1
@@ -135,6 +139,7 @@ jobs:
             native-evidence/phone/*.log
             native-evidence/phone/avd-config.ini
             native-evidence/phone/script-acceptance/**
+            native-evidence/phone/api29-smoke/**
             native-evidence/phone/script-codec-acceptance/**
             native-evidence/tablet/*.json
             native-evidence/tablet/*.txt
