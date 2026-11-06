@@ -2,7 +2,9 @@
 #if defined(KELPIE_TEST_G08_ROI_WITNESS)
 #include <windows.h>
 #include <bcrypt.h>
+#include <array>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <utility>
 
@@ -17,10 +19,13 @@ std::string HashRoi(const ScriptMediaFrame& frame) {
   if (ok) ok = BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH,
       reinterpret_cast<PUCHAR>(&object_size), sizeof(object_size), &returned, 0) >= 0 && object_size <= 65536;
   if (ok) { object.resize(object_size); ok = BCryptCreateHash(algorithm, &hash, object.data(), object_size, nullptr, 0, 0) >= 0; }
+  std::array<unsigned char, 85 * 85 * 4> roi{};
   for (int y = 161; ok && y <= 245; ++y) {
     const auto offset = static_cast<std::size_t>(y) * frame.stride + 438 * 4;
-    ok = BCryptHashData(hash, const_cast<PUCHAR>(frame.bgra.data() + offset), 85 * 4, 0) >= 0;
+    std::memcpy(roi.data() + static_cast<std::size_t>(y - 161) * 85 * 4, frame.bgra.data() + offset, 85 * 4);
   }
+  if (ok) ok = BCryptHashData(hash, roi.data(), static_cast<ULONG>(roi.size()), 0) >= 0;
+  SecureZeroMemory(roi.data(), roi.size());
   if (ok) ok = BCryptFinishHash(hash, digest.data(), static_cast<ULONG>(digest.size()), 0) >= 0;
   if (hash) BCryptDestroyHash(hash);
   if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0);

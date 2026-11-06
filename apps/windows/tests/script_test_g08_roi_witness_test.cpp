@@ -21,6 +21,15 @@ int main() {
   assert(witness.Finalize(false, video));
   assert(!witness.Finalize(false, video));
 
+  TestG08RoiWitness region;
+  assert(region.RecordAdmittedFrame(frame));
+  frame.elapsed_ms += 50; frame.bgra[0] = 0;
+  assert(region.RecordAdmittedFrame(frame));
+  assert(region.rows()[0].roi_sha256 == region.rows()[1].roi_sha256);
+  frame.elapsed_ms += 50; frame.bgra[(161 * 640 + 438) * 4] = 0;
+  assert(region.RecordAdmittedFrame(frame));
+  assert(region.rows()[1].roi_sha256 != region.rows()[2].roi_sha256);
+
   TestG08RoiWitness wrong_time;
   assert(wrong_time.RecordAdmittedFrame(frame));
   assert(!wrong_time.RecordAdmittedFrame(frame) && wrong_time.rows().empty());
