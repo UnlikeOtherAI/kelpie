@@ -38,7 +38,6 @@ class ScriptNavigationStopTest : ScriptPublicFixture() {
                             return MockResponse()
                                 .setHeader("Content-Type", "text/html")
                                 .setBody("<!doctype html><title>Delayed destination</title>")
-
                         }
                     }
                 val executor = Executors.newSingleThreadExecutor()
