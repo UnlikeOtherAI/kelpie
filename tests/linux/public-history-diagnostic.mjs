@@ -5,7 +5,7 @@ export function createPublicHistoryReport() {
     rawDispatchCount: 'not-observed',
   }, complete: false };
 }
-export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, timeoutError, now = () => performance.now(), report = createPublicHistoryReport() }) {
+export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, timeoutError, noHistoryEvidence = () => ({status:'insufficient'}), now = () => performance.now(), report = createPublicHistoryReport() }) {
   const stop = Symbol('stop');
   async function stage(name, method, params, check = () => true) {
     let result; const start = now();
@@ -19,6 +19,22 @@ export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, 
   const url = expected => value => value === origin + expected;
   const ready = value => value?.ready === true && ['interactive', 'complete'].includes(value.documentState);
   try {
+    await delay(250);
+    if (noHistoryEvidence().status === 'one-entry') {
+      await stage('no-history-before-url', 'tab.url', {}, url('/preflight'));
+      await stage('no-history-before-ready', 'tab.ready', { state: 'interactive' }, ready);
+      await stage('no-history-back', 'tab.back', {});
+      await stage('no-history-back-url', 'tab.url', {}, url('/preflight'));
+      await stage('no-history-back-ready', 'tab.ready', { state: 'interactive' }, ready);
+      await delay(250);
+      if (noHistoryEvidence().status !== 'one-entry') throw stop;
+      await stage('no-history-forward', 'tab.forward', {});
+      await stage('no-history-forward-url', 'tab.url', {}, url('/preflight'));
+      await stage('no-history-forward-ready', 'tab.ready', { state: 'interactive' }, ready);
+      await delay(250);
+      if (noHistoryEvidence().status !== 'one-entry') throw stop;
+      report.limitations.noHistory='passed';
+    }
     await stage('root', 'tab.goto', { url: origin + '/' });
     await delay(250);
     await stage('next', 'tab.goto', { url: origin + '/next' });
@@ -61,7 +77,8 @@ export async function publicHistoryDiagnostic({ call, origin, lifecycle, delay, 
     report.hashForward = lifecycle.hashResult(mark, 'h2');
     report.complete = report.backLifecycle.status === 'restored-from-bfcache'
       && report.forwardLifecycle.status === 'restored-from-bfcache'
-      && report.hashBack.status === 'observed' && report.hashForward.status === 'observed';
+      && report.hashBack.status === 'observed' && report.hashForward.status === 'observed'
+      && report.limitations.noHistory === 'passed';
   } catch (error) { if (error !== stop) throw error; }
   return report;
 }

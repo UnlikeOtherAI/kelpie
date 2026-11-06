@@ -20,3 +20,11 @@ test('public history is an opt-in default-BFCache Chromium diagnostic', async ()
   ok(runner.includes('report.cleanup.session.sessionClose="error"'));
   strictEqual((lint.match(/^          - public-history-2204$/gm) ?? []).length, 1);
 });
+
+test('no-history calls follow sandbox proof and require a single preflight fixture', async()=>{
+ const runner=await readFile(new URL('./worker-comparison.mjs',import.meta.url),'utf8');
+ const proof=runner.indexOf('assert.ok(report.sessionSandboxEvidence,"CHROMIUM_SANDBOX_NOT_PROVEN")');
+ const check=runner.indexOf('await publicHistoryDiagnostic(');
+ ok(proof>=0&&check>proof);
+ ok(runner.includes('preflightRequests===1?noHistory.result():{status:"insufficient"}'));
+});

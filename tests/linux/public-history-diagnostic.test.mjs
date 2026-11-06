@@ -3,23 +3,23 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { publicHistoryDiagnostic } from './public-history-diagnostic.mjs';
 
 test('one public mutation per history case and fixed insufficient limits', async () => {
-  const origin = 'http://127.0.0.1:1234'; let url = ''; const calls = [];
+  const origin = 'http://127.0.0.1:1234'; let url = origin + '/preflight'; const calls = [];
   const lifecycle = { mark: () => 1, result: () => ({ status: 'restored-from-bfcache' }), hashResult: () => ({ status: 'observed' }) };
   const call = async (method, params) => {
     calls.push(method);
     if (method === 'tab.goto') url = params.url;
     if (method === 'locator.click') url = origin + (params.locator[0].value === '#hash-one' ? '/next#one' : '/next#two');
-    if (method === 'tab.back') url = url.endsWith('#two') ? origin + '/next#one' : origin + '/';
-    if (method === 'tab.forward') url = url.endsWith('#one') ? origin + '/next#two' : origin + '/next';
+    if (method === 'tab.back' && !url.endsWith('/preflight')) url = url.endsWith('#two') ? origin + '/next#one' : origin + '/';
+    if (method === 'tab.forward' && !url.endsWith('/preflight')) url = url.endsWith('#one') ? origin + '/next#two' : origin + '/next';
     if (method === 'tab.url') return { ok: true, value: url };
     if (method === 'tab.ready') return { ok: true, value: { ready: true, documentState: 'complete' } };
     return { ok: true, value: null };
   };
-  const result = await publicHistoryDiagnostic({ call, origin, lifecycle, delay: async () => undefined });
+  const result = await publicHistoryDiagnostic({ call, origin, lifecycle, delay: async () => undefined, noHistoryEvidence: () => ({status:'one-entry'}) });
   strictEqual(result.complete, true);
-  strictEqual(calls.filter(x => x === 'tab.back').length, 2);
-  strictEqual(calls.filter(x => x === 'tab.forward').length, 2);
-  deepStrictEqual(result.limitations, { noHistory: 'insufficient', iframe: 'insufficient', replacement: 'insufficient', rawDispatchCount: 'not-observed' });
+  strictEqual(calls.filter(x => x === 'tab.back').length, 3);
+  strictEqual(calls.filter(x => x === 'tab.forward').length, 3);
+  deepStrictEqual(result.limitations, { noHistory: 'passed', iframe: 'insufficient', replacement: 'insufficient', rawDispatchCount: 'not-observed' });
 });
 
 test('failed public call is not retried', async () => {
@@ -32,6 +32,16 @@ test('records fixed timeout and elapsed time without exposing error content', as
   const timeoutError = new Error('private'); let t = 0;
   const result = await publicHistoryDiagnostic({ call: async () => { throw timeoutError; }, timeoutError, now: () => (t += 5), origin: 'http://127.0.0.1:1234', lifecycle: {}, delay: async () => undefined });
   deepStrictEqual(result.stages, [{ name: 'root', status: 'timeout', elapsedMs: 5 }]);
+});
+
+test('ambiguous preflight after Back stops before Forward', async () => {
+  const origin='http://127.0.0.1:1234';let observations=0;const calls=[];
+  const call=async method=>{calls.push(method);return {ok:true,value:method==='tab.url'?origin+'/preflight':method==='tab.ready'?{ready:true,documentState:'complete'}:null};};
+  const result=await publicHistoryDiagnostic({call,origin,lifecycle:{},delay:async()=>undefined,
+    noHistoryEvidence:()=>({status:observations++===0?'one-entry':'insufficient'})});
+  strictEqual(result.limitations.noHistory,'insufficient');
+  strictEqual(calls.filter(x=>x==='tab.back').length,1);
+  strictEqual(calls.includes('tab.forward'),false);
 });
 
 test('missing BFCache evidence cannot pass', async () => {
