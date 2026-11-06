@@ -62,9 +62,10 @@ def selection(scope):
             "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
             "testObserverRetiresAndRejectsChangedDocument",
             "testDiagnosticRunRotationPreservesCurrentAndRejectsStaleArtifacts",
+            "testChangedViewportRangeWithUnchangedScrollClearance",
         }
         return (["KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSPinchObservationTests",
-                 "KelpieTests/IOSWorkflowMediaEvidenceTests"] +
+                 "KelpieTests/IOSWorkflowMediaEvidenceTests", "KelpieTests/IOSViewportInsetReconciliationTests"] +
                 ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods]), set(methods) | unit
     if scope not in ("full", "navigation", "diagnostics"):
         raise ValueError("Unsupported native workflow test scope")
@@ -74,12 +75,13 @@ def selection(scope):
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieTests/IOSWorkflowReceiptTests",
                         "KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSG08GeometryTests",
                         "KelpieTests/IOSWorkflowPresentationModeTests", "KelpieTests/IOSPinchObservationTests",
-                        "KelpieTests/IOSWorkflowMediaEvidenceTests",
+                        "KelpieTests/IOSWorkflowMediaEvidenceTests", "KelpieTests/IOSViewportInsetReconciliationTests",
                         "KelpieUITests/WorkflowCaptureUITests"])
         files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"), Path("apps/ios/Tests/IOSCaptureViewportTests.swift"),
                       Path("apps/ios/Tests/IOSG08GeometryTests.swift"), Path("apps/ios/Tests/IOSWorkflowPresentationModeTests.swift"),
                       Path("apps/ios/Tests/IOSPinchObservationTests.swift"),
-                      Path("apps/ios/Tests/IOSWorkflowMediaEvidenceTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
+                      Path("apps/ios/Tests/IOSWorkflowMediaEvidenceTests.swift"),
+                      Path("apps/ios/Tests/IOSViewportInsetReconciliationTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
