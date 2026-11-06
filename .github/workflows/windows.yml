@@ -21,6 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/browser-contract
+      - name: Initialize hosted capture evidence
+        if: ${{ inputs.hosted_g08 }}
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'kelpie-hosted-g08-preflight'
+          New-Item -ItemType Directory $dir | Out-Null
+          '{"stage":"workflow-started","status":"pending","code":null}' | Set-Content (Join-Path $dir 'preflight.json')
+      - name: Verify hosted preflight policy
+        if: ${{ inputs.hosted_g08 }}
+        shell: pwsh
+        run: ./scripts/hosted-windows-build-check.test.ps1
       - name: Verify harness process handling
         shell: pwsh
         run: node --test tests/windows/process.test.mjs
@@ -46,7 +57,9 @@ jobs:
         if: ${{ always() && inputs.hosted_g08 }}
         with:
           name: kelpie-windows-hosted-public-g08
-          path: ${{ runner.temp }}/kelpie-hosted-g08-evidence
+          path: |
+            ${{ runner.temp }}/kelpie-hosted-g08-preflight
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence
           if-no-files-found: warn
       - name: Package release candidate
         if: ${{ !inputs.hosted_g08 }}
