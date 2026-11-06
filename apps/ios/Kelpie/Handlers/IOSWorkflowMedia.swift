@@ -29,7 +29,8 @@ final class IOSWorkflowMedia {
         self.runID = runID
         self.owner = owner
         #if DEBUG
-        Self.testEvidence = [:]
+        Self.testEvidence = ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt")
+            ? ["runId": runID] : [:]
         #endif
         formats = Set(settings["formats"] as? [String] ?? [])
         fps = settings["fps"] as? Int ?? 15
@@ -122,6 +123,22 @@ final class IOSWorkflowMedia {
     }
 
     #if DEBUG
+    static func recordSnapshotRefusal(
+        before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport, hasBaseline: Bool, targetBound: Bool
+    ) {
+        guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt"),
+              testEvidence["runId"] is String else { return }
+        func values(_ viewport: IOSWorkflowTab.Viewport) -> [Double] {
+            [viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
+             viewport.visible.width, viewport.visible.height, viewport.scale, viewport.pixelRatio].map(Double.init)
+        }
+        let first = values(before), second = values(after)
+        guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }) else { return }
+        testEvidence["snapshotRefusal"] = [
+            "hasBaseline": hasBaseline, "targetBound": targetBound, "before": first, "after": second
+        ]
+    }
+
     private static func recordTestEvidence(entry: Body, runID: String, projection: Any?, geometry: Any?) {
         let args = ProcessInfo.processInfo.arguments
         guard let id = entry["id"] as? String,

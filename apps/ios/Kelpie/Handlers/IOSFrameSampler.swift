@@ -308,6 +308,11 @@ final class IOSFrameSampler {
             after.fixtureDocumentID == before.fixtureDocumentID && after.layout == before.layout &&
             after.visible.size == before.visible.size && after.scale == before.scale && after.pixelRatio == before.pixelRatio
         guard scrolled else {
+            #if DEBUG
+            IOSWorkflowMedia.recordSnapshotRefusal(
+                before: before, after: after, hasBaseline: hasBaseline, targetBound: expected != nil
+            )
+            #endif
             Self.diagnostic("snapshot-" + Self.resizeReason(initial: before, viewport: after))
             Self.geometryDiagnostic(before: before, after: after)
             reportInsets()

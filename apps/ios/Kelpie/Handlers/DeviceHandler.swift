@@ -178,6 +178,9 @@ struct DeviceHandler {
             ]
             if ProcessInfo.processInfo.arguments.contains("--test-pinch-observer") {
                 inspectScrollInfo["pinchObservation"] = IOSPinchObservation.sample(view: wv)
+                if ProcessInfo.processInfo.arguments.contains("--test-pinch-content-mode") {
+                    inspectScrollInfo["testMobilePolicyApplied"] = IOSPinchObservation.mobilePolicyApplied(view: wv)
+                }
             }
             let effectiveScrollInfo = inspectScrollInfo
             #else
@@ -260,7 +263,8 @@ struct DeviceHandler {
         ]
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
-        if args.contains("--test-g08-document-binding") || args.contains("--test-pinch-projection") {
+        if args.contains("--test-g08-document-binding") || args.contains("--test-pinch-projection") ||
+            args.contains("--test-paired-geometry-receipt") {
             var extended = response
             extended["testCaptureEvidence"] = IOSWorkflowMedia.testEvidence
             return successResponse(extended)

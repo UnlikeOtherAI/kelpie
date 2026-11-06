@@ -259,6 +259,26 @@ struct TabWebViewContainer: UIViewRepresentable {
             decisionHandler(.allow)
         }
 
+        #if DEBUG
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            preferences: WKWebpagePreferences,
+            decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void
+        ) {
+            if ProcessInfo.processInfo.arguments.contains("--test-pinch-content-mode"),
+               webView === currentWebView, navigationAction.targetFrame?.isMainFrame == true,
+               let url = navigationAction.request.url, url.host == "127.0.0.1", url.path == "/pinch-scroll",
+               URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(
+                   where: { $0.name == "case" && $0.value == "mobile" }
+               ) == true {
+                preferences.preferredContentMode = .mobile
+                IOSPinchObservation.noteMobilePolicy(view: webView)
+            }
+            decisionHandler(.allow, preferences)
+        }
+        #endif
+
         // MARK: - WKUIDelegate
 
         func webView(

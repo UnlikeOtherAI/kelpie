@@ -117,7 +117,8 @@ final class WorkflowLoopbackPage {
           let clicks=0;
           const calibrated=new URLSearchParams(location.search).get('case')==='visible';
           const viewport=()=>({scale:visualViewport.scale,x:visualViewport.offsetLeft,y:visualViewport.offsetTop,
-            width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight});
+            width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight,
+            viewportMeta:document.querySelector('meta[name=viewport]').content});
           const position=()=>{
             const v=viewport();
             if(!edge.style.left)edge.style.left='0px';

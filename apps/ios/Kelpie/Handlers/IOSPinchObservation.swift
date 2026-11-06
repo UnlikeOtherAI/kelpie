@@ -7,6 +7,10 @@ import WebKit
 final class IOSPinchObservation: NSObject {
     private static var active: IOSPinchObservation?
     private static var retiredReason: String?
+    private static weak var mobilePolicyView: WKWebView?
+
+    static func noteMobilePolicy(view: WKWebView) { mobilePolicyView = view }
+    static func mobilePolicyApplied(view: WKWebView) -> Bool { mobilePolicyView === view }
     private weak var view: WKWebView?
     private weak var window: UIWindow?
     private weak var recognizer: UIPinchGestureRecognizer?

@@ -53,6 +53,7 @@ def selection(scope):
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchRejectsClippedUnhittableTarget",
             "testNativePinchScrollableControl",
+            "testIPadDefaultAndMobileContentModePinchComparison",
         ]
         unit = {
             "testFirstCaptureRequiresInsetPropagationIncludingZoom",

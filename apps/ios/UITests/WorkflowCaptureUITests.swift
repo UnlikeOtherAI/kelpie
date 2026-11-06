@@ -153,6 +153,7 @@ final class WorkflowCaptureUITests: XCTestCase {
 
     @MainActor
     func testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia() async throws {
+        testLaunchArguments.append("--test-paired-geometry-receipt")
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let steps: [Body] = [
@@ -223,6 +224,17 @@ final class WorkflowCaptureUITests: XCTestCase {
             await attachFixtureGeometry(tab: tab)
             let status = try await probe.call("kelpie_get_script_status", [:])
             let error = status["runError"] as? Body ?? [:]
+            if WorkflowCaptureProbe.errorCode(["error": error]) == "CAPTURE_VIEWPORT_CHANGED" {
+                let diagnostic = try await probe.request("/v1/debug-screens", [:])
+                let receipt = try XCTUnwrap(diagnostic["testCaptureEvidence"] as? Body)
+                XCTAssertEqual(try XCTUnwrap(receipt["runId"] as? String), try XCTUnwrap(status["runId"] as? String))
+                let snapshot = receipt["snapshotRefusal"] as? Body ?? ["kind": "non-snapshot-or-unavailable"]
+                let data = try JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys])
+                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                attachment.name = "Paired run exact snapshot refusal"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
             XCTFail("MCP play failed; terminal code: " + WorkflowCaptureProbe.errorCode(["error": error]))
             return
         }
