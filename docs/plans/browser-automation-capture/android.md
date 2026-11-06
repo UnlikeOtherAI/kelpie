@@ -786,3 +786,21 @@ Hardware keyboard input blocking is therefore not established. The targeted
 run did not exercise the full corpus or the document-scale fix. Artifact
 13469511332 has GitHub-reported SHA-256
 551543d10634aef729919e4629c58cfdae74cf173bb4809954e2e01cf191baba.
+
+The opt-in hosted run [42145950644](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42145950644)
+used source b39d11911f6f21fde34de128c5a0df4d9cf7c8e8 on API 35 phone and
+tablet emulators. Full Android build and lint and the shipping JNI app/test APK
+build passed. The built and installed app SHA-256 was
+98b2bcb42663dbb032975529cfd70f5c48f1d89eac3237ed7a183e9fc9722b17; the
+built and installed test APK SHA-256 was
+17f425f6c1a0775aa8aaab7cc384ff850cd73122397a99aaf2dc959c0d58042b.
+
+On both profiles, the public delayed-navigation Stop case passed with
+SCRIPT_ABORTED, mayHaveCompleted: true and recovery. The owned WebView
+Enter down/up control passed before, during and after playback: each count
+remained 1 during playback and reached 2 after Stop, with the same URL and
+owned popup control. The separate renderer system-key test failed before
+dispatch on child.requestFocus(); it establishes no system-key delegation
+result. Both cleanup receipts report CLEANUP_CONFIRMED. Artifact 13472040144
+retains the individual logs and receipts. The overall native job failed, and
+this scoped result does not establish API 29 or full-corpus acceptance.
