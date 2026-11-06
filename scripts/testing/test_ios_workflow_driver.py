@@ -200,12 +200,15 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testProjectionUsesInsetContentOriginAndVisualViewport",
             "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
             "testObserverRetiresAndRejectsChangedDocument",
+            "testDiagnosticRunRotationPreservesCurrentAndRejectsStaleArtifacts",
         })
         units = {"testFirstCaptureRequiresInsetPropagationIncludingZoom",
                  "testProjectionUsesInsetContentOriginAndVisualViewport",
                  "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
-                 "testObserverRetiresAndRejectsChangedDocument"}
-        self.assertEqual(set(targets), {"KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSPinchObservationTests"} |
+                 "testObserverRetiresAndRejectsChangedDocument",
+                 "testDiagnosticRunRotationPreservesCurrentAndRejectsStaleArtifacts"}
+        self.assertEqual(set(targets), {"KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSPinchObservationTests",
+                                       "KelpieTests/IOSWorkflowMediaEvidenceTests"} |
                          {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names - units})
         _, full_names = DRIVER.selection("full")
         self.assertTrue(names < full_names)
@@ -255,7 +258,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         marker_targets, marker_names = DRIVER.selection("marker")
         self.assertEqual(targets, geometry_targets + marker_targets)
         self.assertEqual(names, geometry_names | marker_names)
-        self.assertEqual(len(names), 19)
+        self.assertEqual(len(names), 20)
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:

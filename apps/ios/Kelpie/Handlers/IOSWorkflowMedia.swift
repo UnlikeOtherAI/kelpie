@@ -29,8 +29,7 @@ final class IOSWorkflowMedia {
         self.runID = runID
         self.owner = owner
         #if DEBUG
-        Self.testEvidence = ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt")
-            ? ["runId": runID] : [:]
+        Self.beginDiagnosticRun(runID)
         #endif
         formats = Set(settings["formats"] as? [String] ?? [])
         fps = settings["fps"] as? Int ?? 15
@@ -123,9 +122,22 @@ final class IOSWorkflowMedia {
     }
 
     #if DEBUG
+    static func newTestEvidence(runID: String, arguments: [String]) -> Body {
+        let flags = ["--test-paired-geometry-receipt", "--test-g08-document-binding", "--test-pinch-projection"]
+        return flags.contains(where: arguments.contains) ? ["runId": runID] : [:]
+    }
+
     static func beginDiagnosticRun(_ runID: String) {
-        guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt") else { return }
-        testEvidence = ["runId": runID]
+        testEvidence = newTestEvidence(runID: runID, arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    static func mergeTestArtifact(_ current: Body, runID: String, id: String, facts: Body) -> Body? {
+        guard current["runId"] as? String == runID else { return nil }
+        var updated = current
+        var artifacts = updated["artifacts"] as? [String: Body] ?? [:]
+        artifacts[id] = facts
+        updated["artifacts"] = artifacts
+        return updated
     }
 
     static func recordViewportRefusal(
@@ -163,14 +175,10 @@ final class IOSWorkflowMedia {
         let args = ProcessInfo.processInfo.arguments
         guard let id = entry["id"] as? String,
               args.contains("--test-g08-document-binding") || args.contains("--test-pinch-projection") else { return }
-        var artifacts = testEvidence["artifacts"] as? [String: Body] ?? [:]
         var facts: Body = [:]
         if args.contains("--test-pinch-projection"), let projection { facts["projection"] = projection }
         if args.contains("--test-g08-document-binding"), let geometry { facts["geometry"] = geometry }
-        if let current = testEvidence["runId"] as? String, current != runID { return }
-        artifacts[id] = facts
-        testEvidence["runId"] = runID
-        testEvidence["artifacts"] = artifacts
+        if let updated = mergeTestArtifact(testEvidence, runID: runID, id: id, facts: facts) { testEvidence = updated }
     }
     #endif
 
