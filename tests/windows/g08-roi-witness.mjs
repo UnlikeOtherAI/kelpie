@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 // any missing attestation rather than treating a page-provided nonce as proof.
 export function validateG08RoiWitness(receipt,decodedPts){
  assert.equal(receipt?.version,1);assert.equal(receipt?.scope,"owned-g08-mp4-roi");
- assert.deepEqual(Object.keys(receipt).sort(),["binding","format","geometry","partial","rows","scope","truncated","version","writerDroppedFrames"]);
+ assert.deepEqual(Object.keys(receipt).sort(),["artifactSha256","binarySha256","binding","ffprobeSha256","format","geometry","partial","rows","scope","source","truncated","version","writerDroppedFrames"]);
+ assert.match(receipt.source,/^[a-f0-9]{40}$/);
+ for(const field of ["artifactSha256","binarySha256","ffprobeSha256"])assert.match(receipt[field],/^[a-f0-9]{64}$/);
  assert.deepEqual(receipt?.binding,{fixtureListenerOwned:true,exactFixture:true,ownerCurrent:true,
   sameLease:true,sameDocument:true,viewportStable:true,postCaptureGrantCurrent:true});
  assert.deepEqual(receipt?.geometry,{width:640,height:406,left:438,top:161,right:522,bottom:245});

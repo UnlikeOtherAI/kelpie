@@ -1,3 +1,6 @@
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+#include "desktop_test_g08_scope.h"
+#endif
 #include "desktop_script_runtime.h"
 #include "desktop_script_coordinates.h"
 #include "desktop_script_capture_state.h"
@@ -35,6 +38,12 @@ void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::
 }
 void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   DesktopCaptureStageTiming stage_timing;
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+  TestG08Scope test_scope;
+  bool test_scope_intact = true, test_scope_started = false;
+  Json test_scope_viewport;
+  std::string test_scope_document;
+#endif
   std::unique_ptr<DesktopScriptCapture> encoder;
   int initial_width = 0, initial_height = 0;
   Json previous_viewport;
@@ -111,6 +120,9 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const auto timing_post_nav=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       if (before.tab.document_version != after.tab.document_version) {
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+        test_scope_intact = false;
+#endif
         bool cleared=false;
         { std::lock_guard lock(mutex); cleared=ClearRetiredDesktopPresentation(presentation,sample_owner); }
         ++dropped;
@@ -125,9 +137,26 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       }
       const auto timing_post=stage_timing.Now();
 #if defined(KELPIE_TEST_G08_ROI_WITNESS)
-      // Fail closed until the runner-owned fixture listener can be proven.
-      // Never inherit a similarly named field from any presentation payload.
-      shown["_testG08Scope"] = false;
+      // The listener is checked before first admission and at final disposition;
+      // the hosted parent must separately prove it held that listener throughout.
+      if (!test_scope_started) {
+        test_scope_started = true;
+        test_scope_document = before.tab.document_version;
+        test_scope_viewport = viewport;
+        test_scope_intact = test_scope.MatchesUrl(before.tab.url) && test_scope.ListenerOwned() &&
+          width == 1042 && height == 662;
+      }
+      bool test_grant_current = false;
+      try { test_grant_current = config.revalidate && config.revalidate(owner); } catch (...) {}
+      test_scope_intact = test_scope_intact && test_scope.MatchesUrl(before.tab.url) &&
+        test_scope.MatchesUrl(after.tab.url) && !test_scope_document.empty() &&
+        before.tab.id == lease.id && after.tab.id == lease.id &&
+        before.tab.generation == lease.generation && after.tab.generation == lease.generation &&
+        before.tab.document_version == test_scope_document && after.tab.document_version == test_scope_document &&
+        viewport == test_scope_viewport && after_viewport == test_scope_viewport &&
+        test_grant_current && !abort->load();
+      // Override rather than inherit anything with this name from presentation.
+      shown["_testG08Scope"] = test_scope_intact;
 #endif
       const bool terminal=step>=0 && purpose==DesktopScriptFramePurpose::TerminalClear && encoder->SupportsTerminalClear();
       if (terminal) {
@@ -192,6 +221,36 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   if (encoder) {
     try {
       Json finalized = encoder->Finish(partial, reason, Elapsed());
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+      // The private rows never enter public status or artifact JSON.
+      Json test_rows=finalized.value("_testG08WitnessRows",Json());
+      finalized.erase("_testG08WitnessRows");
+      if(test_scope_started && test_scope_intact && !partial && !abort->load() &&
+          !finalized.contains("error") && test_rows.is_array() && !test_rows.empty() && test_rows.size()<=800) {
+        BrowserNavigationState final_navigation;
+        Json final_viewport;
+        const auto final_nav=engine.GetNavigationState(lease,&final_navigation,std::chrono::seconds(2));
+        const auto final_view=engine.EvaluateBrowserControl(lease,viewport_expression,&final_viewport,std::chrono::seconds(2));
+        bool final_grant=false;
+        try { final_grant=config.revalidate && config.revalidate(owner); } catch (...) {}
+        if(final_nav.ok && final_view.ok && final_grant && !abort->load() &&
+            final_navigation.tab.id==lease.id && final_navigation.tab.generation==lease.generation &&
+            final_navigation.tab.document_version==test_scope_document &&
+            test_scope.MatchesUrl(final_navigation.tab.url) && final_viewport==test_scope_viewport &&
+            test_scope.ListenerOwned()) {
+          for(const auto& row:test_rows) {
+            const auto hash=row.value("roiSha256",std::string());
+            if(hash.size()!=64) { test_scope_intact=false; break; }
+            if(std::fprintf(stderr,"KELPIE_TEST_G08_ROI_ROW %zu %lld %s\n",row.value("frameIndex",std::size_t{}),
+              static_cast<long long>(row.value("pts100ns",std::int64_t{})),hash.c_str())<0) { test_scope_intact=false; break; }
+          }
+          bool disposition_grant=false;
+          try { disposition_grant=config.revalidate && config.revalidate(owner); } catch (...) {}
+          if(test_scope_intact && disposition_grant && !abort->load() && test_scope.ListenerOwned() && std::fflush(stderr)==0)
+            std::fprintf(stderr,"KELPIE_TEST_G08_ROI_DONE %zu\n",test_rows.size());
+        }
+      }
+#endif
       Json completed=finalized.value("artifacts",Json::array());
       if(finalized.contains("error")) { std::lock_guard lock(mutex); capture_error=finalized["error"]; }
       std::lock_guard lock(mutex);

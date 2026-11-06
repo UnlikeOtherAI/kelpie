@@ -16,6 +16,7 @@ if(KELPIE_TEST_G08_ROI_WITNESS)
   target_sources(kelpie PRIVATE src/script_test_g08_roi_witness.cpp)
   target_compile_definitions(kelpie PRIVATE KELPIE_TEST_G08_ROI_WITNESS)
   target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE KELPIE_TEST_G08_ROI_WITNESS)
+  target_link_libraries(kelpie_engine_chromium_desktop PRIVATE iphlpapi ws2_32)
 endif()
 target_sources(kelpie PRIVATE
   ${KELPIE_SCRIPT_CODEC_SOURCES}
@@ -36,7 +37,7 @@ if(BUILD_TESTING AND WIN32)
     target_include_directories(kelpie_windows_test_g08_roi_witness PRIVATE src)
     target_compile_definitions(kelpie_windows_test_g08_roi_witness PRIVATE
       KELPIE_TEST_G08_ROI_WITNESS WIN32_LEAN_AND_MEAN NOMINMAX)
-    target_link_libraries(kelpie_windows_test_g08_roi_witness PRIVATE bcrypt)
+    target_link_libraries(kelpie_windows_test_g08_roi_witness PRIVATE bcrypt iphlpapi ws2_32)
     kelpie_enable_test_assertions(kelpie_windows_test_g08_roi_witness)
     if(MSVC)
       target_compile_options(kelpie_windows_test_g08_roi_witness PRIVATE /W4 /WX)

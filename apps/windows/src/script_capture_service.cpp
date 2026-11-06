@@ -26,7 +26,7 @@ class Capture final : public DesktopScriptCapture {
     }
     movies_=!codecs.empty();
 #if defined(KELPIE_TEST_G08_ROI_WITNESS)
-    if(codecs.size()==1 && codecs.front()=="mp4" && !screenshots_)
+    if(std::find(codecs.begin(),codecs.end(),"mp4")!=codecs.end() && !screenshots_)
       test_witness_=std::make_unique<TestG08RoiWitness>();
 #endif
     try { encoder_=ScriptMediaEncoder::Create(directory_,codecs,options_.value("fps",15),options_.value("maxBytes",std::size_t(67108864))); }
@@ -99,8 +99,11 @@ class Capture final : public DesktopScriptCapture {
 #if defined(KELPIE_TEST_G08_ROI_WITNESS)
     // Finish has drained the real MF FIFO. No rows are published here: the
     // sampler must first prove final authority and the caller must match PTS.
-    if(test_witness_ && (outputs.size()!=1 || !test_witness_->Finalize(partial || !failure.empty(),outputs.front())))
-      test_witness_->Invalidate();
+    if(test_witness_) {
+      const auto video=std::find_if(outputs.begin(),outputs.end(),[](const auto& output){return output.mime_type=="video/mp4";});
+      test_witness_finished_ = video!=outputs.end() && test_witness_->Finalize(partial || !failure.empty(),*video);
+      if(!test_witness_finished_) test_witness_->Invalidate();
+    }
 #endif
     try {
       for(const auto& output:outputs) owned_[output.path]=CaptureFileIdentity(output.path);
@@ -114,6 +117,16 @@ class Capture final : public DesktopScriptCapture {
     } catch(...) { failure="CAPTURE_FINALIZE_FAILED"; }
     Json result={{"artifacts",manifests_}};
     if(!failure.empty()) result["error"]=failure;
+#if defined(KELPIE_TEST_G08_ROI_WITNESS)
+    // Private in-process handoff only. The sampler must erase this field and
+    // revalidate final authority before emitting any bounded hash receipt.
+    if(test_witness_finished_ && failure.empty()) {
+      Json rows=Json::array();
+      for(const auto& row:test_witness_->rows()) rows.push_back({{"frameIndex",row.frame_index},
+        {"pts100ns",row.pts100ns},{"roiSha256",row.roi_sha256}});
+      result["_testG08WitnessRows"]=std::move(rows);
+    }
+#endif
     return result;
   }
  private:
@@ -131,6 +144,7 @@ class Capture final : public DesktopScriptCapture {
   double last_elapsed_=0,last_movie_frame_=-1;
 #if defined(KELPIE_TEST_G08_ROI_WITNESS)
   std::unique_ptr<TestG08RoiWitness> test_witness_;
+  bool test_witness_finished_=false;
 #endif
 };
 }

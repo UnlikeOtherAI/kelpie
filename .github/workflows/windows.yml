@@ -11,6 +11,10 @@ on:
         description: Run the owned public CEF capture diagnostic
         type: boolean
         default: false
+      hosted_roi_witness:
+        description: Run the test-only owned G08 MP4 ROI witness
+        type: boolean
+        default: false
 permissions: {contents: read}
 jobs:
   build:
@@ -37,7 +41,11 @@ jobs:
         run: node --test tests/windows/process.test.mjs tests/windows/hosted-upload-allowlist.test.mjs
       - name: Build CEF wrapper and Windows release
         shell: pwsh
-        run: ./scripts/build-windows.ps1
+        run: |
+          if ('${{ inputs.hosted_roi_witness }}' -eq 'true') {
+            if ('${{ inputs.hosted_g08 }}' -ne 'true') { throw 'ROI_WITNESS_REQUIRES_HOSTED_G08' }
+            ./scripts/build-windows.ps1 -TestG08RoiWitness
+          } else { ./scripts/build-windows.ps1 }
       - name: Prepare hosted public capture dependencies
         if: ${{ inputs.hosted_g08 }}
         shell: pwsh
@@ -52,6 +60,8 @@ jobs:
       - name: Run hosted public capture diagnostic
         if: ${{ inputs.hosted_g08 }}
         shell: pwsh
+        env:
+          KELPIE_TEST_G08_WITNESS: ${{ inputs.hosted_roi_witness && '1' || '0' }}
         run: ./scripts/run-hosted-windows-g08.ps1
       - uses: actions/upload-artifact@v7
         if: ${{ always() && inputs.hosted_g08 }}
@@ -63,6 +73,7 @@ jobs:
             ${{ runner.temp }}/kelpie-hosted-g08-evidence/diagnostic.json
             ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted-spawn.json
             ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted-cleanup.json
+            ${{ runner.temp }}/kelpie-hosted-g08-evidence/g08-roi-witness.json
             ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/c-events.json
             ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/capture-failure.json
             ${{ runner.temp }}/kelpie-hosted-g08-evidence/hosted/oracle-input.json

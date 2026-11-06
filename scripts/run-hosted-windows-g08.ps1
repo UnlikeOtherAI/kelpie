@@ -33,6 +33,11 @@ $preflight.runtime = if ($runtime -ceq 'MultiThreaded') { 'MultiThreaded' } else
 $preflight.buildType = if ((Get-HostedCacheValue $cache 'CMAKE_BUILD_TYPE') -ceq 'Release') { 'Release' } else { 'other' }
 $buildCheck = Test-HostedWindowsBuild $cache $wrapperCache $ninja
 if ($buildCheck -ne 'OK') { throw $buildCheck }
+$witnessRequested = $env:KELPIE_TEST_G08_WITNESS -eq '1'
+$witnessCache = Get-HostedCacheValue $cache 'KELPIE_TEST_G08_ROI_WITNESS'
+if (($witnessRequested -and $witnessCache -cne 'ON') -or (-not $witnessRequested -and $witnessCache -cne 'OFF')) {
+  throw 'HOSTED_WITNESS_BUILD_MISMATCH'
+}
 $preflight.targetRuntime = 'all-kelpie-objects-MT'
 $files = @(Get-ChildItem $build -File | Where-Object { ($_.Extension -in @('.dll','.pak','.bin','.dat') -and $_.Name -ne 'kelpie.dll') -or $_.Name -eq 'vk_swiftshader_icd.json' }) +
   @(Get-ChildItem (Join-Path $build "locales") -Recurse -File)
@@ -45,7 +50,7 @@ $manifest = [ordered]@{
   ffmpegSha256=(Get-FileHash $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
   ffprobeSha256=(Get-FileHash $ffprobe -Algorithm SHA256).Hash.ToLowerInvariant()
   mediaArchiveSha256="fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9"
-  configuration=@{cef="ON";sandbox="ON";runtime="MultiThreaded /MT";localLlm="ON"}
+  configuration=@{cef="ON";sandbox="ON";runtime="MultiThreaded /MT";localLlm="ON";roiWitness=$witnessRequested}
   assets=$assets;scope="hosted-public-export-only";wgc="not-run"
 }
 [IO.File]::WriteAllText($manifestFile,($manifest | ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
@@ -53,7 +58,7 @@ $preflight.stage = 'ready'; $preflight.status = 'passed'; Save-Preflight
 } catch {
   $known = @('HOSTED_OUTPUT_EXISTS','HOSTED_SOURCE_MISMATCH','HOSTED_MEDIA_MISSING','HOSTED_CEF_ROOT_MISSING',
     'HOSTED_BUILD_NOT_RELEASE','HOSTED_LLM_DISABLED','HOSTED_RUNTIME_CACHE_MISMATCH','HOSTED_CEF_SANDBOX_MISMATCH',
-    'HOSTED_TARGET_OBJECTS_MISSING','HOSTED_CEF_DEFINITIONS_MISSING','HOSTED_RUNTIME_FLAGS_MISMATCH')
+    'HOSTED_TARGET_OBJECTS_MISSING','HOSTED_CEF_DEFINITIONS_MISSING','HOSTED_RUNTIME_FLAGS_MISMATCH','HOSTED_WITNESS_BUILD_MISMATCH')
   $preflight.status = 'failed'
   $preflight.code = if ($known -contains $_.Exception.Message) { $_.Exception.Message } else { 'HOSTED_PREFLIGHT_IO_FAILURE' }
   Save-Preflight

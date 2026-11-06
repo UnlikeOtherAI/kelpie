@@ -12,7 +12,7 @@ function uploadPaths(workflow){
 }
 test("hosted upload lists only exact synthetic evidence paths",async()=>{
  const paths=uploadPaths(await readFile(".github/workflows/windows.yml","utf8"));
- const evidence=["manifest.json","diagnostic.json","hosted-spawn.json","hosted-cleanup.json",
+ const evidence=["manifest.json","diagnostic.json","hosted-spawn.json","hosted-cleanup.json","g08-roi-witness.json",
   "hosted/c-events.json","hosted/capture-failure.json","hosted/oracle-input.json","hosted/oracle-output.json","hosted/*.gif","hosted/*.mp4"];
  const expected=["kelpie-hosted-g08-preflight/preflight.json",...evidence.map(file=>"kelpie-hosted-g08-evidence/"+file)];
  assert.deepEqual([...paths].sort(),expected.sort());

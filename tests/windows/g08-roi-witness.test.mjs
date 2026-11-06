@@ -4,6 +4,7 @@ import {compareG08RoiWitness,validateG08RoiWitness} from "./g08-roi-witness.mjs"
 
 const hash="a".repeat(64);
 function receipt(){return {version:1,scope:"owned-g08-mp4-roi",format:"video/mp4",partial:false,writerDroppedFrames:0,truncated:false,
+ source:"b".repeat(40),artifactSha256:hash,binarySha256:hash,ffprobeSha256:hash,
  binding:{fixtureListenerOwned:true,exactFixture:true,ownerCurrent:true,sameLease:true,sameDocument:true,viewportStable:true,postCaptureGrantCurrent:true},
  geometry:{width:640,height:406,left:438,top:161,right:522,bottom:245},
  rows:[{frameIndex:0,pts100ns:0,roiSha256:hash},{frameIndex:1,pts100ns:500000,roiSha256:hash}]};}

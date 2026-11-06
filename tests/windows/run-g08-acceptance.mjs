@@ -10,6 +10,11 @@ import {g08Curves,safeG08Failure} from "./g08-hosted-options.mjs";
 const [readinessFile,outputPath,identityFile,mode]=process.argv.slice(2);
 assert.ok(readinessFile&&outputPath&&identityFile);
 const curves=g08Curves(mode);
+const witnessUrl=process.env.KELPIE_TEST_G08_URL;
+if(witnessUrl){
+ assert.equal(mode,"--single-c");
+ assert.ok(/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/g08\/[a-f0-9]{32}$/.test(witnessUrl),"WITNESS_URL_INVALID");
+}
 const readiness=JSON.parse(await readFile(readinessFile,"utf8"));
 const identity=JSON.parse(await readFile(identityFile,"utf8"));
 const output=resolve(outputPath);await mkdir(output,{recursive:false});
@@ -40,7 +45,7 @@ let fixture;
 try{
  const tabs=await api("get-tabs"),tabId=tabs.tabs.find(tab=>tab.active)?.id;assert.ok(tabId);
  for(const curve of curves){
-  fixture=await startG08Fixture();
+  fixture=witnessUrl?{url:witnessUrl,close:async()=>{}}:await startG08Fixture();
   assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);
   assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);
   const run=await api("play-script",g08Workflow(tabId,curve));

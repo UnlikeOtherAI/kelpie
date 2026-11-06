@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import {spawn,execFile} from "node:child_process";
 import {promisify} from "node:util";
-import {createHash} from "node:crypto";
-import {readFile,writeFile,mkdir,access} from "node:fs/promises";
+import {createHash,randomBytes} from "node:crypto";
+import {readFile,writeFile,mkdir,access,stat} from "node:fs/promises";
 import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
 import {parseViewportDiagnostic} from "./viewport-diagnostic-sanitizer.mjs";
 import {parseCaptureStage} from "./capture-stage-diagnostics.mjs";
+import {validateG08RoiWitness} from "./g08-roi-witness.mjs";
+import {createG08WitnessLog} from "./g08-witness-log.mjs";
 import {captureDiagnosticStep} from "./capture-diagnostic-step.mjs";
 import {downloadArtifacts} from "./capture-artifact-download.mjs";
 import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
@@ -22,18 +24,28 @@ const profile=join(privateRoot,"profile"),readinessPath=join(profile,"readiness.
 const stageTiming=process.env.KELPIE_DIRECT_STAGE_G08==="1";
 const startupOnly=process.env.KELPIE_DIRECT_STARTUP_ONLY==="1";
 const hostedG08=process.env.KELPIE_HOSTED_PUBLIC_G08==="1";
+const witnessRequested=process.env.KELPIE_TEST_G08_WITNESS==="1";
+assert.ok(!witnessRequested||hostedG08);
 assert.ok(Number(stageTiming)+Number(startupOnly)+Number(hostedG08)<=1);
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:join(privateRoot,"cli-home"),KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS:"1",...(stageTiming?{KELPIE_CAPTURE_STAGE_DIAGNOSTICS:"1"}:{})};
 const exec=promisify(execFile),report={source:manifest.source,stage:"launch",diagnostics:[],cleanup:"not-started"};
-let pending="",child,closed,readiness,fixture,api;
+let pending="",child,closed,readiness,fixture,api,witnessFixture;
+const witnessLog=createG08WitnessLog();
 if(stageTiming||startupOnly)report.steps=[];
 if(stageTiming)report.captureStages=[];
 function acceptLine(line){const value=parseViewportDiagnostic(line);if(value&&report.diagnostics.length<16)report.diagnostics.push(value);
- if(stageTiming){const stage=parseCaptureStage(line);if(stage&&report.captureStages.length<801)report.captureStages.push(stage);}}
+ if(stageTiming){const stage=parseCaptureStage(line);if(stage&&report.captureStages.length<801)report.captureStages.push(stage);}
+ if(witnessRequested)witnessLog.accept(line);}
 try{
  const sidCode="[Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
  const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCode,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
  assert.match(sid,/^S-1-[0-9-]+$/);await exec(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+sid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"],{windowsHide:true,timeout:15000});
+ if(witnessRequested){
+  witnessFixture=await startG08Fixture({witnessNonce:randomBytes(16).toString("hex")});
+  assert.equal(witnessFixture.listenerHeld,true);
+  env.KELPIE_TEST_G08_URL=witnessFixture.url;env.KELPIE_TEST_G08_FIXTURE_PID=String(process.pid);
+  env.KELPIE_TEST_G08_FIXTURE_EXE=process.execPath;
+ }
  const started=Date.now();child=spawn(exe,["--port","28420","--profile-dir",profile],{env,windowsHide:true,stdio:["ignore","ignore","pipe"]});
  if(hostedG08)report.spawn={pid:child.pid??null,startedMs:started};
  closed=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",(code,signal)=>resolve({code,signal}));});void closed.catch(()=>{});
@@ -111,6 +123,38 @@ try{
 }finally{
  if(fixture) await fixture.close();
  if(child&&child.exitCode===null){child.kill();try{report.forcedExit=await Promise.race([closed,new Promise((_,reject)=>setTimeout(()=>reject(new Error("EXIT_TIMEOUT")),2000))]);}catch{report.forcedExit={timedOut:true};}}
+ if(witnessRequested){
+  const held=witnessFixture?.listenerHeld===true;
+  const witnessRows=witnessLog.finish();
+  if(held&&witnessRows&&report.casePassed===true&&report.cleanup==="public-close-exited"){
+   const receipt={version:1,scope:"owned-g08-mp4-roi",format:"video/mp4",partial:false,writerDroppedFrames:0,truncated:false,
+    source:manifest.source,binarySha256:manifest.dllSha256,artifactSha256:"",ffprobeSha256:"",
+    binding:{fixtureListenerOwned:true,exactFixture:true,ownerCurrent:true,sameLease:true,sameDocument:true,viewportStable:true,postCaptureGrantCurrent:true},
+    geometry:{width:640,height:406,left:438,top:161,right:522,bottom:245},rows:witnessRows};
+   try{
+    assert.equal(witnessFixture.pageRequests,1);assert.equal(witnessFixture.events.length,4);
+    mapG08Scene(witnessFixture.events);assert.ok(witnessFixture.events.every(event=>event.trusted===true));
+    const input=JSON.parse(await readFile(join(evidenceRoot,"hosted","oracle-input.json"),"utf8"));
+    const items=input.cases?.[0]?.artifacts?.filter(item=>item.mimeType==="video/mp4")??[];
+    assert.equal(items.length,1);const item=items[0];assert.match(item.id,/^[a-f0-9]{48}$/);
+    assert.equal(input.source,manifest.source);assert.equal(input.binarySHA256,manifest.dllSha256);
+    const file=join(evidenceRoot,"hosted",item.id+".mp4"),info=await stat(file);
+    assert.ok(info.isFile()&&info.size>0&&info.size<=33554432);const bytes=await readFile(file);
+    assert.ok(bytes.length>0&&bytes.length<=33554432);assert.equal(bytes.length,item.byteLength);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"),item.sha256);
+    assert.equal(await hash(process.env.FFPROBE),manifest.ffprobeSha256);
+    receipt.artifactSha256=item.sha256;receipt.ffprobeSha256=manifest.ffprobeSha256;
+    const probe=await exec(process.env.FFPROBE,["-v","error","-select_streams","v:0","-show_frames",
+     "-show_entries","frame=best_effort_timestamp_time:stream=width,height","-of","json",file],
+    {windowsHide:true,timeout:30000,maxBuffer:1048576});
+    const parsed=JSON.parse(probe.stdout);assert.equal(parsed.streams[0].width,640);assert.equal(parsed.streams[0].height,406);
+    validateG08RoiWitness(receipt,parsed.frames.map(frame=>Number(frame.best_effort_timestamp_time)));
+    await writeFile(join(evidenceRoot,"g08-roi-witness.json"),JSON.stringify(receipt,null,2),{flag:"wx"});
+    report.witness="matched-independent-decoded-pts";
+   }catch{report.witness="invalid-or-pts-mismatch";process.exitCode=1;}
+  }else {report.witness="unavailable";process.exitCode=1;}
+  if(witnessFixture)await witnessFixture.close();
+ }
  await writeFile(join(evidenceRoot,"diagnostic.json"),JSON.stringify(report,null,2),{flag:"wx"});
 }
 if(!report.casePassed)process.exitCode=1;

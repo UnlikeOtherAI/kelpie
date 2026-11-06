@@ -21,6 +21,17 @@ test("neutral fixture serves blank named controls and bounded facts through actu
   assert.equal(fixture.pageRequests,1);
  }finally{await fixture.close();}
 });
+test("witness fixture binds a nonce path and records listener retirement",async()=>{
+ const nonce="a".repeat(32),fixture=await startG08Fixture({witnessNonce:nonce});
+ try{
+  assert.match(fixture.url,new RegExp("/g08/"+nonce+"$"));assert.equal(fixture.listenerHeld,true);
+  assert.equal((await fetch(fixture.url)).status,200);
+  assert.equal((await fetch(new URL("/g08",fixture.url))).status,404);
+ }finally{await fixture.close();}
+ assert.equal(fixture.listenerHeld,false);
+ await assert.rejects(startG08Fixture({witnessNonce:"not-a-nonce"}));
+ await assert.rejects(startG08Fixture({host:"0.0.0.0",witnessNonce:nonce}));
+});
 test("same bounded production request covers both curves without product eval",()=>{
  for(const curve of ["c","s"]){
   const workflow=g08Workflow("owned",curve);

@@ -1,8 +1,10 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
-export async function startG08Fixture({host="127.0.0.1",port=0}={}){
+export async function startG08Fixture({host="127.0.0.1",port=0,witnessNonce}={}){
   assert.ok(Number.isInteger(port)&&port>=0&&port<=65535);
+  if(witnessNonce!==undefined){assert.equal(host,"127.0.0.1");assert.match(witnessNonce,/^[a-f0-9]{32}$/);}
+  const documentPath=witnessNonce===undefined?"/g08":"/g08/"+witnessNonce;
   const html=await readFile(new URL("./g08-fixture.html",import.meta.url));
   const events=[],sockets=new Set();let dropped=0,pageRequests=0;
   const send=(response,status,body,type="application/json")=>{
@@ -11,7 +13,7 @@ export async function startG08Fixture({host="127.0.0.1",port=0}={}){
   };
   const server=createServer((request,response)=>{void(async()=>{
     const path=new URL(request.url??"/","http://fixture.invalid").pathname;
-    if(request.method==="GET"&&(path==="/"||path==="/g08")){pageRequests++;return send(response,200,html,"text/html; charset=utf-8");}
+    if(request.method==="GET"&&(path===documentPath||(witnessNonce===undefined&&path==="/"))){pageRequests++;return send(response,200,html,"text/html; charset=utf-8");}
     if(request.method==="POST"&&path==="/events"){
       const chunks=[];let bytes=0;
       for await(const chunk of request){bytes+=chunk.length;if(bytes>8192)return send(response,413,"{}");chunks.push(chunk);}
@@ -28,10 +30,12 @@ export async function startG08Fixture({host="127.0.0.1",port=0}={}){
     send(response,404,"{}");
   })().catch(()=>{if(!response.headersSent)send(response,500,"{}");else response.destroy();});});
   server.requestTimeout=5000;server.headersTimeout=5000;
+  let retired=false;server.once("close",()=>{retired=true;});server.on("error",()=>{retired=true;});
   server.on("connection",socket=>{sockets.add(socket);socket.once("close",()=>sockets.delete(socket));});
   await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,host,resolve);});
   const address=server.address();
-  return {url:"http://"+host+":"+address.port+"/g08",events,get pageRequests(){return pageRequests;},
+  return {url:"http://"+host+":"+address.port+documentPath,events,get pageRequests(){return pageRequests;},
+    get listenerHeld(){return !retired&&server.listening;},
     close:()=>new Promise(resolve=>{server.close(resolve);for(const socket of sockets)socket.destroy();})};
 }
 export function g08Workflow(tabId,curve="c"){
