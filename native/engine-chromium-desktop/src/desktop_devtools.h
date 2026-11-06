@@ -88,6 +88,21 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
               const std::function<bool()>& interrupted = {});
   void CancelAll();
 
+#if defined(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  // Internal test-only event bridge. The sink receives a bounded owned copy;
+  // its caller must bind and audit the fixture, lease, grant and document.
+  using TestStreamEventSink = std::function<void(std::string)>;
+  using TestStreamDetachSink = std::function<void()>;
+  bool InstallTestStream(CefRefPtr<CefBrowser> browser, TestStreamEventSink event,
+                         TestStreamDetachSink detached);
+  void CloseTestStreamIngress();
+  bool WaitTestStreamDrained(std::chrono::milliseconds timeout);
+  bool ReleaseTestStream();
+  void ClearTestStream();
+  void SendTestStreamAck(CefRefPtr<CefBrowser> browser, int session_id,
+                         std::function<void(bool)> completed);
+#endif
+
   static Json EvaluateParams(const std::string& expression);
   static Result ParseEvaluateResult(const Result& protocol_result);
   // Viewport capture params: format "png" (default) or "jpeg" with an
@@ -123,6 +138,16 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   std::unordered_map<int, std::shared_ptr<Operation>> pending_;
   DesktopNetworkEventAdapter network_events_;
   NetworkEventSink network_sink_;
+
+#if defined(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  TestStreamEventSink test_stream_event_;
+  TestStreamDetachSink test_stream_detached_;
+  std::unordered_map<int, std::function<void(bool)>> test_stream_acks_;
+  std::condition_variable test_stream_drained_;
+  std::size_t test_stream_ingress_ = 0, test_stream_completions_ = 0;
+  bool test_stream_accepting_ = false;
+  void CompleteTestStreamCallback(std::function<void(bool)> callback, bool success);
+#endif
 
   IMPLEMENT_REFCOUNTING(DesktopDevToolsSession);
 };

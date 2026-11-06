@@ -232,6 +232,9 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::Wait(const std::shared_pt
 }
 
 void DesktopDevToolsSession::CancelAll() {
+#if defined(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  ClearTestStream();
+#endif
   std::vector<std::shared_ptr<Operation>> operations;
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -340,8 +343,24 @@ DesktopDevToolsSession::Json DesktopDevToolsSession::TrustedKeyParams(const Json
   return params;
 }
 
-void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser>, int message_id, bool success,
+void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser> browser, int message_id, bool success,
                                                     const void* result, size_t result_size) {
+#if defined(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  std::function<void(bool)> ack;
+  bool same_browser = false;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto item = test_stream_acks_.find(message_id);
+    if (item != test_stream_acks_.end()) {
+      ack = std::move(item->second); test_stream_acks_.erase(item);
+      same_browser = browser_ && browser && browser_->IsSame(browser);
+      ++test_stream_completions_;
+    }
+  }
+  if (ack) { CompleteTestStreamCallback(std::move(ack), success && same_browser); return; }
+#else
+  (void)browser;
+#endif
   std::shared_ptr<Operation> operation;
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -355,6 +374,29 @@ void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser>, int m
 
 void DesktopDevToolsSession::OnDevToolsEvent(CefRefPtr<CefBrowser> browser, const CefString& method,
                                              const void* params, size_t params_size) {
+#if defined(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  if (method.ToString() == "Page.screencastFrame") {
+    TestStreamEventSink sink;
+    bool overflow = false;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (browser_ && browser && browser_->IsSame(browser) && test_stream_accepting_ && test_stream_event_) {
+        if (test_stream_ingress_ >= 3) overflow = true;
+        else { sink = test_stream_event_; ++test_stream_ingress_; }
+      }
+    }
+    if (overflow) { ClearTestStream(); return; }
+    if (sink) {
+      constexpr size_t kMaxEventBytes = 3 * 1024 * 1024;
+      try {
+        sink(params && params_size <= kMaxEventBytes
+            ? std::string(static_cast<const char*>(params), params_size) : std::string());
+      } catch (...) { ClearTestStream(); }
+      { std::lock_guard<std::mutex> lock(mutex_); --test_stream_ingress_; test_stream_drained_.notify_all(); }
+    }
+    return;
+  }
+#endif
   const std::string raw = params == nullptr ? std::string()
                                             : std::string(static_cast<const char*>(params), params_size);
   const Json parsed = Json::parse(raw, nullptr, false);
@@ -368,11 +410,6 @@ void DesktopDevToolsSession::OnDevToolsEvent(CefRefPtr<CefBrowser> browser, cons
     sink = network_sink_;
   }
   if (event) sink(*event);
-}
-
-void DesktopDevToolsSession::OnDevToolsAgentDetached(CefRefPtr<CefBrowser>) {
-  // Detaching a transport does not prove JavaScript stopped. Preserve ownership
-  // until the owning tab's confirmed OnBeforeClose callback calls CancelAll().
 }
 
 CefRefPtr<CefDictionaryValue> DesktopDevToolsSession::ToCefDictionary(const Json& object) {

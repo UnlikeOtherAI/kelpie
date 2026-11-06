@@ -135,6 +135,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine_partitions.cpp
     src/desktop_partition_registry.cpp
     src/desktop_devtools.cpp
+    src/desktop_devtools_lifecycle.cpp
     src/desktop_engine_favicon.cpp
     src/start_page_scheme.cpp)
 else()
@@ -147,6 +148,7 @@ add_library(kelpie_engine_chromium_desktop STATIC
 
 if(KELPIE_WINDOWS_CEF_STREAM_PROBE)
   target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE KELPIE_WINDOWS_CEF_STREAM_PROBE=1)
+  target_sources(kelpie_engine_chromium_desktop PRIVATE src/desktop_devtools_test_stream.cpp)
 endif()
 
 target_include_directories(kelpie_engine_chromium_desktop
