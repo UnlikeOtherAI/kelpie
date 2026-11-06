@@ -38,13 +38,18 @@ struct TabWebViewContainer: UIViewRepresentable {
     func updateUIView(_ container: UIView, context: Context) {
         guard let webView = tabStore.activeBrowserTab?.webView else { return }
         context.coordinator.install(webView: webView, in: container)
-        if webView.scrollView.contentInset.bottom != bottomClearance {
-            webView.scrollView.contentInset.bottom = bottomClearance
-            webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomClearance
-            webView.setMinimumViewportInset(
-                UIEdgeInsets(top: 0, left: 0, bottom: bottomViewportInsets.lowerBound, right: 0),
-                maximumViewportInset: UIEdgeInsets(top: 0, left: 0, bottom: bottomViewportInsets.upperBound, right: 0)
-            )
+        Self.reconcileInsets(webView, clearance: bottomClearance, viewport: bottomViewportInsets)
+    }
+
+    static func reconcileInsets(_ webView: WKWebView, clearance: CGFloat, viewport: ClosedRange<CGFloat>) {
+        if webView.scrollView.contentInset.bottom != clearance {
+            webView.scrollView.contentInset.bottom = clearance
+            webView.scrollView.verticalScrollIndicatorInsets.bottom = clearance
+        }
+        let minimum = UIEdgeInsets(top: 0, left: 0, bottom: viewport.lowerBound, right: 0)
+        let maximum = UIEdgeInsets(top: 0, left: 0, bottom: viewport.upperBound, right: 0)
+        if webView.minimumViewportInset != minimum || webView.maximumViewportInset != maximum {
+            webView.setMinimumViewportInset(minimum, maximumViewportInset: maximum)
         }
     }
 
