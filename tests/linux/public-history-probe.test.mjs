@@ -7,6 +7,7 @@ test('forward pageshow and same-document events require prior anchors', () => {
   let mark = p.mark(); p.record('n1');
   strictEqual(p.result(mark, 'next').status, 'restored-from-bfcache');
   mark = p.mark(); p.record('h1');
+  strictEqual(p.hashResult(mark, 'h1', false).status, 'observed');
   strictEqual(p.hashResult(mark, 'h1').status, 'insufficient');
   p.record('h2'); mark = p.mark(); p.record('h1');
   strictEqual(p.hashResult(mark, 'h1').status, 'observed');
