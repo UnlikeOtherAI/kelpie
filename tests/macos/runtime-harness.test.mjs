@@ -7,6 +7,7 @@ import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
 import {waitForRendererTransition} from "./runtime-renderer-transition.mjs";
+import {overlayScene} from "./runtime-overlay-scene.mjs";
 test("stream fixture renders its own non-auth nonce as sixteen binary cells",async()=>{
  const fixture=await startFixture();
  try{
@@ -27,6 +28,16 @@ test("overlay fixture selects bright damage while standard stream stays red",asy
   assert.ok(standardHTML.includes("background:#f52233;animation:stream"));
   assert.ok(overlayHTML.includes("background:#f8df45;animation:stream"));
  }finally{await standard.close();await overlay.close();}
+});
+test("overlay scene retains measured centers and relative time without document IDs",()=>{
+ const event=(target,x,time)=>({type:"click",target,x,y:20,time,documentId:"private",viewport:{width:900,height:700},
+  rect:{left:x-5,right:x+5,top:15,bottom:25}});
+ const first=event("first",50,100),second=event("second",550,1600);
+ assert.deepEqual(overlayScene([first,second]),{width:900,height:700,first:{x:50,y:20},second:{x:550,y:20},
+  firstCenter:{x:50,y:20},secondCenter:{x:550,y:20},clickSeparationMs:1500});
+ assert.equal(overlayScene([first,{...second,documentId:"changed"}]),null);
+ assert.equal(overlayScene([first,{...second,viewport:{width:800,height:700}}]),null);
+ assert.equal(overlayScene([first,{...second,time:99}]),null);
 });
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
