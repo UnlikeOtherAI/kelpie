@@ -101,7 +101,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   impl_->started=true;
   KELPIE_STARTUP_TRACE("PUBLISH_ENTER");
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
-  KELPIE_STARTUP_TRACE("PUBLISH_OK");
+  KELPIE_STARTUP_TRACE("PUBLISH_RETURNED");
   impl_->account.RestoreSession();
   impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine(),connect::Executor::Infer{},
       [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); },

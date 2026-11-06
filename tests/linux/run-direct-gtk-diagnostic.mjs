@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { control, rawRequest, bearerHeaders } from "../windows/lib/http.mjs";
 import { startBrowser, stopBrowser, delay } from "../windows/lib/process.mjs";
@@ -11,6 +11,7 @@ import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from 
 import { runGtkStop } from "./gtk-stop.mjs";
 import { verifyOwnedListener } from "./worker-comparison-listener.mjs";
 import { parseGtkStartupTrace } from "./gtk-startup-trace.mjs";
+import { verifyGtkDiagnosticManifest } from "./gtk-diagnostic-manifest.mjs";
 
 const [binaryArg, expectedHash, outputArg] = process.argv.slice(2);
 assert.ok(binaryArg && /^[a-f0-9]{64}$/.test(expectedHash ?? "") && outputArg);
@@ -27,15 +28,25 @@ const binary = await realpath(resolve(binaryArg)), output = resolve(outputArg);
 const worktree = await realpath(process.cwd()), parent = await realpath(resolve(output, ".."));
 const parentRelative = relative(worktree, parent);
 assert.ok(parentRelative !== ".." && !parentRelative.startsWith(".." + sep) && !isAbsolute(parentRelative));
+const digest = createHash("sha256").update(await readFile(binary)).digest("hex");
+assert.equal(digest, expectedHash);
+let buildIdentity;
+if (traceRequested) {
+  const manifestPath = await realpath(resolve(process.env.KELPIE_GTK_BUILD_MANIFEST ?? ""));
+  const manifestRelative = relative(worktree, manifestPath);
+  assert.ok(manifestRelative !== ".." && !manifestRelative.startsWith(".." + sep) && !isAbsolute(manifestRelative));
+  assert.ok((await stat(manifestPath)).size <= 16384);
+  buildIdentity = verifyGtkDiagnosticManifest(await readFile(manifestPath),
+    process.env.KELPIE_GTK_BUILD_MANIFEST_SHA256, process.env.KELPIE_GTK_BUILD_SOURCE, digest);
+  execFileSync("git", ["merge-base", "--is-ancestor", buildIdentity.diagnosticBuildSource, "HEAD"], { timeout: 5000 });
+}
 await mkdir(output, { recursive: false, mode: 0o700 });
 const runtime = await mkdtemp(join(parent, ".private-runtime-"));
 const profile = join(runtime, "profile");
 await mkdir(profile, { mode: 0o700 });
 const readinessPath = join(profile, "readiness.json");
-const digest = createHash("sha256").update(await readFile(binary)).digest("hex");
-assert.equal(digest, expectedHash);
-const report = { source: process.env.KELPIE_CAPTURE_SOURCE, testSource: process.env.KELPIE_TEST_REVISION,
-  binarySHA256: digest, stages: [], cleanup: "not-started" };
+const report = { ...(buildIdentity ?? { source: process.env.KELPIE_CAPTURE_SOURCE }),
+  testSource: process.env.KELPIE_TEST_REVISION, binarySHA256: digest, stages: [], cleanup: "not-started" };
 const stage = name => report.stages.push({ name, elapsedMs: Math.round(performance.now() - began) });
 const began = performance.now();
 let browser, identity, readiness, verified = false, acknowledged = false, failed = false;

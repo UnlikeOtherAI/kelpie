@@ -51,3 +51,12 @@ cause of a failed or stalled DesktopApp start. A future separately authorized
 owned GNOME run can locate the last observed boundary, with no focus change or
 desktop-wide capture; it does not by itself prove a cause or final visual
 acceptance. No native compilation or runtime has yet exercised this trace.
+
+The diagnostic receipt separates `historicalBase` c42 from the exact
+`diagnosticBuildSource` and `testSource`. The launcher requires an
+independently reviewed bounded manifest with exact source, executable SHA-256,
+target and test-only build options, verifies the supplied manifest SHA-256 and
+checks the build source is an ancestor of the test checkout. The manifest is
+evidence supplied by the build workflow, not proof of its own origin. A
+`PUBLISH_RETURNED` marker means only that the publish call returned;
+the separate readiness/listener check establishes external readiness.
