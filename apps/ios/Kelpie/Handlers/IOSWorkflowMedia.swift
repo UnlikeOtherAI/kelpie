@@ -130,7 +130,7 @@ final class IOSWorkflowMedia {
 
     static func recordViewportRefusal(
         runID: String, site: String, before: IOSWorkflowTab.Viewport? = nil, after: IOSWorkflowTab.Viewport? = nil,
-        hasBaseline: Bool, targetBound: Bool
+        hasBaseline: Bool, targetBound: Bool, sameDocumentBaseline: Bool? = nil
     ) {
         guard ProcessInfo.processInfo.arguments.contains("--test-paired-geometry-receipt"),
               testEvidence["runId"] as? String == runID, testEvidence["viewportRefusal"] == nil,
@@ -141,11 +141,20 @@ final class IOSWorkflowMedia {
              viewport.visible.width, viewport.visible.height, viewport.scale, viewport.pixelRatio].map(Double.init)
         }
         var receipt: Body = ["site": site, "hasBaseline": hasBaseline, "targetBound": targetBound]
+        if let sameDocumentBaseline { receipt["sameDocumentBaseline"] = sameDocumentBaseline }
         if let before, let after {
             let first = values(before), second = values(after)
-            guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }) else { return }
+            func content(_ viewport: IOSWorkflowTab.Viewport) -> [Double] {
+                [viewport.content.minX, viewport.content.minY, viewport.content.width, viewport.content.height].map(Double.init)
+            }
+            let firstContent = content(before), secondContent = content(after)
+            guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }),
+                  (firstContent + secondContent).allSatisfy({ $0.isFinite && abs($0) <= 100_000 }),
+                  firstContent[2] > 0, firstContent[3] > 0, secondContent[2] > 0, secondContent[3] > 0 else { return }
             receipt["before"] = first
             receipt["after"] = second
+            receipt["beforeContent"] = firstContent
+            receipt["afterContent"] = secondContent
         }
         testEvidence["viewportRefusal"] = receipt
     }
@@ -158,8 +167,10 @@ final class IOSWorkflowMedia {
         var facts: Body = [:]
         if args.contains("--test-pinch-projection"), let projection { facts["projection"] = projection }
         if args.contains("--test-g08-document-binding"), let geometry { facts["geometry"] = geometry }
+        if let current = testEvidence["runId"] as? String, current != runID { return }
         artifacts[id] = facts
-        testEvidence = ["runId": runID, "artifacts": artifacts]
+        testEvidence["runId"] = runID
+        testEvidence["artifacts"] = artifacts
     }
     #endif
 

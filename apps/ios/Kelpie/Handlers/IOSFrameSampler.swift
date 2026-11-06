@@ -162,7 +162,8 @@ final class IOSFrameSampler {
         guard initial.bounds == viewport.bounds, initial.content == viewport.content, initial.pixelRatio == viewport.pixelRatio else {
             #if DEBUG
             IOSWorkflowMedia.recordViewportRefusal(runID: runID, site: "native-viewport", before: initial,
-                                                   after: viewport, hasBaseline: true, targetBound: targetBound)
+                                                   after: viewport, hasBaseline: true, targetBound: targetBound,
+                                                   sameDocumentBaseline: initialDocument == tab.document)
             #endif
             Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
             Self.geometryDiagnostic(before: initial, after: viewport)
