@@ -234,7 +234,7 @@ jobs:
         run: exit 1
 
       - name: Retain sanitized native runtime evidence
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && inputs.runtime_scope != 'cef-png-equivalence'
         uses: actions/upload-artifact@v7.0.1
         with:
           name: macos-native-runtime-evidence
@@ -242,8 +242,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Retain fixed PNG equivalence receipt
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && inputs.runtime_scope == 'cef-png-equivalence'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-png-equivalence-receipt
+          path: .cache/macos-runtime/evidence/png-equivalence-comparison.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Retain compile diagnostics
-        if: always()
+        if: always() && inputs.runtime_scope != 'cef-png-equivalence'
         uses: actions/upload-artifact@v7.0.1
         with:
           name: macos-build-diagnostics
