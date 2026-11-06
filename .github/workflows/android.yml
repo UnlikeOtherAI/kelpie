@@ -139,7 +139,18 @@ jobs:
             native-evidence/phone/*.log
             native-evidence/phone/avd-config.ini
             native-evidence/phone/script-acceptance/**
-            native-evidence/phone/api29-smoke/**
+            native-evidence/phone/api29-smoke/*/case.txt
+            native-evidence/phone/api29-smoke/*/exit.txt
+            native-evidence/phone/api29-smoke/*/instrumentation.log
+            native-evidence/phone/api29-smoke/*/pull.log
+            native-evidence/phone/api29-smoke/*/script-acceptance/api29-one-step-result.json
+            native-evidence/phone/api29-smoke/*/script-acceptance/api29-native-marker.png
+            native-evidence/phone/api29-smoke/*/script-acceptance/native-marker-evidence.json
+            native-evidence/phone/api29-smoke/*/script-acceptance/before-native-stop-status.json
+            native-evidence/phone/api29-smoke/*/script-acceptance/stopped-manifest.json
+            native-evidence/phone/api29-smoke/*/script-acceptance/*.png
+            native-evidence/phone/api29-smoke/*/script-acceptance/*.gif
+            native-evidence/phone/api29-smoke/*/script-acceptance/*.mp4
             native-evidence/phone/script-codec-acceptance/**
             native-evidence/tablet/*.json
             native-evidence/tablet/*.txt

@@ -2,11 +2,14 @@ package com.kelpie.browser.automation
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
+import androidx.test.platform.app.InstrumentationRegistry
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import java.util.concurrent.Executors
@@ -16,6 +19,7 @@ import java.util.concurrent.TimeUnit
 class ScriptApi29SmokeTest : ScriptPublicFixture() {
     @Test
     fun oneSemanticClickShowsNativeMarkerAndReturnsOneDecodablePng() {
+        assumeTrue(Build.VERSION.SDK_INT == 29 && InstrumentationRegistry.getArguments().getString("api29Smoke") == "true")
         MockWebServer().use { server ->
             server.start()
             ScriptHttpFixture().use { client ->
@@ -45,6 +49,7 @@ class ScriptApi29SmokeTest : ScriptPublicFixture() {
                 assertTrue(result.toString(), result.getBoolean("success"))
                 assertEquals("completed", result.getString("state"))
                 assertEquals(1, result.getInt("actionsExecuted"))
+                assertEquals("Clicked:false", client.core("tab.title", tab).getString("value"))
                 val screen = captureBlueMarker(client, geometry)
                 File(evidence, "api29-native-marker.png").outputStream().use {
                     screen.compress(Bitmap.CompressFormat.PNG, 100, it)
