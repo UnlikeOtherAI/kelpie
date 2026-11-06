@@ -38,6 +38,13 @@ struct BrowserView: View {
 
     @State var touchpadMode = false
 
+    private var immersiveNativePolicy: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--test-fixed-native-safe-area") { return false }
+        #endif
+        return serverState.isScriptImmersive
+    }
+
     var body: some View {
         ZStack {
             if touchpadMode {
@@ -214,8 +221,8 @@ struct BrowserView: View {
             migrateLegacyTabletViewportSelectionIfNeeded()
             layoutLoading = browserState.isLoading
         }
-        .ignoresSafeArea(.container, edges: serverState.isScriptImmersive ? [.top, .bottom] : [])
-        .statusBarHidden(serverState.isScriptImmersive)
+        .ignoresSafeArea(.container, edges: immersiveNativePolicy ? [.top, .bottom] : [])
+        .statusBarHidden(immersiveNativePolicy)
         .onChange(of: browserState.currentURL) { _ in
             externalDisplayManager.triggerSyncPass()
             updateChromeSample()

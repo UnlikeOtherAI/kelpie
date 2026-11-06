@@ -238,9 +238,11 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         targets, names = DRIVER.selection("immersive")
         unit = "testChangedViewportRangeWithUnchangedScrollClearance"
         ui = "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia"
-        self.assertEqual(names, {unit, ui})
+        fixed = "testPairedMCPWithFixedNativeSafeAreaPolicy"
+        self.assertEqual(names, {unit, ui, fixed})
         self.assertEqual(targets, ["KelpieTests/IOSViewportInsetReconciliationTests/" + unit,
-                                   "KelpieUITests/WorkflowCaptureUITests/" + ui])
+                                   "KelpieUITests/WorkflowCaptureUITests/" + ui,
+                                   "KelpieUITests/WorkflowCaptureUITests/" + fixed])
 
     def test_marker_selection_includes_both_lifetime_controls(self):
         targets, names = DRIVER.selection("marker")

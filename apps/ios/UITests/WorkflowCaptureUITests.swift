@@ -157,9 +157,24 @@ final class WorkflowCaptureUITests: XCTestCase {
 
     @MainActor
     func testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia() async throws {
+        try await pairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia()
+    }
+
+    @MainActor
+    func testPairedMCPWithFixedNativeSafeAreaPolicy() async throws {
+        testLaunchArguments.append("--test-fixed-native-safe-area")
+        try await pairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia()
+    }
+
+    @MainActor
+    private func pairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia() async throws {
         testLaunchArguments.append("--test-paired-geometry-receipt")
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
+        let before = XCTAttachment(screenshot: app.screenshot())
+        before.name = "Paired capture before immersive layout"
+        before.lifetime = .keepAlways
+        add(before)
         let steps: [Body] = [
             ["action": "wait-ready", "selector": "button"],
             ["action": "click", "target": ["role": "button", "name": "Submit"]],
@@ -266,9 +281,15 @@ final class WorkflowCaptureUITests: XCTestCase {
 
     @MainActor
     private func attachImmersiveLayoutTrace(runID: String) async throws {
+        let after = XCTAttachment(screenshot: app.screenshot())
+        after.name = "Paired capture after immersive layout"
+        after.lifetime = .keepAlways
+        add(after)
         let diagnostic = try await probe.request("/v1/debug-screens", [:])
         let receipt = try XCTUnwrap(diagnostic["testImmersiveLayout"] as? Body)
         XCTAssertEqual(try XCTUnwrap(receipt["runId"] as? String), runID)
+        XCTAssertEqual(receipt["fixedNativePolicy"] as? Bool,
+                       testLaunchArguments.contains("--test-fixed-native-safe-area"))
         let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]),
                                        uniformTypeIdentifier: "public.json")
         attachment.name = "Paired run immersive layout receipt"

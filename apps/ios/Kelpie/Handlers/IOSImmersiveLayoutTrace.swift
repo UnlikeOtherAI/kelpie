@@ -19,7 +19,11 @@ final class IOSImmersiveLayoutTrace {
         self.view = tab.view
         self.window = window
         self.document = tab.document
-        self.receipt = ["runId": runID, "request": Self.raw(tab.view)]
+        self.receipt = [
+            "runId": runID,
+            "fixedNativePolicy": ProcessInfo.processInfo.arguments.contains("--test-fixed-native-safe-area"),
+            "request": Self.raw(tab.view)
+        ]
     }
 
     static func begin(runID: String, tab: IOSWorkflowTab, immersive: Bool) {

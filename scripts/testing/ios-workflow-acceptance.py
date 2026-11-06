@@ -26,8 +26,10 @@ def selection(scope):
     if scope == "immersive":
         unit = "testChangedViewportRangeWithUnchangedScrollClearance"
         ui = "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia"
+        fixed = "testPairedMCPWithFixedNativeSafeAreaPolicy"
         return ["KelpieTests/IOSViewportInsetReconciliationTests/" + unit,
-                "KelpieUITests/WorkflowCaptureUITests/" + ui], {unit, ui}
+                "KelpieUITests/WorkflowCaptureUITests/" + ui,
+                "KelpieUITests/WorkflowCaptureUITests/" + fixed], {unit, ui, fixed}
     if scope == "mobilecheck":
         geometry_targets, geometry_names = selection("geometry")
         marker_targets, marker_names = selection("marker")
