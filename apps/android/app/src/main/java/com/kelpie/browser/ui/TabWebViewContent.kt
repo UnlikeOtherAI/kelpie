@@ -36,7 +36,7 @@ fun TabWebViewContent(
     val installedWebViewRef = remember { mutableStateOf<WebView?>(null) }
 
     AndroidView(
-        factory = { ctx -> FrameLayout(ctx) },
+        factory = { ctx -> ScriptRendererKeyFrame(ctx) { handlerContext.scriptPlaybackState?.isRecording?.value == true } },
         update = { container ->
             val tab = tabs.firstOrNull { it.id == activeTabId } ?: return@AndroidView
             val wv = tab.webView
