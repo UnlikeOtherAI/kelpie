@@ -204,3 +204,5 @@ reclassified, and these checkpoints do not establish platform acceptance.
 
 Final per-platform formats, privacy, Stop and recovery, the integrated PR,
 release publication and actual installed-artifact checks remain open.
+
+For the later evidence checkpoint, see [acceptance checkpoint at 48c7a7c8](acceptance-checkpoint-48c7.md).
