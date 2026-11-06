@@ -7,6 +7,7 @@ import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
 import {parseViewportDiagnostic} from "./viewport-diagnostic-sanitizer.mjs";
 import {parseCaptureStage} from "./capture-stage-diagnostics.mjs";
+import {parsePngSpeedBytes} from "./png-speed-receipt.mjs";
 import {captureDiagnosticStep} from "./capture-diagnostic-step.mjs";
 import {downloadArtifacts} from "./capture-artifact-download.mjs";
 import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
@@ -22,14 +23,20 @@ const profile=join(privateRoot,"profile"),readinessPath=join(profile,"readiness.
 const stageTiming=process.env.KELPIE_DIRECT_STAGE_G08==="1";
 const startupOnly=process.env.KELPIE_DIRECT_STARTUP_ONLY==="1";
 const hostedG08=process.env.KELPIE_HOSTED_PUBLIC_G08==="1";
+const pngArm=process.env.KELPIE_HOSTED_PNG_AB||"";
+assert.ok(!pngArm||(hostedG08&&["control","candidate"].includes(pngArm)));
 assert.ok(Number(stageTiming)+Number(startupOnly)+Number(hostedG08)<=1);
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:join(privateRoot,"cli-home"),KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS:"1",...(stageTiming?{KELPIE_CAPTURE_STAGE_DIAGNOSTICS:"1"}:{})};
+if(pngArm){env.KELPIE_CAPTURE_STAGE_DIAGNOSTICS="1";env.KELPIE_TEST_PNG_METRICS="1";
+ if(pngArm==="candidate")env.KELPIE_TEST_SCRIPT_PNG_SPEED="1";else delete env.KELPIE_TEST_SCRIPT_PNG_SPEED;}
 const exec=promisify(execFile),report={source:manifest.source,stage:"launch",diagnostics:[],cleanup:"not-started"};
 let pending="",child,closed,readiness,fixture,api;
 if(stageTiming||startupOnly)report.steps=[];
-if(stageTiming)report.captureStages=[];
+if(stageTiming||pngArm)report.captureStages=[];
+if(pngArm){report.pngArm=pngArm;report.pngByteReceipts=[];}
 function acceptLine(line){const value=parseViewportDiagnostic(line);if(value&&report.diagnostics.length<16)report.diagnostics.push(value);
- if(stageTiming){const stage=parseCaptureStage(line);if(stage&&report.captureStages.length<801)report.captureStages.push(stage);}}
+ if(stageTiming||pngArm){const stage=parseCaptureStage(line);if(stage&&report.captureStages.length<801)report.captureStages.push(stage);}
+ if(pngArm){const bytes=parsePngSpeedBytes(line);if(bytes&&report.pngByteReceipts.length<4)report.pngByteReceipts.push(bytes);}}
 try{
  const sidCode="[Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
  const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCode,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
@@ -68,6 +75,12 @@ try{
     if(failure.code==="CAPTURE_NATIVE_PRESENTATION_FAILED")report.hostedPresentation="unavailable-cause-unproven";
    }catch{}
   }
+ if(pngArm){
+  const code="$p=Get-Process -Id "+child.pid+";[pscustomobject]@{pid=$p.Id;start=$p.StartTime.ToUniversalTime().ToString('o');peakWorkingSetBytes=$p.PeakWorkingSet64;peakPagedBytes=$p.PeakPagedMemorySize64}|ConvertTo-Json";
+  const peaks=JSON.parse((await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(code,"utf16le").toString("base64")],{env,windowsHide:true,timeout:15000})).stdout);
+  assert.equal(peaks.pid,report.identity.pid);assert.equal(peaks.start,report.identity.start);
+  assert.ok(Number.isSafeInteger(peaks.peakWorkingSetBytes)&&Number.isSafeInteger(peaks.peakPagedBytes));report.processPeaks=peaks;
+ }
  }else if(stageTiming||startupOnly){
   const step=(name,fn)=>captureDiagnosticStep(report,name,fn);
   fixture=await step("fixture-start",()=>startG08Fixture());

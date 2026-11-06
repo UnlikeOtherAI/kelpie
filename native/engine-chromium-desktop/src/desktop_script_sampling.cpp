@@ -38,6 +38,9 @@ void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::
 }
 void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   DesktopCaptureStageTiming stage_timing;
+#if defined(KELPIE_TEST_SCRIPT_PNG_SPEED)
+  TestScriptPngByteStats png_byte_stats(std::getenv("KELPIE_TEST_PNG_METRICS"));
+#endif
   std::unique_ptr<DesktopScriptCapture> encoder;
   int initial_width = 0, initial_height = 0;
   Json previous_viewport;
@@ -115,6 +118,9 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       }
       const auto timing_screenshot=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
+#if defined(KELPIE_TEST_SCRIPT_PNG_SPEED)
+      if (movies) png_byte_stats.Add(image.base64_data.size());
+#endif
       result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
       const auto timing_post_nav=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
