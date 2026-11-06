@@ -16,7 +16,7 @@ export function validateWorkerPolicy(text,expectedUser){
  assert.equal(entries.get("KillMode"),"control-group","POLICY_KILL_MODE");
  assert.equal(entries.get("PrivateNetwork"),"yes","POLICY_PRIVATE_NETWORK");
  assert.match(entries.get("ControlGroup")??"",
-  /^\/system\.slice\/kelpie-worker-ab-\d+-\d+-(lightpanda|playwright|probe|sandbox)\.service$/);
+  /^\/system\.slice\/kelpie-worker-ab-\d+-\d+-(lightpanda|playwright|probe|sandbox|eof)\.service$/);
  assert.equal(entries.get("MemoryMax"),"2147483648","POLICY_MEMORY");
  assert.equal(entries.get("TasksMax"),"256","POLICY_TASKS");
  assert.ok(["1s","1000000us"].includes(entries.get("CPUQuotaPerSecUSec")),"POLICY_CPU");

@@ -16,6 +16,9 @@ on:
       isolation_only:
         type: boolean
         default: false
+      eof_only:
+        type: boolean
+        default: false
       prepare_only:
         description: Record official Chromium identity without starting benchmark units
         type: boolean
@@ -37,6 +40,9 @@ on:
         type: boolean
         default: false
       isolation_only:
+        type: boolean
+        default: false
+      eof_only:
         type: boolean
         default: false
       prepare_only:
@@ -66,15 +72,17 @@ jobs:
       REQUESTED_RUNNER: ${{ inputs.runner_label }}
       SANDBOX_ONLY: ${{ inputs.sandbox_only }}
       ISOLATION_ONLY: ${{ inputs.isolation_only }}
+      EOF_ONLY: ${{ inputs.eof_only }}
       CHROMIUM_ARCHIVE_SHA256: ${{ inputs.chromium_archive_sha256 }}
       CHROMIUM_BINARY_SHA256: ${{ inputs.chromium_binary_sha256 }}
     steps:
       - name: Validate hosted runner choice
         shell: bash
         run: |
+          [[ "$EOF_ONLY" != true || ( "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == true && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
           case "$REQUESTED_RUNNER" in
             ubuntu-24.04) [[ "$PREPARE_ONLY" == true || "$SANDBOX_ONLY" == true || "$ISOLATION_ONLY" == true ]] || exit 1 ;;
-            ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false ) ]] || exit 1 ;;
+            ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false || "$EOF_ONLY" == true ) ]] || exit 1 ;;
             *) exit 1 ;;
           esac
       - uses: actions/checkout@v6.0.3
@@ -89,7 +97,7 @@ jobs:
           node-version: 22.14.0
 
       - name: Prepare pinned test inputs outside measured units
-        if: inputs.isolation_only == false && inputs.sandbox_only == false
+        if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.eof_only == false
         shell: bash
         run: |
           set -euo pipefail
@@ -136,14 +144,34 @@ jobs:
             [[ "$binary_sha" == "$CHROMIUM_BINARY_SHA256" ]]
           fi
       - name: Build comparison CLI and shared packages
-        if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.prepare_only == false
+        if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.eof_only == false && inputs.prepare_only == false
         shell: bash
         run: |
           pnpm --filter @unlikeotherai/kelpie-shared build
           pnpm --filter @unlikeotherai/kelpie build
       - name: Compare in separately bounded loopback-only units
-        if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.prepare_only == false
+        if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.eof_only == false && inputs.prepare_only == false
         shell: bash
+        run: bash scripts/testing/run-worker-comparison-hosted.sh
+      - name: Prepare pinned Lightpanda and public CLI for EOF proof
+        if: inputs.eof_only == true
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(id -u)" != 0 ]]
+          pnpm install --frozen-lockfile
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          pnpm --filter @unlikeotherai/kelpie build
+          assets="$RUNNER_TEMP/worker-ab-assets"
+          mkdir -m 700 "$assets"
+          curl --fail --location --proto '=https' --max-time 240 --max-filesize 100000000 \
+            'https://github.com/lightpanda-io/browser/releases/download/1.0.2/lightpanda-x86_64-linux' -o "$assets/lightpanda"
+          printf '%s  %s\n' 'ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e' "$assets/lightpanda" | sha256sum --check --status
+          chmod 700 "$assets/lightpanda"
+      - name: Probe public worker EOF in isolated unit
+        if: inputs.eof_only == true
+        env:
+          KELPIE_AB_EOF_ONLY: "true"
         run: bash scripts/testing/run-worker-comparison-hosted.sh
       - name: Probe isolation without a browser
         if: inputs.isolation_only == true

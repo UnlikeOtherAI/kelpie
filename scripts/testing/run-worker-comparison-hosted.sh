@@ -4,11 +4,14 @@ umask 077
 : "${GITHUB_WORKSPACE:?}" "${RUNNER_TEMP:?}" "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}"
 isolation_only="${KELPIE_AB_ISOLATION_ONLY:-false}"
 sandbox_only="${KELPIE_AB_SANDBOX_ONLY:-false}"
+eof_only="${KELPIE_AB_EOF_ONLY:-false}"
+[[ "$eof_only" == true || "$eof_only" == false ]]
+[[ "$eof_only" != true || ( "$sandbox_only" == false && "$isolation_only" == false ) ]]
 [[ "$sandbox_only" == true || "$sandbox_only" == false ]]
 [[ "$isolation_only" != true || "$sandbox_only" != true ]]
 [[ "$isolation_only" == true || "$isolation_only" == false ]]
 [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-1}" =~ ^[0-9]+$ ]]
-if [[ "$isolation_only" == false ]]; then
+if [[ "$isolation_only" == false && "$eof_only" == false ]]; then
  : "${CHROMIUM_ARCHIVE_SHA256:?}" "${CHROMIUM_BINARY_SHA256:?}"
  [[ "$CHROMIUM_ARCHIVE_SHA256" =~ ^[a-f0-9]{64}$ && "$CHROMIUM_BINARY_SHA256" =~ ^[a-f0-9]{64}$ ]]
 fi
@@ -46,6 +49,8 @@ run_arm() {
  local -a command
  if [[ "$backend" == probe ]]; then
   command=("$node" "$root/tests/linux/worker-isolation-probe.mjs" "$dir")
+ elif [[ "$backend" == eof ]]; then
+  command=("$node" "$root/tests/linux/worker-comparison-eof-proof.mjs" "$executable" "$expected" "$dir")
  elif [[ "$backend" == sandbox ]]; then
   command=("$node" "$root/tests/linux/worker-comparison-sandbox-smoke.mjs" "$executable" "$expected" "$dir")
  else
@@ -150,6 +155,10 @@ run_arm() {
 }
 if [[ "$isolation_only" == true ]]; then
  run_arm probe "" "" || failed=1
+ exit "$failed"
+fi
+if [[ "$eof_only" == true ]]; then
+ run_arm eof "$assets/lightpanda" ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e || failed=1
  exit "$failed"
 fi
 if [[ "$sandbox_only" == true ]]; then
