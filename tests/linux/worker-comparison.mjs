@@ -22,7 +22,7 @@ import {observeClientClose,clientCloseWasForced,observeEngineStop,engineStopFail
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {diagnoseChromiumFirstFailure} from "./worker-comparison-first-failure.mjs";
 import {createHistoryProbe} from "./worker-comparison-history-probe.mjs";
-import {publicHistoryDiagnostic} from "./public-history-diagnostic.mjs";
+import {createPublicHistoryReport,publicHistoryDiagnostic} from "./public-history-diagnostic.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
 const require=createRequire(new URL("../../packages/cli/package.json",import.meta.url));
@@ -113,6 +113,7 @@ const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBind
  startupScope:"engine spawn through isolated session and common preflight navigation; fixture setup and separately reported sandbox validation excluded",
  cleanup:{session:{tabClose:"not-attempted",tabList:"not-attempted",sessionClose:"not-attempted"},client:null,engine:null},
  networkBoundary:"external systemd policy verification required",sessionSandboxEvidence:null,sandboxAuditStatus:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
+if(publicHistory)report.publicHistory=createPublicHistoryReport();
 let engine,transport,client,failure,session;
 const started=performance.now();
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
@@ -221,11 +222,13 @@ try{
    return method==="__session_limit"?lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}}):tool("kelpie_browser_control",{sessionId:session.sessionId,request:{version:1,method,params,tabId:session.ownedTabIds[0]}});
   };
   if(publicHistory){
-   report.publicHistory=await publicHistoryDiagnostic({call:diagnosticCall,origin,lifecycle:historyProbe,delay});
-   const closed=await diagnosticCall("tabs.close",{});
-   assert.equal(closed.ok,true);report.cleanup.session.tabClose="ok";
-   const retired=await lifecycle({action:"close",sessionId:session.sessionId});
-   assert.equal(retired.ok,true);report.cleanup.session.sessionClose="ok";
+   try{await publicHistoryDiagnostic({call:diagnosticCall,origin,lifecycle:historyProbe,delay,report:report.publicHistory});}
+   catch{failure="HISTORY_DIAGNOSTIC_FAILED";}
+   try{const closed=await diagnosticCall("tabs.close",{});report.cleanup.session.tabClose=closed?.ok===true?"ok":"refused";}
+   catch{report.cleanup.session.tabClose="error";}
+   try{const retired=await lifecycle({action:"close",sessionId:session.sessionId});report.cleanup.session.sessionClose=retired?.ok===true?"ok":"refused";}
+   catch{report.cleanup.session.sessionClose="error";}
+   if(report.cleanup.session.tabClose!=="ok"||report.cleanup.session.sessionClose!=="ok")failure="SESSION_CLEANUP_FAILED";
   }else report.firstFailureDiagnostic=await diagnoseChromiumFirstFailure({call:diagnosticCall,origin,now:()=>performance.now(),sessionStarted,timeoutError:diagnosticTimeout});
   if(!publicHistory&&backMark!==null){await delay(250);report.historyObservationWindowMs=250;report.historyLifecycle=historyProbe.result(backMark);}
   report.bfcacheControl=bfcacheOff?"disabled":"browser-default";

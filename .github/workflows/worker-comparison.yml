@@ -22,6 +22,9 @@ on:
       diagnostic_only:
         type: boolean
         default: false
+      public_history:
+        type: boolean
+        default: false
       bfcache_off:
         type: boolean
         default: false
@@ -52,6 +55,9 @@ on:
         type: boolean
         default: false
       diagnostic_only:
+        type: boolean
+        default: false
+      public_history:
         type: boolean
         default: false
       bfcache_off:
@@ -86,6 +92,7 @@ jobs:
       ISOLATION_ONLY: ${{ inputs.isolation_only }}
       EOF_ONLY: ${{ inputs.eof_only }}
       DIAGNOSTIC_ONLY: ${{ inputs.diagnostic_only }}
+      PUBLIC_HISTORY: ${{ inputs.public_history }}
       BFCACHE_OFF: ${{ inputs.bfcache_off }}
       CHROMIUM_ARCHIVE_SHA256: ${{ inputs.chromium_archive_sha256 }}
       CHROMIUM_BINARY_SHA256: ${{ inputs.chromium_binary_sha256 }}
@@ -96,6 +103,7 @@ jobs:
           [[ "$EOF_ONLY" != true || ( "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == true && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
           [[ "$DIAGNOSTIC_ONLY" != true || ( "$EOF_ONLY" == false && "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == false && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
           [[ "$BFCACHE_OFF" != true || "$DIAGNOSTIC_ONLY" == true ]] || exit 1
+          [[ "$PUBLIC_HISTORY" != true || ( "$DIAGNOSTIC_ONLY" == true && "$BFCACHE_OFF" == false ) ]] || exit 1
           case "$REQUESTED_RUNNER" in
             ubuntu-24.04) [[ "$PREPARE_ONLY" == true || "$SANDBOX_ONLY" == true || "$ISOLATION_ONLY" == true ]] || exit 1 ;;
             ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false || "$EOF_ONLY" == true ) ]] || exit 1 ;;
@@ -169,6 +177,7 @@ jobs:
         if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.eof_only == false && inputs.prepare_only == false
         env:
           KELPIE_AB_DIAGNOSTIC_ONLY: ${{ inputs.diagnostic_only }}
+          KELPIE_AB_PUBLIC_HISTORY: ${{ inputs.public_history }}
           KELPIE_AB_BFCACHE_OFF: ${{ inputs.bfcache_off }}
         shell: bash
         run: bash scripts/testing/run-worker-comparison-hosted.sh

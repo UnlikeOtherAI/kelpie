@@ -10,12 +10,12 @@ test("hosted comparison defaults to identity preparation and explicit hashes gat
  assert.match(workflow,/if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.eof_only == false && inputs\.prepare_only == false/);
  assert.match(workflow,/\[\[ "\$archive_sha" == "\$CHROMIUM_ARCHIVE_SHA256" \]\]/);
  assert.match(workflow,/\[\[ "\$binary_sha" == "\$CHROMIUM_BINARY_SHA256" \]\]/);
- assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' && inputs\.worker_comparison_mode != 'execute-2204' && inputs\.worker_comparison_mode != 'diagnostic-2204' && inputs\.worker_comparison_mode != 'diagnostic-bfcache-off-2204' \}\}/);
+ assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' && inputs\.worker_comparison_mode != 'execute-2204' && inputs\.worker_comparison_mode != 'diagnostic-2204' && inputs\.worker_comparison_mode != 'diagnostic-bfcache-off-2204' && inputs\.worker_comparison_mode != 'public-history-2204' \}\}/);
  const input=caller.match(/worker_comparison_mode:\s*\n([\s\S]*?)\n      worker_comparison_archive_sha256:/);
  assert.ok(input);
  const options=[...input[1].matchAll(/^\s*- (?:'([^']+)'|([^\s]+))\s*$/gm)].map(match=>match[1]??match[2]);
- assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","eof-2204","execute-2204","diagnostic-2204","diagnostic-bfcache-off-2204","prepare","execute"]);
- assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- eof-2204\s*\n {10}- execute-2204\s*\n {10}- diagnostic-2204\s*\n {10}- diagnostic-bfcache-off-2204\s*\n {10}- prepare\s*\n {10}- execute/);
+ assert.deepEqual(options,["off","probe","sandbox","sandbox-2204","eof-2204","execute-2204","diagnostic-2204","diagnostic-bfcache-off-2204","public-history-2204","prepare","execute"]);
+ assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- sandbox\s*\n {10}- sandbox-2204\s*\n {10}- eof-2204\s*\n {10}- execute-2204\s*\n {10}- diagnostic-2204\s*\n {10}- diagnostic-bfcache-off-2204\s*\n {10}- public-history-2204\s*\n {10}- prepare\s*\n {10}- execute/);
  const [setup,build]=workflow.split("      - name: Build comparison CLI and shared packages");
  assert.ok(build);assert.doesNotMatch(setup,/pnpm --filter @unlikeotherai\/kelpie(?:-shared)? build/);
  assert.match(build,/^\s*if: inputs\.isolation_only == false && inputs\.sandbox_only == false && inputs\.eof_only == false && inputs\.prepare_only == false/m);
