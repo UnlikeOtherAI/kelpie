@@ -11,6 +11,10 @@ on:
         description: Run the owned public CEF capture diagnostic
         type: boolean
         default: false
+      hosted_png_ab:
+        description: Run the test-only serial PNG speed comparison
+        type: boolean
+        default: false
 permissions: {contents: read}
 jobs:
   build:
@@ -37,7 +41,11 @@ jobs:
         run: node --test tests/windows/process.test.mjs
       - name: Build CEF wrapper and Windows release
         shell: pwsh
-        run: ./scripts/build-windows.ps1
+        run: |
+          if ('${{ inputs.hosted_png_ab }}' -eq 'true') {
+            if ('${{ inputs.hosted_g08 }}' -ne 'true') { throw 'PNG_AB_REQUIRES_HOSTED_G08' }
+            ./scripts/build-windows.ps1 -TestScriptPngSpeed
+          } else { ./scripts/build-windows.ps1 }
       - name: Prepare hosted public capture dependencies
         if: ${{ inputs.hosted_g08 }}
         shell: pwsh
@@ -50,9 +58,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/prepare-hosted-windows-media.ps1
       - name: Run hosted public capture diagnostic
-        if: ${{ inputs.hosted_g08 }}
+        if: ${{ inputs.hosted_g08 && !inputs.hosted_png_ab }}
         shell: pwsh
         run: ./scripts/run-hosted-windows-g08.ps1
+      - name: Run serial PNG speed comparison
+        if: ${{ inputs.hosted_g08 && inputs.hosted_png_ab }}
+        shell: pwsh
+        run: node tests/windows/run-hosted-png-speed-pair.mjs
       - uses: actions/upload-artifact@v7
         if: ${{ always() && inputs.hosted_g08 }}
         with:
@@ -60,6 +72,7 @@ jobs:
           path: |
             ${{ runner.temp }}/kelpie-hosted-g08-preflight
             ${{ runner.temp }}/kelpie-hosted-g08-evidence
+            ${{ runner.temp }}/kelpie-hosted-png-ab
           if-no-files-found: warn
       - name: Package release candidate
         if: ${{ !inputs.hosted_g08 }}

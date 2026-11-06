@@ -6,7 +6,8 @@ param(
   [string]$NlohmannJsonRoot,
   [string]$WrapperBuildDir = (Join-Path $PSScriptRoot "..\.cache\cef-windows-build\wrapper"),
   [string]$BuildDir = (Join-Path $PSScriptRoot "..\.cache\windows-release3"),
-  [switch]$SkipTests
+  [switch]$SkipTests,
+  [switch]$TestScriptPngSpeed
 )
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -68,6 +69,8 @@ $kelpieConfigure = @(
   "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING=ON", "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
   ("-DCEF_ROOT=" + $cef), ("-DCEF_WRAPPER=" + $wrapper)
 )
+if ($TestScriptPngSpeed) { $kelpieConfigure += '-DKELPIE_TEST_SCRIPT_PNG_SPEED=ON' }
+else { $kelpieConfigure += '-DKELPIE_TEST_SCRIPT_PNG_SPEED=OFF' }
 if (-not [string]::IsNullOrWhiteSpace($CppHttplibRoot)) {
   $httplib = [IO.Path]::GetFullPath($CppHttplibRoot)
   Require-Path (Join-Path $httplib "CMakeLists.txt")
