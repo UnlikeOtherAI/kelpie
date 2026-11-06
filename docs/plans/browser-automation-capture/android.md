@@ -702,7 +702,12 @@ The hosted API 35 KVM phone and tablet acceptance run
 used source 2c1ac38d11536fa90c6f38acdf87211bba1e428a and the same installed
 app APK SHA-256
 8ab4a84eeb1927b6d9e27cdf9811c0a11a9847b948c8c334fa94632b334244cf
-on both profiles. The test APK hash was not retained by this workflow.
+on both profiles. The built test APK SHA-256 is
+5ad8963546e2f14e17c57f7bd39c23f35e3c582f4e97737abec647735e1b1428;
+the workflow did not retain an installed test APK hash. Its CLI index SHA-256
+is 1b808c37502b1b218dc2b9d0ebe7304b0d8f84eff0054b553f30c3072ad8e4b5,
+and packaged native library SHA-256 is
+25ca3deab222e9e0381961fdebbb1712236f469a14cb48ffd04580cd171b1d68.
 Build and lint passed. The phone instrumentation reported 58 tests and five
 failures; the tablet reported 58 tests and four failures. These are emulator
 results, not physical-device or signed-release acceptance.
