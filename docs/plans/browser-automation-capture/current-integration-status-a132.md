@@ -29,3 +29,5 @@ the actual installed releases remain open. No final PR or release is claimed by
 this supplement. See the [finite gates](outstanding-gates.md),
 [dense timeline inventory](g08-final-inventory.md) and
 [release readiness map](release-pr-readiness.md).
+
+For the later evidence checkpoint, see [acceptance checkpoint at 48c7a7c8](acceptance-checkpoint-48c7.md).
