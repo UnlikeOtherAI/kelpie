@@ -165,6 +165,11 @@ jobs:
             tests/macos/cef-stream-probe.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamProbe.mm \
             apps/macos/Kelpie/Renderer/CEFHostedStreamPixels.mm -o .cache/macos-ci/cef-stream-probe
           .cache/macos-ci/cef-stream-probe
+          xcrun clang++ -std=c++17 -fobjc-arc -fblocks -Wall -Wextra -Werror \
+            -DDEBUG=1 -DKELPIE_HOSTED_STREAM_TEST=1 \
+            -framework AppKit -framework Foundation -framework ImageIO -framework CoreGraphics \
+            tests/macos/cef-stream-nonce.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamNonce.mm -o .cache/macos-ci/cef-stream-nonce
+          .cache/macos-ci/cef-stream-nonce
 
       - name: Run hosted workflow admission XCTest
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
