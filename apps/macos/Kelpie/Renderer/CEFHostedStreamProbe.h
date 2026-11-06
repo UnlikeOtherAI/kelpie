@@ -12,6 +12,11 @@ NS_ASSUME_NONNULL_BEGIN
                          width:(double)width
                         height:(double)height
                       identity:(BOOL (^)(void))identity NS_SWIFT_NAME(init(bridge:epoch:width:height:identity:));
+// Optional, fixture-only private consumer. Context is captured on the main thread at receipt;
+// the frame callback runs on main only after nonce validation, before retirement joins.
+- (void)setFixtureNonce:(uint16_t)nonce
+               context:(nullable id (^)(void))context
+                 frame:(void (^)(NSData *, double, id))frame NS_SWIFT_NAME(setFixtureNonce(_:context:frame:));
 - (void)startWithCompletion:(void (^)(BOOL))completion NS_SWIFT_NAME(start(completion:));
 - (void)stopWithCompletion:(void (^)(BOOL))completion NS_SWIFT_NAME(stop(completion:));
 // Call only after the asynchronous grant/document audit has completed.

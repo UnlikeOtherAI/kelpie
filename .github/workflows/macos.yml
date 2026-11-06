@@ -163,7 +163,7 @@ jobs:
             -DDEBUG=1 -DKELPIE_HOSTED_STREAM_TEST=1 -DKELPIE_HOSTED_STREAM_MOCK=1 -I tests/macos \
             -framework AppKit -framework Foundation -framework ImageIO -framework CoreGraphics \
             tests/macos/cef-stream-probe.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamProbe.mm \
-            apps/macos/Kelpie/Renderer/CEFHostedStreamPixels.mm -o .cache/macos-ci/cef-stream-probe
+            apps/macos/Kelpie/Renderer/CEFHostedStreamPixels.mm apps/macos/Kelpie/Renderer/CEFHostedStreamNonce.mm -o .cache/macos-ci/cef-stream-probe
           .cache/macos-ci/cef-stream-probe
           xcrun clang++ -std=c++17 -fobjc-arc -fblocks -Wall -Wextra -Werror \
             -DDEBUG=1 -DKELPIE_HOSTED_STREAM_TEST=1 \

@@ -7,6 +7,7 @@
 #import "CEFBridge_Internal.h"
 #endif
 #import "CEFHostedStreamPixels.h"
+#import "CEFHostedStreamNonce.h"
 #import "CEFHostedStreamFence.h"
 #import <CoreFoundation/CoreFoundation.h>
 #include <atomic>
@@ -34,6 +35,9 @@ struct HostedStreamObserver {
 @interface CEFHostedStreamProbe () {
     __weak CEFBridge *_bridge;
     BOOL (^_identity)(void);
+    id (^_frameContext)(void);
+    void (^_frameConsumer)(NSData *, double, id);
+    uint16_t _fixtureNonce;
     uint64_t _epoch;
     double _expectedWidth;
     double _expectedHeight;
@@ -162,6 +166,13 @@ static BOOL StreamJSONNumber(id value) {
     return self;
 }
 
+- (void)setFixtureNonce:(uint16_t)nonce context:(id (^)(void))context frame:(void (^)(NSData *, double, id))frame {
+    NSCAssert(NSThread.isMainThread && !_started, @"Fixture hooks must be set before start");
+    _fixtureNonce = nonce;
+    _frameContext = [context copy];
+    _frameConsumer = [frame copy];
+}
+
 - (void)startWithCompletion:(void (^)(BOOL))completion {
     NSCAssert(NSThread.isMainThread, @"Hosted stream must start on main thread");
     NSDictionary *env = NSProcessInfo.processInfo.environment;
@@ -247,8 +258,9 @@ static BOOL StreamJSONNumber(id value) {
     if (!identityCurrent) { ++_identityFailed; }
     if (!std::isfinite(protocolMs)) { ++_badProtocol; }
     uint64_t token = 0;
+    const double receipt = NSProcessInfo.processInfo.systemUptime;
     const auto decision = _fence->admit(browser, _epoch, static_cast<int>(session),
-        NSProcessInfo.processInfo.systemUptime * 1000, protocolMs, [data length], identityCurrent && coherentMetadata, &token);
+        receipt * 1000, protocolMs, [data length], identityCurrent && coherentMetadata, &token);
     if (decision == CEFHostedStreamFence::Decision::reject) { ++_rejected; return; }
     if (decision == CEFHostedStreamFence::Decision::ackDrop) { ++_ackDrop; }
     if (decision == CEFHostedStreamFence::Decision::ackDecode) { ++_ackDecode; }
@@ -261,15 +273,22 @@ static BOOL StreamJSONNumber(id value) {
         });
     if (decision == CEFHostedStreamFence::Decision::ackStop) { [self stopWithCompletion:^(BOOL) {}]; return; }
     if (decision != CEFHostedStreamFence::Decision::ackDecode) { return; }
+    id context = _frameConsumer ? _frameContext() : nil;
+    if (_frameConsumer && !context) { _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return; }
     NSString *encoded = [data copy];
     dispatch_group_enter(_pending);
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSData *image = [[NSData alloc] initWithBase64EncodedString:encoded options:0];
         int x = 0, y = 0;
-        const BOOL decoded = image != nil && CEFHostedStreamLocateRed(image, &x, &y);
+        const BOOL decoded = image != nil && CEFHostedStreamLocateRed(image, &x, &y) &&
+            (!self->_frameConsumer || CEFHostedStreamHasNonce(image, self->_fixtureNonce,
+                self->_expectedWidth, self->_expectedHeight));
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!decoded) { ++self->_decodeFailed; }
-            if (self->_fence) { self->_fence->complete(self->_epoch, token, self->_identity(), decoded, x, y); }
+            const BOOL current = self->_identity();
+            if (self->_fence) { self->_fence->complete(self->_epoch, token, current, decoded, x, y); }
+            if (decoded && current && self->_frameConsumer) { self->_frameConsumer(image, receipt, context); }
+            if (!decoded || !current) { [self stopWithCompletion:^(BOOL) {}]; }
             dispatch_group_leave(self->_pending);
         });
     });

@@ -56,7 +56,12 @@ static NSData *redPNG() {
                                                 kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(space);
     CGContextSetRGBFillColor(context, 1, 1, 1, 1); CGContextFillRect(context, CGRectMake(0, 0, 100, 100));
-    CGContextSetRGBFillColor(context, 1, 0.1, 0.1, 1); CGContextFillRect(context, CGRectMake(20, 30, 20, 20));
+    for (unsigned bit = 0; bit < 16; ++bit) {
+        if ((0xA59Cu & (1u << bit)) == 0) { continue; }
+        CGContextSetRGBFillColor(context, 0, 0, 0, 1);
+        CGContextFillRect(context, CGRectMake((bit % 4) * 12, 100 - (bit / 4 + 1) * 12, 12, 12));
+    }
+    CGContextSetRGBFillColor(context, 1, 0.1, 0.1, 1); CGContextFillRect(context, CGRectMake(60, 30, 20, 20));
     CGImageRef image = CGBitmapContextCreateImage(context); CGContextRelease(context);
     CGImageDestinationRef dest = CGImageDestinationCreateWithData((__bridge CFMutableDataRef)data, CFSTR("public.png"), 1, nullptr);
     CGImageDestinationAddImage(dest, image, nullptr); CGImageDestinationFinalize(dest);
@@ -160,8 +165,30 @@ int main() {
                                                                                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
                                                                                         [seventh stopWithCompletion:^(BOOL) {
                                                                                             assert([seventh sealAfterAudit:YES] == nil && stops == 7);
-                                                                                            puts("PASS: ACK, bounded ingress/decode, malformed metadata/payload, late events, separate retirement, identity and detach");
-                                                                                            exit(0);
+                                                                                            __block int frames = 0;
+                                                                                            CEFHostedStreamProbe *eighth = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:130 width:100 height:100 identity:^BOOL { return YES; }];
+                                                                                            [eighth setFixtureNonce:0xA59C context:^id { return @42; } frame:^(NSData *image, double receipt, id context) {
+                                                                                                assert(image.length > 0 && receipt > 0 && [context isEqual:@42]); ++frames;
+                                                                                            }];
+                                                                                            [eighth startWithCompletion:^(BOOL started) {
+                                                                                                assert(started); emitFrame();
+                                                                                                dispatch_after(dispatch_time(DISPATCH_TIME_NOW,100 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                                                                    [eighth stopWithCompletion:^(BOOL stopped) {
+                                                                                                        assert(stopped && frames == 1 && [eighth sealAfterAudit:YES] != nil);
+                                                                                                        CEFHostedStreamProbe *ninth = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:131 width:100 height:100 identity:^BOOL { return YES; }];
+                                                                                                        [ninth setFixtureNonce:0xA59D context:^id { return @42; } frame:^(NSData *, double, id) { ++frames; }];
+                                                                                                        [ninth startWithCompletion:^(BOOL started) {
+                                                                                                            assert(started); emitFrame();
+                                                                                                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,100 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                                                                                [ninth stopWithCompletion:^(BOOL stopped) {
+                                                                                                                    assert(stopped && frames == 1 && [ninth sealAfterAudit:YES] == nil);
+                                                                                                                    puts("PASS: ACK, nonce-bound frame hook, mismatch refusal, bounded ingress/decode, late events and retirement"); exit(0);
+                                                                                                                }];
+                                                                                                            });
+                                                                                                        }];
+                                                                                                    }];
+                                                                                                });
+                                                                                            }];
                                                                                         }];
                                                                                     });
                                                                                 }];
