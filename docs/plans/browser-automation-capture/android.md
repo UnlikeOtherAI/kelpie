@@ -696,3 +696,66 @@ marker publication; the first screenshot was acquired 1.62–1.97 s after
 publication and the marker expired at its original five-second deadline.
 This diagnostic adds instrumentation and does not explain the earlier 2d8
 tablet failure. Tablet PNG, Stop and movie checks remain open.
+
+The hosted API 35 KVM phone and tablet acceptance run
+[42129812351](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42129812351)
+used source 2c1ac38d11536fa90c6f38acdf87211bba1e428a and the same installed
+app APK SHA-256
+8ab4a84eeb1927b6d9e27cdf9811c0a11a9847b948c8c334fa94632b334244cf
+on both profiles. The built test APK SHA-256 is
+5ad8963546e2f14e17c57f7bd39c23f35e3c582f4e97737abec647735e1b1428;
+the workflow did not retain an installed test APK hash. Its CLI index SHA-256
+is 1b808c37502b1b218dc2b9d0ebe7304b0d8f84eff0054b553f30c3072ad8e4b5,
+and packaged native library SHA-256 is
+25ca3deab222e9e0381961fdebbb1712236f469a14cb48ffd04580cd171b1d68.
+Build and lint passed. The phone instrumentation reported 58 tests and five
+failures; the tablet reported 58 tests and four failures. These are emulator
+results, not physical-device or signed-release acceptance.
+
+Both native navigation Stop receipts report SCRIPT_ABORTED and
+mayHaveCompleted: true; their test bodies reached recovery, but both cases
+failed when the delayed-response MockWebServer timed out during shutdown. The
+receipt SHA-256 values are
+616aaa80525c101aa4ab373ec551a76c0d73be159c3195fcd0ef4f0c3ee4d510
+(phone) and
+acca301fc2a195359110165dbcaff9116c15862cb7252cb6961bcec6f50e430e
+(tablet). The real chrome-input case opened More before playback, then failed
+while dismissing that popup; active input blocking was not exercised. The
+PNG next-run marker case detected the original marker but could not exclude
+natural expiry before its next screenshot. Neither outcome proves a product
+input-blocking or retirement failure.
+
+Both navigation-scale cases returned VIEWPORT_CHANGED when the physical
+WebView size remained fixed and the destination document changed native page
+scale. The run-wide scale guard is inconsistent with this observed navigation;
+the exact guard site was not instrumented. The phone address-editing screenshot
+also returned VIEWPORT_CHANGED, with cause unresolved.
+
+Authenticated CLI pairing, run, status and artifact download succeeded on both
+profiles. Both CLI bridge cases nevertheless received complete:1 because
+their later host capture checks failed. Phone C/S GIF and MP4 checks reported
+insufficient dense samples or a missing pre-dispatch baseline; tablet capture
+ended with CAPTURE_DURATION_LIMIT before verification. Dense capture, short
+motion and the full public corpus therefore remain open.
+
+Artifact 13465656715 has GitHub-reported SHA-256
+33a3028019c5e82065f19c6380a63d669d40d26b24b52cc17f96a0de3fc00bbd.
+All 180 phone and 187 tablet exports listed in its report were present and
+matched their recorded hashes. Report SHA-256 is
+9eb111096b97d2c2b6f7454d03b36a5f839897916bc0288394a4b6d6737a5003;
+phone and tablet instrumentation logs are respectively
+f2ab740b7432d205dd53c194b66a6e3775d03d08b1af2461d0b67d1d85d3f16d and
+7abbae1a41bacb0b93e6c8da5b38c578ca60c24d3a20deaf7a6cc4bc6265a5ec.
+The hosted job ended and retained its logs; independent post-job process
+cleanup was not observed.
+
+Independent inspection of the hosted native screenshots found the blue marker
+and virtual pointer centered on Submit with native Stop visible on both
+profiles. Their SHA-256 values are
+e6f6dfc4dabaf375c88d5e5fef91801adb08e7ecb2515932cc07a8fb7ba0741d
+(phone) and cb30cc2a46bedd3d8dd836d7142f2fb727c3a016b066b224f0d22ae54ebd5b07
+(tablet). Separate native Stop images showed Stop with no marker, with hashes
+c3f07367acc85baebcfdf42ec9e11f82b3dd3ce4f44684fff011fcbb2fe22ad2
+(phone) and 21bdd5b17169c8b295a334468926afc9c3cbb3e72d1abd9c9e182d71fa76cd58
+(tablet). The image alone does not resolve whether an earlier marker retired
+naturally or because of a subsequent run.

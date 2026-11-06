@@ -392,3 +392,66 @@ cadence comparison remain open.
 The normal, test-hook-OFF 455d1923 baseline and 5fc5f353 receipt candidate used the same LLM-ON CEF/sandbox graph, matching bootstrap and 234 inventoried runtime assets, the same runner (SHA-256 96cb0977f9be2e0c574170a1978ca1651d55c46cf63c86576e33a94564b1a047), C fixture, GIF/MP4 outputs, and 2-CPU/2-GiB Job. Both workflows and public shutdown passed; their exact owned processes, listeners, tasks and Jobs retired. Baseline DLL SHA-256 a6aeaa071cd47f6a59de37b9c2b510991c13fa81c628ec4826ad2cdd55a2e4fb; candidate 7ea338f5103cb9a2ada1ef343384351723fd63e3c4ca35b71737f6f99fb2ecb1. Reports are retained under production/receipt-ab-baseline-455-runtime-r3 and production/receipt-ab-candidate-5fc-r1, hashes 12f22c7ecb03f37b104a16f68f39dfa595a41b80d7a6d3268a92d0b7e610e930 and e625c8f24c64dcb05da90f0407146dad8ffda586970a1710d65a784e9d602b59.
 
 Baseline versus candidate admitted 225 versus 218 frames and reported 307 drops each. Median combined screenshot/post-navigation/post-viewport time was 77.582 versus 77.289 ms; total pre/screenshot/post/encode was 84.771 versus 84.721 ms. Post-navigation moved from 47.787 to 0 ms while post-viewport moved from 1.171 to 48.013 ms. Total Job CPU was 12.14 versus 12.16 seconds. Independently hash-checked exports and ffprobe on Minis (SHA-256 afe05347caaabe479b3c4eae71992b6ec1e11c57266a1d665deb0f9fe9847208) found MP4 median/p90 frame gaps 108.60/154.0 versus 108.25/156.2 ms; GIF timing was consistent to its centisecond precision. All timestamps increased. The serial pair has load/order confounds, shows no speed improvement and does not justify integrating the receipt optimization. The runner validated four trusted fixture events but did not retain their scene coordinates/timestamps; canonical scene-dependent G08 density is therefore unclaimed. The 736a0453 hook navigation checkpoint and normal 5fc safety results remain separately scoped above.
+
+### Four-core public C export and WGC clock failure
+
+One Maxis Session 1 C-curve retest used the reconstructed normal 455d1923
+graph, DLL SHA-256 `a6aeaa071cd47f6a59de37b9c2b510991c13fa81c628ec4826ad2cdd55a2e4fb`,
+and d2473b73 test sources whose Windows and capture test trees match b6a18315.
+The reconstructed runtime assets matched the recorded baseline inventory; the
+auxiliary Vulkan ICD matched pinned CEF 152 but was not recorded at the earlier
+baseline. The owned 4-CPU/4-GiB Job executed eight actions, observed four
+trusted fixture events without drops, retained both exports by the public API,
+and completed public stop/removal. The exact process, listener and task were
+absent afterward and the Job had no active processes.
+
+The separately compiled WGC helper (SHA-256
+`d5ac6e7140f66cfd96455cfb9a6b14a3d673699af64b526ac8d3132adb129f1e`)
+failed with `WGC_CLOCK_NONINCREASING` after retaining 252 actual frames through
+19,516.59 ms. The rejected tick was not recorded, so equality and regression
+cannot be distinguished. No native dense or native/export correspondence pass
+is claimed. The earlier 303-frame WGC clock failure remains separate.
+
+Both independently decoded exports contained 213 frames and reported 317
+dropped frames. GIF SHA-256
+`fc3273650c85b5e0954cd340817a57f7fffcf223a54db3e16c477e0dd1794f7b`
+(253,957 bytes) had median/p90/max PTS gaps of 110/160/230 ms; MP4 SHA-256
+`5c229008a8d1a2db7c6432c094b5d7072fe04d3dd11ad60eb4edbb88115247bf`
+(86,261 bytes) had gaps of 110.55/156.95/227.25 ms. The unchanged per-case
+oracle reported `INSUFFICIENT_EVIDENCE dense motion samples` for both formats.
+Oracle input and output SHA-256 values are
+`83a4bce7af99feb24341bdb29fd87e921bbeaf65ca6f211aba1aa30591f44046` and
+`15660de7544607fde3a1b5f5fd04bb6a97e3ec259283ef2ee2b8f60060b8e366`.
+The retained evidence is under
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/production/g08-455-d247-fourcore-c-r1`.
+This one C case is not S-curve, release, or a controlled CPU-affinity comparison.
+
+### Hosted Windows public C export
+
+The single opt-in hosted Windows 2022 run
+[42135727180](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42135727180)
+used source `a70d8a38e0173d8878c0e620df730e6202c44173`. Its Release CEF,
+sandbox, static `/MT` and local-LLM preflight passed. The hosted DLL SHA-256
+was `4cc71d40076eefd7d07da5ac116fb4541b7f3ac69bfe4c33d2fb6277ffdfd922`;
+FFmpeg and ffprobe SHA-256 values were
+`72a489eccd008c2ec2c0a5856c5c75bc3d8bbfa90166c4566865c246445e6aa3` and
+`19202b23c0043f15ad1b7bce2344f406fd52bd6efd8f995ce02e7392a1cec52f`.
+
+The public workflow captured four trusted fixture events with no event loss,
+downloaded both artifacts with verified hashes, and closed through the public
+interface. The owned PID and listener were independently absent afterward.
+Both decoded exports contained 219 frames and reported 315 drops. GIF SHA-256
+`48a8707d128464164b69077fca8e6a678d0c343508c5a19340a193b55d79cfd9`
+(291,387 bytes) had median/p90/max PTS gaps 110/160/220 ms. MP4 SHA-256
+`bc4ba5d62520a627f96cb7d849f492aabcb20cbfcf03d63bb44ab25870a79b9c`
+(89,112 bytes) had gaps 106.15/159.60/215.85 ms. The unchanged single-case
+oracle reported `INSUFFICIENT_EVIDENCE dense motion samples` for both. Its
+input and output hashes were
+`b1261cc963da7adfcb2bdffb42998c654a2f50b02db6b50d5316fc0f18d31d28` and
+`a7d61e9cebaafbaef19603e4d5c44d9fd42b266a7dc22c727ab49633e20587e3`.
+The workflow failed on that oracle result and retained its diagnostic artifact.
+The preceding hosted run 42132391770 failed its overly narrow runtime-cache
+preflight before app launch and produced no capture artifact; it remains a
+separate prelaunch failure.
+This hosted case does not verify WGC, a visible native overlay or Stop control,
+an installed release, an S curve, or Maxis runtime performance.

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {setImmediate} from "node:timers";
 import {observeG08Native,retainG08Exports} from "./g08-export-retention.mjs";
 import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 
