@@ -12,7 +12,9 @@ const rules = new Set([
   '@typescript-eslint/no-unused-vars', '@typescript-eslint/no-floating-promises',
   '@typescript-eslint/require-await', '@typescript-eslint/return-await',
   '@typescript-eslint/strict-boolean-expressions', '@typescript-eslint/unbound-method',
-  'no-undef', 'no-unused-vars', 'prefer-const',
+  '@typescript-eslint/no-confusing-void-expression', '@typescript-eslint/no-unnecessary-type-assertion',
+  '@typescript-eslint/no-non-null-assertion', '@typescript-eslint/consistent-return',
+  'consistent-return', 'no-undef', 'no-unused-vars', 'prefer-const',
 ]);
 
 export function classifyLint(text) {
