@@ -68,7 +68,8 @@ class TestG08Scope {
         ++matches;
       }
     }
-    return matches == 1;
+    // Close the PID-reuse window while inspecting the socket table.
+    return matches == 1 && WaitForSingleObject(process_, 0) == WAIT_TIMEOUT;
   }
   bool MatchesUrl(const std::string& url) const { return initialized_ && url == expected_url_; }
  private:

@@ -17,7 +17,8 @@ std::string HashRoi(const ScriptMediaFrame& frame) {
   std::vector<unsigned char> object, digest(32);
   bool ok = BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) >= 0;
   if (ok) ok = BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH,
-      reinterpret_cast<PUCHAR>(&object_size), sizeof(object_size), &returned, 0) >= 0 && object_size <= 65536;
+      reinterpret_cast<PUCHAR>(&object_size), sizeof(object_size), &returned, 0) >= 0 &&
+      returned == sizeof(object_size) && object_size > 0 && object_size <= 65536;
   if (ok) { object.resize(object_size); ok = BCryptCreateHash(algorithm, &hash, object.data(), object_size, nullptr, 0, 0) >= 0; }
   std::array<unsigned char, 85 * 85 * 4> roi{};
   for (int y = 161; ok && y <= 245; ++y) {
