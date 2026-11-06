@@ -75,9 +75,9 @@ class DesktopTestStreamGate {
 
  private:
   void InvalidateLocked() { valid_ = false; stop_requested_ = true; samples_.clear(); }
-  static constexpr std::size_t kMaxEvents = 64, kMaxPendingAcks = 4;
-  static constexpr std::size_t kMaxFrameBytes = 1024 * 1024, kMaxTotalBytes = 16 * 1024 * 1024;
-  static constexpr double kMaxDurationMs = 5000;
+  static constexpr std::size_t kMaxEvents = 256, kMaxPendingAcks = 3;
+  static constexpr std::size_t kMaxFrameBytes = 2 * 1024 * 1024, kMaxTotalBytes = 32 * 1024 * 1024;
+  static constexpr double kMaxDurationMs = 10000;
   int browser_;
   std::uint64_t epoch_, next_token_ = 0, pending_decode_ = 0;
   double start_ms_, last_receipt_, last_protocol_ = 0, decode_receipt_ = 0, decode_protocol_ = 0;

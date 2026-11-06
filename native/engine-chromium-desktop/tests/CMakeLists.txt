@@ -18,6 +18,10 @@ function(add_desktop_engine_test name)
   endif()
 endfunction()
 
+if(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  add_desktop_engine_test(test_desktop_test_stream_gate test_desktop_test_stream_gate.cpp)
+endif()
+
 add_desktop_engine_test(test_renderer_operation_ownership test_renderer_operation_ownership.cpp)
 add_desktop_engine_test(test_desktop_router test_desktop_router.cpp)
 add_desktop_engine_test(test_desktop_mcp_server test_desktop_mcp_server.cpp)

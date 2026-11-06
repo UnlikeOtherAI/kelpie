@@ -85,6 +85,11 @@ list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
   "${KELPIE_START_PAGE_RESOURCES_CPP}")
 
 option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
+option(KELPIE_WINDOWS_CEF_STREAM_PROBE "Enable the Windows owned-fixture stream probe" OFF)
+if(KELPIE_WINDOWS_CEF_STREAM_PROBE AND
+   (NOT WIN32 OR NOT BUILD_TESTING OR NOT KELPIE_ENABLE_CHROMIUM_DESKTOP))
+  message(FATAL_ERROR "KELPIE_WINDOWS_CEF_STREAM_PROBE requires Windows, CEF and BUILD_TESTING")
+endif()
 set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
 set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "")
 set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER "")
@@ -139,6 +144,10 @@ endif()
 add_library(kelpie_engine_chromium_desktop STATIC
   ${MOLOTOV_DESKTOP_ENGINE_SOURCES}
 )
+
+if(KELPIE_WINDOWS_CEF_STREAM_PROBE)
+  target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE KELPIE_WINDOWS_CEF_STREAM_PROBE=1)
+endif()
 
 target_include_directories(kelpie_engine_chromium_desktop
   PUBLIC

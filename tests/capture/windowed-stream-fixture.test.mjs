@@ -11,6 +11,13 @@ test("nonce-bound fixture has distinct animated and static pages",async()=>{
   const moving=await animated.text(),still=await stationary.text();
   assert.match(moving,/animation:move 2s linear infinite alternate/);
   assert.doesNotMatch(still,/animation:move 2s linear infinite alternate/);
+  assert.equal((moving.match(/<i style=/g)??[]).length,18);
+  assert.equal((still.match(/<i style=/g)??[]).length,18);
+  for(let index=0;index<16;index++){
+   const color=fixture.visualNonce&(1<<index)?"#000":"#fff";
+   assert.ok(moving.includes(`left:${10+index*8}px;background:${color}`));
+   assert.ok(still.includes(`left:${10+index*8}px;background:${color}`));
+  }
   assert.equal((await fetch(`${fixture.origin}/other/animated`)).status,404);
   assert.equal((await fetch(`${fixture.static}?extra=1`)).status,404);
  }finally{await fixture.close();}
