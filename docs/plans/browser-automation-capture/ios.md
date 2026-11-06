@@ -303,3 +303,45 @@ and baseline and separately reported normal post-run tab-wrapper retirement.
 The fixed policy was a DEBUG-only control, not a released behavior or full
 cross-platform acceptance. These paired journeys did not press Stop; dedicated
 Stop tests are recorded separately.
+
+## Hosted product mobile check: 42150931177
+
+The focused `mobilecheck` used production candidate
+`cd9ee8b326ae59c0f9f2a1afa5f4246f30881a2d`, source tree
+`d09995a955b1285f9d6bff163b8e2a9eb63f20a6`, Xcode 26.6 (17F113) and
+iOS 26.5 on iPhone 17 and iPad Air 13-inch (M4). Its simulator executable
+SHA-256 was `e9a0b1b2fac00cf5f11f4205048e126e799b4760a9ab2e0ec431eae474e7ee8d`
+and debug dylib SHA-256 was
+`4549f8c7cc964b159750fdf6c54d17599ecc1c5799ecc728ff4bbcbd141fa456`.
+[The hosted run](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42150931177)
+retains its evidence. Both devices passed 14 of 16 selected methods; all
+methods were present and both simulators were verified shut down.
+
+Both devices passed the inset reconciliation and five other selected unit
+controls, native same-scene marker, marker retirement, non-movie loading and
+scroll geometry, address-focus control, and presentation-mode journey. The
+presentation journey pressed Stop in the no-capture case. The iPad staged
+viewport case passed; its iPhone method returns early. Native before/during/
+after screenshots show the system status bar visible during GIF capture on
+both devices while browser chrome is hidden and Stop is visible. A separately
+executed paired iPad MCP capture passed its centered click, native marker and
+Stop visibility checks, downloaded four PNGs, GIF and MP4, and passed the
+XCTest decoder checks. That paired journey did not press Stop.
+
+The iPhone paired MCP journey returned `TIMEOUT` after the fixture recorded a
+centered click. Its retained marker observation occurred after a 45.81-second
+poll and Stop was no longer visible; no media was retained, so this is not a
+successful iPhone capture or marker proof. The iPhone clipped-pinch case
+returned `TARGET_NOT_FOUND`; its older fixture was outside the BODY clip and
+its hit test was false. The separately tested calibrated positive and refusal
+fixtures from [42130731818](#hosted-geometry-check-42130731818) are test-only
+and were not in this candidate. On iPad, the two pinch methods failed before
+the gesture: one initial fixture navigation timed out, while the other found
+the blank tab complete but still loading. Those outcomes do not establish an
+iPad pinch result or a scheduler cause.
+
+Hosted SwiftLint and the iOS scheme build passed. The build reported the
+existing AppReveal Sendable and unrelated-cast warnings, skipped AppIntents
+metadata in two test targets, and a missing-ccache performance warning; no
+Kelpie Swift warning was observed. Full corpus, simulated-key control and
+release verification remain separate gates.
