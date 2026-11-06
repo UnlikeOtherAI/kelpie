@@ -759,3 +759,30 @@ c3f07367acc85baebcfdf42ec9e11f82b3dd3ce4f44684fff011fcbb2fe22ad2
 (phone) and 21bdd5b17169c8b295a334468926afc9c3cbb3e72d1abd9c9e182d71fa76cd58
 (tablet). The image alone does not resolve whether an earlier marker retired
 naturally or because of a subsequent run.
+
+The opt-in hosted run
+[42141182122](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42141182122)
+used source 225d68d7ec97196a03e57d54268c1d26b53cdb77 on API 35 phone and
+tablet emulators. Build and lint passed. The built and installed app APK
+SHA-256 was f0256ebac29a8c09cedae26e55f1ee6daa63c7a7ce4ebba9580293670770d82d;
+the built and installed test APK SHA-256 was
+b24b36850726f30b018ffc9d886f7e1906e398e5626b0a176ccea75cc8e8bf30.
+Both profile cleanup receipts report the owned emulator PID and ports retired.
+
+The native Stop during an observed pending navigation passed separately on
+phone and tablet, including SCRIPT_ABORTED, mayHaveCompleted, one request and
+recovery. Their instrumentation log SHA-256 values are
+05f6aface463094653dd0029c4fadf3c28bde0c5d953cf36b5b2b0a207b6b918 and
+c78c655c03db0dc068da3e3a9e0a4dce0165ba0154f1378d28fa1f2b2456f8f5.
+
+The owned chrome/input test failed on both profiles. It confirmed a baseline
+Enter reached the page once, opened and dismissed the owned More popup during
+admission, and reached native Stop. After a second owned decor-dispatched Enter
+during playback, the page counter was two instead of one. Phone and tablet
+instrumentation log SHA-256 values are
+ff118777346bc9355f04e678720a87b25ccd87d7789a4809c30e11da9bc748d2 and
+cda902a697039d8d654e1888adba8ede26620bbdfbc005c6460eca4bd9ed7500.
+Hardware keyboard input blocking is therefore not established. The targeted
+run did not exercise the full corpus or the document-scale fix. Artifact
+13469511332 has GitHub-reported SHA-256
+551543d10634aef729919e4629c58cfdae74cf173bb4809954e2e01cf191baba.
