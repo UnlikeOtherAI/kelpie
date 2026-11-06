@@ -1,5 +1,6 @@
 // Called only after the explicit shared package build. Output belongs to the native build directory.
 import { mkdir, writeFile } from 'node:fs/promises';
+import { lowerNativeExpression } from './native-expression.mjs';
 import { dirname } from 'node:path';
 import { z } from '../../packages/shared/node_modules/zod/index.js';
 import { BrowserControlRequestSchema, browserControlInputSchema, BROWSER_CONTROL_METHODS, browserControlMutates } from '../../packages/shared/dist/browser-control/protocol.js';
@@ -134,7 +135,7 @@ const cases = inputs.map(input => { const result = BrowserControlRequestSchema.s
 const assets = {
   script_cases: JSON.stringify(scriptCases), script_target_cases: JSON.stringify(targetCases),
   script_v1_schema: JSON.stringify(scriptSchema), script_target_schema: JSON.stringify(targetSchema),
-  script_target: resolveScriptTarget.toString(),
+  script_target: lowerNativeExpression(resolveScriptTarget.toString()),
   cases: JSON.stringify(cases),
   extension_schemas: JSON.stringify(extensionSchemas),
   extension_cases: JSON.stringify(extensionCases),
@@ -143,8 +144,8 @@ const assets = {
   methods: JSON.stringify(BROWSER_CONTROL_METHODS),
   mutations: JSON.stringify(BROWSER_CONTROL_METHODS.filter(browserControlMutates)),
   description: BROWSER_CONTROL_DESCRIPTION, documentation: BROWSER_CONTROL_DOCUMENTATION,
-  extractor: fixedObservationReaderSource("extract"), status_reader: fixedObservationReaderSource("status"), readiness_reader: fixedObservationReaderSource("ready"),
-  reader: fixedObservationReaderSource("snapshot"), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(), action: actOnNativeReference.toString(),
+  extractor: lowerNativeExpression(fixedObservationReaderSource("extract")), status_reader: lowerNativeExpression(fixedObservationReaderSource("status")), readiness_reader: lowerNativeExpression(fixedObservationReaderSource("ready")),
+  reader: lowerNativeExpression(fixedObservationReaderSource("snapshot")), remember: lowerNativeExpression(rememberNativeSnapshot.toString()), resolve: lowerNativeExpression(resolveNativeReference.toString()), action: lowerNativeExpression(actOnNativeReference.toString()),
 };
 await mkdir(dirname(output), { recursive: true });
 // MSVC limits individual and concatenated string literals. UTF-8 byte arrays

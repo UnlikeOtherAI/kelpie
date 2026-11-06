@@ -18,3 +18,8 @@ target_include_directories(test_native_extensions PRIVATE ../src "${CMAKE_CURREN
 target_link_libraries(test_native_extensions PRIVATE kelpie_core_mcp)
 kelpie_enable_test_assertions(test_native_extensions)
 add_test(NAME test_native_extensions COMMAND test_native_extensions)
+
+add_test(
+  NAME test_native_expression
+  COMMAND "${KELPIE_NODE_EXECUTABLE}" --test "${KELPIE_REPO_ROOT}/scripts/native/native-expression.test.mjs"
+)
