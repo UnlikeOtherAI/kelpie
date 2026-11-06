@@ -93,11 +93,11 @@ jobs:
           [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
           git cat-file -e "${package_revision}^{commit}"
           git diff "${package_revision}" "${diagnostic_revision}" -- \
-            scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/linux/verify-native-replay.mjs tests/linux/verify-terminal-idr.mjs tests/capture/ffmpeg-passthrough.mjs \
+            scripts/ci/linux-installed-smoke.sh scripts/ci/sanitize-linux-evidence.mjs tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/linux/verify-native-replay.mjs tests/linux/verify-terminal-idr.mjs tests/capture/ffmpeg-passthrough.mjs \
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs tests/windows/capture-final-dwell-cases.mjs \
             > "${package_root}/resource-hook-diff.patch"
           git checkout --detach "${package_revision}"
-          for path in scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/capture/ffmpeg-passthrough.mjs tests/linux/native-resource-snapshot.mjs \
+          for path in scripts/ci/linux-installed-smoke.sh scripts/ci/sanitize-linux-evidence.mjs tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/capture/ffmpeg-passthrough.mjs tests/linux/native-resource-snapshot.mjs \
             tests/linux/navigation-resource-diagnostic.mjs \
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs; do
             git show "${diagnostic_revision}:${path}" > "${path}"
@@ -147,30 +147,33 @@ jobs:
             -w /workspace "${DISTRO_IMAGE}" \
             bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
             2>&1 | tee "${package_root}/resource-diagnostic.log"
+      - name: Summarize safe Linux evidence
+        if: always()
+        run: node scripts/ci/sanitize-linux-evidence.mjs dist/release/${{ matrix.distro.name }}
+
       - name: Upload bounded resource evidence
         uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: linux-resource-diagnostic-${{ matrix.distro.name }}
           path: |
+            dist/release/${{ matrix.distro.name }}/safe-diagnostics.json
             dist/release/${{ matrix.distro.name }}/resource-expected.txt
             dist/release/${{ matrix.distro.name }}/resource-scope.txt
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/outcome.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/installed-sha256.txt
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/client-package-sha256.txt
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/public-cli.log
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/alias/report.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/alias/observations.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/alias/alias/report.json
             dist/release/${{ matrix.distro.name }}/resource-test-revision.txt
             dist/release/${{ matrix.distro.name }}/resource-image.txt
             dist/release/${{ matrix.distro.name }}/resource-hook-diff.patch
-            dist/release/${{ matrix.distro.name }}/resource-diagnostic.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/installed-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/client-package-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/cgroup-before.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/cgroup-after.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/outcome.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.txt
-            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/installed-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/client-package-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/cgroup-before.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/cgroup-after.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/count-mismatch.gif
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/count-mismatch.mp4
-            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/*.json
-            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/capture/*.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/capture/resource-diagnostics.json
           if-no-files-found: warn
