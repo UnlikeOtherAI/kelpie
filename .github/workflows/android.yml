@@ -101,6 +101,7 @@ jobs:
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Install media verification tools
+        if: ${{ !inputs.targeted_mobile }}
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
