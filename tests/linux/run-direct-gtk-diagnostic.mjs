@@ -130,7 +130,7 @@ try {
       report.startupTrace = parseGtkStartupTrace(logs.stderrFirst, mode);
       report.startupTrace.stderrMayBeTruncated = logs.stderrFirst.length >= 32768;
       if (auxRequested) {
-        report.auxiliaryTrace = parseGtkStartupAux(logs.stderrFirst, report.startupTrace, report.startupTrace.stderrMayBeTruncated);
+        report.auxiliaryTrace = parseGtkStartupAux(logs.stderrFirst, report.startupTrace, report.startupTrace.stderrMayBeTruncated, identity?.pid);
         if (report.auxiliaryTrace.state !== "observed") failed = true;
       }
       if (report.startupTrace.state !== "valid-prefix" || (mode === "headless" && report.startupTrace.stderrMayBeTruncated)) failed = true;

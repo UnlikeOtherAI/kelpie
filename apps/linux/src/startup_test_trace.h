@@ -51,7 +51,8 @@ inline void StartupTrace(StartupStage stage) {
       static_cast<long long>(now.tv_sec) * 1000000000LL + now.tv_nsec);
   if (n > 0 && n < static_cast<int>(sizeof(line))) (void)write(STDERR_FILENO, line, n);
 }
-enum class StartupAux { CONTEXT_INITIALIZED, SCHEDULE_FIRST, GTK_PUMP_FIRST };
+enum class StartupAux { CONTEXT_INITIALIZED, SCHEDULE_FIRST, GTK_PUMP_FIRST,
+  AFTER_CREATED_ENTER_UI, AFTER_CREATED_ENTER_OTHER, AFTER_CREATED_RETURN_UI, AFTER_CREATED_RETURN_OTHER };
 inline void StartupAuxTrace(StartupAux stage) {
   const char* enabled = std::getenv("KELPIE_GTK_STARTUP_TRACE");
   if (!enabled || std::strcmp(enabled, "1") != 0) return;
@@ -63,6 +64,10 @@ inline void StartupAuxTrace(StartupAux stage) {
     case StartupAux::CONTEXT_INITIALIZED: name = "CONTEXT_INITIALIZED"; bit = 1; break;
     case StartupAux::SCHEDULE_FIRST: name = "SCHEDULE_FIRST"; bit = 2; break;
     case StartupAux::GTK_PUMP_FIRST: name = "GTK_PUMP_FIRST"; bit = 4; break;
+    case StartupAux::AFTER_CREATED_ENTER_UI: name = "AFTER_CREATED_ENTER_UI"; bit = 8; break;
+    case StartupAux::AFTER_CREATED_ENTER_OTHER: name = "AFTER_CREATED_ENTER_OTHER"; bit = 16; break;
+    case StartupAux::AFTER_CREATED_RETURN_UI: name = "AFTER_CREATED_RETURN_UI"; bit = 32; break;
+    case StartupAux::AFTER_CREATED_RETURN_OTHER: name = "AFTER_CREATED_RETURN_OTHER"; bit = 64; break;
   }
   if (!name) return;
   static std::atomic<unsigned> seen{0};
@@ -70,14 +75,31 @@ inline void StartupAuxTrace(StartupAux stage) {
   timespec now{};
   if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return;
   char line[128];
-  const int n = std::snprintf(line, sizeof(line), "KELPIE_GTK_AUX %s %lld\n", name,
+  const int n = std::snprintf(line, sizeof(line), "KELPIE_GTK_AUX %s %ld %lld\n", name, static_cast<long>(getpid()),
       static_cast<long long>(now.tv_sec) * 1000000000LL + now.tv_nsec);
   if (n > 0 && n < static_cast<int>(sizeof(line))) (void)write(STDERR_FILENO, line, n);
+}
+inline bool StartupAfterCreatedEnter(bool on_ui) {
+  const char* enabled = std::getenv("KELPIE_GTK_STARTUP_TRACE");
+  const char* aux_enabled = std::getenv("KELPIE_GTK_AUX_TRACE");
+  if (!enabled || std::strcmp(enabled, "1") != 0 ||
+      !aux_enabled || std::strcmp(aux_enabled, "1") != 0) return false;
+  static std::atomic_flag first = ATOMIC_FLAG_INIT;
+  if (first.test_and_set()) return false;
+  StartupAuxTrace(on_ui ? StartupAux::AFTER_CREATED_ENTER_UI : StartupAux::AFTER_CREATED_ENTER_OTHER);
+  return true;
+}
+inline void StartupAfterCreatedReturn(bool on_ui) {
+  StartupAuxTrace(on_ui ? StartupAux::AFTER_CREATED_RETURN_UI : StartupAux::AFTER_CREATED_RETURN_OTHER);
 }
 }
 #define KELPIE_STARTUP_TRACE(event) ::kelpie::linuxapp::StartupTrace(::kelpie::linuxapp::StartupStage::event)
 #define KELPIE_STARTUP_AUX(event) ::kelpie::linuxapp::StartupAuxTrace(::kelpie::linuxapp::StartupAux::event)
+#define KELPIE_STARTUP_AFTER_ENTER(ui) ::kelpie::linuxapp::StartupAfterCreatedEnter(ui)
+#define KELPIE_STARTUP_AFTER_RETURN(ui) ::kelpie::linuxapp::StartupAfterCreatedReturn(ui)
 #else
 #define KELPIE_STARTUP_TRACE(event) ((void)0)
 #define KELPIE_STARTUP_AUX(event) ((void)0)
+#define KELPIE_STARTUP_AFTER_ENTER(ui) false
+#define KELPIE_STARTUP_AFTER_RETURN(ui) ((void)0)
 #endif

@@ -1,3 +1,7 @@
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+#include "startup_test_trace.h"
+#endif
+
 #include <algorithm>
 #include <string>
 
@@ -45,6 +49,9 @@ class DestroyTabHostWindowTask final : public CefTask {
 namespace kelpie {
 
 void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+  const bool traced_first = KELPIE_STARTUP_AFTER_ENTER(CefCurrentlyOn(TID_UI));
+#endif
   if (owner_->browser == nullptr) {
     owner_->browser = browser;
   }
@@ -53,6 +60,9 @@ void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
                                        : std::string("about:blank");
   }
   owner_->UpdateActiveState();
+#if defined(KELPIE_LINUX_STARTUP_TEST_TRACE) && KELPIE_LINUX_STARTUP_TEST_TRACE
+  if (traced_first) KELPIE_STARTUP_AFTER_RETURN(CefCurrentlyOn(TID_UI));
+#endif
 }
 
 bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
