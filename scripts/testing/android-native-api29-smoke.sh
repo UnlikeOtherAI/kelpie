@@ -11,6 +11,19 @@ avd="$7"
 port="$8"
 sdk="$9"
 started="${10}"
+# No host media tool is needed: the device decodes these fixed movie cases.
+# Fail the run if any caller unexpectedly invokes a host codec tool.
+guard_dir="$dir/api29-media-guard"
+mkdir -p "$guard_dir"
+export KELPIE_API29_MEDIA_ATTEMPT="$guard_dir/attempted"
+cat > "$guard_dir/ffmpeg" <<'GUARD'
+#!/bin/sh
+printf '%s\n' unexpected > "$KELPIE_API29_MEDIA_ATTEMPT"
+exit 97
+GUARD
+cp "$guard_dir/ffmpeg" "$guard_dir/ffprobe"
+chmod +x "$guard_dir/ffmpeg" "$guard_dir/ffprobe"
+export PATH="$guard_dir:$PATH"
 cases=(
   'one-step-png=com.kelpie.browser.automation.ScriptApi29SmokeTest#oneSemanticClickShowsNativeMarkerAndReturnsOneDecodablePng'
   'movie-stop=com.kelpie.browser.automation.ScriptSecurityFlowTest#visibleStopFinalizesPartialMoviesAndNextRunRecovers'
@@ -35,6 +48,10 @@ for entry in "${cases[@]}"; do
   printf '%s\n' "$status" > "$case_dir/exit.txt"
   adb -s "$serial" pull /sdcard/Android/data/com.kelpie.browser/files/script-acceptance "$case_dir/" \
     > "$case_dir/pull.log" 2>&1 || true
+  if [[ -e "$KELPIE_API29_MEDIA_ATTEMPT" ]]; then
+    echo UNEXPECTED_API29_HOST_MEDIA_REQUEST >&2
+    result=1
+  fi
   case "$name" in
     one-step-png)
       for required in api29-one-step-result.json api29-native-marker.png native-marker-evidence.json; do
