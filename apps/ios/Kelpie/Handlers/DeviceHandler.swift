@@ -267,6 +267,9 @@ struct DeviceHandler {
             args.contains("--test-paired-geometry-receipt") {
             var extended = response
             extended["testCaptureEvidence"] = IOSWorkflowMedia.testEvidence
+            if args.contains("--test-paired-geometry-receipt") {
+                extended["testImmersiveLayout"] = IOSImmersiveLayoutTrace.evidence
+            }
             return successResponse(extended)
         }
         #endif

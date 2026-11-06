@@ -228,6 +228,7 @@ final class WorkflowCaptureUITests: XCTestCase {
             await attachFixtureGeometry(tab: tab)
             let status = try await probe.call("kelpie_get_script_status", [:])
             let error = status["runError"] as? Body ?? [:]
+            try await attachImmersiveLayoutTrace(runID: XCTUnwrap(status["runId"] as? String))
             if ["CAPTURE_VIEWPORT_CHANGED", "CAPTURE_VIEWPORT_UNSTABLE"].contains(WorkflowCaptureProbe.errorCode(["error": error])) {
                 let diagnostic = try await probe.request("/v1/debug-screens", [:])
                 let receipt = try XCTUnwrap(diagnostic["testCaptureEvidence"] as? Body)
@@ -243,6 +244,7 @@ final class WorkflowCaptureUITests: XCTestCase {
             return
         }
         let result = try XCTUnwrap(envelope["value"] as? Body)
+        try await attachImmersiveLayoutTrace(runID: XCTUnwrap(result["runId"] as? String))
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
         let geometry = try XCTUnwrap((result["outputs"] as? Body)?["tapGeometry"] as? Body)
@@ -260,6 +262,22 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: run) }
         XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
+    }
+
+    @MainActor
+    private func attachImmersiveLayoutTrace(runID: String) async throws {
+        let diagnostic = try await probe.request("/v1/debug-screens", [:])
+        let receipt = try XCTUnwrap(diagnostic["testImmersiveLayout"] as? Body)
+        XCTAssertEqual(try XCTUnwrap(receipt["runId"] as? String), runID)
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]),
+                                       uniformTypeIdentifier: "public.json")
+        attachment.name = "Paired run immersive layout receipt"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertEqual(receipt["identityValid"] as? Bool, true)
+        XCTAssertNotNil(receipt["request"])
+        XCTAssertNotNil(receipt["application"])
+        XCTAssertNotNil(receipt["baseline"])
     }
 
     @MainActor

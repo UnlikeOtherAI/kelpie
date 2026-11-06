@@ -14,6 +14,7 @@ struct TabWebViewContainer: UIViewRepresentable {
     var bottomClearance: CGFloat = 0
     /// CSS viewport insets with the bottom bar collapsed and expanded.
     var bottomViewportInsets: ClosedRange<CGFloat> = 0...0
+    var immersive = false
     let onScrollDirectionChange: (ScrollDirection) -> Void
     let onWebViewReady: (WKWebView) -> Void
 
@@ -39,6 +40,14 @@ struct TabWebViewContainer: UIViewRepresentable {
         guard let webView = tabStore.activeBrowserTab?.webView else { return }
         context.coordinator.install(webView: webView, in: container)
         Self.reconcileInsets(webView, clearance: bottomClearance, viewport: bottomViewportInsets)
+        #if DEBUG
+        IOSImmersiveLayoutTrace.applied(
+            view: webView,
+            immersive: immersive,
+            clearance: bottomClearance,
+            range: bottomViewportInsets
+        )
+        #endif
     }
 
     static func reconcileInsets(_ webView: WKWebView, clearance: CGFloat, viewport: ClosedRange<CGFloat>) {

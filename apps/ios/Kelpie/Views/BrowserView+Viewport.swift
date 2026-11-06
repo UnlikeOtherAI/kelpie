@@ -55,6 +55,7 @@ extension BrowserView {
             bottomViewportInsets: serverState.isScriptImmersive
                 ? 0...0
                 : bottomBarClearance(collapsed: true)...bottomBarClearance(collapsed: false),
+            immersive: serverState.isScriptImmersive,
             onScrollDirectionChange: { direction in
                 guard !serverState.isScriptRecording, !addressEditing, !showTabOverview, !isIn3DInspector else { return }
                 withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.2)) {

@@ -472,6 +472,9 @@ final class IOSFrameSampler {
                 #endif
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
             }
+            #if DEBUG
+            IOSImmersiveLayoutTrace.baseline(runID: runID, tab: tab, viewport: viewport)
+            #endif
             try pinViewport(viewport, generation: generation, targetBound: expected != nil)
         }
         let frame = try Self.composite(source: source, state: state, output: output)

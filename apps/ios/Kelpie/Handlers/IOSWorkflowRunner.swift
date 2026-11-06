@@ -92,6 +92,9 @@ final class IOSWorkflowRunner {
             totalActions = workflow.steps.count
             finalizing = false
             await host.context.exit3DInspectorIfNeeded(notify: true)
+            #if DEBUG
+            IOSImmersiveLayoutTrace.begin(runID: id, tab: tab, immersive: workflow.requiresMovieImmersion)
+            #endif
             await host.setRecordingMode(true, workflow.requiresMovieImmersion)
             return await run(workflow, tab: tab, grant: grant, id: id)
         } catch { return (error as? IOSWorkflowFailure ?? IOSWorkflowFailure("INVALID_SCRIPT")).response }
