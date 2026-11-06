@@ -50,6 +50,7 @@ on:
           - sandbox-2204
           - eof-2204
           - execute-2204
+          - diagnostic-2204
           - prepare
           - execute
         default: 'off'
@@ -71,11 +72,12 @@ jobs:
     permissions:
       contents: read
     with:
-      prepare_only: ${{ inputs.worker_comparison_mode != 'execute' && inputs.worker_comparison_mode != 'execute-2204' }}
+      prepare_only: ${{ inputs.worker_comparison_mode != 'execute' && inputs.worker_comparison_mode != 'execute-2204' && inputs.worker_comparison_mode != 'diagnostic-2204' }}
       isolation_only: ${{ inputs.worker_comparison_mode == 'probe' }}
       eof_only: ${{ inputs.worker_comparison_mode == 'eof-2204' }}
+      diagnostic_only: ${{ inputs.worker_comparison_mode == 'diagnostic-2204' }}
       sandbox_only: ${{ inputs.worker_comparison_mode == 'sandbox' || inputs.worker_comparison_mode == 'sandbox-2204' }}
-      runner_label: ${{ (inputs.worker_comparison_mode == 'sandbox-2204' || inputs.worker_comparison_mode == 'execute-2204' || inputs.worker_comparison_mode == 'eof-2204') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
+      runner_label: ${{ (inputs.worker_comparison_mode == 'sandbox-2204' || inputs.worker_comparison_mode == 'execute-2204' || inputs.worker_comparison_mode == 'eof-2204' || inputs.worker_comparison_mode == 'diagnostic-2204') && 'ubuntu-22.04' || 'ubuntu-24.04' }}
       chromium_archive_sha256: ${{ inputs.worker_comparison_archive_sha256 }}
       chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
 

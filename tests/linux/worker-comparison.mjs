@@ -20,6 +20,7 @@ import {queryRendererPidsAtOwnedPort} from "./worker-comparison-cdp-process.mjs"
 import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
 import {observeClientClose,clientCloseWasForced,observeEngineStop,engineStopFailure} from "./worker-comparison-cleanup.mjs";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
+import {diagnoseChromiumFirstFailure} from "./worker-comparison-first-failure.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
 const require=createRequire(new URL("../../packages/cli/package.json",import.meta.url));
@@ -27,6 +28,8 @@ const {Client}=require("@modelcontextprotocol/sdk/client/index.js");
 const {StdioClientTransport,getDefaultEnvironment}=require("@modelcontextprotocol/sdk/client/stdio.js");
 const [backend,path,expectedHash,output]=process.argv.slice(2);
 assert.ok(["lightpanda","playwright"].includes(backend)&&path&&output);
+const diagnostic=process.env.KELPIE_AB_DIAGNOSTIC_ONLY==="true";
+assert.ok(!diagnostic||backend==="playwright","DIAGNOSTIC_BACKEND_INVALID");
 assert.match(expectedHash??"",/^[a-f0-9]{64}$/);
 if(backend==="playwright")assert.match(process.env.KELPIE_CHROMIUM_ARCHIVE_SHA256??"",/^[a-f0-9]{64}$/);
 if(backend==="lightpanda")assert.equal(expectedHash,"ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e");
@@ -38,7 +41,7 @@ const root=fileURLToPath(new URL("../..",import.meta.url));
 assert.equal((await exec("git",["rev-parse","HEAD"],{cwd:root})).stdout.trim(),process.env.KELPIE_TEST_REVISION);
 assert.equal((await exec("git",["status","--porcelain","--untracked-files=no"],{cwd:root})).stdout.trim(),"");
 await mkdir(dir,{recursive:true,mode:0o700});
-const home=join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
+const home=diagnostic?join(dir,"..","..","worker-ab-assets","diagnostic-home"):join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
 const environment={PATH:process.env.PATH??"/usr/bin:/bin",LANG:"C.UTF-8",HOME:home,KELPIE_HOME:join(home,"kelpie"),
  LIGHTPANDA_DISABLE_TELEMETRY:"true",LIGHTPANDA_DISABLE_CORE_DUMP:"1"};
 async function hashFile(file){const h=createHash("sha256");for await(const b of createReadStream(file))h.update(b);return h.digest("hex");}
@@ -99,7 +102,8 @@ const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBind
 let engine,transport,client,failure,session;
 const started=performance.now();
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
-const bounded=async(promise,ms)=>{let timer;try{return await Promise.race([promise,new Promise((_,bad)=>{timer=setTimeout(()=>bad(Error("TIMEOUT")),ms);})]);}finally{clearTimeout(timer);}};
+const diagnosticTimeout=Error("TIMEOUT");
+const bounded=async(promise,ms)=>{let timer;try{return await Promise.race([promise,new Promise((_,bad)=>{timer=setTimeout(()=>bad(diagnostic?diagnosticTimeout:Error("TIMEOUT")),ms);})]);}finally{clearTimeout(timer);}};
 const cpu=async()=>Number((await readFile(cgroup+"/cpu.stat","utf8")).match(/^usage_usec (\d+)/m)?.[1]);
 const cpuBefore=await cpu();
 report.cpuStatBefore=(await readFile(cgroup+"/cpu.stat","utf8")).trim();
@@ -147,7 +151,7 @@ try{
  assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
  const methods=["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload",
   "tab.snapshot","tab.extract","tab.status","tab.ready"];
- const config=join(dir,"operator.json");
+ const config=diagnostic?join(dir,"..","..","worker-ab-assets","diagnostic-operator.json"):join(dir,"operator.json");
  await writeFile(config,JSON.stringify({version:1,backend,endpointEnv:"KELPIE_AB_ENDPOINT",allowedOrigins:[origin],
   networkBoundary:"operator-enforced",maxSessions:1,maxTabs:1,maxTtlMs:60000,
   ...(backend==="lightpanda"?{verifiedLightpandaMethods:methods}:{})}),{mode:0o600,flag:"wx"});
@@ -165,10 +169,12 @@ try{
   report.toolCalls++;
   const result=await bounded(client.callTool({name,arguments:arguments_}),5000);
   const text=result.content.find(x=>x.type==="text")?.text;
+  if(diagnostic&&typeof text!=="string")throw new SyntaxError("MALFORMED_ENVELOPE");
   assert.equal(typeof text,"string");report.responseBytes+=Buffer.byteLength(text);
   return JSON.parse(text);
  };
  const lifecycle=request=>tool("kelpie_worker_session",{request});
+ const sessionStarted=diagnostic?performance.now():0;
  const created=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
  assert.equal(created.ok,true);session=created.value;assert.equal(session.ownedTabIds.length,1);
  const preflightStart=performance.now();
@@ -194,6 +200,10 @@ try{
   }finally{report.sandboxValidationMs=performance.now()-sandboxStart;report.sandboxValidationCpuUsec=await cpu()-sandboxCpu;}
  }
  report.startupMs=performance.now()-engineStarted-report.sandboxValidationMs;
+ if(diagnostic){
+  const diagnosticCall=(method,params)=>method==="__session_limit"?lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}}):tool("kelpie_browser_control",{sessionId:session.sessionId,request:{version:1,method,params,tabId:session.ownedTabIds[0]}});
+  report.firstFailureDiagnostic=await diagnoseChromiumFirstFailure({call:diagnosticCall,origin,now:()=>performance.now(),sessionStarted,timeoutError:diagnosticTimeout});
+ }else{
  await check("second session refused at configured limit",async()=>{
   const second=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
   assert.equal(second.ok,false);assert.equal(second.error.code,"RESOURCE_LIMIT");
@@ -239,6 +249,7 @@ try{
   assert.equal((await record("tabList",()=>call("tabs.list"))).value.length,0);
   assert.equal((await record("sessionClose",()=>lifecycle({action:"close",sessionId:session.sessionId}))).ok,true);
  });
+ }
 }catch{failure="COMPARISON_RUN_FAILED";}finally{
  if(client){
   report.cleanup.client=await observeClientClose(client,transport);
@@ -255,12 +266,13 @@ try{
  report.rss={sampledPeakBytes:rssSampledPeakBytes,samples:rssSamples,readFailures:rssReadFailures,
   intervalMs:250,meaning:"sampled sum of unit process RSS, not a guaranteed peak"};
  report.wallInclusiveMs=performance.now()-started;report.wallMs=report.wallInclusiveMs-report.sandboxValidationMs;report.failure=failure??null;
- report.eligibleForComparison=!failure&&!report.forcedCleanup&&report.engineExited&&
+ report.eligibleForComparison=!diagnostic&&!failure&&!report.forcedCleanup&&report.engineExited&&
   report.rss.samples>0&&report.rss.readFailures===0&&report.warm.length===5&&report.checks.every(x=>x.passed);
  if(report.eligibleForComparison){
   const values=report.warm.map(x=>x.wallMs).sort((a,b)=>a-b);
   report.warmDistributionMs={samples:values.length,median:values[2],p95NearestRank:values[4]};
  }
+ if(diagnostic)report.diagnosticEvidenceComplete=!!report.firstFailureDiagnostic&&!failure&&!report.forcedCleanup&&report.engineExited;
  await writeFile(join(dir,"report.json"),JSON.stringify(report,null,2),{mode:0o600,flag:"wx"});
- if(!report.eligibleForComparison)process.exitCode=1;
+ if(!report.eligibleForComparison&&!(diagnostic&&report.diagnosticEvidenceComplete))process.exitCode=1;
 }

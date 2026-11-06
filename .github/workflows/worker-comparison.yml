@@ -19,6 +19,9 @@ on:
       eof_only:
         type: boolean
         default: false
+      diagnostic_only:
+        type: boolean
+        default: false
       prepare_only:
         description: Record official Chromium identity without starting benchmark units
         type: boolean
@@ -43,6 +46,9 @@ on:
         type: boolean
         default: false
       eof_only:
+        type: boolean
+        default: false
+      diagnostic_only:
         type: boolean
         default: false
       prepare_only:
@@ -73,6 +79,7 @@ jobs:
       SANDBOX_ONLY: ${{ inputs.sandbox_only }}
       ISOLATION_ONLY: ${{ inputs.isolation_only }}
       EOF_ONLY: ${{ inputs.eof_only }}
+      DIAGNOSTIC_ONLY: ${{ inputs.diagnostic_only }}
       CHROMIUM_ARCHIVE_SHA256: ${{ inputs.chromium_archive_sha256 }}
       CHROMIUM_BINARY_SHA256: ${{ inputs.chromium_binary_sha256 }}
     steps:
@@ -80,6 +87,7 @@ jobs:
         shell: bash
         run: |
           [[ "$EOF_ONLY" != true || ( "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == true && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
+          [[ "$DIAGNOSTIC_ONLY" != true || ( "$EOF_ONLY" == false && "$ISOLATION_ONLY" == false && "$SANDBOX_ONLY" == false && "$PREPARE_ONLY" == false && "$REQUESTED_RUNNER" == ubuntu-22.04 ) ]] || exit 1
           case "$REQUESTED_RUNNER" in
             ubuntu-24.04) [[ "$PREPARE_ONLY" == true || "$SANDBOX_ONLY" == true || "$ISOLATION_ONLY" == true ]] || exit 1 ;;
             ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false || "$EOF_ONLY" == true ) ]] || exit 1 ;;
@@ -151,6 +159,8 @@ jobs:
           pnpm --filter @unlikeotherai/kelpie build
       - name: Compare in separately bounded loopback-only units
         if: inputs.isolation_only == false && inputs.sandbox_only == false && inputs.eof_only == false && inputs.prepare_only == false
+        env:
+          KELPIE_AB_DIAGNOSTIC_ONLY: ${{ inputs.diagnostic_only }}
         shell: bash
         run: bash scripts/testing/run-worker-comparison-hosted.sh
       - name: Prepare pinned Lightpanda and public CLI for EOF proof

@@ -5,6 +5,9 @@ umask 077
 isolation_only="${KELPIE_AB_ISOLATION_ONLY:-false}"
 sandbox_only="${KELPIE_AB_SANDBOX_ONLY:-false}"
 eof_only="${KELPIE_AB_EOF_ONLY:-false}"
+diagnostic_only="${KELPIE_AB_DIAGNOSTIC_ONLY:-false}"
+[[ "$diagnostic_only" == true || "$diagnostic_only" == false ]]
+[[ "$diagnostic_only" != true || ( "$eof_only" == false && "$sandbox_only" == false && "$isolation_only" == false ) ]]
 [[ "$eof_only" == true || "$eof_only" == false ]]
 [[ "$eof_only" != true || ( "$sandbox_only" == false && "$isolation_only" == false ) ]]
 [[ "$sandbox_only" == true || "$sandbox_only" == false ]]
@@ -64,6 +67,7 @@ run_arm() {
   --setenv="KELPIE_COMPARISON_ID=$comparison_id" --setenv="KELPIE_AB_CANARY_HOST=$host_ip" \
   --setenv="KELPIE_AB_CANARY_PORT=$port" --setenv="KELPIE_CHROMIUM_ARCHIVE=$assets/chrome.zip" \
   --setenv="KELPIE_CHROMIUM_ARCHIVE_SHA256=${CHROMIUM_ARCHIVE_SHA256:-}" \
+  --setenv="KELPIE_AB_DIAGNOSTIC_ONLY=$diagnostic_only" \
   "${command[@]}" >"$dir/unit.log" 2>&1 &
  local launcher=$! active=0
  for _ in $(seq 1 100); do
@@ -163,6 +167,10 @@ if [[ "$eof_only" == true ]]; then
 fi
 if [[ "$sandbox_only" == true ]]; then
  run_arm sandbox "$assets/chrome/chrome-linux64/chrome" "$CHROMIUM_BINARY_SHA256" || failed=1
+ exit "$failed"
+fi
+if [[ "$diagnostic_only" == true ]]; then
+ run_arm playwright "$assets/chrome/chrome-linux64/chrome" "$CHROMIUM_BINARY_SHA256" || failed=1
  exit "$failed"
 fi
 run_arm lightpanda "$assets/lightpanda" ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e || failed=1
