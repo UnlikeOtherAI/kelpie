@@ -27,6 +27,9 @@ test("overlay fixture selects bright damage while standard stream stays red",asy
   const overlayHTML=await (await fetch(overlay.url+"/stream")).text();
   assert.ok(standardHTML.includes("background:#f52233;animation:stream"));
   assert.ok(overlayHTML.includes("background:#f8df45;animation:stream"));
+  const staticHTML=await (await fetch(overlay.url+"/stream-static")).text();
+  assert.ok(staticHTML.includes("background:#f8df45;animation:none"));
+  assert.ok(staticHTML.includes("document.getAnimations().length===0"));
  }finally{await standard.close();await overlay.close();}
 });
 test("overlay scene retains measured centers and relative time without document IDs",()=>{
@@ -271,6 +274,9 @@ test("pump experiment signal accepts only fixed modes",()=>{
 
 test("hosted stream parser accepts only bounded synthetic numeric events",()=>{
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=started"),{event:"started"});
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=sparse accepted=0"),{event:"sparse",accepted:0});
+ assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=sparse accepted=1"),{event:"sparse",accepted:1});
+ assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=sparse accepted=2"),null);
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=1 failure=4 stale=2"),{event:"fence",stop:1,failure:4,stale:2});
  assert.equal(hostedStreamSignal("[WorkflowHostedStream] event=fence stop=11 failure=0 stale=0"),null);
  assert.deepEqual(hostedStreamSignal("[WorkflowHostedStream] event=refusal reason=viewport"),{event:"refusal",reason:"viewport"});

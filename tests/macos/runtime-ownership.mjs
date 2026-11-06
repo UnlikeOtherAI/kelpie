@@ -107,6 +107,8 @@ export function cefPumpSignal(line){
 export function hostedStreamSignal(line){
  if(line==="[WorkflowHostedStream] event=started")return {event:"started"};
  if(line==="[WorkflowHostedStream] event=discarded")return {event:"discarded"};
+ const sparse=/^\[WorkflowHostedStream\] event=sparse accepted=([01])$/.exec(line);
+ if(sparse)return {event:"sparse",accepted:Number(sparse[1])};
  const fence=/^\[WorkflowHostedStream\] event=fence stop=(\d{1,2}) failure=(\d{1,2}) stale=(\d{1,3})$/.exec(line);
  if(fence){const stop=Number(fence[1]),failure=Number(fence[2]),stale=Number(fence[3]);return stop<=10&&failure<=10?{event:"fence",stop,failure,stale}:null;}
  const refusal=/^\[WorkflowHostedStream\] event=refusal reason=(stop|authority|fixture|identity|document|viewport|seal|sample|audit|overlay)$/.exec(line);

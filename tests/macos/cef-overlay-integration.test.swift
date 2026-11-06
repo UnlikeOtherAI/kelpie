@@ -101,6 +101,39 @@ struct ScriptWorkflowFailure: Error { init(_ code: String) {} }
             current: { true }, move: { moved = true; return true }
         )
         guard !lateAuthorityAllowed, !moved else { fatalError("late authority change accepted") }
-        print("PASS: real compositor/writer publication and late viewport/authority disposal")
+        tab.authorized = true
+        unsetenv("KELPIE_CEF_STATIC_TEST")
+        let ordinaryID = UUID().uuidString
+        let ordinary = try ScriptHostedOverlayCapture(tab: tab, presentation: scene, runID: ordinaryID, isCurrent: { true })
+        guard !(await ordinary.prepare()) else { fatalError("ordinary empty stream accepted") }
+        ordinary.discard()
+        setenv("KELPIE_CEF_STATIC_TEST", "1", 1)
+        let sparseID = UUID().uuidString
+        let sparse = try ScriptHostedOverlayCapture(tab: tab, presentation: scene, runID: sparseID, isCurrent: { true })
+        sparse.receive(data, receipt: ProcessInfo.processInfo.systemUptime, context: sparse.context()!)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        guard await sparse.prepare() else { fatalError("single frame not classified sparse") }
+        let sparseAllowed = await ScriptHostedOverlayAudit.publish(
+            check: { try await tab.check() }, inspect: { true }, current: { true }, move: { sparse.publish() }
+        )
+        sparse.discard()
+        guard sparseAllowed,
+              !FileManager.default.fileExists(atPath: directory.appendingPathComponent("overlay-" + sparseID + ".mp4").path) else {
+            fatalError("sparse observation published placeholder")
+        }
+        let deniedID = UUID().uuidString
+        let denied = try ScriptHostedOverlayCapture(tab: tab, presentation: scene, runID: deniedID, isCurrent: { true })
+        guard await denied.prepare() else { fatalError("empty stream not classified sparse") }
+        tab.authorized = false
+        let deniedAllowed = await ScriptHostedOverlayAudit.publish(
+            check: { try await tab.check() }, inspect: { true }, current: { true }, move: { denied.publish() }
+        )
+        denied.discard()
+        guard !deniedAllowed,
+              !FileManager.default.fileExists(atPath: directory.appendingPathComponent("overlay-" + deniedID + ".mp4").path) else {
+            fatalError("sparse revocation accepted")
+        }
+        unsetenv("KELPIE_CEF_STATIC_TEST")
+        print("PASS: real writer, late refusals and zero/one-frame sparse disposal")
     }
 }

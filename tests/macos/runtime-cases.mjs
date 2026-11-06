@@ -11,6 +11,7 @@ import {runNonimmersive} from "./runtime-nonimmersive.mjs";
 import {runPumpControls} from "./runtime-pump-control.mjs";
 import {runHostedStream} from "./runtime-stream.mjs";
 import {runHostedOverlay} from "./runtime-overlay.mjs";
+import {runHostedStatic} from "./runtime-static.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {Failure,delay,requireTrue,waitFor,probeListeners} from "./runtime-client.mjs";
@@ -106,6 +107,13 @@ export async function runEngine(client,fixture,engine,report,scope="full",pumpCo
   return {success:true};
  });
  await load();
+ if(scope==="cef-static"){
+  requireTrue(engine==="chromium","FOCUSED_RENDERER");
+  await runHostedStatic({client,fixture,engine,base,capture,check,load,report});
+  const failed=checks.find(item=>!item.passed);
+  if(failed)throw new Failure(failed.code);
+  return;
+ }
  if(scope==="cef-overlay"){
   requireTrue(engine==="chromium","FOCUSED_RENDERER");
   await runHostedOverlay({client,fixture,engine,base,capture,check,load,report});

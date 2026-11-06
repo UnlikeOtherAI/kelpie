@@ -20,6 +20,7 @@ on:
           - cef-pump-compare
           - cef-stream
           - cef-overlay
+          - cef-static
         default: full
 
 permissions:
@@ -128,7 +129,7 @@ jobs:
           run_xcodebuild() {
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
-            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" || "${{ inputs.runtime_scope }}" == "cef-overlay" ]]; then
+            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" || "${{ inputs.runtime_scope }}" == "cef-overlay" || "${{ inputs.runtime_scope }}" == "cef-static" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) DEBUG=1 KELPIE_HOSTED_STREAM_TEST=1' \
                 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG KELPIE_HOSTED_STREAM_TEST' \
                 'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DDEBUG=1 -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
@@ -154,7 +155,7 @@ jobs:
           .cache/macos-ci/cef-pump-scheduler-test
 
       - name: Test hosted CEF stream controls
-        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && (inputs.runtime_scope == 'cef-stream' || inputs.runtime_scope == 'cef-overlay')
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && (inputs.runtime_scope == 'cef-stream' || inputs.runtime_scope == 'cef-overlay' || inputs.runtime_scope == 'cef-static')
         timeout-minutes: 2
         run: |
           set -euo pipefail
@@ -237,7 +238,7 @@ jobs:
           run_xcodebuild() {
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
-            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" || "${{ inputs.runtime_scope }}" == "cef-overlay" ]]; then
+            elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" || "${{ inputs.runtime_scope }}" == "cef-overlay" || "${{ inputs.runtime_scope }}" == "cef-static" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) DEBUG=1 KELPIE_HOSTED_STREAM_TEST=1' \
                 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG KELPIE_HOSTED_STREAM_TEST' \
                 'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DDEBUG=1 -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
@@ -255,7 +256,7 @@ jobs:
             2>&1 | tee .cache/macos-ci/runtime-build.log
           brew install ffmpeg
           pnpm --filter @unlikeotherai/kelpie build
-          if [[ "${{ inputs.runtime_scope }}" == "cef-overlay" ]]; then
+          if [[ "${{ inputs.runtime_scope }}" == "cef-overlay" || "${{ inputs.runtime_scope }}" == "cef-static" ]]; then
             node --test tests/macos/runtime-media-overlay.test.mjs
           fi
           bash scripts/testing/macos-sign-test-app.sh

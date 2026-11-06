@@ -221,10 +221,13 @@ final class ScriptWorkflowTab {
               let input = String(data: data, encoding: .utf8) else {
             throw ScriptWorkflowFailure("INVALID_PARAM")
         }
+        let fixturePath = ProcessInfo.processInfo.environment["KELPIE_CEF_STATIC_TEST"] == "1"
+            ? "location.pathname==='/stream-static'"
+            : "(location.pathname==='/stream'||location.pathname==='/stream-nav')"
         let expression = """
         (()=>{const expected=\(input).origin;return {viewport:\(Self.viewportExpression),
         document:\(documentIdentityExpression),fixture:location.origin===expected&&
-        (location.pathname==='/stream'||location.pathname==='/stream-nav')&&location.search===''&&location.hash===''}})()
+        (\(fixturePath))&&location.search===''&&location.hash===''}})()
         """
         let raw = try await fixed(expression)
         guard let body = raw as? Body, ScriptWorkflowBoolean.value(body["fixture"]) == true else {

@@ -24,7 +24,7 @@ export async function startFixture({overlay=false}={}) {
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
   const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"].includes(mode)?mode:"";
   const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":mode==="/paced-final-delay"?"Delayed X fixture":"Hosted Mac fixture";
-  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge",stream=["/stream","/stream-nav"].includes(mode);
+  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge",stream=["/stream","/stream-nav","/stream-static"].includes(mode);
   const marker=Array.from({length:16},(_,i)=>`<i style="background:${streamNonce&(1<<i)?"#ccc":"#fff"}"></i>`).join("");
   const body=stream?`<div id="stream-marker">${marker}</div><div id="stream-dot"></div><button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>`:edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
@@ -44,7 +44,9 @@ export async function startFixture({overlay=false}={}) {
    <button id="scroll-target">Scrolled target</button>`;
   const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)},pacedMode=${JSON.stringify(pacedMode)},streamMode=${JSON.stringify(mode)};const documentId=crypto.randomUUID();let sequence=0;
   const send=(value,synchronous=false)=>{const body=JSON.stringify({
-   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight,clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,pixelRatio:devicePixelRatio},
+   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,
+   fixtureStatic:streamMode==='/stream-static'?getComputedStyle(document.querySelector('#stream-dot')).animationName==='none'&&document.getAnimations().length===0:null,
+   scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight,clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,pixelRatio:devicePixelRatio},
    visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}});
    if(synchronous){const request=new XMLHttpRequest();request.open('POST','/events',false);request.setRequestHeader('content-type','application/json');request.send(body);return;}
    return fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body}).catch(()=>{});};
@@ -91,7 +93,7 @@ export async function startFixture({overlay=false}={}) {
   addEventListener('scroll',()=>send({type:'scroll'}));
   send({type:'document'});
   })();`;
-  const style=stream?`body{margin:0;background:white;overflow:hidden}#stream-marker{position:absolute;left:0;top:0;width:48px;height:48px;display:grid;grid-template-columns:repeat(4,12px);grid-template-rows:repeat(4,12px)}#stream-marker i{display:block}button{position:absolute;border:0;background:white;color:white}#first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}#stream-dot{position:absolute;left:30px;top:120px;width:30px;height:30px;background:${overlay?"#f8df45":"#f52233"};animation:stream 2s linear infinite alternate}@keyframes stream{to{transform:translateX(500px)}}`:edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
+  const style=stream?`body{margin:0;background:white;overflow:hidden}#stream-marker{position:absolute;left:0;top:0;width:48px;height:48px;display:grid;grid-template-columns:repeat(4,12px);grid-template-rows:repeat(4,12px)}#stream-marker i{display:block}button{position:absolute;border:0;background:white;color:white}#first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}#stream-dot{position:absolute;left:30px;top:120px;width:30px;height:30px;background:${overlay?"#f8df45":"#f52233"};animation:${mode==="/stream-static"?"none":"stream 2s linear infinite alternate"}}@keyframes stream{to{transform:translateX(500px)}}`:edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
    #first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}`:
    bands?`body{margin:0;height:9000px;background:repeating-linear-gradient(to bottom,#f00 0 1000px,#0f0 1000px 2000px,#00f 2000px 3000px,#f0f 3000px 4000px)}`:
    next?"body{background:#ffe881;color:black}":`
