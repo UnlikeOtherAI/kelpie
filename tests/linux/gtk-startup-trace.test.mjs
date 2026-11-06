@@ -45,3 +45,16 @@ test("substage failure and interrupted cleanup remain honest prefixes", () => {
   assert.equal(parseGtkStartupTrace(lines([...listener, "START_FAIL", "ATTACH_FAIL"])).state, "valid-prefix");
   assert.equal(parseGtkStartupTrace(lines([...base, "FIRST_BROWSER_OK"])).state, "invalid");
 });
+
+test("headless mode accepts only its engine-first startup sequence", () => {
+  const headless = ["START_ENTER", "ENGINE_ENTER", "CEF_INIT_ENTER", "CEF_INIT_OK",
+    "FIRST_BROWSER_ENTER", "FIRST_BROWSER_OK", "ENGINE_OK", "HANDLERS_ENTER",
+    "HANDLERS_RETURN", "LISTENER_ENTER", "LISTENER_OK", "MDNS_SKIPPED",
+    "START_OK", "PUBLISH_ENTER", "PUBLISH_RETURNED"];
+  assert.equal(parseGtkStartupTrace(lines(headless), "headless").state, "valid-prefix");
+  assert.equal(parseGtkStartupTrace(lines(headless.slice(0, 5)), "headless").events.at(-1).name, "FIRST_BROWSER_ENTER");
+  assert.equal(parseGtkStartupTrace(lines(headless), "windowed").state, "invalid");
+  assert.equal(parseGtkStartupTrace(lines(["START_ENTER", "ATTACH_ENTER"]), "headless").state, "invalid");
+  assert.equal(parseGtkStartupTrace(lines(["START_ENTER", "START_OK"]), "headless").state, "invalid");
+  assert.equal(parseGtkStartupTrace(lines(headless), "other").state, "invalid");
+});

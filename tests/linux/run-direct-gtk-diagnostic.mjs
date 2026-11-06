@@ -12,11 +12,20 @@ import { runGtkStop } from "./gtk-stop.mjs";
 import { verifyOwnedListener } from "./worker-comparison-listener.mjs";
 import { parseGtkStartupTrace } from "./gtk-startup-trace.mjs";
 import { verifyGtkDiagnosticManifest } from "./gtk-diagnostic-manifest.mjs";
+import { installHeadlessEnvironment } from "./headless-control-environment.mjs";
 
 const [binaryArg, expectedHash, outputArg] = process.argv.slice(2);
 assert.ok(binaryArg && /^[a-f0-9]{64}$/.test(expectedHash ?? "") && outputArg);
-assert.equal(process.env.GDK_BACKEND, "wayland");
+const mode = process.env.KELPIE_STARTUP_CONTROL_MODE ?? "windowed";
+assert.ok(mode === "windowed" || mode === "headless");
 const traceRequested = process.env.KELPIE_GTK_STARTUP_TRACE === "1";
+if (mode === "windowed") assert.equal(process.env.GDK_BACKEND, "wayland");
+else {
+  assert.ok(traceRequested);
+  assert.equal(expectedHash, "cf23a2f1da2e335f03c001e17fa58d3d736e982d80851695f6f97e0de718df0c");
+  assert.equal(process.env.KELPIE_GTK_BUILD_SOURCE, "0732d2ca8baf43130ea1c838afe7b38347f28179");
+  assert.equal(process.env.KELPIE_GTK_BUILD_MANIFEST_SHA256, "4d692268ef3ab5673aad76d3177e3a100a5959e86b29ec36709d5cecd32ff9eb");
+}
 if (!traceRequested) assert.equal(expectedHash, "6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c");
 assert.equal(process.env.KELPIE_CAPTURE_SOURCE, "c42fc68d7fdfa01fae0cbe9cda82dc39bd8c4dc2");
 assert.match(process.env.KELPIE_TEST_REVISION ?? "", /^[a-f0-9]{40}$/);
@@ -46,7 +55,9 @@ const profile = join(runtime, "profile");
 await mkdir(profile, { mode: 0o700 });
 const readinessPath = join(profile, "readiness.json");
 const report = { ...(buildIdentity ?? { source: process.env.KELPIE_CAPTURE_SOURCE }),
-  testSource: process.env.KELPIE_TEST_REVISION, binarySHA256: digest, stages: [], cleanup: "not-started" };
+  testSource: process.env.KELPIE_TEST_REVISION, binarySHA256: digest, mode,
+  ...(mode === "headless" ? { nativeHeadlessSwitch: true, displayAndBusVariablesRemoved: true } : {}),
+  stages: [], cleanup: "not-started" };
 const stage = name => report.stages.push({ name, elapsedMs: Math.round(performance.now() - began) });
 const began = performance.now();
 let browser, identity, readiness, verified = false, acknowledged = false, failed = false;
@@ -54,8 +65,9 @@ const verify = () => verifyOwnedListener(identity.pid, readiness.port, identity.
 const cancel = new AbortController();
 const deadline = setTimeout(() => cancel.abort(), 150000);
 try {
+  if (mode === "headless") installHeadlessEnvironment(process.env, runtime);
   stage("spawn");
-  browser = startBrowser(binary, ["--port", "0", "--profile-dir", profile,
+  browser = startBrowser(binary, [...(mode === "headless" ? ["--headless"] : []), "--port", "0", "--profile-dir", profile,
     "--readiness-file", readinessPath, "--width", "1280", "--height", "900", "--url", "about:blank"]);
   if (!browser.child.pid) throw Error("spawn_error");
   identity = await readNativeIdentity(browser.child.pid);
@@ -92,13 +104,15 @@ try {
       params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "direct-gtk-diagnostic", version: "1" } } }) });
   if (mcp.status !== 200 || !mcp.json?.result?.serverInfo) throw Error("mcp_failure");
   stage("mcp");
-  await verify();
-  try {
-    const result = await runGtkStop({ readiness, identity, binary, hash: digest, output,
-      env: process.env, signal: cancel.signal, sanitizeFailure: true });
-    report.gtk = { invoked: result.action?.invoked === true, recovered: result.recovered === true,
-      resultCode: result.result?.code, artifacts: result.artifacts.length };
-  } catch { throw Error("atspi_or_gtk_failure"); }
+  if (mode === "windowed") {
+    await verify();
+    try {
+      const result = await runGtkStop({ readiness, identity, binary, hash: digest, output,
+        env: process.env, signal: cancel.signal, sanitizeFailure: true });
+      report.gtk = { invoked: result.action?.invoked === true, recovered: result.recovered === true,
+        resultCode: result.result?.code, artifacts: result.artifacts.length };
+    } catch { throw Error("atspi_or_gtk_failure"); }
+  }
   stage("complete");
 } catch (error) {
   const allowed = new Set(["spawn_error", "identity_mismatch", "early_exit", "readiness_invalid",
@@ -110,9 +124,10 @@ try {
   if (browser) {
     const logs = browser.logs(), stderr = logs.stderrFirst + logs.stderr;
     if (traceRequested) {
-      report.startupTrace = parseGtkStartupTrace(logs.stderrFirst);
+      report.startupTrace = parseGtkStartupTrace(logs.stderrFirst, mode);
       report.startupTrace.stderrMayBeTruncated = logs.stderrFirst.length >= 32768;
-      if (report.startupTrace.state !== "valid-prefix") failed = true;
+      if (report.startupTrace.state !== "valid-prefix" || (mode === "headless" && report.startupTrace.stderrMayBeTruncated)) failed = true;
+      if (mode === "headless" && readiness && !report.startupTrace.events.some(event => event.name === "PUBLISH_RETURNED")) failed = true;
     }
     report.stderr = { boundedBytes: Buffer.byteLength(stderr),
       display: /gtk|wayland|display/i.test(stderr), sandbox: /sandbox|zygote/i.test(stderr),
