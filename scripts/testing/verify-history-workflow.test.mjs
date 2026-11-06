@@ -7,7 +7,7 @@ test("hosted verifier is opt-in, pinned, capped and retains only receipts",async
  assert.ok(start>=0&&end>start);const job=text.slice(start,end);
  assert.ok(job.includes("inputs.history_verify_patch_b64 != ''"));
  assert.ok(job.includes("ref: 22e616cfed21074cffef1e0d557645db6e895a28"));
- assert.ok(job.includes("HISTORY_PATCH_SHA: 4201044e5128fbb75850de684bccec4078a1f88315ca84535ae264d5b85ef210"));
+ assert.ok(job.includes("HISTORY_PATCH_SHA: 6126fc0fb5112912ef5026d3b1f313aae169e0b599c13a56a471db0c3feda4e6"));
  assert.equal((job.match(/persist-credentials: false/g)??[]).length,2);
  const verify=job.indexOf("verify-history-patch.mjs"),install=job.indexOf("pnpm install");
  assert.ok(verify>=0&&install>verify);
