@@ -103,6 +103,6 @@ and the unrelated listener remained present. Sanitized receipt SHA-256:
 `3b4ef6828114163bcaad78bd79caaad8990255b7fc73dcc11c843cd69f6ad665`.
 
 This is a failed control, not a headless pass or a diagnosis of the GNOME
-wait. The native `--headless` path selects Ozone headless and removes
-display and session-bus references, so more than GTK context differs between
-the two attempts.
+wait. The native `--headless` path selects Ozone headless; the test launcher
+removed display and session-bus references. More than GTK context therefore
+differs between the two attempts.
