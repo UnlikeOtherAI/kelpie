@@ -345,3 +345,50 @@ existing AppReveal Sendable and unrelated-cast warnings, skipped AppIntents
 metadata in two test targets, and a missing-ccache performance warning; no
 Kelpie Swift warning was observed. Full corpus, simulated-key control and
 release verification remain separate gates.
+
+## Hosted paired check: 42156136625
+
+The focused [paired check](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42156136625)
+used `d8a17fcaeebeaca5d00c66b018d24504af0fdda1`, source tree
+`e9288b3b2ae782fb8614ce542f2c9f2bca9afdfd`, Xcode 26.6 (17F113), and
+iOS 26.5. The simulator executable SHA-256 was
+`e9a0b1b2fac00cf5f11f4205048e126e799b4760a9ab2e0ec431eae474e7ee8d`;
+the debug dylib SHA-256 was
+`84a00f53ec64b32f6fed71fa873aa7c5d7fb15ce654e2a5e67e7275e95fda5ae`.
+SwiftLint and the iOS scheme build passed. Artifact `13475875732` retains the
+reports and attachments; both app and test runner were stopped and both
+simulators were verified shut down.
+
+| Selected method | iPhone 17 | iPad Air 13-inch (M4) |
+| --- | --- | --- |
+| Inset range reconciliation with unchanged scroll clearance | Pass | Pass |
+| Paired MCP capture with bounded phase observation | Pass | Fail: `CAPTURE_VIEWPORT_UNSTABLE` |
+| Non-movie viewport and movie presentation, including Stop | Pass | Pass |
+
+The iPhone paired run executed four actions, checked the centered fixture click,
+and downloaded four PNGs, a GIF and an MP4 with XCTest decoder checks. Its
+run-matched observation recorded action 1 at 2624 ms, action 3 at 5197 ms and
+a successful response at 6047 ms. The separate presentation test pressed Stop
+in the no-capture case. The iPad paired request returned the unstable-viewport
+refusal at 2295 ms; its observation did not match a run and contains no action
+samples. No iPad paired media success is claimed. Status polling was bounded
+and read-only but could affect timing.
+
+The aggregate iPad capture log contains a 980×1277 to 1024×1314 CSS change
+with 1024×1334 native bounds; that aggregate is not bound to the failing run
+and does not establish its cause. The SHA-256 values of the retained `report.json`,
+iPhone phase JSON, iPad phase JSON, iPhone summary, iPad summary, iPhone aggregate
+capture log and iPad aggregate capture log are respectively:
+
+```text
+093333f3d29f1acbbfa81f580a02ac082865a3291f18348dc3243418d56e7e6b
+7244313ebe38ae801956a9a5f8c22fb8644952e904f8197cc916bea775104216
+613c9e3658c4294d5a85eb6a69373c62d4853a7eeed604e79140f83d77df35ad
+d6df2a90e42c19948156e8fb78538fd999e3e379b50dd479c1653bfb4a6c7e62
+e3e1887e6511fdc8e89f3db4dbd1f67b1502d23a3d1802bad35701703167dfc6
+ce5c46e0476360b30ea289cc7486f2696277a29020ae40a548f25fcd86051d1d
+1c3d5fa78cf50b6dc931d1c47806d2eaa2faede9e167461198ff47ec6328b2e3
+```
+
+This focused pass on iPhone does not establish both-device acceptance. Full
+corpus, iPad paired capture, pinch, keyboard and release gates remain open.
