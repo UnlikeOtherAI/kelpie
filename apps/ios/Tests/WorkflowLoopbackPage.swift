@@ -118,7 +118,7 @@ final class WorkflowLoopbackPage {
           const calibrated=new URLSearchParams(location.search).get('case')==='visible';
           const viewport=()=>({scale:visualViewport.scale,x:visualViewport.offsetLeft,y:visualViewport.offsetTop,
             width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight,
-            viewportMeta:document.querySelector('meta[name=viewport]').content});
+            viewportMeta:document.querySelector('meta[name=viewport]')?.content??null});
           const position=()=>{
             const v=viewport();
             if(!edge.style.left)edge.style.left='0px';
@@ -189,6 +189,12 @@ final class WorkflowLoopbackPage {
                     if path == "/paced-signal" {
                         let body = requestCounter.count("/paced-ack") > 0 ? "go" : "wait"
                         reply = Data("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)".utf8)
+                    } else if path == "/pinch-scroll?case=no-meta" || path == "/pinch-scroll?case=explicit-meta" {
+                        let original = "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                        let replacement = path.hasSuffix("no-meta") ? "" :
+                            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,user-scalable=yes,maximum-scale=5\">"
+                        let variant = html.replacingOccurrences(of: original, with: replacement)
+                        reply = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: no-store\r\nContent-Length: \(variant.utf8.count)\r\nConnection: close\r\n\r\n\(variant)".utf8)
                     } else {
                         reply = data
                     }

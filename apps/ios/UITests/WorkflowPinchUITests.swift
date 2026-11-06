@@ -238,6 +238,53 @@ extension WorkflowCaptureUITests {
         }
     }
 
+    @MainActor
+    func testIPadViewportMetadataPinchComparison() async throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { return }
+        testLaunchArguments.append("--test-pinch-observer")
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let viewport = XCUIApplication().webViews.firstMatch
+        var results: [Body] = []
+        for mode in ["no-meta", "explicit-meta"] {
+            let navigation = try await probe.request("/v1/play-script", [
+                "version": 1, "tabId": tab,
+                "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/pinch-scroll?case=\(mode)"]]
+            ])
+            XCTAssertEqual(navigation["success"] as? Bool, true, mode)
+            let before = try await pinchMetrics(tab, selector: "#zoom")
+            let nativeBefore = await nativeZoomEvidence()
+            XCTAssertEqual((nativeBefore["observation"] as? Body)?["armed"] as? Bool, true, mode)
+            viewport.pinch(withScale: 2, velocity: 1)
+            try await Task.sleep(nanoseconds: 500_000_000)
+            let after = try await pinchMetrics(tab, selector: "#zoom")
+            let nativeAfter = await nativeZoomEvidence()
+            let observation = try XCTUnwrap(nativeAfter["observation"] as? Body)
+            XCTAssertEqual(observation["sameView"] as? Bool, true, mode)
+            XCTAssertEqual(observation["sameDocument"] as? Bool, true, mode)
+            results.append(["mode": mode, "before": before, "after": after,
+                            "nativeBefore": nativeBefore, "nativeAfter": nativeAfter])
+            let image = XCTAttachment(screenshot: viewport.screenshot())
+            image.name = "iPad pinch viewport " + mode
+            image.lifetime = .keepAlways
+            add(image)
+        }
+        XCTAssertTrue((results[0]["before"] as? Body)?["viewportMeta"] is NSNull)
+        XCTAssertEqual((results[1]["before"] as? Body)?["viewportMeta"] as? String,
+                       "width=device-width,initial-scale=1,user-scalable=yes,maximum-scale=5")
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: results, options: [.sortedKeys]),
+                                       uniformTypeIdentifier: "public.json")
+        attachment.name = "iPad viewport metadata pinch comparison"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        for result in results {
+            let native = try XCTUnwrap(result["nativeAfter"] as? Body)
+            let observation = try XCTUnwrap(native["observation"] as? Body)
+            XCTAssertGreaterThan(try XCTUnwrap(observation["began"] as? Int), 0)
+        }
+    }
+
     private func nativeZoomEvidence() async -> Body {
         guard let value = try? await probe.request("/v1/debug-screens", [:]),
               let webView = value["webView"] as? Body, let scroll = webView["scrollView"] as? Body else { return [:] }
