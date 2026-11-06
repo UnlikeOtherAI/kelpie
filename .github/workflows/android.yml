@@ -36,6 +36,10 @@ on:
         description: Run only the scoped Android navigation and input controls
         type: boolean
         default: false
+      api29_smoke:
+        description: Run only the API 29 phone capture smoke (requires native_test)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -88,6 +92,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v4.0.3
+      - name: Reject conflicting native scopes
+        if: ${{ inputs.targeted_mobile && inputs.api29_smoke }}
+        run: |
+          echo "Select only one Android native scope" >&2
+          exit 1
       - name: Check native runner ownership and report guards
         run: node --test scripts/testing/android-native-ownership.test.mjs scripts/testing/android-native-report.test.mjs
       - name: Verify hosted KVM
@@ -101,7 +110,7 @@ jobs:
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Install media verification tools
-        if: ${{ !inputs.targeted_mobile }}
+        if: ${{ !inputs.targeted_mobile && !inputs.api29_smoke }}
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
@@ -123,7 +132,7 @@ jobs:
         run: |
           bash scripts/testing/android-native-capture.sh "$PWD/native-evidence" \
             apps/android/app/build/intermediates/apk/debug/app-debug.apk \
-            apps/android/app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk "${{ inputs.targeted_mobile && 'targeted' || 'full' }}"
+            apps/android/app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk "${{ inputs.targeted_mobile && 'targeted' || inputs.api29_smoke && 'api29-smoke' || 'full' }}"
       - name: Retain curated evidence for seven days
         if: always()
         uses: actions/upload-artifact@v7.0.1
@@ -151,6 +160,22 @@ jobs:
             native-evidence/phone/targeted/navigation-stop/script-acceptance/navigation-stop-result.json
             native-evidence/phone/targeted/chrome-input/script-acceptance/native-chrome-input-result.json
             native-evidence/phone/script-acceptance/**
+            native-evidence/phone/api29-smoke/one-step-png/case.txt
+            native-evidence/phone/api29-smoke/one-step-png/exit.txt
+            native-evidence/phone/api29-smoke/one-step-png/instrumentation.log
+            native-evidence/phone/api29-smoke/one-step-png/pull.log
+            native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-one-step-result.json
+            native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-native-marker.png
+            native-evidence/phone/api29-smoke/one-step-png/script-acceptance/api29-step.png
+            native-evidence/phone/api29-smoke/one-step-png/script-acceptance/native-marker-evidence.json
+            native-evidence/phone/api29-smoke/movie-stop/case.txt
+            native-evidence/phone/api29-smoke/movie-stop/exit.txt
+            native-evidence/phone/api29-smoke/movie-stop/instrumentation.log
+            native-evidence/phone/api29-smoke/movie-stop/pull.log
+            native-evidence/phone/api29-smoke/movie-stop/script-acceptance/before-native-stop-status.json
+            native-evidence/phone/api29-smoke/movie-stop/script-acceptance/stopped-manifest.json
+            native-evidence/phone/api29-smoke/movie-stop/script-acceptance/api29-partial.gif
+            native-evidence/phone/api29-smoke/movie-stop/script-acceptance/api29-partial.mp4
             native-evidence/phone/script-codec-acceptance/**
             native-evidence/tablet/*.json
             native-evidence/tablet/*.txt

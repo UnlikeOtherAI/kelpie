@@ -136,6 +136,15 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                         val artifact = artifacts.getJSONObject(index)
                         assertTrue(artifact.getBoolean("partial"))
                         val file = retrieve(client, stopped.getString("runId"), artifact)
+                        if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("api29Smoke") == "true") {
+                            val name =
+                                when (artifact.getString("mimeType")) {
+                                    "image/gif" -> "api29-partial.gif"
+                                    "video/mp4" -> "api29-partial.mp4"
+                                    else -> error("Unexpected API 29 movie type")
+                                }
+                            file.copyTo(java.io.File(evidence, name), overwrite = true)
+                        }
                         var frames = 0
                         ScriptMovieProbe.frames(file) { _, _ -> frames++ }
                         assertTrue(frames > 0)
