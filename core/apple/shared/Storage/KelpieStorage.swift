@@ -18,7 +18,7 @@ enum KelpieStorage {
     }
 
     static var homeDirectory: URL {
-        if standalone { return FileManager.default.homeDirectoryForCurrentUser }
+        if standalone { return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true) }
         return isolated(FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
     }
 

@@ -13,7 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -71,14 +71,16 @@ object UOAAccount {
         hostSession = session
         hostSubscription?.cancel()
         hostSubscription = scope.launch {
-            session.identity.collect { identity ->
+            session.identity.collectLatest { identity ->
                 val subject = identity.subject
-                if (subject != null && identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
                 reset(clearStorage = false)
                 if (subject != null) {
                     val current = generation
                     try {
+                        if (identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
                         finishSignIn(current)
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
                     } catch (error: Exception) {
                         if (generation == current) mutableState.value = State(error = error.message)
                     }
@@ -354,7 +356,14 @@ object UOAAccount {
     }
 
     suspend fun settingsRequest(): okhttp3.Request {
-        hostSession?.let { return it.settingsRequest() }
+        hostSession?.let { session ->
+            val identity = session.identity.value
+            val current = generation
+            if (identity.subject == null || identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
+            val request = session.settingsRequest()
+            if (current != generation || session.identity.value != identity) throw kotlinx.coroutines.CancellationException()
+            return request
+        }
         val tokens = credentials?.takeIf { it.active } ?: throw UOATransport.Failure(401)
         val current = generation
         val token = tokens.validToken(tokens.generation)

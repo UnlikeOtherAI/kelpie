@@ -1,4 +1,5 @@
 import ProjectDescription
+import ProjectDescriptionHelpers
 
 // MARK: - Script phases
 
@@ -104,28 +105,6 @@ let embedGeckoHelper = TargetScript.post(
     name: "Embed Gecko Helper"
 )
 
-// MARK: - Linker flags
-
-let macOSLinkerFlags: SettingValue = .array([
-    "-lkelpie_core_state",
-    "-lkelpie_core_connect",
-    "-lkelpie_core_protocol",
-    "-lkelpie_core_automation",
-    "-lkelpie_core_mcp",
-    "-lkelpie_core_ai",
-    "-lllama",
-    "-lggml",
-    "-lggml-base",
-    "-lggml-cpu",
-    "-lggml-metal",
-    "-lggml-blas",
-    "-lc++",
-    "-framework AppIntents",
-    "-framework Metal",
-    "-framework Accelerate",
-    "-framework \"Chromium Embedded Framework\"",
-])
-
 // MARK: - Targets
 
 
@@ -153,38 +132,10 @@ let kelpieApp = Target.target(
         .package(product: "AppReveal"),
     ],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../core/apple/macos/Renderer",
-                "$(PROJECT_DIR)/../../core/native/core-state/include",
-                "$(PROJECT_DIR)/../../core/native/core-connect/include",
-                "$(PROJECT_DIR)/../../core/native/core-protocol/include",
-                "$(PROJECT_DIR)/../../core/native/core-automation/include",
-                "$(PROJECT_DIR)/../../core/native/core-mcp/include",
-                "$(PROJECT_DIR)/../../core/native/core-ai/include",
-                "$(PROJECT_DIR)/../../core/apple/macos/Frameworks/cef_include",
-                "$(PROJECT_DIR)/../../core/apple/macos/vendor/llama.cpp/include",
-            ]),
-            "LIBRARY_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../core/native/.build/core-state",
-                "$(PROJECT_DIR)/../../core/native/.build/core-connect",
-                "$(PROJECT_DIR)/../../core/native/.build/core-protocol",
-                "$(PROJECT_DIR)/../../core/native/.build/core-automation",
-                "$(PROJECT_DIR)/../../core/native/.build/core-mcp",
-                "$(PROJECT_DIR)/../../core/native/.build/core-ai",
-                "$(PROJECT_DIR)/../../core/apple/macos/vendor/llama.cpp/lib",
-            ]),
-            "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../core/apple/macos/Frameworks",
-            ]),
-            "OTHER_LDFLAGS": macOSLinkerFlags,
+        base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core", additional: [
             "COMBINE_HIDPI_IMAGES": "YES",
-            "ENABLE_APP_SANDBOX": "NO",
-            "GENERATE_APP_INTENTS_METADATA": "NO",
-            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-        ]
+            "ENABLE_APP_SANDBOX": "NO"
+        ])
     )
 )
 
@@ -204,14 +155,7 @@ let kelpieTests = Target.target(
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
     ],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../core/apple/macos/Renderer",
-                "$(PROJECT_DIR)/../../core/apple/macos/Frameworks/cef_include",
-            ]),
-        ]
+        base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core")
     )
 )
 

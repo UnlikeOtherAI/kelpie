@@ -1,37 +1,5 @@
 import ProjectDescription
-
-let macOSLinkerFlags: SettingValue = .array([
-    "-lkelpie_core_state",
-    "-lkelpie_core_connect",
-    "-lkelpie_core_protocol",
-    "-lkelpie_core_automation",
-    "-lkelpie_core_mcp",
-    "-lkelpie_core_ai",
-    "-lllama",
-    "-lggml",
-    "-lggml-base",
-    "-lggml-cpu",
-    "-lggml-metal",
-    "-lggml-blas",
-    "-lc++",
-    "-framework AppIntents",
-    "-framework Metal",
-    "-framework Accelerate",
-    "-framework \"Chromium Embedded Framework\""
-])
-
-let iOSLinkerFlags: SettingValue = .array([
-    "-lkelpie_core_state",
-    "-lkelpie_core_connect",
-    "-lkelpie_core_protocol",
-    "-lkelpie_core_automation",
-    "-lkelpie_core_mcp",
-    "-lkelpie_core_ai",
-    "-lllama", "-lggml", "-lggml-base", "-lggml-cpu",
-    "-framework AppIntents",
-    "-framework Accelerate",
-    "-lc++"
-])
+import ProjectDescriptionHelpers
 
 let macBrowser = Target.target(
     name: "KelpieBrowserMac",
@@ -47,42 +15,14 @@ let macBrowser = Target.target(
     ],
     dependencies: [.target(name: "KelpieResourcesMac")],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
+        base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/..", additional: [
             "DEFINES_MODULE": "YES",
             "PRODUCT_MODULE_NAME": "KelpieBrowser",
             "ENABLE_TESTABILITY": "YES",
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
             "SWIFT_OBJC_BRIDGING_HEADER": "macos/Kelpie-Bridging-Header.h",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Renderer",
-                "$(PROJECT_DIR)/../../core/native/core-state/include",
-                "$(PROJECT_DIR)/../../core/native/core-connect/include",
-                "$(PROJECT_DIR)/../../core/native/core-protocol/include",
-                "$(PROJECT_DIR)/../../core/native/core-automation/include",
-                "$(PROJECT_DIR)/../../core/native/core-mcp/include",
-                "$(PROJECT_DIR)/../../core/native/core-ai/include",
-                "$(PROJECT_DIR)/macos/Frameworks/cef_include",
-                "$(PROJECT_DIR)/macos/vendor/llama.cpp/include"
-            ]),
-            "LIBRARY_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../core/native/.build/core-state",
-                "$(PROJECT_DIR)/../../core/native/.build/core-connect",
-                "$(PROJECT_DIR)/../../core/native/.build/core-protocol",
-                "$(PROJECT_DIR)/../../core/native/.build/core-automation",
-                "$(PROJECT_DIR)/../../core/native/.build/core-mcp",
-                "$(PROJECT_DIR)/../../core/native/.build/core-ai",
-                "$(PROJECT_DIR)/macos/vendor/llama.cpp/lib"
-            ]),
-            "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Frameworks"
-            ]),
-            "OTHER_LDFLAGS": macOSLinkerFlags,
             "COMBINE_HIDPI_IMAGES": "YES",
-            "ENABLE_APP_SANDBOX": "NO",
-            "GENERATE_APP_INTENTS_METADATA": "NO",
-            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO"
-        ]
+            "ENABLE_APP_SANDBOX": "NO"
+        ])
     )
 )
 
@@ -99,42 +39,13 @@ let iosBrowser = Target.target(
     ],
     dependencies: [.target(name: "KelpieResourcesIOS")],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
+        base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/..", additional: [
             "DEFINES_MODULE": "YES",
             "PRODUCT_MODULE_NAME": "KelpieBrowser",
             "ENABLE_TESTABILITY": "YES",
             "SWIFT_OBJC_BRIDGING_HEADER": "ios/Kelpie-Bridging-Header.h",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../core/native/core-state/include",
-                "$(PROJECT_DIR)/../../core/native/core-connect/include",
-                "$(PROJECT_DIR)/../../core/native/core-protocol/include",
-                "$(PROJECT_DIR)/../../core/native/core-automation/include",
-                "$(PROJECT_DIR)/../../core/native/core-mcp/include",
-                "$(PROJECT_DIR)/../../core/native/core-ai/include"
-            ]),
-            "LIBRARY_SEARCH_PATHS": .array([
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-state",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-connect",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-protocol",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-automation",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-mcp",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-ai",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/src",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src/ggml-cpu"
-            ]),
-            "OTHER_LDFLAGS": iOSLinkerFlags,
-            "GENERATE_APP_INTENTS_METADATA": "NO",
-            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.22",
-            "CURRENT_PROJECT_VERSION": "21",
-            "TARGETED_DEVICE_FAMILY": "1,2",
-            "DEVELOPMENT_TEAM": "59S95D279D",
-            // Conditional native build dir — device vs simulator
-            "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../core/native/.build-iphoneos",
-            "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../core/native/.build-ios-sim"
-        ]
+            "TARGETED_DEVICE_FAMILY": "1,2"
+        ])
     )
 )
 
