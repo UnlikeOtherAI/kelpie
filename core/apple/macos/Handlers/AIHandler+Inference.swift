@@ -135,7 +135,7 @@ extension AIHandler {
             return .failure(errorResponse(code: "MISSING_PARAM", message: "model or path is required"))
         }
 
-        let modelURL = FileManager.default.homeDirectoryForCurrentUser
+        let modelURL = KelpieStorage.homeDirectory
             .appendingPathComponent(".kelpie/models/\(model)/model.gguf")
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
             return .failure(errorResponse(code: "MODEL_NOT_FOUND", message: "No GGUF file at specified path"))

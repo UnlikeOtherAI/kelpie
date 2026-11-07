@@ -153,9 +153,9 @@ extension BrowserView {
 
     func updateAvailableTabletViewportPresetState(for availableSize: CGSize) {
         let nextIDs = fittingTabletViewportPresets(for: availableSize).map(\.id)
-        UserDefaults.standard.set(nextIDs.joined(separator: ","), forKey: ipadMobileStageAvailablePresetIDsDefaultsKey)
-        UserDefaults.standard.set(availableSize.width, forKey: ipadMobileStageAvailableWidthDefaultsKey)
-        UserDefaults.standard.set(availableSize.height, forKey: ipadMobileStageAvailableHeightDefaultsKey)
+        KelpieStorage.defaults.set(nextIDs.joined(separator: ","), forKey: ipadMobileStageAvailablePresetIDsDefaultsKey)
+        KelpieStorage.defaults.set(availableSize.width, forKey: ipadMobileStageAvailableWidthDefaultsKey)
+        KelpieStorage.defaults.set(availableSize.height, forKey: ipadMobileStageAvailableHeightDefaultsKey)
 
         if nextIDs != availableIPadViewportPresetIDs {
             availableIPadViewportPresetIDs = nextIDs
@@ -168,7 +168,7 @@ extension BrowserView {
 
     func setTabletViewportPreset(_ presetID: String) {
         iPadMobileStagePresetID = presetID
-        UserDefaults.standard.set(presetID, forKey: ipadMobileStagePresetDefaultsKey)
+        KelpieStorage.defaults.set(presetID, forKey: ipadMobileStagePresetDefaultsKey)
     }
 
 }

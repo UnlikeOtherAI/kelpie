@@ -33,6 +33,7 @@ final class NessieConnection: ObservableObject {
     private var remoteTabMutation = false
     private var epoch = UUID()
     #if os(macOS)
+    var acceptsPersonEvent: (NSEvent) -> Bool = { _ in true }
     private var personInputMonitor: Any?
     #endif
 
@@ -41,7 +42,7 @@ final class NessieConnection: ObservableObject {
         browser = ConnectBrowser(context: context)
         #if os(macOS)
         personInputMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown, .scrollWheel]) { [weak self] event in
-            MainActor.assumeIsolated { self?.personInteracted() }
+            MainActor.assumeIsolated { if self?.acceptsPersonEvent(event) == true { self?.personInteracted() } }
             return event
         }
         #endif
@@ -350,7 +351,7 @@ final class NessieConnection: ObservableObject {
     }
 
     private var installationID: String {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         if let value = defaults.string(forKey: "nessie.connect.installation"), UUID(uuidString: value) != nil { return value }
         let value = UUID().uuidString
         defaults.set(value, forKey: "nessie.connect.installation")

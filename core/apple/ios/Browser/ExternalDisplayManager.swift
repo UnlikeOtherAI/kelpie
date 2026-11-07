@@ -15,7 +15,7 @@ final class ExternalDisplayManager: ObservableObject {
     static let debugTVSize = CGSize(width: 1920, height: 1080)
 
     @Published private(set) var isConnected = false
-    @Published private(set) var isSyncEnabled = UserDefaults.standard.bool(forKey: "tvSyncEnabled")
+    @Published private(set) var isSyncEnabled = KelpieStorage.defaults.bool(forKey: "tvSyncEnabled")
     let externalPort: UInt16 = 8421
     var attachPath: String?
 
@@ -141,7 +141,7 @@ final class ExternalDisplayManager: ObservableObject {
     func setSyncEnabled(_ enabled: Bool) {
         guard isSyncEnabled != enabled else { return }
         isSyncEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "tvSyncEnabled")
+        KelpieStorage.defaults.set(enabled, forKey: "tvSyncEnabled")
         log("sync enabled changed to \(enabled)")
         if enabled {
             startSyncLoopIfNeeded()

@@ -19,10 +19,10 @@ struct BrowserView: View {
     @State private var showBookmarks = false
     @State var chromeAppearance = BrowserChromeAppearance()
     @State private var showNetworkInspector = false
-    @State var isAIPanelOpen: Bool = UserDefaults.standard.bool(forKey: "com.kelpie.macos.ai-panel-open")
+    @State var isAIPanelOpen: Bool = KelpieStorage.defaults.bool(forKey: "com.kelpie.macos.ai-panel-open")
     @State var aiPanelTab: AIPanelTab = .models
     @State var aiPanelWidth: CGFloat = {
-        let v = UserDefaults.standard.double(forKey: "com.kelpie.macos.ai-panel-width")
+        let v = KelpieStorage.defaults.double(forKey: "com.kelpie.macos.ai-panel-width")
         return CGFloat(v >= 200 ? v : 250)
     }()
     @State var isIn3DInspector = false
@@ -34,6 +34,7 @@ struct BrowserView: View {
     @State var pendingInsecureURL: URL?
     /// Stable per-window id used by `WindowRegistry` so HTTP handlers can
     /// route `(windowId, tabId)` requests to the correct shell.
+    let ownsWindowChrome: Bool
     let windowId: String
 
     var body: some View {
@@ -42,7 +43,7 @@ struct BrowserView: View {
                 ConnectControls(compact: true)
                 if !serverState.isScriptRecording {
                     Group {
-                        if isWindowFullscreen {
+                        if !ownsWindowChrome || isWindowFullscreen {
                             browserTabs.padding(.horizontal, 12)
                         } else {
                             Color.clear.frame(height: 32)
@@ -201,7 +202,8 @@ struct BrowserView: View {
             inspectorMode = "rotate"
         }
         .animation(.easeOut(duration: 0.2), value: serverState.shellToastMessage != nil)
-        .background(
+        .background {
+            if ownsWindowChrome {
             WindowChromeBridge(
                 title: windowTitle,
                 tabs: AnyView(browserTabs),
@@ -213,7 +215,8 @@ struct BrowserView: View {
                 )
             )
             .frame(width: 0, height: 0)
-        )
+            }
+        }
         .background(
             WindowRegistrationBridge(windowId: windowId, tabStore: tabStore)
                 .frame(width: 0, height: 0)
@@ -272,8 +275,10 @@ struct BrowserView: View {
             // requests here.
             registerWindow()
             // Remove focus from URL bar on launch
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                NSApplication.shared.keyWindow?.makeFirstResponder(nil)
+            if ownsWindowChrome {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NSApplication.shared.keyWindow?.makeFirstResponder(nil)
+                }
             }
             Task { @MainActor in
                 aiState.configure(router: serverState.router)
@@ -321,7 +326,7 @@ struct BrowserView: View {
             inspectorMode = "rotate"
         }
         .onChange(of: isAIPanelOpen) { _, open in
-            UserDefaults.standard.set(open, forKey: "com.kelpie.macos.ai-panel-open")
+            KelpieStorage.defaults.set(open, forKey: "com.kelpie.macos.ai-panel-open")
         }
         .onChange(of: serverState.isScriptRecording) { _, isRecording in
             guard isRecording else { return }

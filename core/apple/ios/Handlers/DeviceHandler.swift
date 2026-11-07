@@ -41,7 +41,7 @@ struct DeviceHandler {
     @MainActor
     private func getViewportPresets() async -> [String: Any] {
         let availablePresetIDs = currentTabletViewportAvailablePresetIDs()
-        let storedPresetID = UserDefaults.standard.string(forKey: ipadMobileStagePresetDefaultsKey) ?? ""
+        let storedPresetID = KelpieStorage.defaults.string(forKey: ipadMobileStagePresetDefaultsKey) ?? ""
         let activePresetID: Any = availablePresetIDs.contains(storedPresetID) ? storedPresetID : NSNull()
 
         return successResponse([
@@ -277,12 +277,12 @@ struct DeviceHandler {
 
     private func setDebugOverlay(_ body: [String: Any]) -> [String: Any] {
         let enabled = body["enabled"] as? Bool ?? true
-        UserDefaults.standard.set(enabled, forKey: "debugOverlay")
+        KelpieStorage.defaults.set(enabled, forKey: "debugOverlay")
         return successResponse(["enabled": enabled])
     }
 
     private func getDebugOverlay() -> [String: Any] {
-        successResponse(["enabled": UserDefaults.standard.bool(forKey: "debugOverlay")])
+        successResponse(["enabled": KelpieStorage.defaults.bool(forKey: "debugOverlay")])
     }
 
     private func getCapabilities() -> [String: Any] {

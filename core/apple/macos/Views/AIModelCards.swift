@@ -20,7 +20,7 @@ struct CollapsibleModelSection<Content: View, Trailing: View>: View {
         self.defaultsKey = defaultsKey
         self.trailing = trailing
         self.content = content
-        let saved = UserDefaults.standard.object(forKey: defaultsKey) as? Bool
+        let saved = KelpieStorage.defaults.object(forKey: defaultsKey) as? Bool
         _isExpanded = State(initialValue: saved ?? true)
     }
 
@@ -30,7 +30,7 @@ struct CollapsibleModelSection<Content: View, Trailing: View>: View {
                 withAnimation(.easeOut(duration: 0.15)) {
                     isExpanded.toggle()
                 }
-                UserDefaults.standard.set(isExpanded, forKey: defaultsKey)
+                KelpieStorage.defaults.set(isExpanded, forKey: defaultsKey)
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")

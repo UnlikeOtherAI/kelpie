@@ -105,7 +105,7 @@ struct SettingsView: View {
                 Section("Experimental") {
                     Toggle("3D DOM Inspector", isOn: Binding(
                         get: { FeatureFlags.is3DInspectorEnabled },
-                        set: { UserDefaults.standard.set($0, forKey: "enable3DInspector") }
+                        set: { KelpieStorage.defaults.set($0, forKey: "enable3DInspector") }
                     ))
                 }
 

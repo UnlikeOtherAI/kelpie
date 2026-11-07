@@ -33,23 +33,23 @@ final class AIState: ObservableObject {
 
     @Published var backend: String {
         didSet {
-            UserDefaults.standard.set(backend, forKey: DefaultsKey.backend)
+            KelpieStorage.defaults.set(backend, forKey: DefaultsKey.backend)
         }
     }
 
     @Published var activeModel: String? {
         didSet {
             if let activeModel {
-                UserDefaults.standard.set(activeModel, forKey: DefaultsKey.activeModel)
+                KelpieStorage.defaults.set(activeModel, forKey: DefaultsKey.activeModel)
             } else {
-                UserDefaults.standard.removeObject(forKey: DefaultsKey.activeModel)
+                KelpieStorage.defaults.removeObject(forKey: DefaultsKey.activeModel)
             }
         }
     }
 
     var ollamaEndpoint: String {
         get {
-            let stored = UserDefaults.standard.string(forKey: DefaultsKey.ollamaEndpoint)
+            let stored = KelpieStorage.defaults.string(forKey: DefaultsKey.ollamaEndpoint)
             return stored?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
                 // swiftlint:disable:next force_unwrapping
                 ? stored!
@@ -57,7 +57,7 @@ final class AIState: ObservableObject {
         }
         set {
             let normalized = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            UserDefaults.standard.set(
+            KelpieStorage.defaults.set(
                 normalized.isEmpty ? Self.defaultOllamaEndpoint : normalized,
                 forKey: DefaultsKey.ollamaEndpoint
             )
@@ -100,7 +100,7 @@ final class AIState: ObservableObject {
     private init() {
         isAvailable = PlatformAIEngine.isAvailable
 
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         huggingFaceToken = Self.loadHuggingFaceTokenWithMigration(defaults: defaults)
         let storedModel = defaults.string(forKey: DefaultsKey.activeModel)
         let storedBackend = defaults.string(forKey: DefaultsKey.backend) ?? "platform"
@@ -186,7 +186,7 @@ final class AIState: ObservableObject {
 
     /// The persisted endpoint selection, if it still names a saved endpoint.
     private static func persistedOpenAISelection() -> OpenAIActiveSelection? {
-        let persistence = OpenAIEndpointPersistence(defaults: .standard)
+        let persistence = OpenAIEndpointPersistence(defaults: KelpieStorage.defaults)
         guard let active = persistence.loadActive(),
               persistence.loadEndpoints().contains(where: { $0.id == active.endpointId }) else { return nil }
         return active

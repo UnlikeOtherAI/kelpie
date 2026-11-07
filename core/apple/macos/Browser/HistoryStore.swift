@@ -174,7 +174,7 @@ final class HistoryStore: ObservableObject {
 
     private func persist() {
         let payload = Self.jsonData(from: entries.map(Self.persistedJSONObject)) ?? Data("[]".utf8)
-        UserDefaults.standard.set(payload, forKey: key)
+        KelpieStorage.defaults.set(payload, forKey: key)
     }
 
     private func exportedJSON() -> String? {
@@ -185,11 +185,11 @@ final class HistoryStore: ObservableObject {
     }
 
     private func loadPersistedJSON() -> String? {
-        if let data = UserDefaults.standard.data(forKey: key) {
+        if let data = KelpieStorage.defaults.data(forKey: key) {
             return normalizedPersistedJSON(from: data)
         }
 
-        if let string = UserDefaults.standard.string(forKey: key) {
+        if let string = KelpieStorage.defaults.string(forKey: key) {
             return normalizedPersistedJSON(from: Data(string.utf8))
         }
 

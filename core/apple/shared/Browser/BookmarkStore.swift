@@ -17,7 +17,7 @@ final class BookmarkStore: ObservableObject {
     private var loadError: Error?
     private var undoRemoval: (BookmarkTree.Mutation, UUID)?
 
-    init(defaults: UserDefaults = .standard) { self.defaults = defaults; load() }
+    init(defaults: UserDefaults = KelpieStorage.defaults) { self.defaults = defaults; load() }
 
     func children(of parent: UUID?) -> [Bookmark] { nodes.filter { $0.parentId == parent } }
 

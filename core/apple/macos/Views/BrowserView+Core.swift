@@ -181,7 +181,7 @@ extension BrowserView {
     }
 
     func persistAIPanelWidth() {
-        UserDefaults.standard.set(Double(aiPanelWidth), forKey: "com.kelpie.macos.ai-panel-width")
+        KelpieStorage.defaults.set(Double(aiPanelWidth), forKey: "com.kelpie.macos.ai-panel-width")
     }
 
     func notifyRendererViewportChangeIfNeeded() {

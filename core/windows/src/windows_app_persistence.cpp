@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <limits>
+#include <stdexcept>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -82,6 +83,13 @@ bool SameSession(const SessionSnapshot& left, const SessionSnapshot& right) {
 void WindowsApp::ResolveProfileDirectory() {
   if (config_.profile_dir.empty()) {
     config_.profile_dir = RoamingAppDataPath();
+    if (config_.hosted || config_.uoa_session) {
+      std::wstring executable(32768, L'\0');
+      const DWORD size = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+      if (size == 0 || size >= executable.size()) throw std::runtime_error("Cannot identify the browser host");
+      executable.resize(size);
+      config_.profile_dir /= std::filesystem::path("hosts") / std::filesystem::path(executable).stem();
+    }
   }
   // CEF compares profile parents with its normalized user-data path. Mixed
   // separators or relative paths otherwise turn persistent partitions into

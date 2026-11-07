@@ -18,13 +18,13 @@ final class RendererState: ObservableObject {
     @Published var activeEngine: Engine {
         didSet {
             if activeEngine != oldValue { NessieConnection.shared.personChangedTab() }
-            UserDefaults.standard.set(activeEngine.rawValue, forKey: "com.kelpie.renderer-engine")
+            KelpieStorage.defaults.set(activeEngine.rawValue, forKey: "com.kelpie.renderer-engine")
         }
     }
     @Published var isSwitching: Bool = false
 
     init() {
-        let saved = UserDefaults.standard.string(forKey: "com.kelpie.renderer-engine") ?? ""
+        let saved = KelpieStorage.defaults.string(forKey: "com.kelpie.renderer-engine") ?? ""
         self.activeEngine = Engine(rawValue: saved) ?? .webkit
     }
 }

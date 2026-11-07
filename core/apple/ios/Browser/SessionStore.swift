@@ -22,26 +22,26 @@ enum SessionStore {
         let records = valid.map { TabRecord(url: $0.currentURL, partition: $0.partition, name: $0.name) }
         let snapshot = Snapshot(version: 2, tabs: records, activeIndex: valid.firstIndex(where: { $0.id == activeID }) ?? 0)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        KelpieStorage.defaults.set(data, forKey: key)
         // An older app must never reopen an isolated URL in its default profile.
-        UserDefaults.standard.set(valid.filter { $0.partition == nil }.map(\.currentURL), forKey: urlsKey)
-        UserDefaults.standard.set(0, forKey: activeIndexKey)
+        KelpieStorage.defaults.set(valid.filter { $0.partition == nil }.map(\.currentURL), forKey: urlsKey)
+        KelpieStorage.defaults.set(0, forKey: activeIndexKey)
     }
 
     static func load() -> Snapshot? {
-        if let data = UserDefaults.standard.data(forKey: key) {
+        if let data = KelpieStorage.defaults.data(forKey: key) {
             guard let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data), snapshot.version == 2 else { return nil }
             return snapshot
         }
-        guard let urls = UserDefaults.standard.stringArray(forKey: urlsKey), !urls.isEmpty else { return nil }
+        guard let urls = KelpieStorage.defaults.stringArray(forKey: urlsKey), !urls.isEmpty else { return nil }
         return Snapshot(
             version: 2,
             tabs: urls.map { TabRecord(url: $0, partition: nil, name: nil) },
-            activeIndex: max(0, UserDefaults.standard.integer(forKey: activeIndexKey))
+            activeIndex: max(0, KelpieStorage.defaults.integer(forKey: activeIndexKey))
         )
     }
 
     static func clear() {
-        for key in [key, urlsKey, activeIndexKey] { UserDefaults.standard.removeObject(forKey: key) }
+        for key in [key, urlsKey, activeIndexKey] { KelpieStorage.defaults.removeObject(forKey: key) }
     }
 }

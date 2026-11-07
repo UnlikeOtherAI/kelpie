@@ -7,11 +7,11 @@ enum DeviceIdentity {
     private static let defaultsKey = "com.kelpie.device-id"
 
     static var id: String {
-        if let stored = UserDefaults.standard.string(forKey: defaultsKey), !stored.isEmpty {
+        if let stored = KelpieStorage.defaults.string(forKey: defaultsKey), !stored.isEmpty {
             return stored
         }
         let newId = hardwareUUID() ?? UUID().uuidString
-        UserDefaults.standard.set(newId, forKey: defaultsKey)
+        KelpieStorage.defaults.set(newId, forKey: defaultsKey)
         return newId
     }
 

@@ -30,13 +30,13 @@ final class TabStore: ObservableObject {
                 return
             }
         }
-        let showStartPage = !UserDefaults.standard.bool(forKey: "hideWelcomeCard")
+        let showStartPage = !KelpieStorage.defaults.bool(forKey: "hideWelcomeCard")
         let tab = createBrowserTab(isStartPage: showStartPage)
         bind(tab)
         tabs = [tab]
         activeBrowserTabID = tab.id
         if !showStartPage {
-            let homeURL = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
+            let homeURL = KelpieStorage.defaults.string(forKey: "homeURL") ?? defaultHomeURL
             if let url = URL(string: homeURL) {
                 tab.webView.load(URLRequest(url: url))
             }

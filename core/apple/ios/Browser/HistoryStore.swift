@@ -150,14 +150,14 @@ final class HistoryStore: ObservableObject {
         guard let json = encodeEntriesForNative(entries) else {
             return
         }
-        UserDefaults.standard.set(Data(json.utf8), forKey: key)
+        KelpieStorage.defaults.set(Data(json.utf8), forKey: key)
     }
 
     private func persistedData() -> Data? {
-        if let data = UserDefaults.standard.data(forKey: key) {
+        if let data = KelpieStorage.defaults.data(forKey: key) {
             return data
         }
-        if let string = UserDefaults.standard.string(forKey: key) {
+        if let string = KelpieStorage.defaults.string(forKey: key) {
             return Data(string.utf8)
         }
         return nil

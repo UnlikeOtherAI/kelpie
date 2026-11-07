@@ -17,7 +17,7 @@ enum TapCalibrationStore {
     private static let offsetYKey = "tapCalibrationOffsetY"
 
     static func current() -> TapCalibration {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         return TapCalibration(
             offsetX: defaults.double(forKey: offsetXKey),
             offsetY: defaults.double(forKey: offsetYKey)
@@ -26,7 +26,7 @@ enum TapCalibrationStore {
 
     @discardableResult
     static func save(offsetX: Double, offsetY: Double) -> TapCalibration {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         defaults.set(offsetX, forKey: offsetXKey)
         defaults.set(offsetY, forKey: offsetYKey)
         return TapCalibration(offsetX: offsetX, offsetY: offsetY)

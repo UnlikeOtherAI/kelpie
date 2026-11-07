@@ -35,7 +35,7 @@ struct DeviceInfo {
     }
 
     static func currentRendererEngine() -> String {
-        let saved = UserDefaults.standard.string(forKey: rendererEngineDefaultsKey) ?? ""
+        let saved = KelpieStorage.defaults.string(forKey: rendererEngineDefaultsKey) ?? ""
         return ["webkit", "chromium"].contains(saved) ? saved : "webkit"
     }
 

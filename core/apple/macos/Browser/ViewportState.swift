@@ -134,12 +134,12 @@ final class ViewportState: ObservableObject {
 
     func scaleUp() {
         scale = min(((scale + Self.scaleStep) * 10).rounded() / 10, Self.maxScale)
-        UserDefaults.standard.set(scale, forKey: Self.scaleDefaultsKey)
+        KelpieStorage.defaults.set(scale, forKey: Self.scaleDefaultsKey)
     }
 
     func scaleDown() {
         scale = max(((scale - Self.scaleStep) * 10).rounded() / 10, Self.minScale)
-        UserDefaults.standard.set(scale, forKey: Self.scaleDefaultsKey)
+        KelpieStorage.defaults.set(scale, forKey: Self.scaleDefaultsKey)
     }
 
     // MARK: - Stage summary (shown in the chrome pill above the viewport)
@@ -155,7 +155,7 @@ final class ViewportState: ObservableObject {
     // MARK: - Window size persistence
 
     static var persistedShellWindowSize: NSSize? {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         let width  = defaults.double(forKey: shellWindowWidthDefaultsKey)
         let height = defaults.double(forKey: shellWindowHeightDefaultsKey)
         guard width > 0, height > 0 else { return nil }
@@ -170,15 +170,15 @@ final class ViewportState: ObservableObject {
             width: max(size.width.rounded(.down), minimumShellSize.width),
             height: max(size.height.rounded(.down), minimumShellSize.height)
         )
-        UserDefaults.standard.set(normalized.width, forKey: shellWindowWidthDefaultsKey)
-        UserDefaults.standard.set(normalized.height, forKey: shellWindowHeightDefaultsKey)
+        KelpieStorage.defaults.set(normalized.width, forKey: shellWindowWidthDefaultsKey)
+        KelpieStorage.defaults.set(normalized.height, forKey: shellWindowHeightDefaultsKey)
     }
 
     // MARK: - Window position persistence
 
     /// Last saved window origin (bottom-left, screen coordinates), or nil if never saved.
     static var persistedShellWindowOrigin: NSPoint? {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         guard defaults.bool(forKey: shellWindowOriginSetDefaultsKey) else { return nil }
         return NSPoint(
             x: defaults.double(forKey: shellWindowOriginXDefaultsKey),
@@ -187,7 +187,7 @@ final class ViewportState: ObservableObject {
     }
 
     static func persistShellWindowOrigin(_ origin: NSPoint) {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         defaults.set(origin.x, forKey: shellWindowOriginXDefaultsKey)
         defaults.set(origin.y, forKey: shellWindowOriginYDefaultsKey)
         defaults.set(true, forKey: shellWindowOriginSetDefaultsKey)
@@ -282,7 +282,7 @@ final class ViewportState: ObservableObject {
     func selectOrientation(_ newOrientation: ViewportOrientation) {
         guard orientation != newOrientation else { return }
         orientation = newOrientation
-        UserDefaults.standard.set(newOrientation.rawValue, forKey: Self.orientationDefaultsKey)
+        KelpieStorage.defaults.set(newOrientation.rawValue, forKey: Self.orientationDefaultsKey)
         _ = recalculateViewportSize()
     }
 
@@ -357,11 +357,11 @@ final class ViewportState: ObservableObject {
         case .custom:          value = "custom"
         case let .preset(id):  value = "preset:\(id)"
         }
-        UserDefaults.standard.set(value, forKey: Self.selectedModeDefaultsKey)
+        KelpieStorage.defaults.set(value, forKey: Self.selectedModeDefaultsKey)
     }
 
     private static func restoredMode() -> ViewportMode {
-        let raw = UserDefaults.standard.string(forKey: selectedModeDefaultsKey) ?? "full"
+        let raw = KelpieStorage.defaults.string(forKey: selectedModeDefaultsKey) ?? "full"
         if raw == "full" || raw == "custom" { return .full }
         if raw.hasPrefix("preset:") {
             let id = String(raw.dropFirst("preset:".count))
@@ -371,12 +371,12 @@ final class ViewportState: ObservableObject {
     }
 
     private static func restoredOrientation() -> ViewportOrientation {
-        let raw = UserDefaults.standard.string(forKey: orientationDefaultsKey) ?? ""
+        let raw = KelpieStorage.defaults.string(forKey: orientationDefaultsKey) ?? ""
         return ViewportOrientation(rawValue: raw) ?? .portrait
     }
 
     private static func restoredScale() -> Double {
-        let saved = UserDefaults.standard.double(forKey: scaleDefaultsKey)
+        let saved = KelpieStorage.defaults.double(forKey: scaleDefaultsKey)
         guard saved > 0 else { return 1.0 }
         let clamped = min(max(saved, minScale), maxScale)
         return (clamped / scaleStep).rounded() * scaleStep

@@ -6,6 +6,9 @@ included:
   - apps/macos/Kelpie
 
 excluded:
+  - core/apple/macos/Frameworks
+  - core/apple/macos/vendor
+  - core/apple/.build
   - apps/ios/.build
   - apps/macos/.build
   - apps/macos/Frameworks

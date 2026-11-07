@@ -60,7 +60,7 @@ struct AIHandler {
     @MainActor private static let recorder = AudioRecorder()
 
     private let aiManager: AIManager = {
-        let modelsDir = FileManager.default.homeDirectoryForCurrentUser
+        let modelsDir = KelpieStorage.homeDirectory
             .appendingPathComponent(".kelpie/models", isDirectory: true).path
         return AIManager(modelsDir: modelsDir)
     }()

@@ -7,7 +7,7 @@ import Foundation
 /// `OpenAIEndpointService+Health.swift`.
 actor OpenAIEndpointService {
     static let shared = OpenAIEndpointService(
-        persistence: OpenAIEndpointPersistence(defaults: .standard),
+        persistence: OpenAIEndpointPersistence(defaults: KelpieStorage.defaults),
         secrets: SecretStore.shared,
         transport: URLSessionOpenAITransport.shared
     )

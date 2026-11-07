@@ -82,7 +82,7 @@ enum SharedCookieJar {
     }
 
     private static var directoryURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        KelpieStorage.homeDirectory
             .appendingPathComponent(".kelpie", isDirectory: true)
             .appendingPathComponent("session", isDirectory: true)
     }

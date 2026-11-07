@@ -44,13 +44,13 @@ enum SessionStore {
             print("[SessionStore] failed to encode \(records.count) tab record(s) — session not saved")
             return
         }
-        UserDefaults.standard.set(data, forKey: tabsKey)
-        UserDefaults.standard.removeObject(forKey: legacyURLsKey)
-        UserDefaults.standard.removeObject(forKey: legacyActiveIndexKey)
+        KelpieStorage.defaults.set(data, forKey: tabsKey)
+        KelpieStorage.defaults.removeObject(forKey: legacyURLsKey)
+        KelpieStorage.defaults.removeObject(forKey: legacyActiveIndexKey)
     }
 
     static func load() -> [TabRecord] {
-        if let data = UserDefaults.standard.data(forKey: tabsKey) {
+        if let data = KelpieStorage.defaults.data(forKey: tabsKey) {
             guard let records = try? JSONDecoder().decode([TabRecord].self, from: data) else {
                 print("[SessionStore] tab records failed to decode — starting from a blank session")
                 clear()
@@ -63,18 +63,18 @@ enum SessionStore {
 
     /// Reads the pre-partition format: a plain URL array plus an active index.
     private static func loadLegacy() -> [TabRecord] {
-        guard let urls = UserDefaults.standard.stringArray(forKey: legacyURLsKey), !urls.isEmpty else {
+        guard let urls = KelpieStorage.defaults.stringArray(forKey: legacyURLsKey), !urls.isEmpty else {
             return []
         }
-        let activeIndex = UserDefaults.standard.integer(forKey: legacyActiveIndexKey)
+        let activeIndex = KelpieStorage.defaults.integer(forKey: legacyActiveIndexKey)
         return urls.enumerated().map { index, url in
             TabRecord(url: url, isActive: index == activeIndex)
         }
     }
 
     static func clear() {
-        UserDefaults.standard.removeObject(forKey: tabsKey)
-        UserDefaults.standard.removeObject(forKey: legacyURLsKey)
-        UserDefaults.standard.removeObject(forKey: legacyActiveIndexKey)
+        KelpieStorage.defaults.removeObject(forKey: tabsKey)
+        KelpieStorage.defaults.removeObject(forKey: legacyURLsKey)
+        KelpieStorage.defaults.removeObject(forKey: legacyActiveIndexKey)
     }
 }

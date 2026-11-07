@@ -6,14 +6,14 @@ import WebKit
 let defaultHomeURL = "https://unlikeotherai.github.io/kelpie"
 
 enum WebViewDefaults {
-    static let sharedWebsiteDataStore = WKWebsiteDataStore.default()
+    static let sharedWebsiteDataStore = KelpieWebsiteData.store
     static let sharedUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 }
 
 /// Observable state shared between the browser UI and WebView coordinator.
 final class BrowserState: ObservableObject {
-    @Published var currentURL: String = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
-    @Published var isStartPage: Bool = !UserDefaults.standard.bool(forKey: "hideWelcomeCard")
+    @Published var currentURL: String = KelpieStorage.defaults.string(forKey: "homeURL") ?? defaultHomeURL
+    @Published var isStartPage: Bool = !KelpieStorage.defaults.bool(forKey: "hideWelcomeCard")
     @Published var pageTitle: String = ""
     @Published var isLoading: Bool = false
     @Published var canGoBack: Bool = false

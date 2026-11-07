@@ -12,7 +12,7 @@ final class ConnectBrowser {
     var modelInstalled: Bool {
         if cachedModelReady { return true }
         #if os(iOS)
-        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("local-models")
+        let directory = KelpieStorage.documentsDirectory.appendingPathComponent("local-models")
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         return files.contains { $0.pathExtension.lowercased() == "gguf" }
         #else

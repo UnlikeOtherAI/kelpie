@@ -23,8 +23,13 @@ public final class KelpieUOASession: ObservableObject {
     let signIn: () -> Void
     let signOut: () -> Void
 
-    public init(subject: String?, request: @escaping Request, settingsSocket: @escaping SettingsSocket,
-                signIn: @escaping () -> Void, signOut: @escaping () -> Void) {
+    public init(
+        subject: String?,
+        request: @escaping Request,
+        settingsSocket: @escaping SettingsSocket,
+        signIn: @escaping () -> Void,
+        signOut: @escaping () -> Void
+    ) {
         self.subject = subject
         self.request = request
         self.settingsSocket = settingsSocket

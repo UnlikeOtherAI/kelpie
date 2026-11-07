@@ -124,12 +124,12 @@ struct NavigationHandler {
         guard let url = body["url"] as? String, !url.isEmpty else {
             return errorResponse(code: "MISSING_PARAM", message: "url is required")
         }
-        UserDefaults.standard.set(url, forKey: "homeURL")
+        KelpieStorage.defaults.set(url, forKey: "homeURL")
         return successResponse(["url": url])
     }
 
     private func getHome() -> [String: Any] {
-        let url = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
+        let url = KelpieStorage.defaults.string(forKey: "homeURL") ?? defaultHomeURL
         return successResponse(["url": url])
     }
 }

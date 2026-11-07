@@ -64,7 +64,7 @@ final class PartitionRegistry {
     private var deletingIds: Set<String> = []
 
     private init() {
-        let raw = UserDefaults.standard.dictionary(forKey: Self.mapDefaultsKey) as? [String: String] ?? [:]
+        let raw = KelpieStorage.defaults.dictionary(forKey: Self.mapDefaultsKey) as? [String: String] ?? [:]
         let decoded = PartitionMap.decode(raw)
         map = decoded.map
         for warning in decoded.warnings {
@@ -276,11 +276,12 @@ final class PartitionRegistry {
     /// worst a stale entry that this pass was about to prune.
     func reconcile() async {
         // Use the completion-handler API: its async importer name varies across SDKs.
-        let engineIdentifiers: Set<UUID> = await withCheckedContinuation { continuation in
+        var engineIdentifiers: Set<UUID> = await withCheckedContinuation { continuation in
             WKWebsiteDataStore.fetchAllDataStoreIdentifiers { identifiers in
                 continuation.resume(returning: Set(identifiers))
             }
         }
+        if !KelpieStorage.standalone { engineIdentifiers.formIntersection(map.identifiers.values) }
         let liveIds = livePartitionIds()
 
         for id in map.danglingIds(engineIdentifiers: engineIdentifiers, liveIds: liveIds) {
@@ -309,6 +310,6 @@ final class PartitionRegistry {
     }
 
     private func persistMap() {
-        UserDefaults.standard.set(map.encoded(), forKey: Self.mapDefaultsKey)
+        KelpieStorage.defaults.set(map.encoded(), forKey: Self.mapDefaultsKey)
     }
 }

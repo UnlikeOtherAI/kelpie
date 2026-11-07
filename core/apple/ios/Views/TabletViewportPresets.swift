@@ -67,7 +67,7 @@ func tabletViewportPreset(id: String?) -> TabletViewportPreset? {
 }
 
 func currentTabletViewportAvailableSize() -> CGSize {
-    let defaults = UserDefaults.standard
+    let defaults = KelpieStorage.defaults
     return CGSize(
         width: defaults.double(forKey: ipadMobileStageAvailableWidthDefaultsKey),
         height: defaults.double(forKey: ipadMobileStageAvailableHeightDefaultsKey)
@@ -75,7 +75,7 @@ func currentTabletViewportAvailableSize() -> CGSize {
 }
 
 func currentTabletViewportAvailablePresetIDs() -> [String] {
-    let raw = UserDefaults.standard.string(forKey: ipadMobileStageAvailablePresetIDsDefaultsKey) ?? ""
+    let raw = KelpieStorage.defaults.string(forKey: ipadMobileStageAvailablePresetIDsDefaultsKey) ?? ""
     return raw.split(separator: ",").map(String.init)
 }
 

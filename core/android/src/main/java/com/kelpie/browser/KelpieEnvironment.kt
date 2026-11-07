@@ -10,9 +10,13 @@ object KelpieEnvironment {
     lateinit var app: Context
         private set
 
+    fun standalone(context: Context): Boolean = context.packageName in setOf("com.kelpie.browser", "com.kelpie.browser.nessieverify")
+
+    fun context(context: Context): Context = if (standalone(context)) context else KelpieStorageContext(context)
+
     fun initialize(context: Context) {
         if (::app.isInitialized) return
-        app = context.applicationContext
+        app = if (standalone(context)) context.applicationContext else KelpieStorageContext(context.applicationContext)
         com.kelpie.browser.browser.PartitionRegistry
             .initialize(app)
         // Enable Chrome DevTools Protocol for WebView

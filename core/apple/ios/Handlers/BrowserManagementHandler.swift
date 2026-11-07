@@ -231,7 +231,7 @@ struct BrowserManagementHandler {
     private func resizeViewport(_ body: [String: Any]) async -> [String: Any] {
         let width = body["width"] as? Int ?? 390
         let height = body["height"] as? Int ?? 844
-        UserDefaults.standard.set("", forKey: ipadMobileStagePresetDefaultsKey)
+        KelpieStorage.defaults.set("", forKey: ipadMobileStagePresetDefaultsKey)
         return successResponse([
             "viewport": ["width": width, "height": height],
             "originalViewport": ["width": 390, "height": 844],
@@ -241,7 +241,7 @@ struct BrowserManagementHandler {
 
     @MainActor
     private func resetViewport() async -> [String: Any] {
-        UserDefaults.standard.set("", forKey: ipadMobileStagePresetDefaultsKey)
+        KelpieStorage.defaults.set("", forKey: ipadMobileStagePresetDefaultsKey)
         return successResponse([
             "viewport": ["width": 390, "height": 844],
             "activePresetId": NSNull()
@@ -269,7 +269,7 @@ struct BrowserManagementHandler {
             ]
         }
 
-        UserDefaults.standard.set(preset.id, forKey: ipadMobileStagePresetDefaultsKey)
+        KelpieStorage.defaults.set(preset.id, forKey: ipadMobileStagePresetDefaultsKey)
         let viewportSize = tabletViewportSize(for: preset, availableSize: currentTabletViewportAvailableSize())
 
         return successResponse([

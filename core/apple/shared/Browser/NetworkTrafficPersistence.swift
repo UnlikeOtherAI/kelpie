@@ -14,7 +14,7 @@ final class NetworkTrafficPersistence: @unchecked Sendable {
     private var retryDelay: TimeInterval = 1
     private var needsRecoveryCopy = false
 
-    init(fileURL: URL = defaultURL, defaults: UserDefaults = .standard, interval: TimeInterval = 1) {
+    init(fileURL: URL = defaultURL, defaults: UserDefaults = KelpieStorage.defaults, interval: TimeInterval = 1) {
         self.fileURL = fileURL
         self.defaults = defaults
         self.interval = interval

@@ -14,7 +14,7 @@ enum UOALoginCookies {
     /// Seeds the login store from an active Chromium renderer and returns the store's cookies
     /// afterwards, the baseline `share(changesSince:)` compares against.
     static func prepare() async -> [HTTPCookie] {
-        let store = WKWebsiteDataStore.default().httpCookieStore
+        let store = KelpieWebsiteData.store.httpCookieStore
         if let renderer = chromiumRenderer() {
             for cookie in await renderer.allCookies() {
                 await store.setCookie(cookie)
@@ -27,7 +27,7 @@ enum UOALoginCookies {
     /// WebKit tabs already share the login store and need nothing.
     static func share(changesSince baseline: [HTTPCookie]) async {
         guard let renderer = chromiumRenderer() else { return }
-        let current = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
+        let current = await KelpieWebsiteData.store.httpCookieStore.allCookies()
         let changed = changes(from: baseline, to: current)
         guard !changed.isEmpty else { return }
         await renderer.setCookies(changed)

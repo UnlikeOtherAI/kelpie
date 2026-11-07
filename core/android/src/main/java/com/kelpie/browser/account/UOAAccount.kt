@@ -71,7 +71,9 @@ object UOAAccount {
         hostSession = session
         hostSubscription?.cancel()
         hostSubscription = scope.launch {
-            session.subject.collect { subject ->
+            session.identity.collect { identity ->
+                val subject = identity.subject
+                if (subject != null && identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
                 reset(clearStorage = false)
                 if (subject != null) {
                     val current = generation
@@ -85,12 +87,12 @@ object UOAAccount {
         }
     }
 
-    fun attach(activity: ComponentActivity, openLogin: (String, String) -> Unit) {
+    fun attach(activity: ComponentActivity, openLogin: (String, String) -> Unit, context: Context = activity) {
         this.openLogin = openLogin
         host = WeakReference(activity)
-        appContext = activity.applicationContext
+        appContext = context.applicationContext
         if (credentials == null && hostSession == null) {
-            credentials = UOACredentials(UOASecretSessionStorage(SecretStore.get(activity)), transport::request)
+            credentials = UOACredentials(UOASecretSessionStorage(SecretStore.get(context)), transport::request)
             restoreSession()
         }
         openPendingLogin()
@@ -266,7 +268,7 @@ object UOAAccount {
         val identity = request("/oauth/me").json()
         if (generation != current) return
         val profile = Profile(identity["sub"]!!.jsonPrimitive.content, identity["email"]?.jsonPrimitive?.content.orEmpty(), identity["name"]?.jsonPrimitive?.contentOrNull)
-        if (hostSession != null && hostSession?.subject?.value != profile.subject) throw UOATransport.Failure(401)
+        if (hostSession != null && hostSession?.identity?.value?.subject != profile.subject) throw UOATransport.Failure(401)
         mutableState.value = State(profile = profile)
         BookmarkStore.useAccount()
         scheduleExpiry(current)
@@ -324,8 +326,10 @@ object UOAAccount {
     ): UOATransport.Response {
         val hostGeneration = generation
         hostSession?.let { session ->
+            val identity = session.identity.value
+            if (identity.subject == null || identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
             val response = session.request(path, method, body, version)
-            if (generation != hostGeneration) throw kotlinx.coroutines.CancellationException()
+            if (generation != hostGeneration || session.identity.value != identity) throw kotlinx.coroutines.CancellationException()
             return response
         }
         val tokens = credentials?.takeIf { it.active } ?: throw UOATransport.Failure(401)

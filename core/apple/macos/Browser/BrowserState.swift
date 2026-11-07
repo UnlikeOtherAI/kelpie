@@ -6,7 +6,7 @@ let defaultHomeURL = "https://unlikeotherai.github.io/kelpie"
 
 /// Observable state shared between the browser UI and WebView coordinator.
 final class BrowserState: ObservableObject {
-    @Published var currentURL: String = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
+    @Published var currentURL: String = KelpieStorage.defaults.string(forKey: "homeURL") ?? defaultHomeURL
     @Published var pageTitle: String = ""
     @Published var isLoading: Bool = false
     @Published var canGoBack: Bool = false

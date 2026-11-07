@@ -102,7 +102,7 @@ final class AIState: ObservableObject {
     private let decoder = JSONDecoder()
 
     private let aiManager: AIManager = {
-        let modelsDir = FileManager.default.homeDirectoryForCurrentUser
+        let modelsDir = KelpieStorage.homeDirectory
             .appendingPathComponent(".kelpie/models", isDirectory: true).path
         return AIManager(modelsDir: modelsDir)
     }()
@@ -123,7 +123,7 @@ final class AIState: ObservableObject {
     /// (legacy `@AppStorage("huggingFaceToken")`) into `SecretStore` and
     /// deletes the plaintext copy.
     private static func loadHuggingFaceTokenWithMigration() -> String {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         let store = SecretStore.shared
         if let legacy = defaults.string(forKey: legacyHuggingFaceTokenKey) {
             defaults.removeObject(forKey: legacyHuggingFaceTokenKey)
@@ -451,7 +451,7 @@ final class AIState: ObservableObject {
     }
 
     private static func modelDirectory(id: String) -> URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        KelpieStorage.homeDirectory
             .appendingPathComponent(".kelpie/models/\(id)", isDirectory: true)
     }
 

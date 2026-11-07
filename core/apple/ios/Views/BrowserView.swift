@@ -88,7 +88,7 @@ struct BrowserView: View {
                     welcomePresentationSource = .automatic
                     if let tab = tabStore.activeBrowserTab, tab.isStartPage {
                         tab.isStartPage = false
-                        let home = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
+                        let home = KelpieStorage.defaults.string(forKey: "homeURL") ?? defaultHomeURL
                         navigate(browserState.currentURL.isEmpty ? home : browserState.currentURL)
                     }
                 }

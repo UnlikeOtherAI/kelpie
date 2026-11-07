@@ -58,7 +58,8 @@ class KelpieBrowserSession(
     private val localControlEnabled: Boolean = true,
     uoaSession: com.kelpie.browser.account.KelpieUOASession? = null,
 ) {
-    private val applicationContext get() = activity.applicationContext
+    private val browserContext get() = KelpieEnvironment.context(activity)
+    private val applicationContext get() = KelpieEnvironment.app
     private var closed = false
     private lateinit var browserView: ComposeView
     private val lifecycleObserver = LifecycleEventObserver { _, event ->
@@ -112,20 +113,20 @@ class KelpieBrowserSession(
     private lateinit var pairingCoordinator: PairApprovalCoordinator
 
     init {
-        KelpieEnvironment.initialize(applicationContext)
+        KelpieEnvironment.initialize(activity.applicationContext)
         uoaSession?.let(com.kelpie.browser.account.UOAAccount::useHostSession)
 
-        val deviceInfo = DeviceInfo.collect(activity)
-        HomeStore.init(activity)
-        BookmarkStore.init(activity)
+        val deviceInfo = DeviceInfo.collect(browserContext)
+        HomeStore.init(browserContext)
+        BookmarkStore.init(browserContext)
         com.kelpie.browser.account.UOAAccount
-            .attach(activity, ::openAccountLogin)
-        HistoryStore.init(activity)
-        TapCalibrationStore.init(activity)
-        pairingStore = PairingStore.forContext(activity)
+            .attach(activity, ::openAccountLogin, browserContext)
+        HistoryStore.init(browserContext)
+        TapCalibrationStore.init(browserContext)
+        pairingStore = PairingStore.forContext(browserContext)
         pairingCoordinator = PairApprovalCoordinator(pairingStore)
 
-        browserView = ComposeView(activity).apply {
+        browserView = ComposeView(browserContext).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
             KelpieTheme {
@@ -145,7 +146,7 @@ class KelpieBrowserSession(
         }
         registerHandlers(deviceInfo)
         com.kelpie.browser.connect.NessieConnection
-            .start(activity, handlerContext)
+            .start(browserContext, handlerContext)
         if (localControlEnabled) startServer(deviceInfo)
         activity.lifecycle.addObserver(lifecycleObserver)
     }

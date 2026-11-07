@@ -10,6 +10,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private let localControlEnabled: Bool
     private var started = false
     private var windows: [NSWindow] = []
+    private var regions: [WeakBrowserRegion] = []
 
     public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true) {
         serverState = ServerState(port: port)
@@ -17,12 +18,15 @@ public final class KelpieBrowserSession: ObservableObject {
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }
     }
 
+    public var websiteDataIsPersistent: Bool { KelpieWebsiteData.store.isPersistent }
+
     public func start() {
         guard !started else { return }
         started = true
         _ = AIState.shared
         serverState.startHTTPServer(rendererState: rendererState, listen: localControlEnabled)
         UOALoginCookies.context = serverState.handlerContext
+        NessieConnection.shared.acceptsPersonEvent = { [weak self] event in self?.contains(event) == true }
         NessieConnection.shared.start(context: serverState.handlerContext)
         UOAAccount.shared.restoreSession()
     }
@@ -31,13 +35,28 @@ public final class KelpieBrowserSession: ObservableObject {
         NessieConnection.shared.setForeground(foreground)
     }
 
-    public func makeSurface() -> KelpieBrowserSurface {
-        KelpieBrowserSurface(session: self)
+    public func makeSurface(ownsWindowChrome: Bool = false) -> KelpieBrowserSurface {
+        KelpieBrowserSurface(session: self, ownsWindowChrome: ownsWindowChrome)
+    }
+
+    func register(region: NSView) {
+        regions.removeAll { $0.view == nil }
+        if !regions.contains(where: { $0.view === region }) { regions.append(WeakBrowserRegion(region)) }
+    }
+
+    private func contains(_ event: NSEvent) -> Bool {
+        regions.contains { item in
+            guard let view = item.view, let window = view.window, event.window === window else { return false }
+            if event.type == .keyDown, let responder = window.firstResponder as? NSView {
+                return view.bounds.intersects(view.convert(responder.bounds, from: responder))
+            }
+            return view.bounds.contains(view.convert(event.locationInWindow, from: nil))
+        }
     }
 
     /// The host may use the controller in any supported AppKit container.
     public func openWindow() {
-        let surface = makeSurface()
+        let surface = makeSurface(ownsWindowChrome: true)
         let size = ViewportState.persistedShellWindowSize ?? ViewportState.minimumShellSize
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
@@ -66,8 +85,12 @@ public final class KelpieBrowserSurface: ObservableObject {
     let session: KelpieBrowserSession
     let tabs = TabStore()
     let windowID = UUID().uuidString
+    let ownsWindowChrome: Bool
 
-    init(session: KelpieBrowserSession) { self.session = session }
+    init(session: KelpieBrowserSession, ownsWindowChrome: Bool) {
+        self.session = session
+        self.ownsWindowChrome = ownsWindowChrome
+    }
 
     public func makeViewController() -> NSViewController {
         NSHostingController(rootView: KelpieBrowserView(surface: self))
@@ -79,8 +102,8 @@ public struct KelpieBrowserView: View {
     @StateObject private var surface: KelpieBrowserSurface
     @Environment(\.scenePhase) private var scenePhase
 
-    public init(session: KelpieBrowserSession) {
-        _surface = StateObject(wrappedValue: session.makeSurface())
+    public init(session: KelpieBrowserSession, ownsWindowChrome: Bool = false) {
+        _surface = StateObject(wrappedValue: session.makeSurface(ownsWindowChrome: ownsWindowChrome))
     }
 
     public init(surface: KelpieBrowserSurface) {
@@ -94,13 +117,16 @@ public struct KelpieBrowserView: View {
             rendererState: surface.session.rendererState,
             viewportState: surface.session.serverState.viewportState,
             tabStore: surface.tabs,
+            ownsWindowChrome: surface.ownsWindowChrome,
             windowId: surface.windowID
         )
+        .background(BrowserInteractionRegion(session: surface.session))
         .onAppear {
             surface.session.start()
             surface.session.setForeground(scenePhase == .active)
         }
         .onChange(of: scenePhase) { phase in surface.session.setForeground(phase == .active) }
-        .frame(minWidth: ViewportState.minimumShellSize.width, minHeight: ViewportState.minimumShellSize.height)
+        .frame(minWidth: surface.ownsWindowChrome ? ViewportState.minimumShellSize.width : nil,
+               minHeight: surface.ownsWindowChrome ? ViewportState.minimumShellSize.height : nil)
     }
 }

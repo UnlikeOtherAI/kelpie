@@ -19,7 +19,7 @@ struct AIHandler {
     static let recorder = AudioRecorder()
 
     private let aiManager: AIManager = {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let dir = KelpieStorage.documentsDirectory
             .appendingPathComponent("models", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         // AI model blobs are persistent user data; apply NSFileProtectionComplete

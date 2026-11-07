@@ -18,7 +18,7 @@ final class MobilePartitionRegistry {
         var response: [String: Any] { errorResponse(code: code, message: message) }
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = KelpieStorage.defaults) {
         self.defaults = defaults
         map = PartitionMap.decode(defaults.dictionary(forKey: key) as? [String: String] ?? [:]).map
     }
@@ -121,9 +121,10 @@ final class MobilePartitionRegistry {
 
     @available(iOS 17.0, *)
     private func existingIdentifiers() async -> [UUID] {
-        await withCheckedContinuation { continuation in
+        let identifiers: [UUID] = await withCheckedContinuation { continuation in
             WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: $0) }
         }
+        return KelpieStorage.standalone ? identifiers : identifiers.filter { map.identifiers.values.contains($0) }
     }
 
     @available(iOS 17.0, *)

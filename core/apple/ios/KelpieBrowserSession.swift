@@ -23,6 +23,8 @@ public final class KelpieBrowserSession: ObservableObject {
 
     public static var supportedOrientations: UIInterfaceOrientationMask { OrientationManager.shared.lock }
 
+    public var websiteDataIsPersistent: Bool { KelpieWebsiteData.store.isPersistent }
+
     public func start() {
         guard !started else { return }
         started = true

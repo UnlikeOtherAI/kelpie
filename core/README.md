@@ -44,3 +44,14 @@ posts `WM_QUIT` to the containing app. CEF's bootstrap sandbox contract still ap
 This extraction is under implementation. Native compilation, installed flows,
 external-display behavior, Store compatibility and Nessie host integration must be
 recorded before claiming delivery. Source relocation alone is not release evidence.
+
+Embedded Mac views draw their own tabs without changing the host window chrome.
+Only input inside the browser pauses its agent work. KelpieBrowserPresentation on
+iOS moves one complete browser controller between a parent and a host-selected
+UIWindowScene, including an iPad external display, without replacing its tabs.
+
+Embedded preferences, files and WebView profiles are separate from the host.
+Standalone profile locations remain unchanged. Embedded website storage is persistent
+on iOS 17+, macOS and current Android WebView providers. iOS 16 embedded browsing uses
+an isolated in-memory website store; websiteDataIsPersistent reports that limit.
+Android embedding requires the existing multiple-profile WebView capability.

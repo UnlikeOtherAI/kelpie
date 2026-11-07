@@ -56,7 +56,7 @@ final class LocalInference: @unchecked Sendable {
         try await Task.detached {
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
-            let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let directory = KelpieStorage.documentsDirectory
                 .appendingPathComponent("local-models", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let file = directory.appendingPathComponent(UUID().uuidString + ".gguf")

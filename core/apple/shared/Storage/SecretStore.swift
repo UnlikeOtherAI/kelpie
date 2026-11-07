@@ -118,7 +118,7 @@ final class SecretStore {
     }
 
     private static func loadOrCreateKey() -> SymmetricKey {
-        let defaults = UserDefaults.standard
+        let defaults = KelpieStorage.defaults
         if let encoded = defaults.string(forKey: Const.keyDefaultsKey),
            let raw = Data(base64Encoded: encoded), raw.count == 32 {
             return SymmetricKey(data: raw)

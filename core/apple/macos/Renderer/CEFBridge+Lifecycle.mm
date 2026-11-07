@@ -127,7 +127,12 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     cef_string_t bundlePathCEF = CEFBridgeStringCreate(bundlePath);
     settings.main_bundle_path = bundlePathCEF;
 
-    NSString *cachePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"kelpie-cef-cache"];
+    NSString *identifier = [NSBundle mainBundle].bundleIdentifier ?: @"kelpie-host";
+    BOOL standalone = [identifier isEqualToString:@"com.kelpie.browser.macos"];
+    NSString *cacheBase = standalone ? NSTemporaryDirectory() :
+        [[[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject.path
+            stringByAppendingPathComponent:identifier];
+    NSString *cachePath = [cacheBase stringByAppendingPathComponent:@"kelpie-cef-cache"];
     [[NSFileManager defaultManager] createDirectoryAtPath:cachePath withIntermediateDirectories:YES attributes:nil error:nil];
     cef_string_t cachePathCEF = CEFBridgeStringCreate(cachePath);
     settings.cache_path = cachePathCEF;

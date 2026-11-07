@@ -10,15 +10,15 @@ enum DeviceIdentity {
     private static let defaultsKey = "com.kelpie.device-id"
 
     static var id: String {
-        if let stored = UserDefaults.standard.string(forKey: defaultsKey), !stored.isEmpty {
+        if let stored = KelpieStorage.defaults.string(forKey: defaultsKey), !stored.isEmpty {
             return stored
         }
         if let migrated = migrateFromKeychain() {
-            UserDefaults.standard.set(migrated, forKey: defaultsKey)
+            KelpieStorage.defaults.set(migrated, forKey: defaultsKey)
             return migrated
         }
         let newId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-        UserDefaults.standard.set(newId, forKey: defaultsKey)
+        KelpieStorage.defaults.set(newId, forKey: defaultsKey)
         return newId
     }
 
