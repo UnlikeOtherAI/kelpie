@@ -55,6 +55,7 @@ let kelpieApp = Target.target(
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
         .glob(pattern: "../../native/licenses/*.txt"),
+        .glob(pattern: "../macos/Kelpie/Resources/Snapshot3D/*.js"),
     ],
     dependencies: [
         .package(product: "AppReveal"),

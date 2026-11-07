@@ -12,16 +12,21 @@ import Foundation
 /// they take Swift-side arguments.
 enum Snapshot3DBridge {
 
-    static let enterScript: String = [
-        "enter-setup",
-        "enter-collect",
-        "enter-apply",
-        "enter-input"
-    ]
-    .map(loadResource(named:))
-    .joined()
+    private static let enterResult = Result {
+        try ["enter-setup", "enter-collect", "enter-apply", "enter-input"]
+            .map { try loadResource(named: $0) }
+            .joined(separator: "\n")
+    }
 
-    static let exitScript: String = loadResource(named: "exit")
+    static var enterScript: String {
+        get throws { try enterResult.get() }
+    }
+
+    private static let exitResult = Result { try loadResource(named: "exit") }
+
+    static var exitScript: String {
+        get throws { try exitResult.get() }
+    }
 
     static func setModeScript(_ mode: String) -> String {
         """
@@ -48,23 +53,16 @@ enum Snapshot3DBridge {
         """
     }
 
-    /// Load a bundled JS resource from `Resources/Snapshot3D/<name>.js`.
-    ///
-    /// The script is part of the app bundle; if the resource is missing the
-    /// bundle is broken and the inspector cannot run. Trap loudly rather than
-    /// silently returning an empty script.
-    private static func loadResource(named name: String) -> String {
-        guard let url = Bundle.main.url(
-            forResource: name,
-            withExtension: "js",
-            subdirectory: "Snapshot3D"
-        ) else {
-            fatalError("Snapshot3DBridge: missing resource Snapshot3D/\(name).js in bundle")
+    /// Xcode flattens globbed resources into the bundle root. Also accept
+    /// directory-preserving bundles. Packaging errors must not terminate the app.
+    static func loadResource(named name: String, bundle: Bundle = .main) throws -> String {
+        let url = bundle.url(forResource: name, withExtension: "js", subdirectory: "Snapshot3D")
+            ?? bundle.url(forResource: name, withExtension: "js")
+        guard let url else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [
+                NSFilePathErrorKey: "Snapshot3D/\(name).js"
+            ])
         }
-        do {
-            return try String(contentsOf: url, encoding: .utf8)
-        } catch {
-            fatalError("Snapshot3DBridge: failed to read Snapshot3D/\(name).js: \(error)")
-        }
+        return try String(contentsOf: url, encoding: .utf8)
     }
 }
