@@ -12,11 +12,12 @@ final class Snapshot3DUITests: XCTestCase {
             "-enable3DInspector", "YES"
         ]
         app.launch()
-        let enter = app.buttons["browser.snapshot-3d.button"]
-        XCTAssertTrue(enter.waitForExistence(timeout: 15))
+        let more = app.buttons["browser.more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 15))
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
         for _ in 0..<2 {
-            enter.tap()
+            more.tap()
+            app.buttons["3D inspector"].tap()
             let exit = app.buttons["browser.snapshot3d.exit"]
             XCTAssertTrue(exit.waitForExistence(timeout: 10))
             app.buttons["browser.snapshot3d.zoom-in"].tap()

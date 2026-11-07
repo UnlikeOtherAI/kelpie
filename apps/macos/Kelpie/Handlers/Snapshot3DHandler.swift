@@ -25,9 +25,9 @@ struct Snapshot3DHandler {
         }
 
         do {
-            _ = try await context.evaluateJS(Snapshot3DBridge.enterScript)
-            let active = try await context.evaluateJSReturningString("window.__m3d ? 'true' : 'false'")
-            if active == "true" {
+            _ = try await context.evaluate3DInspectorJS(Snapshot3DBridge.enterScript)
+            let active = try await context.evaluate3DInspectorJS("window.__m3d ? 'true' : 'false'")
+            if active as? String == "true" {
                 context.isIn3DInspector = true
                 return successResponse()
             }
@@ -44,7 +44,7 @@ struct Snapshot3DHandler {
         }
 
         do {
-            _ = try await context.evaluateJS(Snapshot3DBridge.exitScript)
+            _ = try await context.evaluate3DInspectorJS(Snapshot3DBridge.exitScript)
             context.mark3DInspectorInactive(notify: true)
             return successResponse()
         } catch {
@@ -67,8 +67,8 @@ struct Snapshot3DHandler {
             return errorResponse(code: "INVALID_MODE", message: "mode must be 'rotate' or 'scroll'")
         }
         do {
-            let applied = try await context.evaluateJSReturningString(Snapshot3DBridge.setModeScript(requested))
-            let normalized = applied == "rotate" || applied == "scroll" ? applied : requested
+            let applied = try await context.evaluate3DInspectorJS(Snapshot3DBridge.setModeScript(requested))
+            let normalized = (applied as? String).flatMap { ["rotate", "scroll"].contains($0) ? $0 : nil } ?? requested
             return successResponse(["mode": normalized])
         } catch {
             return errorResponse(code: "JS_ERROR", message: error.localizedDescription)
@@ -94,7 +94,7 @@ struct Snapshot3DHandler {
             return errorResponse(code: "MISSING_PARAM", message: "Provide 'delta' (number) or 'direction' ('in'|'out')")
         }
         do {
-            _ = try await context.evaluateJS(Snapshot3DBridge.zoomByScript(delta))
+            _ = try await context.evaluate3DInspectorJS(Snapshot3DBridge.zoomByScript(delta))
             return successResponse(["delta": delta])
         } catch {
             return errorResponse(code: "JS_ERROR", message: error.localizedDescription)
@@ -107,7 +107,7 @@ struct Snapshot3DHandler {
             return errorResponse(code: "NOT_ACTIVE", message: "3D inspector is not active")
         }
         do {
-            _ = try await context.evaluateJS(Snapshot3DBridge.resetViewScript)
+            _ = try await context.evaluate3DInspectorJS(Snapshot3DBridge.resetViewScript)
             return successResponse()
         } catch {
             return errorResponse(code: "JS_ERROR", message: error.localizedDescription)
