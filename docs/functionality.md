@@ -170,7 +170,7 @@ A visual debugging tool for inspecting element stacking and layer order. Click t
 - **R** key — reset rotation and zoom to default
 - **Escape** or native exit button — exit 3D mode and restore the page
 
-iOS and macOS bundle the same inspector scripts. Missing or unreadable scripts fail activation without terminating the app.
+iOS and macOS bundle the same inspector scripts. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open; on iOS activation keeps the native controls in sync with the WebKit scene.
 
 The 3D view shows DOM depth (tree nesting), not CSS paint order. Position, z-index, and whether the element creates a stacking context appear in the hover info panel. User interactions are suppressed while in 3D mode, but background page logic (timers, network callbacks) may still execute. The page is restored to its original state on exit. Works with both WebKit and Chromium renderers.
 
