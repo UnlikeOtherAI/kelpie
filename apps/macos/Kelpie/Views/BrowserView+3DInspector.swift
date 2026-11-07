@@ -6,22 +6,22 @@ extension BrowserView {
             return
         }
 
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.enterScript)
+        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.enterScript, windowId: windowId)
         // Use a JS string expression so WebKit returns a String rather than NSNumber,
         // avoiding the "1" vs "true" mismatch from evaluateJSReturningString.
-        let active = try? await serverState.handlerContext.evaluateJSReturningString("window.__m3d ? 'true' : 'false'")
-        guard active == "true" else { return }
+        let active = try? await serverState.handlerContext.evaluate3DInspectorJS("window.__m3d ? 'true' : 'false'", windowId: windowId)
+        guard active as? String == "true" else { return }
 
         serverState.handlerContext.isIn3DInspector = true
         isIn3DInspector = true
         inspectorMode = "rotate"
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.setModeScript(inspectorMode))
+        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.setModeScript(inspectorMode), windowId: windowId)
     }
 
     @MainActor
     func exit3DInspector() async {
         guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.exitScript)
+        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.exitScript, windowId: windowId)
         serverState.handlerContext.mark3DInspectorInactive(notify: true)
         isIn3DInspector = false
         inspectorMode = "rotate"
@@ -31,19 +31,19 @@ extension BrowserView {
     func set3DInspectorMode(_ mode: String) async {
         guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
         let normalized = mode == "scroll" ? "scroll" : "rotate"
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.setModeScript(normalized))
+        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.setModeScript(normalized), windowId: windowId)
         inspectorMode = normalized
     }
 
     @MainActor
     func zoom3DInspector(by delta: Double) async {
         guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.zoomByScript(delta))
+        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.zoomByScript(delta), windowId: windowId)
     }
 
     @MainActor
     func reset3DInspectorView() async {
         guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.resetViewScript)
+        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.resetViewScript, windowId: windowId)
     }
 }

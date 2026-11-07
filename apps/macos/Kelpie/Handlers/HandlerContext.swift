@@ -482,7 +482,7 @@ final class HandlerContext {
 
     func exit3DInspectorIfNeeded(notify: Bool) async {
         guard isIn3DInspector else { return }
-        _ = try? await evaluateJS(Snapshot3DBridge.exitScript)
+        _ = try? await evaluate3DInspectorJS(Snapshot3DBridge.exitScript)
         mark3DInspectorInactive(notify: notify)
     }
 
