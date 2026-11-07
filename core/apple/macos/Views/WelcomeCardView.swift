@@ -5,7 +5,7 @@ private let kelpieBlue = Color(red: 120 / 255, green: 176 / 255, blue: 244 / 255
 
 struct WelcomeCardView: View {
     let onDismiss: () -> Void
-    @AppStorage("hideWelcomeCard") private var hideWelcome = false
+    @AppStorage("hideWelcomeCard", store: KelpieStorage.defaults) private var hideWelcome = false
     @State private var dontShowAgain = false
 
     var body: some View {

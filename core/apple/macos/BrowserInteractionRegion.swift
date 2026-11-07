@@ -25,4 +25,3 @@ struct BrowserInteractionRegion: NSViewRepresentable {
         session.register(region: nsView)
     }
 }
-

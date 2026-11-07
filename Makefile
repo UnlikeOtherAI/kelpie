@@ -78,11 +78,7 @@ cli-link:
 # ── SwiftLint ─────────────────────────────────────────────────────────────────
 
 lint-swift:
-	$(SWIFTLINT) lint --strict core/apple
-	@echo "→ Linting Swift (iOS)..."
-	$(SWIFTLINT) lint --strict apps/ios/Kelpie
-	@echo "→ Linting Swift (macOS)..."
-	$(SWIFTLINT) lint --strict apps/macos/Kelpie
+	$(SWIFTLINT) lint --strict
 
 # ── iOS ────────────────────────────────────────────────────────────────────────
 

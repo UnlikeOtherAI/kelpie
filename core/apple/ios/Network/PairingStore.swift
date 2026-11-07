@@ -97,7 +97,7 @@ final class PairingStore: @unchecked Sendable {
             appropriateFor: nil,
             create: true
         ) else { return nil }
-        let dir = support.appendingPathComponent("Kelpie", isDirectory: true)
+        let dir = KelpieStorage.isolated(support).appendingPathComponent("Kelpie", isDirectory: true)
         if !fm.fileExists(atPath: dir.path) {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
         }

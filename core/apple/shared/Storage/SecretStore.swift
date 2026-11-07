@@ -112,7 +112,7 @@ final class SecretStore {
         } else {
             base = fileManager.temporaryDirectory
         }
-        return base
+        return KelpieStorage.isolated(base)
             .appendingPathComponent(Const.directoryName, isDirectory: true)
             .appendingPathComponent(Const.fileName, isDirectory: false)
     }

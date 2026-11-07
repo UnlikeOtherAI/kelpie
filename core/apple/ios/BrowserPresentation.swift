@@ -10,4 +10,3 @@ final class OrientationManager {
     static let shared = OrientationManager()
     var lock: UIInterfaceOrientationMask = .all
 }
-

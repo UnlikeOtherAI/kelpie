@@ -7,7 +7,7 @@ private let kelpieActionBlue = Color(red: 38 / 255, green: 110 / 255, blue: 214 
 
 struct WelcomeCardView: View {
     let onDismiss: () -> Void
-    @AppStorage("hideWelcomeCard") private var hideWelcome = false
+    @AppStorage("hideWelcomeCard", store: KelpieStorage.defaults) private var hideWelcome = false
     @State private var dontShowAgain = false
     private let modalCardMaxWidth: CGFloat = 540
 

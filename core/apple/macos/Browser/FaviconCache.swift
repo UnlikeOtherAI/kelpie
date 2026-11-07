@@ -22,7 +22,7 @@ final class FaviconCache: ObservableObject {
         let fm = FileManager.default
         let base = fm.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? fm.temporaryDirectory
-        cacheDir = base.appendingPathComponent("Favicons", isDirectory: true)
+        cacheDir = KelpieStorage.isolated(base).appendingPathComponent("Favicons", isDirectory: true)
         try? fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         loadDiskCache()
     }

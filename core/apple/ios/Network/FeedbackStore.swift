@@ -37,7 +37,7 @@ enum FeedbackStore {
     private static func feedbackDirectory() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        return base
+        return KelpieStorage.isolated(base)
             .appendingPathComponent("Kelpie", isDirectory: true)
             .appendingPathComponent("feedback", isDirectory: true)
     }

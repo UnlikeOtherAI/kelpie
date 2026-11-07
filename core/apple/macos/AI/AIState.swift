@@ -120,7 +120,7 @@ final class AIState: ObservableObject {
     }
 
     /// Migrates any plaintext HF token previously stored in `UserDefaults`
-    /// (legacy `@AppStorage("huggingFaceToken")`) into `SecretStore` and
+    /// (legacy `@AppStorage("huggingFaceToken", store: KelpieStorage.defaults)`) into `SecretStore` and
     /// deletes the plaintext copy.
     private static func loadHuggingFaceTokenWithMigration() -> String {
         let defaults = KelpieStorage.defaults

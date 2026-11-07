@@ -27,10 +27,10 @@ struct BrowserView: View {
     }()
     @State var isIn3DInspector = false
     @State var inspectorMode = "rotate"
-    @AppStorage("hideWelcomeCard") var hideWelcome = false
+    @AppStorage("hideWelcomeCard", store: KelpieStorage.defaults) var hideWelcome = false
     @State private var showWelcome = false
     @State var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
-    @AppStorage("skipInsecureWarning") var skipInsecureWarning = false
+    @AppStorage("skipInsecureWarning", store: KelpieStorage.defaults) var skipInsecureWarning = false
     @State var pendingInsecureURL: URL?
     /// Stable per-window id used by `WindowRegistry` so HTTP handlers can
     /// route `(windowId, tabId)` requests to the correct shell.

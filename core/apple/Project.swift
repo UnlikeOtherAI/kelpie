@@ -17,7 +17,7 @@ let macOSLinkerFlags: SettingValue = .array([
     "-framework AppIntents",
     "-framework Metal",
     "-framework Accelerate",
-    "-framework \"Chromium Embedded Framework\"",
+    "-framework \"Chromium Embedded Framework\""
 ])
 
 let iOSLinkerFlags: SettingValue = .array([
@@ -30,7 +30,7 @@ let iOSLinkerFlags: SettingValue = .array([
     "-lllama", "-lggml", "-lggml-base", "-lggml-cpu",
     "-framework AppIntents",
     "-framework Accelerate",
-    "-lc++",
+    "-lc++"
 ])
 
 let macBrowser = Target.target(
@@ -43,7 +43,7 @@ let macBrowser = Target.target(
     sources: [
         .glob("shared/**/*.swift"),
         .glob("macos/**/*.swift"),
-        .glob("macos/**/*.mm"),
+        .glob("macos/**/*.mm")
     ],
     dependencies: [.target(name: "KelpieResourcesMac")],
     settings: .settings(
@@ -63,7 +63,7 @@ let macBrowser = Target.target(
                 "$(PROJECT_DIR)/../../core/native/core-mcp/include",
                 "$(PROJECT_DIR)/../../core/native/core-ai/include",
                 "$(PROJECT_DIR)/macos/Frameworks/cef_include",
-                "$(PROJECT_DIR)/macos/vendor/llama.cpp/include",
+                "$(PROJECT_DIR)/macos/vendor/llama.cpp/include"
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/../../core/native/.build/core-state",
@@ -72,16 +72,16 @@ let macBrowser = Target.target(
                 "$(PROJECT_DIR)/../../core/native/.build/core-automation",
                 "$(PROJECT_DIR)/../../core/native/.build/core-mcp",
                 "$(PROJECT_DIR)/../../core/native/.build/core-ai",
-                "$(PROJECT_DIR)/macos/vendor/llama.cpp/lib",
+                "$(PROJECT_DIR)/macos/vendor/llama.cpp/lib"
             ]),
             "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Frameworks",
+                "$(PROJECT_DIR)/macos/Frameworks"
             ]),
             "OTHER_LDFLAGS": macOSLinkerFlags,
             "COMBINE_HIDPI_IMAGES": "YES",
             "ENABLE_APP_SANDBOX": "NO",
             "GENERATE_APP_INTENTS_METADATA": "NO",
-            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
+            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO"
         ]
     )
 )
@@ -95,7 +95,7 @@ let iosBrowser = Target.target(
     infoPlist: .default,
     sources: [
         .glob("shared/**/*.swift"),
-        .glob("ios/**/*.swift"),
+        .glob("ios/**/*.swift")
     ],
     dependencies: [.target(name: "KelpieResourcesIOS")],
     settings: .settings(
@@ -111,7 +111,7 @@ let iosBrowser = Target.target(
                 "$(PROJECT_DIR)/../../core/native/core-protocol/include",
                 "$(PROJECT_DIR)/../../core/native/core-automation/include",
                 "$(PROJECT_DIR)/../../core/native/core-mcp/include",
-                "$(PROJECT_DIR)/../../core/native/core-ai/include",
+                "$(PROJECT_DIR)/../../core/native/core-ai/include"
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-state",
@@ -122,7 +122,7 @@ let iosBrowser = Target.target(
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-ai",
                 "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/src",
                 "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src/ggml-cpu",
+                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src/ggml-cpu"
             ]),
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
@@ -133,7 +133,7 @@ let iosBrowser = Target.target(
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
             "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../core/native/.build-iphoneos",
-            "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../core/native/.build-ios-sim",
+            "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../core/native/.build-ios-sim"
         ]
     )
 )
@@ -146,37 +146,43 @@ let kelpieHelper = Target.target(
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Helpers/Info.plist"),
     sources: [
-        .glob("Helpers/**/*.mm"),
+        .glob("Helpers/**/*.mm")
     ],
     entitlements: .file(path: "Helpers/KelpieHelper.entitlements"),
     settings: .settings(
         base: [
             "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
             "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Frameworks/cef_include",
+                "$(PROJECT_DIR)/macos/Frameworks/cef_include"
             ]),
             "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Frameworks",
+                "$(PROJECT_DIR)/macos/Frameworks"
             ]),
             "OTHER_LDFLAGS": .array([
                 "-framework \"Chromium Embedded Framework\"",
-                "-lc++",
-            ]),
+                "-lc++"
+            ])
         ]
     )
 )
 
 let macResources = Target.target(
-    name: "KelpieResourcesMac", destinations: .macOS, product: .bundle,
-    bundleId: "com.unlikeotherai.kelpie.browser.resources.macos", deploymentTargets: .macOS("14.0"),
+    name: "KelpieResourcesMac",
+    destinations: .macOS,
+    product: .bundle,
+    bundleId: "com.unlikeotherai.kelpie.browser.resources.macos",
+    deploymentTargets: .macOS("14.0"),
     infoPlist: .default,
     resources: [.glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
     settings: .settings(base: ["PRODUCT_NAME": "KelpieBrowserResources"])
 )
 
 let iosResources = Target.target(
-    name: "KelpieResourcesIOS", destinations: [.iPhone, .iPad], product: .bundle,
-    bundleId: "com.unlikeotherai.kelpie.browser.resources.ios", deploymentTargets: .iOS("16.0"),
+    name: "KelpieResourcesIOS",
+    destinations: [.iPhone, .iPad],
+    product: .bundle,
+    bundleId: "com.unlikeotherai.kelpie.browser.resources.ios",
+    deploymentTargets: .iOS("16.0"),
     infoPlist: .default,
     resources: [.glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
     settings: .settings(base: ["PRODUCT_NAME": "KelpieBrowserResources"])

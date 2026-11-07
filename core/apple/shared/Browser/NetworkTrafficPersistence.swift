@@ -21,7 +21,7 @@ final class NetworkTrafficPersistence: @unchecked Sendable {
     }
 
     private static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        KelpieStorage.isolated(FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
             .appendingPathComponent("Kelpie/network/traffic.json")
     }
 

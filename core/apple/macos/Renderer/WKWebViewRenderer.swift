@@ -90,9 +90,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     ///   `webView.configuration.websiteDataStore`, so it follows automatically.
     init(dataStore: WKWebsiteDataStore? = nil) {
         let config = WKWebViewConfiguration()
-        if let dataStore {
-            config.websiteDataStore = dataStore
-        }
+        config.websiteDataStore = dataStore ?? KelpieWebsiteData.store
 
         let ucc = config.userContentController
         // Inject network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)

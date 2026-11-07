@@ -7,7 +7,7 @@ struct LocalModelSection: View {
     @State private var loading = false
     @ObservedObject private var aiState = AIState.shared
     @State private var message = "Import a small instruction GGUF for offline text inference. Use a LAN endpoint for larger models."
-    @AppStorage("ai.importedModel") private var path = ""
+    @AppStorage("ai.importedModel", store: KelpieStorage.defaults) private var path = ""
 
     var body: some View {
         Section("On-device model") {

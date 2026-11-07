@@ -96,4 +96,3 @@ public struct KelpieBrowserCommands: Commands {
         (NSApp.keyWindow ?? NSApp.mainWindow)?.toggleFullScreen(nil)
     }
 }
-

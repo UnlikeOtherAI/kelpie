@@ -8,18 +8,18 @@ struct BrowserView: View {
     @ObservedObject var serverState: ServerState
     @ObservedObject var tabStore: TabStore
     @ObservedObject var externalDisplayManager = ExternalDisplayManager.shared
-    @AppStorage("ipadMobileStageEnabled") var legacyIPadMobileStageEnabled = false
-    @AppStorage(ipadMobileStagePresetDefaultsKey) var iPadMobileStagePresetID = ""
+    @AppStorage("ipadMobileStageEnabled", store: KelpieStorage.defaults) var legacyIPadMobileStageEnabled = false
+    @AppStorage(ipadMobileStagePresetDefaultsKey, store: KelpieStorage.defaults) var iPadMobileStagePresetID = ""
     @State var showSettings = false
     @State var showBookmarks = false
     @State var showHistory = false
     @State var showNetworkInspector = false
     @State var showAI = false
     @State var availableIPadViewportPresetIDs: [String] = []
-    @AppStorage("hideWelcomeCard") var hideWelcome = false
+    @AppStorage("hideWelcomeCard", store: KelpieStorage.defaults) var hideWelcome = false
     @State var showWelcome = true
     @State var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
-    @AppStorage("debugOverlay") var debugOverlayEnabled = false
+    @AppStorage("debugOverlay", store: KelpieStorage.defaults) var debugOverlayEnabled = false
     @State var debugText = ""
     @State var isIn3DInspector = false
     @State var inspectorMode = "rotate"

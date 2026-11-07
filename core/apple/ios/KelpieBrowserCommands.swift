@@ -1,7 +1,7 @@
 import SwiftUI
 
 public struct KelpieBrowserCommands: Commands {
-    @AppStorage(ipadMobileStagePresetDefaultsKey) private var iPadMobileStagePresetID = ""
+    @AppStorage(ipadMobileStagePresetDefaultsKey, store: KelpieStorage.defaults) private var iPadMobileStagePresetID = ""
 
     public init() {}
 

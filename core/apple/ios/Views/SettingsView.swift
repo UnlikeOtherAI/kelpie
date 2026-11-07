@@ -5,7 +5,7 @@ struct SettingsView: View {
     @ObservedObject var serverState: ServerState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
-    @AppStorage("debugOverlay") private var debugOverlay = false
+    @AppStorage("debugOverlay", store: KelpieStorage.defaults) private var debugOverlay = false
     @ObservedObject private var aiState = AIState.shared
     @State private var showTokenField = false
     @State private var tokenInput = ""

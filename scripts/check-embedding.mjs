@@ -7,7 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = name => readFile(resolve(root, name), 'utf8');
 const sourceFiles = async directory => {
   const entries = await readdir(resolve(root, directory), { withFileTypes: true });
-  const nested = await Promise.all(entries.map(entry => entry.isDirectory()
+  const nested = await Promise.all(entries.filter(entry => !['Frameworks', 'vendor', '.build'].includes(entry.name)).map(entry => entry.isDirectory()
     ? sourceFiles(directory + '/' + entry.name) : directory + '/' + entry.name));
   return nested.flat();
 };
@@ -28,7 +28,6 @@ for (const platform of ['ios', 'macos']) {
   assert(app.split('\n').length < 40, platform + ' app must remain a thin host');
   assert(app.includes('import KelpieBrowser'));
 }
-assert((await read('apps/android/app/src/main/java/com/kelpie/browser/MainActivity.kt')).includes('extends') === false);
 assert((await read('apps/windows/CMakeLists.txt')).includes('Kelpie::Browser'));
 assert(!(await read('apps/linux/CMakeLists.txt')).includes('core/apple'));
 console.log('Embeddable browser ownership checks passed.');

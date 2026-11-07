@@ -62,7 +62,7 @@ final class ServerState: ObservableObject {
         guard httpServer == nil else { return }
         self.rendererState = rendererState
         let preferredPort = UInt16(deviceInfo.port)
-        let resolvedPort = Self.firstAvailablePort(startingAt: preferredPort)
+        let resolvedPort = listen ? Self.firstAvailablePort(startingAt: preferredPort) : preferredPort
         if Int(resolvedPort) != deviceInfo.port {
             print("[ServerState] Port \(preferredPort) in use, falling back to \(resolvedPort)")
             deviceInfo = DeviceInfo.current(port: Int(resolvedPort))
