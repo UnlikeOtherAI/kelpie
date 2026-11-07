@@ -8,7 +8,7 @@
 
 ### Observer ownership
 
-- Add `KeyboardObserver` under `apps/android/app/src/main/java/com/kelpie/browser/browser/`.
+- Add `KeyboardObserver` under `core/android/src/main/java/com/kelpie/browser/browser/`.
 - The observer owns two values only:
   - `isVisible: Boolean`
   - `height: Int` in raw pixels

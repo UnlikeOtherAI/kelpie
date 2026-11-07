@@ -32,7 +32,7 @@ apps/linux/
 ### Dependencies on shared native core
 
 ```
-native/
+core/native/
   core-protocol/    — endpoint names, error codes, platform enums (EXISTS)
   core-state/       — bookmark/history/console/network stores (EXISTS)
   core-automation/  — handler context, renderer interface, response helpers (EXISTS)
@@ -46,10 +46,10 @@ native/
 
 This is shared with Windows. Build it first.
 
-### Module: `native/engine-chromium-desktop/`
+### Module: `core/native/engine-chromium-desktop/`
 
 ```
-native/engine-chromium-desktop/
+core/native/engine-chromium-desktop/
   CMakeLists.txt
   include/kelpie/
     desktop_engine.h          # CEF lifecycle, windowed + offscreen modes
@@ -229,7 +229,7 @@ CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & ./kelpie-linux --headless --
 - C++17 compiler (GCC 9+ or Clang 10+)
 - CEF binary distribution (Linux 64-bit)
 - cpp-httplib (header-only, fetched by CMake)
-- nlohmann/json (already in native/ CMake)
+- nlohmann/json (already in core/native/ CMake)
 - GTK3 dev libraries (GUI mode only)
 - Avahi client libraries (mDNS)
 - For Docker testing: Docker on host machine

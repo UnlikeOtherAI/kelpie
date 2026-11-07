@@ -1,4 +1,7 @@
 <p align="center">
+
+The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](core/README.md).
+
   <img src="assets/kelpie-icon-1024.png" width="128" height="128" alt="Kelpie icon">
 </p>
 

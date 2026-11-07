@@ -4,7 +4,7 @@ import ProjectDescription
 
 let fixCEFStructure = TargetScript.pre(
     script: """
-    CEF_FW="${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework"
+    CEF_FW="${PROJECT_DIR}/../../core/apple/macos/Frameworks/Chromium Embedded Framework.framework"
     if [ -d "$CEF_FW/Resources" ] && [ ! -e "$CEF_FW/Info.plist" ]; then
       ln -sf Resources/Info.plist "$CEF_FW/Info.plist"
     fi
@@ -14,7 +14,7 @@ let fixCEFStructure = TargetScript.pre(
 
 let embedCEFFramework = TargetScript.post(
     script: """
-    CEF_SRC="${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework"
+    CEF_SRC="${PROJECT_DIR}/../../core/apple/macos/Frameworks/Chromium Embedded Framework.framework"
     CEF_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Chromium Embedded Framework.framework"
     rm -rf "$CEF_DST"
     mkdir -p "$CEF_DST/Versions/A"
@@ -66,7 +66,7 @@ let embedKelpieHelper = TargetScript.post(
         "$exe_path" 2>/dev/null || true
 
       if [ "${CODE_SIGNING_ALLOWED}" != "NO" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
-        codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --entitlements "${PROJECT_DIR}/KelpieHelper/KelpieHelper.entitlements" "$app_dir"
+        codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --entitlements "${PROJECT_DIR}/../../core/apple/Helpers/KelpieHelper.entitlements" "$app_dir"
       fi
     }
 
@@ -88,7 +88,7 @@ let embedKelpieHelper = TargetScript.post(
 
 let embedGeckoHelper = TargetScript.post(
     script: """
-    GECKO_SRC="${PROJECT_DIR}/Frameworks/KelpieGeckoHelper.app"
+    GECKO_SRC="${PROJECT_DIR}/../../core/apple/macos/Frameworks/KelpieGeckoHelper.app"
     GECKO_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/KelpieGeckoHelper.app"
     if [ -d "$GECKO_SRC" ]; then
       rm -rf "$GECKO_DST"
@@ -128,6 +128,7 @@ let macOSLinkerFlags: SettingValue = .array([
 
 // MARK: - Targets
 
+
 let kelpieApp = Target.target(
     name: "Kelpie",
     destinations: .macOS,
@@ -135,13 +136,9 @@ let kelpieApp = Target.target(
     bundleId: "com.kelpie.browser.macos",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [
-        .glob("Kelpie/**/*.swift"),
-        .glob("Kelpie/**/*.mm"),
-    ],
+    sources: [.glob("Kelpie/**/*.swift")],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
-        .glob(pattern: "Kelpie/Resources/**"),
     ],
     entitlements: .file(path: "Kelpie/Kelpie.entitlements"),
     scripts: [
@@ -151,36 +148,36 @@ let kelpieApp = Target.target(
         embedGeckoHelper,
     ],
     dependencies: [
-        .target(name: "KelpieHelper"),
+        .project(target: "KelpieBrowserMac", path: "../../core/apple"),
+        .project(target: "KelpieHelper", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ],
     settings: .settings(
         base: [
             "SWIFT_VERSION": "5.0",
             "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "SWIFT_OBJC_BRIDGING_HEADER": "Kelpie/Kelpie-Bridging-Header.h",
             "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Kelpie/Renderer",
-                "$(PROJECT_DIR)/../../native/core-state/include",
-                "$(PROJECT_DIR)/../../native/core-connect/include",
-                "$(PROJECT_DIR)/../../native/core-protocol/include",
-                "$(PROJECT_DIR)/../../native/core-automation/include",
-                "$(PROJECT_DIR)/../../native/core-mcp/include",
-                "$(PROJECT_DIR)/../../native/core-ai/include",
-                "$(PROJECT_DIR)/Frameworks/cef_include",
-                "$(PROJECT_DIR)/vendor/llama.cpp/include",
+                "$(PROJECT_DIR)/../../core/apple/macos/Renderer",
+                "$(PROJECT_DIR)/../../core/native/core-state/include",
+                "$(PROJECT_DIR)/../../core/native/core-connect/include",
+                "$(PROJECT_DIR)/../../core/native/core-protocol/include",
+                "$(PROJECT_DIR)/../../core/native/core-automation/include",
+                "$(PROJECT_DIR)/../../core/native/core-mcp/include",
+                "$(PROJECT_DIR)/../../core/native/core-ai/include",
+                "$(PROJECT_DIR)/../../core/apple/macos/Frameworks/cef_include",
+                "$(PROJECT_DIR)/../../core/apple/macos/vendor/llama.cpp/include",
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../native/.build/core-state",
-                "$(PROJECT_DIR)/../../native/.build/core-connect",
-                "$(PROJECT_DIR)/../../native/.build/core-protocol",
-                "$(PROJECT_DIR)/../../native/.build/core-automation",
-                "$(PROJECT_DIR)/../../native/.build/core-mcp",
-                "$(PROJECT_DIR)/../../native/.build/core-ai",
-                "$(PROJECT_DIR)/vendor/llama.cpp/lib",
+                "$(PROJECT_DIR)/../../core/native/.build/core-state",
+                "$(PROJECT_DIR)/../../core/native/.build/core-connect",
+                "$(PROJECT_DIR)/../../core/native/.build/core-protocol",
+                "$(PROJECT_DIR)/../../core/native/.build/core-automation",
+                "$(PROJECT_DIR)/../../core/native/.build/core-mcp",
+                "$(PROJECT_DIR)/../../core/native/.build/core-ai",
+                "$(PROJECT_DIR)/../../core/apple/macos/vendor/llama.cpp/lib",
             ]),
             "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Frameworks",
+                "$(PROJECT_DIR)/../../core/apple/macos/Frameworks",
             ]),
             "OTHER_LDFLAGS": macOSLinkerFlags,
             "COMBINE_HIDPI_IMAGES": "YES",
@@ -191,33 +188,6 @@ let kelpieApp = Target.target(
     )
 )
 
-let kelpieHelper = Target.target(
-    name: "KelpieHelper",
-    destinations: .macOS,
-    product: .commandLineTool,
-    bundleId: "com.kelpie.browser.helper",
-    deploymentTargets: .macOS("14.0"),
-    infoPlist: .file(path: "KelpieHelper/Info.plist"),
-    sources: [
-        .glob("KelpieHelper/**/*.mm"),
-    ],
-    entitlements: .file(path: "KelpieHelper/KelpieHelper.entitlements"),
-    settings: .settings(
-        base: [
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Frameworks/cef_include",
-            ]),
-            "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Frameworks",
-            ]),
-            "OTHER_LDFLAGS": .array([
-                "-framework \"Chromium Embedded Framework\"",
-                "-lc++",
-            ]),
-        ]
-    )
-)
 
 let kelpieTests = Target.target(
     name: "KelpieTests",
@@ -232,14 +202,15 @@ let kelpieTests = Target.target(
     ],
     dependencies: [
         .target(name: "Kelpie"),
+        .project(target: "KelpieBrowserMac", path: "../../core/apple"),
     ],
     settings: .settings(
         base: [
             "SWIFT_VERSION": "5.0",
             "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
             "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Kelpie/Renderer",
-                "$(PROJECT_DIR)/Frameworks/cef_include",
+                "$(PROJECT_DIR)/../../core/apple/macos/Renderer",
+                "$(PROJECT_DIR)/../../core/apple/macos/Frameworks/cef_include",
             ]),
         ]
     )
@@ -263,7 +234,6 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
-        kelpieHelper,
         kelpieTests,
     ],
     schemes: [

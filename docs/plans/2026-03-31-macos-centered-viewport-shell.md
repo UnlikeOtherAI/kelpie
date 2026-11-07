@@ -79,12 +79,12 @@ The current handlers return placeholder viewport sizes. Replace that with the li
 
 ## Files Likely Touched
 
-- `apps/macos/Kelpie/Views/BrowserView.swift`
-- `apps/macos/Kelpie/Views/URLBarView.swift`
+- `core/apple/macos/Views/BrowserView.swift`
+- `core/apple/macos/Views/URLBarView.swift`
 - `apps/macos/Kelpie/KelpieApp.swift`
-- `apps/macos/Kelpie/Handlers/BrowserManagementHandler.swift`
-- `apps/macos/Kelpie/Handlers/DeviceHandler.swift`
-- `apps/macos/Kelpie/Browser/BrowserState.swift` or a new macOS viewport state file
+- `core/apple/macos/Handlers/BrowserManagementHandler.swift`
+- `core/apple/macos/Handlers/DeviceHandler.swift`
+- `core/apple/macos/Browser/BrowserState.swift` or a new macOS viewport state file
 
 ## Acceptance Criteria
 

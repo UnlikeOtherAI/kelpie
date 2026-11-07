@@ -8,7 +8,7 @@ and the persistent gateway; they do not establish live production UOA dispatch.
 
 | Host | Revision | Check | Result |
 | --- | --- | --- | --- |
-| FedoraMaxis / CEF-enabled Linux | `9b51ca74` | Full native/app build, final incremental C++17 rebuild and CTest | Build passed; 34/34 tests |
+| FedoraMaxis / CEF-enabled Linux | `9b51ca74` | Full core/native/app build, final incremental C++17 rebuild and CTest | Build passed; 34/34 tests |
 | Maxis / Windows 0.1.13 candidate | `d3c7b150` | CI CEF build and existing native control acceptance journey | Passed MCP, nested inference/cancellation, canonical snapshot/append typing/stale refs/screenshot and late-callback ownership |
 | dictator / macOS WebKit | `ea4cccd6` | Account job navigation, cancellation and effect-time document checks | 3/3 focused tests; SwiftLint zero violations across 280 files |
 | dictator / iOS 26.5 simulator | `63922b34` | Real WebKit account goto/new document pin, shared-ref append typing, stale-document refusal and callback retirement | 1/1 focused test |
@@ -107,8 +107,8 @@ worktree. This is compile/link evidence, not loaded-model inference evidence.
 Focused commands:
 
 ```sh
-cmake --build native/.build-connect --config Release --target kelpie_connect_test --parallel 2
-ctest --test-dir native/.build-connect -C Release -R kelpie_connect_test --output-on-failure
+cmake --build core/native/.build-connect --config Release --target kelpie_connect_test --parallel 2
+ctest --test-dir core/native/.build-connect -C Release -R kelpie_connect_test --output-on-failure
 swiftlint lint --strict
 xcodebuild -project Kelpie.xcodeproj -scheme Kelpie -configuration Debug \
   -destination 'platform=macOS,arch=arm64' -derivedDataPath .build -jobs 2 \

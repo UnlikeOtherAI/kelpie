@@ -11,7 +11,7 @@ Implement all HTTP API endpoint handlers for the Android app using CDP (Chrome D
 ## Files to Create
 
 ```
-apps/android/app/src/main/java/com/kelpie/browser/
+core/android/src/main/java/com/kelpie/browser/
   handlers/
     NavigationHandler.kt          # navigate, back, forward, reload, getCurrentUrl
     ScreenshotHandler.kt          # screenshot via CDP Page.captureScreenshot

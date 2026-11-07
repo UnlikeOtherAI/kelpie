@@ -1,0 +1,154 @@
+#pragma once
+
+#include <filesystem>
+#include <cstdint>
+#include <mutex>
+#include <memory>
+#include <string>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
+#include <nlohmann/json.hpp>
+
+#include "kelpie/bookmark_store.h"
+#include "kelpie/desktop_app.h"
+#include "kelpie/history_store.h"
+#include "kelpie/network_traffic_store.h"
+
+#include "close_lifecycle.h"
+#include "device_info_windows.h"
+#include "profile_session.h"
+#include "native_window_control.h"
+#include "session_snapshot.h"
+#include "settings_view.h"
+#include "startup_diagnostics.h"
+#include "win32_browser_view.h"
+#include "win32_shell.h"
+#include "window_placement.h"
+#include "page_color_sampler.h"
+#include "account_service.h"
+#include "connect_client.h"
+#include "connect_executor.h"
+#include "inference_service.h"
+
+namespace kelpie::windows {
+
+struct AppConfig {
+  bool hosted = false;
+  HWND parent_window = nullptr;
+  std::shared_ptr<account::HostSession> uoa_session;
+  int port = 8420;
+  std::filesystem::path profile_dir;
+  std::string initial_url = "https://example.com";
+  int width = 1920;
+  int height = 1080;
+  bool port_overridden = false;
+  bool profile_dir_overridden = false;
+  bool url_overridden = false;
+  bool width_overridden = false;
+  bool height_overridden = false;
+  bool mcp_stdio = false;
+  // "Isolate every new tab" from Settings. Off by default: isolating every tab
+  // breaks ordinary browsing, because a login would not carry into a tab
+  // opened from a link.
+  bool isolate_new_tabs = false;
+  std::filesystem::path readiness_path;
+  void* sandbox_info = nullptr;
+  void* cef_process_instance = nullptr;
+};
+
+class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
+ public:
+  WindowsApp(HINSTANCE instance, AppConfig config);
+  ~WindowsApp();
+
+  int Run(int show_command);
+  bool Start(int show_command = SW_SHOW);
+  bool ProcessMessage(const MSG& message);
+  void Tick();
+  void RequestClose();
+  bool IsClosed() const { return close_lifecycle_.completed(); }
+  HWND window() const { return shell_ ? shell_->hwnd() : nullptr; }
+  void AttachTo(HWND parent);
+
+  void OnNavigateRequested(const std::string& url) override;
+  void OnBackRequested() override;
+  void OnForwardRequested() override;
+  void OnReloadRequested() override;
+  void OnHomeRequested() override;
+  void OnAccountRequested() override;
+  void OnAddFavoriteRequested() override;
+  void OnOpenSettingsRequested() override;
+  std::string GetBookmarksJson() const override;
+  std::string GetHistoryJson() const override;
+  std::string GetNetworkJson() const override;
+  std::string GetTabsJson() const override;
+  std::optional<std::wstring> BestUrlCompletion(std::wstring_view typed) const override;
+  SettingsValues CurrentSettings() const override;
+  void OnCreateTabRequested() override;
+  void OnCreateIsolatedTabRequested() override;
+  void OnActivateTabRequested(std::string id, std::uint64_t generation) override;
+  void OnCloseTabRequested(std::string id, std::uint64_t generation) override;
+  void OnWindowCloseRequested() override;
+
+  void OnBrowserStateChanged(const BrowserState& state) override;
+
+ private:
+  using json = nlohmann::json;
+
+  void ResolveProfileDirectory();
+  void LoadSettings();
+  void SaveSettings() const;
+  void LoadStores();
+  void LoadSession();
+  void SaveSession();
+  void SaveStores();
+  void ApplySettings(const SettingsValues& settings);
+  // Opens a tab from the shell, in its own storage partition when asked.
+  void CreateTabFromShell(bool isolated);
+  bool InitializeCommonControls() const;
+  bool InitializeDesktopRuntime();
+  bool ShutdownDesktopRuntime();
+  void UpdateBrowserStateFromRuntime();
+  void PersistForClose();
+  bool TryCompleteClose();
+  void ArmCloseRetry();
+  bool CreateShell(int show_command);
+  std::wstring AppTitle() const;
+
+  HINSTANCE instance_;
+  AppConfig config_;
+  std::atomic<bool> running_{true};
+  CloseLifecycle close_lifecycle_;
+
+  DeviceInfoWindows device_info_provider_;
+  BrowserState browser_state_;
+  std::uint64_t persistence_epoch_ = 0;
+  SessionSnapshot session_snapshot_;
+  // Last known shell frame; loaded from settings.json and refreshed on close.
+  std::optional<WindowPlacement> window_placement_;
+  std::mutex shell_state_mutex_;
+  std::string home_url_;
+
+  NativeWindowControl native_control_;
+  std::unique_ptr<Win32Shell> shell_;
+  std::unique_ptr<Win32BrowserView> browser_view_;
+  std::unique_ptr<SettingsView> settings_view_;
+  std::unique_ptr<DesktopApp> desktop_app_;
+  PageColorSampler page_color_sampler_;
+  std::unique_ptr<account::AccountService> account_;
+  std::unique_ptr<connect::Client> connection_;
+  bool connect_model_ready_=false,connect_model_installed_=false;
+  std::unique_ptr<InferenceService> inference_;
+  ProfileSession profile_session_;
+  StartupDiagnostics startup_diagnostics_;
+
+};
+
+}  // namespace kelpie::windows

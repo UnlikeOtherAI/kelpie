@@ -1,7 +1,7 @@
 import AppKit
 import WebKit
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 @MainActor
 final class UOALoginStorageTests: XCTestCase {

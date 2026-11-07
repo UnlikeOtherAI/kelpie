@@ -21,7 +21,7 @@ latest-asset links remain valid. Use `release/YYYY-MM-DD`, with a numeric suffix
 that date tag already exists. Download and verify the published artifact's SHA-256,
 replace `/Applications/Kelpie.app`, then launch and verify that installed version.
 
-Android and iOS CI are filtered to their app source, shared native/contract inputs
+Android and iOS CI are filtered to their app source, shared core/native/contract inputs
 and relevant toolchain inputs. A Mac-only change or release-workflow edit does not
 build those apps. Workflow-only changes can be checked with Actionlint; their
 explicit `workflow_dispatch` entry points remain available for a platform build.

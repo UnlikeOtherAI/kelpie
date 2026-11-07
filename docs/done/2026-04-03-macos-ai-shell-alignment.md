@@ -82,19 +82,19 @@ The detachable unpinned window and magnetic re-docking are intentionally exclude
 
 ## Files Expected To Change
 
-- `apps/macos/Kelpie/Views/BrowserView.swift`
-- `apps/macos/Kelpie/Views/URLBarView.swift`
-- `apps/macos/Kelpie/Views/SettingsView.swift`
+- `core/apple/macos/Views/BrowserView.swift`
+- `core/apple/macos/Views/URLBarView.swift`
+- `core/apple/macos/Views/SettingsView.swift`
 - `apps/macos/Kelpie/Views/FloatingMenuView.swift`
-- `apps/macos/Kelpie/AI/AIState.swift`
+- `core/apple/macos/AI/AIState.swift`
 - `apps/macos/Kelpie/KelpieApp.swift`
 
 New views are likely:
 
-- `apps/macos/Kelpie/Views/AIChatPanel.swift`
+- `core/apple/macos/Views/AIChatPanel.swift`
 - `apps/macos/Kelpie/Views/AIChatView.swift`
 - `apps/macos/Kelpie/Views/AIModelListView.swift`
-- `apps/macos/Kelpie/Views/AIStatusPill.swift`
+- `core/apple/macos/Views/AIStatusPill.swift`
 
 ## Acceptance Criteria
 

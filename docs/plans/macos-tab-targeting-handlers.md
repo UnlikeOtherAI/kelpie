@@ -2,7 +2,7 @@
 
 ## Scope
 
-Update the specified macOS handler files plus `apps/macos/Kelpie/LLM/LLMHandler.swift` so requests can target a specific tab via `tabId`, using the tab-aware APIs already added to `HandlerContext`.
+Update the specified macOS handler files plus `core/apple/macos/LLM/LLMHandler.swift` so requests can target a specific tab via `tabId`, using the tab-aware APIs already added to `HandlerContext`.
 
 ## Rules
 

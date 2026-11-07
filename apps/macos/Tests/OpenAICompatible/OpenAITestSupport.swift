@@ -1,5 +1,5 @@
 import Foundation
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// Scripted HTTP transport. Each request is answered by `handler`; streamed
 /// bodies are cut into random small chunks to exercise chunk boundaries.

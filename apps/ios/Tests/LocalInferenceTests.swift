@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class LocalInferenceTests: XCTestCase {
     func testNativeBridgeRejectsMissingModelAndAgentMode() async {

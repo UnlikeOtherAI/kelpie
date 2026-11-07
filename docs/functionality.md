@@ -1,5 +1,8 @@
 # Kelpie — Feature Catalogue
 
+The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](../core/README.md).
+
+
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.
 
 For information about browser engine availability by platform and Apple's regulatory requirements for alternative engines, see [browser-engines.md](browser-engines.md).
@@ -282,7 +285,7 @@ AI inference on macOS, iOS, Android and Windows; Linux does not yet expose AI ha
 
 **HF Cloud Inference:** When a HF token is set, models available on the HF Inference API can be queried remotely without downloading. The cloud client posts to `api-inference.huggingface.co/models/{id}` and returns the generated text with timing metadata. Supports prompt, chat-message, and raw HF input formats.
 
-**Shared AI Library (`native/core-ai`):** Model catalog, fitness evaluation, HF token management, and shared model-store helpers live in a shared C++ library. Apple apps use URLSession for authenticated downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
+**Shared AI Library (`core/native/core-ai`):** Model catalog, fitness evaluation, HF token management, and shared model-store helpers live in a shared C++ library. Apple apps use URLSession for authenticated downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
 
 **CLI model management:** `kelpie ai list` shows approved models and their download status, plus any locally running Ollama models. `kelpie ai pull/rm` manage downloads. `kelpie ai load/unload/status/ask` control inference on devices. `kelpie ai catalog` lists a device's approved model catalog and `kelpie ai fitness <model>` scores a model against a device's RAM/disk. `kelpie ai endpoint list|add|edit|remove|models|test|health|use` and `kelpie ai cancel` manage OpenAI-compatible endpoints. All available as MCP tools (`kelpie_ai_models`, `kelpie_ai_pull`, `kelpie_ai_remove`, `kelpie_ai_status`, `kelpie_ai_load`, `kelpie_ai_unload`, `kelpie_ai_ask`, `kelpie_ai_record`, `kelpie_ai_catalog`, `kelpie_ai_fitness`, `kelpie_ai_endpoints`, `kelpie_ai_endpoint_save`, `kelpie_ai_endpoint_remove`, `kelpie_ai_endpoint_models`, `kelpie_ai_endpoint_test`, `kelpie_ai_endpoint_health`, `kelpie_ai_cancel`).
 

@@ -1,6 +1,7 @@
 # Kelpie SwiftLint — strict rules, build must fail on violations.
 
 included:
+  - core/apple
   - apps/ios/Kelpie
   - apps/macos/Kelpie
 

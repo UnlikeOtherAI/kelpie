@@ -6,7 +6,7 @@ Expose the currently available staged phone viewport presets in the iPad `View` 
 
 ## Root Cause
 
-The iPad app already reads the canonical phone viewport preset catalog from `native/core-protocol` and exposes it through the floating menu and HTTP/MCP APIs, but the iPad scene commands only contain the app-menu help items. There is no `View` menu integration for staged viewport selection.
+The iPad app already reads the canonical phone viewport preset catalog from `core/native/core-protocol` and exposes it through the floating menu and HTTP/MCP APIs, but the iPad scene commands only contain the app-menu help items. There is no `View` menu integration for staged viewport selection.
 
 ## Plan
 

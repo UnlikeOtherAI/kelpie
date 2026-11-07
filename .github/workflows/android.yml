@@ -4,7 +4,8 @@ on:
   pull_request:
     paths:
       - 'apps/android/**'
-      - 'native/**'
+      - 'core/native/**'
+      - 'core/android/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
       - 'pnpm-lock.yaml'
@@ -16,7 +17,8 @@ on:
       - main
     paths:
       - 'apps/android/**'
-      - 'native/**'
+      - 'core/native/**'
+      - 'core/android/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
       - 'pnpm-lock.yaml'

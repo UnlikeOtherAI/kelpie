@@ -2,6 +2,8 @@
 
 > Read CLAUDE.md and AGENTS.md before starting any work. Update both when policy changes.
 
+The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session.
+
 ## Source of Truth
 
 **Static docs — read these to understand the project:**

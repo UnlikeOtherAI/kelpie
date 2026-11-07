@@ -5,18 +5,18 @@
 
 > **Summary of 9-agent review:** 107 total issues found across all components. 8 critical security/correctness bugs. The document's core direction (move logic to core) is correct but several items are understated or missing. The C++ implementations are significantly less complete than the document implies.
 
-This document catalogues everything in the macOS Swift app that should live in the core C++ project (`native/`), either because it is already implemented in `native/` and the macOS app isn't using it, or because it is platform-agnostic and belongs in `native/` even if it isn't there yet.
+This document catalogues everything in the macOS Swift app that should live in the core C++ project (`core/native/`), either because it is already implemented in `core/native/` and the macOS app isn't using it, or because it is platform-agnostic and belongs in `core/native/` even if it isn't there yet.
 
 ---
 
-## 1. Already in `native/`, Not Yet Wired in macOS Swift
+## 1. Already in `core/native/`, Not Yet Wired in macOS Swift
 
 The `engine-chromium-desktop` C++ module has complete handler implementations for most automation methods. The macOS Swift handlers below implement the same methods but with inferior or incomplete JS — the C++ versions should be the source of truth and the macOS app should call into them via the C API.
 
 ### 1.1 Interaction — `engine-chromium-desktop/src/handlers/interaction_handler.cpp`
 
 **C++ status:** Complete (click, tap, fill, type, select-option, check, uncheck)
-**macOS status:** `apps/macos/Kelpie/Handlers/InteractionHandler.swift` — same methods, different JS
+**macOS status:** `core/apple/macos/Handlers/InteractionHandler.swift` — same methods, different JS
 
 **Gap:** The C++ implementation has all 7 methods. The macOS Swift version has the same 7. The macOS app is not calling into the C++ core. This means the macOS app is maintaining duplicate logic.
 
@@ -25,7 +25,7 @@ The `engine-chromium-desktop` C++ module has complete handler implementations fo
 ### 1.2 Scroll — `engine-chromium-desktop/src/handlers/scroll_handler.cpp`
 
 **C++ status:** `scroll`, `scroll-to-top`, `scroll-to-bottom` implemented. `scroll2` and `scroll-to-y` return `UNSUPPORTED`.
-**macOS status:** `apps/macos/Kelpie/Handlers/ScrollHandler.swift` — `scroll`, `scroll2`, `scroll-to-top`, `scroll-to-bottom`, `scroll-to-y` all implemented with full JS
+**macOS status:** `core/apple/macos/Handlers/ScrollHandler.swift` — `scroll`, `scroll2`, `scroll-to-top`, `scroll-to-bottom`, `scroll-to-y` all implemented with full JS
 
 **Gap:** The macOS app has `scroll2` (scroll element into view with position) and `scroll-to-y` (absolute Y scroll) which are absent from C++. The C++ version has only basic scroll methods.
 
@@ -34,21 +34,21 @@ The `engine-chromium-desktop` C++ module has complete handler implementations fo
 ### 1.3 Evaluate — `engine-chromium-desktop/src/handlers/evaluate_handler.cpp`
 
 **C++ status:** `evaluate` and `wait-for-element` implemented.
-**macOS status:** `apps/macos/Kelpie/Handlers/EvaluateHandler.swift` — same methods.
+**macOS status:** `core/apple/macos/Handlers/EvaluateHandler.swift` — same methods.
 
 **Action:** Wire macOS `EvaluateHandler.swift` to C++. The `wait-for-element` polling loop pattern is reusable.
 
 ### 1.4 DOM — `engine-chromium-desktop/src/handlers/dom_handler.cpp`
 
 **C++ status:** `query-selector`, `query-selector-all`, `get-element-text`, `get-attributes`, `get-dom` all implemented.
-**macOS status:** `apps/macos/Kelpie/Handlers/DOMHandler.swift` — same methods.
+**macOS status:** `core/apple/macos/Handlers/DOMHandler.swift` — same methods.
 
 **Action:** macOS Swift should call into C++ for DOM operations. The JS (querying `getBoundingClientRect`, `innerText`, attributes, etc.) is already in C++ and should not be duplicated in Swift.
 
 ### 1.5 Network (Performance API) — `engine-chromium-desktop/src/handlers/network_handler.cpp`
 
 **C++ status:** `get-network-log` and `get-resource-timeline` implemented. Uses `performance.getEntriesByType('resource')` and `performance.getEntriesByType('navigation')`.
-**macOS status:** `apps/macos/Kelpie/Handlers/NetworkHandler.swift` — same methods. The JS for `buildSummary()` is in Swift.
+**macOS status:** `core/apple/macos/Handlers/NetworkHandler.swift` — same methods. The JS for `buildSummary()` is in Swift.
 
 **Gap:** `buildSummary()` Swift logic (categorizing by content-type, filtering by method/status/url) is not in C++.
 
@@ -57,7 +57,7 @@ The `engine-chromium-desktop` C++ module has complete handler implementations fo
 ### 1.6 Navigation — `engine-chromium-desktop/src/handlers/navigation_handler.cpp`
 
 **C++ status:** `navigate`, `back`, `forward`, `reload`, `get-current-url`, `set-home`, `get-home` all implemented. Cookie migration on navigate is in C++.
-**macOS status:** `apps/macos/Kelpie/Handlers/NavigationHandler.swift` — same methods plus `context.persistRendererCookiesToSharedJar()`.
+**macOS status:** `core/apple/macos/Handlers/NavigationHandler.swift` — same methods plus `context.persistRendererCookiesToSharedJar()`.
 
 **Gap:** Cookie migration (`persistRendererCookiesToSharedJar`) is in Swift. Should be in `core-automation`.
 
@@ -66,7 +66,7 @@ The `engine-chromium-desktop` C++ module has complete handler implementations fo
 ### 1.7 Console — `engine-chromium-desktop/src/handlers/console_handler.cpp`
 
 **C++ status:** `get-console-messages`, `get-js-errors`, `clear-console` implemented. Uses the injected bridge script.
-**macOS status:** `apps/macos/Kelpie/Handlers/ConsoleHandler.swift` — same methods. Bridge script (`bridgeScript`) is a static Swift string.
+**macOS status:** `core/apple/macos/Handlers/ConsoleHandler.swift` — same methods. Bridge script (`bridgeScript`) is a static Swift string.
 
 **Gap:** The console bridge JS intercepts `console.*` and `window.onerror`. The JS itself is portable. The injection mechanism (via `WKUserScript` or CDP `Page.addScriptToEvaluateOnNewDocument`) is platform-specific. The JS string constant should be in `core-automation`.
 
@@ -75,17 +75,17 @@ The `engine-chromium-desktop` C++ module has complete handler implementations fo
 ### 1.8 Screenshot — `engine-chromium-desktop/src/handlers/screenshot_handler.cpp`
 
 **C++ status:** `screenshot` implemented (PNG/JPEG via CDP `Page.captureScreenshot`).
-**macOS status:** `apps/macos/Kelpie/Handlers/ScreenshotHandler.swift` — same method using `context.takeSnapshot()` and `NSBitmapImageRep`.
+**macOS status:** `core/apple/macos/Handlers/ScreenshotHandler.swift` — same method using `context.takeSnapshot()` and `NSBitmapImageRep`.
 
 **Action:** Keep platform-specific capture (CEF uses CDP, WebKit uses `takeSnapshot()`). The response format (width/height/format/base64) is already consistent.
 
 ---
 
-## 2. Not in `native/`, Should Be Added
+## 2. Not in `core/native/`, Should Be Added
 
-These are macOS Swift components that are platform-agnostic and should be implemented in `native/`.
+These are macOS Swift components that are platform-agnostic and should be implemented in `core/native/`.
 
-### 2.1 MutationHandler — `apps/macos/Kelpie/Handlers/MutationHandler.swift`
+### 2.1 MutationHandler — `core/apple/macos/Handlers/MutationHandler.swift`
 
 **What it does:** Injects a `MutationObserver` bridge script that buffers DOM mutations (childList, attributes, characterData) in `window.__kelpieMutations`. Provides `watch-mutations`, `get-mutations`, `stop-watching`.
 
@@ -93,7 +93,7 @@ These are macOS Swift components that are platform-agnostic and should be implem
 
 **What to move:** The JS string constant (lines 24–67 of `MutationHandler.swift`) to `core-automation/include/kelpie/bridge_scripts.h`. The handler state management (`window.__kelpieMutations` watch tracking) stays in Swift or moves to `core-automation` as a C++ class.
 
-### 2.2 ShadowDOMHandler — `apps/macos/Kelpie/Handlers/ShadowDOMHandler.swift`
+### 2.2 ShadowDOMHandler — `core/apple/macos/Handlers/ShadowDOMHandler.swift`
 
 **What it does:** Queries shadow DOM using `shadowRoot.querySelector()` recursively. Provides `query-shadow-dom`, `get-shadow-roots`.
 
@@ -101,7 +101,7 @@ These are macOS Swift components that are platform-agnostic and should be implem
 
 **Action:** Implement in `core-automation`. JS is reusable as-is.
 
-### 2.3 Snapshot3DBridge — `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift`
+### 2.3 Snapshot3DBridge — `core/apple/shared/Handlers/Snapshot3DBridge.swift`
 
 **What it does:** Full-page 3D CSS transform for element inspection. ~700 lines of JS that:
 1. Reads all DOM elements, computes depth via ancestor traversal
@@ -120,7 +120,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **Note:** `Snapshot3DBridge.swift` also contains `Snapshot3DHandler.swift` (the handler that calls the bridge). The handler has a feature flag check (`FeatureFlags.is3DInspectorEnabled`) and state (`context.isIn3DInspector`).
 
-### 2.4 NetworkBridge — Injected JS in `apps/macos/Kelpie/Handlers/NetworkBridge.swift`
+### 2.4 NetworkBridge — Injected JS in `core/apple/macos/Handlers/NetworkBridge.swift`
 
 **What it does:** Intercepts `XMLHttpRequest.prototype.open/send/setRequestHeader` and `window.fetch` to capture network requests and post them via `window.webkit.messageHandlers.kelpieNetwork.postMessage`.
 
@@ -128,7 +128,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **What to move:** The XHR/fetch interception JS to `core-automation`. The bridge call (`postMessage`) should use the generic fallback chain like Snapshot3DBridge.
 
-### 2.5 ViewportState — `apps/macos/Kelpie/Browser/ViewportState.swift`
+### 2.5 ViewportState — `core/apple/macos/Browser/ViewportState.swift`
 
 **What it does:** Manages viewport dimensions, orientation, and viewport presets. `allMacViewportPresets` is macOS-specific (iPhone SE, iPad Mini, etc.). `ViewportState` itself has platform-agnostic fields: `width`, `height`, `devicePixelRatio`, `orientation`, `mode`.
 
@@ -136,7 +136,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **What to move:** `ViewportState` struct and orientation enum to `core-automation/include/kelpie/viewport_state.h`. Platform-specific preset lists stay in platform code.
 
-### 2.6 FeatureFlags — `apps/macos/Kelpie/Browser/FeatureFlags.swift`
+### 2.6 FeatureFlags — `core/apple/macos/Browser/FeatureFlags.swift`
 
 **What it does:** Static boolean dictionary for feature toggles. Currently: `is3DInspectorEnabled`.
 
@@ -144,7 +144,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **What to move:** Flag name constants (`KELPIE_FF_3D_INSPECTOR`) and the `FeatureFlags` struct to `core-protocol/include/kelpie/feature_flags.h`.
 
-### 2.7 FaviconExtractor — `apps/macos/Kelpie/Browser/FaviconExtractor.swift`
+### 2.7 FaviconExtractor — `core/apple/macos/Browser/FaviconExtractor.swift`
 
 **What it does:** Extracts favicons from web pages by:
 1. Parsing `<link rel="icon">` tags
@@ -157,7 +157,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **Note:** SVG favicon decoding via temp file (`ad6d5d6` — "decode SVG favicons via temp file") is macOS-specific and should remain in platform code.
 
-### 2.8 TabStore — `apps/macos/Kelpie/Browser/TabStore.swift`
+### 2.8 TabStore — `core/apple/macos/Browser/TabStore.swift`
 
 **What it does:** Multi-tab management. Per-tab `WKWebViewRenderer` instances with title/URL/isLoading/favicon tracking. Tab switching, adding, closing with tab spread animation coordination.
 
@@ -170,7 +170,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **Note:** `WKWebViewRenderer` is WebKit-specific. `TabStore` should hold an opaque `RendererInterface*` (already defined in C++ as `kelpie::RendererInterface`). The Swift `Tab` holds a `WKWebViewRenderer` directly — this needs a Swift-level abstraction that wraps the C++ renderer interface.
 
-### 2.9 BrowserState — `apps/macos/Kelpie/Browser/BrowserState.swift`
+### 2.9 BrowserState — `core/apple/macos/Browser/BrowserState.swift`
 
 **What it does:** Aggregates `tabStore`, `viewportState`, `featureFlags`, and bridge scripts (`consoleBridgeScript`, `networkBridgeScript`). Tracks `isIn3DInspector`, `consoleMessages`, `lastError`.
 
@@ -178,7 +178,7 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **What to move:** `BrowserState` struct and the bridge script references to `core-automation`. Platform code owns the actual injection mechanism.
 
-### 2.10 SharedCookieJar — `apps/macos/Kelpie/Browser/SharedCookieJar.swift`
+### 2.10 SharedCookieJar — `core/apple/macos/Browser/SharedCookieJar.swift`
 
 **What it does:** Migrates cookies between WebKit (`WKHTTPCookieStore`) and CEF (`CefCookieManager`). Reads/writes cookies from a persistent JSON file (`~/Library/Cookies/kelpie_shared_cookies.json`).
 
@@ -186,12 +186,12 @@ console.log('__kelpie_3d_exit__')                                // last-resort 
 
 **What to move:** The cookie migration logic (read from one store, write to another) to `core-automation`. Platform-specific cookie APIs (WKHTTPCookieStore vs CefCookieManager) stay in platform code and implement a `CookieStore` interface defined in core.
 
-### 2.11 AIHandler — `apps/macos/Kelpie/Handlers/AIHandler.swift`
+### 2.11 AIHandler — `core/apple/macos/Handlers/AIHandler.swift`
 
 **What it does:** `ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`. Uses `InferenceEngine` (CoreML/MLX) and `AudioRecorder` (AVFoundation) for native inference. Uses Ollama HTTP for remote inference.
 
 **What belongs in core:**
-- Ollama HTTP client protocol (`postJSON`, `ollamaURL`, `isOllamaReachable`) — already in `native/core-ai/src/ollama_client.cpp` but the handler-level orchestration is in Swift
+- Ollama HTTP client protocol (`postJSON`, `ollamaURL`, `isOllamaReachable`) — already in `core/native/core-ai/src/ollama_client.cpp` but the handler-level orchestration is in Swift
 - `InferenceHarness` and `InferenceEngine.InferenceResult` types — portable
 
 **What stays platform-specific:**
@@ -300,7 +300,7 @@ When implementing any Phase 1–4 item, update `docs/functionality.md` and the r
 #### C1 — HTTP Server: Missing Content-Length enables request smuggling/desync
 
 **Source:** Critical Edge Cases agent
-**File:** `apps/macos/Kelpie/Network/HTTPServer.swift`, lines 89–124
+**File:** `core/apple/macos/Network/HTTPServer.swift`, lines 89–124
 
 `parseContentLength` returns `0` when the header is absent or malformed. A POST request with no `Content-Length` is immediately dispatched with a truncated body. Leftover bytes become the start of the next pipelined request — textbook HTTP desync. Connection has no read timeout.
 
@@ -315,7 +315,7 @@ if bodyReceived >= contentLength {   // contentLength = 0 when absent
 #### C2 — HTTP Server + NavigationHandler: No URL scheme validation — javascript: and data: URIs reach the renderer
 
 **Source:** Critical Edge Cases agent
-**Files:** `apps/macos/Kelpie/Network/HTTPServer.swift:136`, `apps/macos/Kelpie/Handlers/NavigationHandler.swift:18`
+**Files:** `core/apple/macos/Network/HTTPServer.swift:136`, `core/apple/macos/Handlers/NavigationHandler.swift:18`
 
 Path passed to router without scheme filtering. navigate checks URL(string:) only — javascript:alert(document.cookie) parses fine. WKWebView executes it. Any CLI user on the LAN can XSS the browser origin via the HTTP API.
 
@@ -324,7 +324,7 @@ Path passed to router without scheme filtering. navigate checks URL(string:) onl
 #### C3 — HTTPServer: @unchecked Sendable on class with multiple mutable shared fields
 
 **Source:** Critical Edge Cases + Architecture agents
-**File:** `apps/macos/Kelpie/Network/HTTPServer.swift`, line 6
+**File:** `core/apple/macos/Network/HTTPServer.swift`, line 6
 
 ```swift
 final class HTTPServer: @unchecked Sendable {
@@ -339,7 +339,7 @@ Marked suppressive but has multiple mutable fields accessed from NWListener inte
 #### C4 — CEFRenderer has zero bridge script injection — NetworkBridge and ConsoleBridge do not work on CEF
 
 **Source:** Bridge Scripts agent
-**File:** `apps/macos/Kelpie/Renderer/CEFRenderer.swift`
+**File:** `core/apple/macos/Renderer/CEFRenderer.swift`
 
 WKWebViewRenderer injects both bridge scripts via addUserScript. CEFRenderer has no equivalent mechanism — does not call addUserScript. Network interception (XMLHttpRequest/fetch) is entirely absent on CEF. The document Phase 1 plan does not address that the CEF injection pipeline does not exist.
 
@@ -348,7 +348,7 @@ WKWebViewRenderer injects both bridge scripts via addUserScript. CEFRenderer has
 #### C5 — NetworkBridge has no fallback chain — hardcodes WebKit messageHandler
 
 **Source:** Bridge Scripts agent
-**File:** `apps/macos/Kelpie/Handlers/NetworkBridge.swift`, lines 9–11
+**File:** `core/apple/macos/Handlers/NetworkBridge.swift`, lines 9–11
 
 ```javascript
 var _post = window.webkit.messageHandlers.kelpieNetwork.postMessage.bind(
@@ -363,7 +363,7 @@ No if (window.webkit...) guard. On CEF or Android WebView this throws TypeError 
 #### C6 — MutationHandler: MutationObserver buffers and observers accumulate across every page navigation — never cleaned up
 
 **Source:** Critical Edge Cases + Bridge Scripts agents
-**File:** `apps/macos/Kelpie/Handlers/MutationHandler.swift`, lines 23–67
+**File:** `core/apple/macos/Handlers/MutationHandler.swift`, lines 23–67
 
 WKWebView reuses the same JS context for same-origin navigations. window.__kelpieMutations persists across navigations. No stopWatching call on navigation — observers accumulate indefinitely. On heavy-DOM pages (live data, infinite scroll), each observer fills to 1000 entries. 10 calls without stop-watching = up to 10000 orphaned mutation entries accumulating in memory. Also: watchId uses Date.now() — two calls within the same millisecond produce duplicate IDs, orphaning the first observer.
 
@@ -372,7 +372,7 @@ WKWebView reuses the same JS context for same-origin navigations. window.__kelpi
 #### C7 — Snapshot3DBridge: document.write/document.open called after injection silently orphans the inspector
 
 **Source:** Critical Edge Cases agent
-**File:** `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift`
+**File:** `core/apple/shared/Handlers/Snapshot3DBridge.swift`
 
 document.write during parse or document.open post-load erases the DOM including __m3d_overlay, __m3d_suppress, iframe labels, and all modified element inline styles. The JS window.__m3d survives. Overlay is gone — user sees nothing and cannot interact. On re-entry after document.open, the stale cleanup at the top of enterScript runs against the new document with nil or dead-element WeakMap references.
 
@@ -381,7 +381,7 @@ document.write during parse or document.open post-load erases the DOM including 
 #### C8 — InteractionHandler: selector parameter escapes only single-quote — full CSS selector injection possible
 
 **Source:** Critical Edge Cases + Handler Wire-Through agents
-**File:** `apps/macos/Kelpie/Handlers/InteractionHandler.swift`, lines 24, 70, 97, 128, 152
+**File:** `core/apple/macos/Handlers/InteractionHandler.swift`, lines 24, 70, 97, 128, 152
 
 document.querySelector('selector.replacingOccurrences(of: "'", with: "\\'")') — crafted selectors like [onfocus=alert(1)//], div[class*=secret], input[type=password], or button[class*=admin] enumerate page structure and detect specific elements. Not direct XSS (native setters bypass re-parsing) but exploitable information disclosure by any CLI user.
 
@@ -390,7 +390,7 @@ document.querySelector('selector.replacingOccurrences(of: "'", with: "\\'")') �
 #### C9 — WKWebViewRenderer: Inverted deduplication guard — non-consecutive duplicate URLs all re-logged
 
 **Source:** Critical Edge Cases + Platform-Specific agents
-**File:** `apps/macos/Kelpie/Renderer/WKWebViewRenderer.swift`, line 220
+**File:** `core/apple/macos/Renderer/WKWebViewRenderer.swift`, line 220
 
 capturedDocumentResponseURL != url else { return } then set at end. Trace A -> B -> A: Call 3 checks B != A -> true -> logs A again. Guard only prevents consecutive duplicates. In CLI automation sessions revisiting pages (form -> submit -> back to form), NetworkTrafficStore silently records duplicate entries.
 
@@ -399,7 +399,7 @@ capturedDocumentResponseURL != url else { return } then set at end. Trace A -> B
 #### C10 — SharedCookieJar: SameSite attribute silently dropped on every save/load cycle
 
 **Source:** Store Parity agent
-**File:** `apps/macos/Kelpie/Browser/SharedCookieJar.swift`
+**File:** `core/apple/macos/Browser/SharedCookieJar.swift`
 
 StoredCookie has no sameSite field. signature() omits SameSite from hash — cookie policy changes undetectable. Additionally: HttpOnly and Secure are set as string "TRUE" instead of Bool true. Both flags silently lost on restore.
 
@@ -408,7 +408,7 @@ StoredCookie has no sameSite field. signature() omits SameSite from hash — coo
 #### C11 — SharedCookieJar: Cookies silently dropped when switching FROM CEF
 
 **Source:** Platform-Specific agent
-**File:** `apps/macos/Kelpie/Renderer/CookieMigrator.swift`, lines 7–16
+**File:** `core/apple/macos/Renderer/CookieMigrator.swift`, lines 7–16
 
 guard source.engineName != "chromium" else { return } — when switching from CEF to WebKit, migrate returns immediately. SharedCookieJar never populated with CEF cookies. httpOnly cookies also silently skipped in injectCookiesViaJS due to CEF API limitations.
 
@@ -417,16 +417,16 @@ guard source.engineName != "chromium" else { return } — when switching from CE
 #### C12 — Document error: wait-for-element and wait-for-navigation do not exist in C++
 
 **Source:** Handler Wire-Through agent
-**File:** `native/engine-chromium-desktop/src/handlers/evaluate_handler.cpp`
+**File:** `core/native/engine-chromium-desktop/src/handlers/evaluate_handler.cpp`
 
-The document claims both are implemented. Grep across entire native/ tree finds zero references. Only evaluate is implemented. Phase 3 wire-through for EvaluateHandler is built on false premise.
+The document claims both are implemented. Grep across entire core/native/ tree finds zero references. Only evaluate is implemented. Phase 3 wire-through for EvaluateHandler is built on false premise.
 
 ---
 
 #### C13 — C++ scroll-to-bottom uses document.body.scrollHeight — fails on overflow:hidden body
 
 **Source:** Handler Wire-Through agent
-**File:** `native/engine-chromium-desktop/src/handlers/scroll_handler.cpp`, line 13
+**File:** `core/native/engine-chromium-desktop/src/handlers/scroll_handler.cpp`, line 13
 
 C++ uses document.body.scrollHeight. Swift uses document.documentElement.scrollHeight. Pages with body { overflow: hidden } (common in SPAs) report body.scrollHeight === window.innerHeight — zero scrollable distance. C++ version will not scroll to bottom of these pages.
 
@@ -435,7 +435,7 @@ C++ uses document.body.scrollHeight. Swift uses document.documentElement.scrollH
 #### C14 — C++ type ignores delay parameter — sends all characters synchronously
 
 **Source:** Handler Wire-Through agent
-**File:** `native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`, lines 99–103
+**File:** `core/native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`, lines 99–103
 
 Swift typeText loops with Task.sleep per character. C++ uses synchronous for-loop with no sleep. Sites listening for intermediate input events (Google Search, typeaheads, form validators) receive all characters simultaneously and miss intermediate state.
 
@@ -444,7 +444,7 @@ Swift typeText loops with Task.sleep per character. C++ uses synchronous for-loo
 #### C15 — C++ navigate does not wait for page load — reports zero load time
 
 **Source:** Handler Wire-Through agent
-**File:** `native/engine-chromium-desktop/src/handlers/navigation_handler.cpp`, lines 22–33
+**File:** `core/native/engine-chromium-desktop/src/handlers/navigation_handler.cpp`, lines 22–33
 
 Swift polls isLoadingPage up to 10 seconds. C++ calls LoadUrl(url), records NowMillis() immediately, returns — loadTime always negligible. C++ navigation methods also do not call cookie persistence. Sessions not migrated on navigation.
 
@@ -453,7 +453,7 @@ Swift polls isLoadingPage up to 10 seconds. C++ calls LoadUrl(url), records NowM
 #### C16 — C++ fill uses element.value= — fails on React/Vue/Angular instrumented inputs
 
 **Source:** Handler Wire-Through agent
-**File:** `native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`, line 68
+**File:** `core/native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`, line 68
 
 Swift uses Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, value)?.set to bypass framework setters. C++ uses element.value = directly. On React/Angular/Vue apps, this sets the DOM property but may not trigger framework state update.
 
@@ -462,7 +462,7 @@ Swift uses Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, value)?.s
 #### C17 — Document error: BrowserState does not contain isIn3DInspector or lastError
 
 **Source:** Store Parity agent
-**File:** `apps/macos/Kelpie/Browser/BrowserState.swift`
+**File:** `core/apple/macos/Browser/BrowserState.swift`
 
 The document claims BrowserState tracks these fields. They are not in the file. consoleMessages is present but not wired to the C++ kelpie_console_store C API. Document misstates what needs to move to core.
 
@@ -471,7 +471,7 @@ The document claims BrowserState tracks these fields. They are not in the file. 
 #### C18 — Snapshot3DBridge exit mechanism: fallback chain broken on CEF and Android
 
 **Source:** Bridge Scripts agent
-**File:** `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift`, lines 447–456
+**File:** `core/apple/shared/Handlers/Snapshot3DBridge.swift`, lines 447–456
 
 webkit.messageHandlers fallback is WebKit-only. KelpieBridge.on3DSnapshotEvent — no platform sets this object. console.log(__kelpie_3d_exit__) depends on console bridging being wired to HandlerContext — no guarantee this forwarding is set up in all CEF and Android code paths.
 
@@ -480,7 +480,7 @@ webkit.messageHandlers fallback is WebKit-only. KelpieBridge.on3DSnapshotEvent �
 #### C19 — Port 8420 claimed by two independent servers — no collision detection
 
 **Source:** Architecture agent
-**Files:** `native/engine-chromium-desktop/include/kelpie/desktop_http_server.h:14`, `apps/macos/Kelpie/Network/ServerState.swift:38`
+**Files:** `core/native/engine-chromium-desktop/include/kelpie/desktop_http_server.h:14`, `core/apple/macos/Network/ServerState.swift:38`
 
 Both DesktopHttpServer (C++) and Swift HTTPServer default to port 8420. Currently only Swift starts. Phase 3 wire-through implies routing through C++ — if both servers run simultaneously they race for the port.
 
@@ -489,7 +489,7 @@ Both DesktopHttpServer (C++) and Swift HTTPServer default to port 8420. Currentl
 #### C20 — Swift HandlerContext has 30+ methods the C++ context does not have
 
 **Source:** Architecture agent
-**File:** `apps/macos/Kelpie/Handlers/HandlerContext.swift` vs `native/core-automation/include/kelpie/handler_context.h`
+**File:** `core/apple/macos/Handlers/HandlerContext.swift` vs `core/native/core-automation/include/kelpie/handler_context.h`
 
 Swift has: load, goBack, goForward, reloadPage, allCookies, setCookie, deleteCookie, syncSharedCookiesIntoRenderer, showTouchIndicator, showToast, waitForViewportSize, tab lifecycle, 3D inspector management. C++ context has: SetRenderer, EvaluateJs, EvaluateJsReturningJson. Wire-through without adding these to C++ will silently drop functionality.
 
@@ -498,7 +498,7 @@ Swift has: load, goBack, goForward, reloadPage, allCookies, setCookie, deleteCoo
 #### C21 — C++ RendererInterface missing SetCookies, DeleteCookie, DeleteAllCookies, AllCookies
 
 **Source:** Architecture agent
-**File:** `native/core-automation/include/kelpie/renderer_interface.h`, lines 14–25
+**File:** `core/native/core-automation/include/kelpie/renderer_interface.h`, lines 14–25
 
 Required by HandlerContext cookie sync methods. Without these, SharedCookieJar cannot be wired through to C++. Phase 3 navigation wire-through cannot complete without cookie infrastructure in core.
 

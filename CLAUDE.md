@@ -6,6 +6,8 @@ Android release signing requires all four configured secrets and verified APK/AA
 
 Windows/Linux outbound Nessie account connections follow [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 
+The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session.
+
 ## What This Is
 
 Kelpie is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.

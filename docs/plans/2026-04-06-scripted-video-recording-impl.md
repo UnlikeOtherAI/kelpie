@@ -30,8 +30,8 @@ Tasks 1-5 are independent and can run in parallel. Task 6 depends on all of 1-5.
 ## Task 1: Add Color Parameter to Touch Indicator
 
 **Files:**
-- Modify: `apps/ios/Kelpie/Handlers/HandlerContext.swift` (lines 69-98)
-- Modify: `apps/macos/Kelpie/Handlers/HandlerContext.swift` (equivalent lines)
+- Modify: `core/apple/ios/Handlers/HandlerContext.swift` (lines 69-98)
+- Modify: `core/apple/macos/Handlers/HandlerContext.swift` (equivalent lines)
 
 **Step 1: Modify `showTouchIndicator` to accept a color parameter**
 
@@ -119,10 +119,10 @@ feat: add color parameter to touch indicator overlay
 ## Task 2: CommentaryHandler — iOS + macOS
 
 **Files:**
-- Create: `apps/ios/Kelpie/Handlers/CommentaryHandler.swift`
-- Create: `apps/macos/Kelpie/Handlers/CommentaryHandler.swift`
-- Modify: `apps/ios/Kelpie/Network/ServerState.swift` (line ~98, add registration)
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift` (equivalent line)
+- Create: `core/apple/ios/Handlers/CommentaryHandler.swift`
+- Create: `core/apple/macos/Handlers/CommentaryHandler.swift`
+- Modify: `core/apple/ios/Network/ServerState.swift` (line ~98, add registration)
+- Modify: `core/apple/macos/Network/ServerState.swift` (equivalent line)
 
 **Step 1: Create CommentaryHandler.swift (iOS)**
 
@@ -223,10 +223,10 @@ feat: add show-commentary and hide-commentary endpoints
 ## Task 3: SwipeHandler — iOS + macOS
 
 **Files:**
-- Create: `apps/ios/Kelpie/Handlers/SwipeHandler.swift`
-- Create: `apps/macos/Kelpie/Handlers/SwipeHandler.swift`
-- Modify: `apps/ios/Kelpie/Network/ServerState.swift`
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift`
+- Create: `core/apple/ios/Handlers/SwipeHandler.swift`
+- Create: `core/apple/macos/Handlers/SwipeHandler.swift`
+- Modify: `core/apple/ios/Network/ServerState.swift`
+- Modify: `core/apple/macos/Network/ServerState.swift`
 
 **Step 1: Create SwipeHandler.swift (iOS)**
 
@@ -332,10 +332,10 @@ feat: add swipe gesture endpoint with trail overlay
 ## Task 4: HighlightHandler — iOS + macOS
 
 **Files:**
-- Create: `apps/ios/Kelpie/Handlers/HighlightHandler.swift`
-- Create: `apps/macos/Kelpie/Handlers/HighlightHandler.swift`
-- Modify: `apps/ios/Kelpie/Network/ServerState.swift`
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift`
+- Create: `core/apple/ios/Handlers/HighlightHandler.swift`
+- Create: `core/apple/macos/Handlers/HighlightHandler.swift`
+- Modify: `core/apple/ios/Network/ServerState.swift`
+- Modify: `core/apple/macos/Network/ServerState.swift`
 
 **Step 1: Create HighlightHandler.swift (iOS)**
 
@@ -480,8 +480,8 @@ feat: add highlight and hide-highlight endpoints
 ## Task 5: Add `mode` Parameter to `fill`
 
 **Files:**
-- Modify: `apps/ios/Kelpie/Handlers/InteractionHandler.swift` (lines 62-88)
-- Modify: `apps/macos/Kelpie/Handlers/InteractionHandler.swift` (identical)
+- Modify: `core/apple/ios/Handlers/InteractionHandler.swift` (lines 62-88)
+- Modify: `core/apple/macos/Handlers/InteractionHandler.swift` (identical)
 
 **Step 1: Modify the `fill` method**
 
@@ -577,10 +577,10 @@ feat: add typing mode to fill endpoint with configurable delay
 ## Task 6: ScriptHandler — iOS + macOS
 
 **Files:**
-- Create: `apps/ios/Kelpie/Handlers/ScriptHandler.swift`
-- Create: `apps/macos/Kelpie/Handlers/ScriptHandler.swift`
-- Modify: `apps/ios/Kelpie/Network/ServerState.swift`
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift`
+- Create: `core/apple/ios/Handlers/ScriptHandler.swift`
+- Create: `core/apple/macos/Handlers/ScriptHandler.swift`
+- Modify: `core/apple/ios/Network/ServerState.swift`
+- Modify: `core/apple/macos/Network/ServerState.swift`
 
 **Depends on:** Tasks 1-5
 
@@ -684,8 +684,8 @@ feat: add play-script, abort-script, get-script-status endpoints
 **Files:**
 - Create: `apps/ios/Kelpie/Recording/RecordingModeManager.swift`
 - Create: `apps/macos/Kelpie/Recording/RecordingModeManager.swift`
-- Modify: `apps/ios/Kelpie/Network/Router.swift` (add recording gate)
-- Modify: `apps/macos/Kelpie/Network/Router.swift`
+- Modify: `core/apple/ios/Network/Router.swift` (add recording gate)
+- Modify: `core/apple/macos/Network/Router.swift`
 
 **Can run in parallel with Task 6.**
 

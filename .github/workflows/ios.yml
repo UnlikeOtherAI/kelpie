@@ -4,7 +4,8 @@ on:
   pull_request:
     paths:
       - 'apps/ios/**'
-      - 'native/**'
+      - 'core/native/**'
+      - 'core/apple/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
       - 'pnpm-lock.yaml'
@@ -19,7 +20,8 @@ on:
       - main
     paths:
       - 'apps/ios/**'
-      - 'native/**'
+      - 'core/native/**'
+      - 'core/apple/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
       - 'pnpm-lock.yaml'
@@ -74,24 +76,24 @@ jobs:
       - name: Build native libraries for iOS simulator
         run: |
           set -euo pipefail
-          cmake -S native -B native/.build-ios-sim \
+          cmake -S core/native -B core/native/.build-ios-sim \
             -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphonesimulator \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
             -DKELPIE_BUILD_DESKTOP_ENGINES=OFF
-          cmake --build native/.build-ios-sim --config Debug
+          cmake --build core/native/.build-ios-sim --config Debug
 
       - name: Flatten native build output to expected layout
         # Xcode generator nests outputs under per-config dirs. The iOS
-        # Project.swift expects them at native/.build-ios-sim/<lib>/lib*.a.
+        # Project.swift expects them at core/native/.build-ios-sim/<lib>/lib*.a.
         run: |
           set -euo pipefail
           for lib in core-state core-connect core-protocol core-automation core-mcp core-ai \
             _deps/kelpie_llama-build/src _deps/kelpie_llama-build/ggml/src _deps/kelpie_llama-build/ggml/src/ggml-cpu; do
-            src="native/.build-ios-sim/${lib}/Debug-iphonesimulator"
-            dst="native/.build-ios-sim/${lib}"
+            src="core/native/.build-ios-sim/${lib}/Debug-iphonesimulator"
+            dst="core/native/.build-ios-sim/${lib}"
             if [ -d "${src}" ]; then
               find "${src}" -maxdepth 1 -name 'lib*.a' -exec cp -a {} "${dst}/" \;
             fi

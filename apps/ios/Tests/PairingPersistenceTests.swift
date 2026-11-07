@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// "Always allow" must survive an app restart and later approvals: the next
 /// store instance reads the same file and still accepts the issued bearer.

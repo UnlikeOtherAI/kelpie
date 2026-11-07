@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Kelpie"
 include(":app")
+
+include(":kelpie-browser")
+project(":kelpie-browser").projectDir = file("../../core/android")

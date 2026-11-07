@@ -36,12 +36,12 @@ At `click-annotation` / `fill-annotation` time:
 
 ## Files
 
-- `apps/macos/Kelpie/Handlers/HandlerContext.swift`
-- `apps/ios/Kelpie/Handlers/HandlerContext.swift`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
-- `apps/macos/Kelpie/LLM/LLMHandler.swift`
-- `apps/ios/Kelpie/LLM/LLMHandler.swift`
-- `apps/android/app/src/main/java/com/kelpie/browser/llm/LLMHandler.kt`
+- `core/apple/macos/Handlers/HandlerContext.swift`
+- `core/apple/ios/Handlers/HandlerContext.swift`
+- `core/android/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
+- `core/apple/macos/LLM/LLMHandler.swift`
+- `core/apple/ios/LLM/LLMHandler.swift`
+- `core/android/src/main/java/com/kelpie/browser/llm/LLMHandler.kt`
 - `docs/api/llm.md`
 
 ## Cross-Provider Review

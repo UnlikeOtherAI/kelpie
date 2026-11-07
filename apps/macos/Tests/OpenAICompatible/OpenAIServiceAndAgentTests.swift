@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class OpenAIServiceAndAgentTests: XCTestCase {
     private let model = "qwen3.8-flash-next-ud-q4_k_xl"

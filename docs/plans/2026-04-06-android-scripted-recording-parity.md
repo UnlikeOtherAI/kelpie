@@ -133,21 +133,21 @@ Update `MainActivity.kt` and `Router.kt`:
 
 New:
 
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/JSEscape.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/CommentaryHandler.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/HighlightHandler.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/SwipeHandler.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/ScriptPlaybackState.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/ScriptHandler.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/ui/RecordingStopButton.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/JSEscape.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/CommentaryHandler.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/HighlightHandler.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/SwipeHandler.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/ScriptPlaybackState.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/ScriptHandler.kt`
+- `core/android/src/main/java/com/kelpie/browser/ui/RecordingStopButton.kt`
 
 Changed:
 
-- `apps/android/app/src/main/java/com/kelpie/browser/MainActivity.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/network/Router.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/InteractionHandler.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
+- `core/android/src/main/java/com/kelpie/browser/MainActivity.kt`
+- `core/android/src/main/java/com/kelpie/browser/network/Router.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/InteractionHandler.kt`
+- `core/android/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
 - `docs/functionality.md`
 
 ## Risks

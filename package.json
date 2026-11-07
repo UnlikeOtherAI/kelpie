@@ -4,7 +4,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "check:embedding": "node scripts/check-embedding.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

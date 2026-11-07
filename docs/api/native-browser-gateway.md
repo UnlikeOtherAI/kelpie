@@ -1,6 +1,6 @@
 # Native browser gateway bindings
 
-`native/core-mcp` owns the canonical validator, capability projection, reference
+`core/native/core-mcp` owns the canonical validator, capability projection, reference
 ownership, sequential operation state, and MCP translation. One persistent
 `KelpieBrowserGatewayRef` serves both `/v1/browser-control` and `/mcp` for a browser.
 The CLI forwards canonical requests to that same gateway. Authentication stays
@@ -70,7 +70,7 @@ value-free reader's transient observed nodes into Nessie's existing selector wir
 reference registry. The shared automation selector builder validates a single match
 against the exact observed node, including duplicate IDs and document roots;
 selectors beyond 2,000 characters are omitted. Run real headless DOM conformance
-separately with `node tests/native/browser-snapshot-selectors.mjs <path-to-browser_snapshot_fixture>`
+separately with `node tests/core/native/browser-snapshot-selectors.mjs <path-to-browser_snapshot_fixture>`
 after building that native test target and installing Playwright Chromium.
 Set `KELPIE_TEST_ARTIFACT_DIR` to retain its synthetic DOM screenshot and safe
 observed snapshot outside the checkout.
@@ -161,7 +161,7 @@ or an agent's pinned visible tab changes during dispatch; dispatched mutations
 retain uncertainty. Isolated real-WebKit fixtures exercise this boundary on macOS
 and the iOS simulator, including captured-node activation, append, replacement
 refusal and single-image screenshot output.
-Run `node tests/native/run-control-acceptance.mjs <absolute-native-executable>`
+Run `node tests/core/native/run-control-acceptance.mjs <absolute-native-executable>`
 on the target host for the real MCP SDK handshake and canonical browser journey,
 including uncertain renderer timeout, BUSY refusal, late completion and recovery.
 On Windows the SDK journey also checks nested common inference page context and

@@ -1,6 +1,6 @@
 # Chromium Desktop Engine Plan
 
-**Goal:** Build `native/engine-chromium-desktop/` as the shared desktop browser runtime used by Linux and Windows shells.
+**Goal:** Build `core/native/engine-chromium-desktop/` as the shared desktop browser runtime used by Linux and Windows shells.
 
 **Scope:** This plan covers only the shared desktop core: CEF runtime wiring, HTTP routing, a reusable MCP server implementation, bridge scripts, shared handlers, and platform extension seams for mDNS and device info.
 
@@ -22,7 +22,7 @@ This matters because the current MCP registry and docs already expose these name
 ## Module Shape
 
 ```text
-native/engine-chromium-desktop/
+core/native/engine-chromium-desktop/
   CMakeLists.txt
   include/kelpie/
     desktop_app.h
@@ -188,7 +188,7 @@ To keep complexity bounded for the first desktop core cut:
 
 ## Build Integration
 
-`native/CMakeLists.txt` will add `add_subdirectory(engine-chromium-desktop)`.
+`core/native/CMakeLists.txt` will add `add_subdirectory(engine-chromium-desktop)`.
 
 The module links:
 
@@ -204,7 +204,7 @@ The module links:
 
 For this implementation phase, verification should cover:
 
-- native configure/build with the new target wired into `native/CMakeLists.txt`
+- native configure/build with the new target wired into `core/native/CMakeLists.txt`
 - handler and router unit tests that do not require a live CEF runtime
 - MCP filtering tests for Linux and Windows Chromium runtimes
 

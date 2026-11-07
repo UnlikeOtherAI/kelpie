@@ -18,7 +18,7 @@
     </queries>
 
     <application
-        android:name=".KelpieApp"
+        android:name="com.kelpie.browser.KelpieApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
@@ -28,7 +28,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.kelpie.browser.MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize">
@@ -38,20 +38,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".account.AccountCallbackActivity" android:exported="true" android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.unlikeotherai.kelpie" android:host="oauth" android:path="/callback" />
-            </intent-filter>
-        </activity>
-        <activity android:name=".account.AccountLoginActivity" android:exported="false" android:excludeFromRecents="true" android:configChanges="orientation|screenSize|keyboardHidden" />
-
-        <service
-            android:name=".network.KelpieNetworkService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
 
     </application>
 

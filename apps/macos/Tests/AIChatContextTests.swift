@@ -1,6 +1,6 @@
 import XCTest
 import WebKit
-@testable import Kelpie
+@testable import KelpieBrowser
 
 @MainActor
 final class AIChatContextTests: XCTestCase {

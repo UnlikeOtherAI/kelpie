@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Downloads a pinned Firefox release, strips Mozilla branding, and places the
-# result as apps/macos/Frameworks/KelpieGeckoHelper.app.
+# result as core/apple/macos/Frameworks/KelpieGeckoHelper.app.
 # Run once: make gecko-runtime
 set -euo pipefail
 
 FIREFOX_VERSION="122.0.1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEST_DIR="$SCRIPT_DIR/../apps/macos/Frameworks"
+DEST_DIR="$SCRIPT_DIR/../core/apple/macos/Frameworks"
 HELPER_APP="$DEST_DIR/KelpieGeckoHelper.app"
 TMP_DMG="/tmp/kelpie-gecko-${FIREFOX_VERSION}.dmg"
 MOUNT_POINT="/Volumes/KelpieFirefoxSetup"

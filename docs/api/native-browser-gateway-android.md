@@ -22,7 +22,7 @@ Android exposes authenticated `POST /v1/browser-control` and `POST /mcp` through
 the existing Ktor listener, pairing bearer policy, header validation and body
 bounds. Pairing still requires on-device approval. Kotlin drives authorization
 and native dispatch; schemas, compact catalogs, extension descriptors, references
-and uncertainty come from `native/core-mcp` through JNI.
+and uncertainty come from `core/native/core-mcp` through JNI.
 
 Protocol failures return HTTP 200 with their canonical/MCP error envelope so
 clients retain uncertain outcomes; authentication, body and recording admission

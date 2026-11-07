@@ -24,7 +24,7 @@ This plan adds two optional fields to new-tab creation — `name` and `partition
 **Out of scope (explicit non-goals):**
 - Linux app — remains single-tab; `partition` field accepted but rejected with `PARTITION_UNSUPPORTED` if multi-tab orchestration is implied. No new tab routes.
 - Windows app — same as Linux.
-- macOS CEF renderer path — when `RendererState.activeEngine == .chromium`, new-tab requests with `partition` set return `PARTITION_UNSUPPORTED_ON_CHROMIUM`. CEF partition support is a follow-up that requires extending `native/engine-chromium-desktop`.
+- macOS CEF renderer path — when `RendererState.activeEngine == .chromium`, new-tab requests with `partition` set return `PARTITION_UNSUPPORTED_ON_CHROMIUM`. CEF partition support is a follow-up that requires extending `core/native/engine-chromium-desktop`.
 - Parallel-different-tabId concurrency on macOS. The platform's `@MainActor` isolation already serialises handler execution; lifting that is a separate body of work. Same-tab requests already serialise.
 - Bumping CLI to use partition in group commands.
 
@@ -284,7 +284,7 @@ Parallel adversarial review run 2026-05-16: `superpowers:code-reviewer` (Claude)
 
 ### Resolved findings
 
-1. **[CONVERGENT, CRITICAL] macOS `SharedCookieJar` cross-tab cookie propagation.** `apps/macos/Kelpie/Handlers/HandlerContext.swift:459-562` actively syncs cookies across all WKWebView tabs via `~/.kelpie/session/cookies.json`. Partitioned tabs would write into the shared jar and have other tabs' cookies pushed back. **Resolved:** macOS sub-plan now states that partitioned tabs are excluded from `SharedCookieJar` participation — `persistRendererCookiesToSharedJar`, `syncSharedCookiesIntoRenderer`, and the cookie handlers (`allCookies`, `setCookie`, `deleteCookie`, `deleteAllCookies`) must early-return for any tab whose `partition != nil`, operating on that tab's own `websiteDataStore.httpCookieStore` directly.
+1. **[CONVERGENT, CRITICAL] macOS `SharedCookieJar` cross-tab cookie propagation.** `core/apple/macos/Handlers/HandlerContext.swift:459-562` actively syncs cookies across all WKWebView tabs via `~/.kelpie/session/cookies.json`. Partitioned tabs would write into the shared jar and have other tabs' cookies pushed back. **Resolved:** macOS sub-plan now states that partitioned tabs are excluded from `SharedCookieJar` participation — `persistRendererCookiesToSharedJar`, `syncSharedCookiesIntoRenderer`, and the cookie handlers (`allCookies`, `setCookie`, `deleteCookie`, `deleteAllCookies`) must early-return for any tab whose `partition != nil`, operating on that tab's own `websiteDataStore.httpCookieStore` directly.
 
 2. **[CONVERGENT, HIGH] "12 concurrent employee sessions" oversold.** Plan delivers isolated identities, not parallel command execution. **Resolved:** Master plan opens with an explicit "Important framing" section distinguishing isolation from parallelism, and the Concurrency section spells out the serialised model. `docs/functionality.md` will state the same.
 

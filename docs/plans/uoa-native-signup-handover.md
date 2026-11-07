@@ -27,13 +27,13 @@ Do not investigate Chromium for this work. The browser engine is out of scope.
 
 Relevant Kelpie files:
 
-- `apps/macos/Kelpie/Account/UOAAccount.swift`
-- `apps/macos/Kelpie/Account/UOAAuthorization.swift`
-- `apps/macos/Kelpie/Account/UOATransport.swift`
-- `apps/macos/Kelpie/Account/AccountBookmarks.swift`
-- `apps/macos/Kelpie/Views/AccountButton.swift`
-- `apps/macos/Kelpie/Browser/BookmarkStore.swift`
-- `apps/macos/Kelpie/Handlers/BookmarkHandler.swift`
+- `core/apple/shared/Account/UOAAccount.swift`
+- `core/apple/shared/Account/UOAAuthorization.swift`
+- `core/apple/shared/Account/UOATransport.swift`
+- `core/apple/shared/Account/AccountBookmarks.swift`
+- `core/apple/macos/Views/AccountButton.swift`
+- `core/apple/shared/Browser/BookmarkStore.swift`
+- `core/apple/macos/Handlers/BookmarkHandler.swift`
 - `apps/macos/Tests/UOAAccountTests.swift`
 
 ### UOA

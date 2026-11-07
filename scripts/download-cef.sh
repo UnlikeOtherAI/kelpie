@@ -21,7 +21,7 @@ download_and_extract() {
 install_macos_arm64() {
     local cef_version="149.0.6+g0d0eeb6+chromium-149.0.7827.201"
     local cef_platform="macosarm64"
-    local outdir="apps/macos/Frameworks"
+    local outdir="core/apple/macos/Frameworks"
     local tarball="${TMP_ROOT}/cef-${cef_platform}.tar.bz2"
     local extract_root="${TMP_ROOT}/extract-macos"
     local url="https://cef-builds.spotifycdn.com/cef_binary_${cef_version}_${cef_platform}_minimal.tar.bz2"

@@ -133,7 +133,7 @@ Document this honestly.
 The core JavaScript: a single IIFE injected via `evaluateJS()`, cleaned up by a second script.
 
 **Files:**
-- Create: `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift` (JS as Swift string constants)
+- Create: `core/apple/shared/Handlers/Snapshot3DBridge.swift` (JS as Swift string constants)
 
 **Step 1: Write the enter script**
 
@@ -628,7 +628,7 @@ Hold both scripts as `static let enterScript: String` and `static let exitScript
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift
+git add core/apple/shared/Handlers/Snapshot3DBridge.swift
 git commit -m "feat(macos): 3D DOM inspector JavaScript engine"
 ```
 
@@ -639,8 +639,8 @@ git commit -m "feat(macos): 3D DOM inspector JavaScript engine"
 The 3D inspector is behind a feature flag. Hidden by default, enabled via Settings toggle or environment variable for testing.
 
 **Files:**
-- Create: `apps/macos/Kelpie/Browser/FeatureFlags.swift`
-- Modify: `apps/macos/Kelpie/Views/SettingsView.swift`
+- Create: `core/apple/macos/Browser/FeatureFlags.swift`
+- Modify: `core/apple/macos/Views/SettingsView.swift`
 
 **Step 1: Create `FeatureFlags.swift`**
 
@@ -681,8 +681,8 @@ Section("Experimental") {
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Browser/FeatureFlags.swift \
-    apps/macos/Kelpie/Views/SettingsView.swift
+git add core/apple/macos/Browser/FeatureFlags.swift \
+    core/apple/macos/Views/SettingsView.swift
 git commit -m "feat(macos): feature flag for 3D DOM inspector (settings toggle + env var)"
 ```
 
@@ -691,10 +691,10 @@ git commit -m "feat(macos): feature flag for 3D DOM inspector (settings toggle +
 ### Task 3: Swift Handler — Snapshot3DHandler
 
 **Files:**
-- Create: `apps/macos/Kelpie/Handlers/Snapshot3DHandler.swift`
-- Modify: `apps/macos/Kelpie/Handlers/HandlerContext.swift`
-- Modify: `apps/macos/Kelpie/Network/Router.swift`
-- Modify: `apps/macos/Kelpie/Renderer/WKWebViewRenderer.swift`
+- Create: `core/apple/macos/Handlers/Snapshot3DHandler.swift`
+- Modify: `core/apple/macos/Handlers/HandlerContext.swift`
+- Modify: `core/apple/macos/Network/Router.swift`
+- Modify: `core/apple/macos/Renderer/WKWebViewRenderer.swift`
 
 **Step 1: Create `Snapshot3DHandler.swift`**
 
@@ -814,10 +814,10 @@ if isIn3DInspector {
 **Step 6: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Handlers/Snapshot3DHandler.swift \
-    apps/macos/Kelpie/Handlers/HandlerContext.swift \
-    apps/macos/Kelpie/Network/Router.swift \
-    apps/macos/Kelpie/Renderer/WKWebViewRenderer.swift
+git add core/apple/macos/Handlers/Snapshot3DHandler.swift \
+    core/apple/macos/Handlers/HandlerContext.swift \
+    core/apple/macos/Network/Router.swift \
+    core/apple/macos/Renderer/WKWebViewRenderer.swift
 git commit -m "feat(macos): 3D inspector HTTP handler and bridge message routing"
 ```
 
@@ -827,7 +827,7 @@ git commit -m "feat(macos): 3D inspector HTTP handler and bridge message routing
 
 **Files:**
 - Modify: `apps/macos/Kelpie/Views/FloatingMenuView.swift`
-- Modify: `apps/macos/Kelpie/Views/BrowserView.swift`
+- Modify: `core/apple/macos/Views/BrowserView.swift`
 
 **Step 1: Add callback to `FloatingMenuView`**
 
@@ -884,7 +884,7 @@ Add notification listener:
 
 ```bash
 git add apps/macos/Kelpie/Views/FloatingMenuView.swift \
-    apps/macos/Kelpie/Views/BrowserView.swift
+    core/apple/macos/Views/BrowserView.swift
 git commit -m "feat(macos): 3D inspector button in floating menu"
 ```
 

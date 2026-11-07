@@ -1,7 +1,7 @@
 # Kelpie Functional Parity Audit
 
 **Date:** 2026-04-06
-**Scope:** macOS (apps/macos/Kelpie/), iOS (apps/ios/Kelpie/), Android (apps/android/app/src/main/java/com/kelpie/)
+**Scope:** macOS (apps/macos/Kelpie/), iOS (apps/ios/Kelpie/), Android (core/android/src/main/java/com/kelpie/)
 **Exclusions:** Renderer engines (WKWebView/WebView/CEF), UI frameworks (SwiftUI/UIKit/Compose)
 
 ---
@@ -134,7 +134,7 @@ BookmarkHandler, HistoryHandler, NetworkInspectorHandler
 
 **What's broken:**
 iOS `ServerState.swift:96` registers `Snapshot3DHandler(context: ctx).register(on: router)`, but:
-- `apps/ios/Kelpie/Handlers/Snapshot3DHandler.swift` **does not exist**
+- `core/apple/ios/Handlers/Snapshot3DHandler.swift` **does not exist**
 - `apps/ios/Kelpie/Handlers/Snapshot3DBridge.swift` **does not exist**
 
 **macOS:** Has both `Snapshot3DHandler.swift` (lines 6–119) and `Snapshot3DBridge.swift` (802 lines of JS).
@@ -144,16 +144,16 @@ iOS `ServerState.swift:96` registers `Snapshot3DHandler(context: ctx).register(o
 
 **Evidence:**
 ```swift
-// apps/ios/Kelpie/Network/ServerState.swift:96
+// core/apple/ios/Network/ServerState.swift:96
 Snapshot3DHandler(context: ctx).register(on: router)  // ← file does not exist
 ```
 
 ```bash
-$ test -f apps/ios/Kelpie/Handlers/Snapshot3DHandler.swift && echo EXISTS || echo DOES NOT EXIST
+$ test -f core/apple/ios/Handlers/Snapshot3DHandler.swift && echo EXISTS || echo DOES NOT EXIST
 DOES NOT EXIST
 ```
 
-**Fix:** Copy `apps/macos/Kelpie/Handlers/Snapshot3DHandler.swift` and `Snapshot3DBridge.swift` to iOS, update the `import WebKit` to `import WebKit` (same), change `context.evaluateJS` calls if needed.
+**Fix:** Copy `core/apple/macos/Handlers/Snapshot3DHandler.swift` and `Snapshot3DBridge.swift` to iOS, update the `import WebKit` to `import WebKit` (same), change `context.evaluateJS` calls if needed.
 
 ---
 
@@ -161,13 +161,13 @@ DOES NOT EXIST
 
 **Severity:** IMPORTANT — functional parity violation
 
-**macOS TabStore** (`apps/macos/Kelpie/Browser/TabStore.swift`): Full `TabStore: ObservableObject` with real tab creation, switching, closing, URL/title tracking, persisted via `UserDefaults`. HTTP routes:
+**macOS TabStore** (`core/apple/macos/Browser/TabStore.swift`): Full `TabStore: ObservableObject` with real tab creation, switching, closing, URL/title tracking, persisted via `UserDefaults`. HTTP routes:
 - `get-tabs` → real implementation
 - `new-tab` → real implementation via `TabStore`
 - `switch-tab` → real implementation
 - `close-tab` → real implementation
 
-**iOS BrowserManagementHandler** (`apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`):
+**iOS BrowserManagementHandler** (`core/apple/ios/Handlers/BrowserManagementHandler.swift`):
 - `get-tabs` (line 56): calls `getTabs()` — returns hardcoded stub data
 - `new-tab` (line 57): returns `successResponse(["tab": ["id": 0, ...], "tabCount": 1])` — hardcoded stub
 - `switch-tab` (line 58): returns hardcoded stub
@@ -175,7 +175,7 @@ DOES NOT EXIST
 - `TabStore` does not exist on iOS
 - `getTabs()` method (line 290): returns hardcoded stub with id=0
 
-**Android BrowserManagementHandler** (`apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`):
+**Android BrowserManagementHandler** (`core/android/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`):
 - All tab routes present but return hardcoded stubs (lines 49–52)
 - `getTabs()` (line 274): returns `mapOf("tabs" to listOf(...), "activeTab" to 0)` — hardcoded stub
 - `TabStore` does not exist on Android
@@ -250,7 +250,7 @@ Also uses `tvSyncEnabled` key in `ExternalDisplayManager.swift`.
 
 **Severity:** MINOR
 
-**macOS** has `apps/macos/Kelpie/Browser/FaviconExtractor.swift` (5 lines).
+**macOS** has `core/apple/macos/Browser/FaviconExtractor.swift` (5 lines).
 **iOS:** No equivalent file.
 **Android:** No equivalent file.
 

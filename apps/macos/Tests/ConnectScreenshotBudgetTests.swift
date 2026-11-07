@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class ConnectScreenshotBudgetTests: XCTestCase {
     private func shot(_ format: String, _ size: Int) -> [String: Any] {

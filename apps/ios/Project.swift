@@ -17,6 +17,7 @@ let iOSLinkerFlags: SettingValue = .array([
 
 // MARK: - Target
 
+
 let kelpieApp = Target.target(
     name: "Kelpie",
     destinations: [.iPhone, .iPad],
@@ -24,53 +25,24 @@ let kelpieApp = Target.target(
     bundleId: "com.unlikeotherai.kelpie",
     deploymentTargets: .iOS("16.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [
-        .glob("Kelpie/**/*.swift"),
-        // Shared from macOS — cross-project source references
-        .glob("../macos/Kelpie/Handlers/Snapshot3DBridge.swift"),
-        .glob("../macos/Kelpie/Storage/SecretStore.swift"),
-        .glob("../macos/Kelpie/Views/BrowserChromeAppearance.swift"),
-        .glob("../macos/Kelpie/Views/BrowserChromeSampler.swift"),
-        .glob("../macos/Kelpie/Account/UOAAccount.swift"),
-        .glob("../macos/Kelpie/Connect/**/*.swift"),
-        .glob("../macos/Kelpie/Account/UOASession.swift"),
-        .glob("../macos/Kelpie/Account/UOAPresentation.swift"),
-        .glob("../macos/Kelpie/Account/UOALoginWebView.swift"),
-        .glob("../macos/Kelpie/Account/UOAAuthorization.swift"),
-        .glob("../macos/Kelpie/Account/UOATransport.swift"),
-        .glob("../macos/Kelpie/Account/AccountBookmarks.swift"),
-        .glob("../macos/Kelpie/Account/UOASettingsStream.swift"),
-        .glob("../macos/Kelpie/Browser/BookmarkStore.swift"),
-        .glob("../macos/Kelpie/Browser/BookmarkNode.swift"),
-        .glob("../macos/Kelpie/Browser/BookmarkTree.swift"),
-        .glob("../macos/Kelpie/Browser/AddressInput.swift"),
-        .glob("../macos/Kelpie/Browser/NetworkTrafficPersistence.swift"),
-        .glob("../macos/Kelpie/Browser/PartitionMap.swift"),
-        .glob("../macos/Kelpie/Browser/PartitionValidator.swift"),
-        .glob("../macos/Kelpie/AI/OpenAICompatible/**/*.swift"),
-        .glob("../macos/Kelpie/Network/BrowserControlGateway.swift"),
-        .glob("../macos/Kelpie/Network/Router+BrowserControl.swift"),
-        .glob("../macos/Kelpie/Network/AccountPairingAuthorization.swift"),
-    ],
+    sources: [.glob("Kelpie/**/*.swift")],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
-        .glob(pattern: "../../native/licenses/*.txt"),
-        .glob(pattern: "../macos/Kelpie/Resources/Snapshot3D/*.js"),
     ],
     dependencies: [
+        .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ],
     settings: .settings(
         base: [
             "SWIFT_VERSION": "5.0",
-            "SWIFT_OBJC_BRIDGING_HEADER": "Kelpie/Kelpie-Bridging-Header.h",
             "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../native/core-state/include",
-                "$(PROJECT_DIR)/../../native/core-connect/include",
-                "$(PROJECT_DIR)/../../native/core-protocol/include",
-                "$(PROJECT_DIR)/../../native/core-automation/include",
-                "$(PROJECT_DIR)/../../native/core-mcp/include",
-                "$(PROJECT_DIR)/../../native/core-ai/include",
+                "$(PROJECT_DIR)/../../core/native/core-state/include",
+                "$(PROJECT_DIR)/../../core/native/core-connect/include",
+                "$(PROJECT_DIR)/../../core/native/core-protocol/include",
+                "$(PROJECT_DIR)/../../core/native/core-automation/include",
+                "$(PROJECT_DIR)/../../core/native/core-mcp/include",
+                "$(PROJECT_DIR)/../../core/native/core-ai/include",
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-state",
@@ -91,8 +63,8 @@ let kelpieApp = Target.target(
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
-            "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../native/.build-iphoneos",
-            "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../native/.build-ios-sim",
+            "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../core/native/.build-iphoneos",
+            "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../core/native/.build-ios-sim",
         ]
     )
 )
@@ -118,6 +90,7 @@ let kelpieTests = Target.target(
     ],
     dependencies: [
         .target(name: "Kelpie"),
+        .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
     ],
     settings: .settings(
         base: [

@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// Deterministic unit tests for `CookieScope`'s pure matching logic.
 /// No network, IO, or device dependency — all inputs are in-memory.

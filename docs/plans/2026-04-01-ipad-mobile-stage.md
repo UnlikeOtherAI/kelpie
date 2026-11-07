@@ -55,11 +55,11 @@
 
 ## Files
 
-- `apps/ios/Kelpie/Views/BrowserView.swift`
-- `apps/ios/Kelpie/Views/FloatingMenuView.swift`
-- `apps/ios/Kelpie/Views/WelcomeCardView.swift`
-- `apps/android/app/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/ui/FloatingMenu.kt`
+- `core/apple/ios/Views/BrowserView.swift`
+- `core/apple/ios/Views/FloatingMenuView.swift`
+- `core/apple/ios/Views/WelcomeCardView.swift`
+- `core/android/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
+- `core/android/src/main/java/com/kelpie/browser/ui/FloatingMenu.kt`
 - `docs/functionality.md`
 - `docs/ui/mobile.md`
 

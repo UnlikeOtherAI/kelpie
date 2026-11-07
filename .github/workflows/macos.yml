@@ -50,7 +50,7 @@ jobs:
 
       # NOTE: Full xcodebuild is intentionally deferred. The macOS target
       # requires the CEF framework (downloaded via scripts/download-cef.sh)
-      # and the llama.cpp vendor tree at apps/macos/vendor/llama.cpp, which
+      # and the llama.cpp vendor tree at core/apple/macos/vendor/llama.cpp, which
       # is not currently committed or scripted. Re-enable the full build
       # below once vendor bootstrap is in place - until then, lint and
       # project-graph validation are the meaningful CI signal we have.

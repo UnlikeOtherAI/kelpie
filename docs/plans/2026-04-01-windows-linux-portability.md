@@ -45,9 +45,9 @@ The parts of the macOS app worth preserving are architectural seams, not the App
 
 ### Proven reusable seams
 
-- [`apps/macos/Kelpie/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Renderer/RendererEngine.swift) defines the right abstraction boundary: navigation, JS evaluation, cookies, screenshots, view attachment, and state callbacks.
-- [`apps/macos/Kelpie/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Handlers/HandlerContext.swift) centralizes browser actions behind the active renderer.
-- [`apps/macos/Kelpie/Network/ServerState.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Network/ServerState.swift) already separates server lifecycle, mDNS, renderer lifecycle, and switching.
+- [`core/apple/macos/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/core/apple/macos/Renderer/RendererEngine.swift) defines the right abstraction boundary: navigation, JS evaluation, cookies, screenshots, view attachment, and state callbacks.
+- [`core/apple/macos/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/core/apple/macos/Handlers/HandlerContext.swift) centralizes browser actions behind the active renderer.
+- [`core/apple/macos/Network/ServerState.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/core/apple/macos/Network/ServerState.swift) already separates server lifecycle, mDNS, renderer lifecycle, and switching.
 - [`packages/shared/src/device-types.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/device-types.ts) and [`packages/shared/src/api-types.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/api-types.ts) already define the external contract consumed by the CLI and MCP.
 
 ### macOS-specific code we should not treat as portable

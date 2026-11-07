@@ -18,7 +18,7 @@ Log the gate result at startup so debugging is easy.
 
 ## Files
 
-### `apps/android/app/src/main/java/com/kelpie/browser/browser/BrowserTab.kt`
+### `core/android/src/main/java/com/kelpie/browser/browser/BrowserTab.kt`
 
 Add fields:
 ```kotlin
@@ -35,7 +35,7 @@ data class BrowserTab(
 )
 ```
 
-### `apps/android/app/src/main/java/com/kelpie/browser/browser/PartitionRegistry.kt` (new)
+### `core/android/src/main/java/com/kelpie/browser/browser/PartitionRegistry.kt` (new)
 
 ```kotlin
 class PartitionRegistry(private val context: Context) {
@@ -90,7 +90,7 @@ Without this sweep, every crash mid-session leaks one or more `ephemeral-*` prof
 - Tabs restored from `SessionStore` referencing a missing partition name: reject restore, log warning.
 - `tabCount` rebuilt from live tabs after restore — never trust the persisted count.
 
-### `apps/android/app/src/main/java/com/kelpie/browser/browser/TabStore.kt`
+### `core/android/src/main/java/com/kelpie/browser/browser/TabStore.kt`
 
 Extend `createTab` / `addTab`:
 - Accept `name`, `partition`, `persistent`.
@@ -99,7 +99,7 @@ Extend `createTab` / `addTab`:
 - Store `name`/`partition`/`persistent` on the `BrowserTab`.
 - On close, call `PartitionRegistry.release`.
 
-### `apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
+### `core/android/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
 
 - `newTab(body)`: read `name`, `partition`, `persistent`. Validate. Call `tabStore.addTab(...)`. Map registry errors to API errors.
 - `getTabs(body)`: include `name`, `partition`, `persistent` per tab (omit when null).
@@ -107,13 +107,13 @@ Extend `createTab` / `addTab`:
 - Add `deletePartition(body)`.
 - Existing global `CookieManager.getInstance()` callers must **not** be invoked for partitioned tabs — they target the Default profile and would corrupt isolation. Audit `ChromeAuthHelper.kt` and route any partitioned-tab cookie reads through `WebViewCompat.getProfile(webView).cookieManager`.
 
-### `apps/android/app/src/main/java/com/kelpie/browser/server/Router.kt` (or equivalent)
+### `core/android/src/main/java/com/kelpie/browser/server/Router.kt` (or equivalent)
 
 Register `get-partitions` and `delete-partition` routes.
 
 ### Tests
 
-- `apps/android/app/src/test/java/com/kelpie/browser/browser/PartitionRegistryTest.kt` (new).
+- `core/android/src/test/java/com/kelpie/browser/browser/PartitionRegistryTest.kt` (new).
 - `apps/android/app/src/androidTest/java/com/kelpie/browser/handlers/BrowserManagementHandlerTest.kt` — extend with the acceptance test from the master plan, executed against a real WebView via Espresso/instrumentation.
 
 ## Constraints
