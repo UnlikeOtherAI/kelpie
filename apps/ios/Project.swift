@@ -90,7 +90,6 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
     dependencies: [
-        .target(name: "Kelpie"),
         .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
     ],
     settings: .settings(

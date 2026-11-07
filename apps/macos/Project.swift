@@ -201,7 +201,6 @@ let kelpieTests = Target.target(
         .glob("Tests/**/*.mm"),
     ],
     dependencies: [
-        .target(name: "Kelpie"),
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
     ],
     settings: .settings(
