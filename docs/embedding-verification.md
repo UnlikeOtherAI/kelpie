@@ -204,3 +204,9 @@ Native compile subprocesses receive an explicit environment allowlist and the
 Pod phase disables environment-variable logging. Browser resources include the
 JSON, HTTP and llama license notices. Installed source-Pod consumption is still
 being verified separately from the existing packaged-framework checks.
+
+The source Pod compiled and linked an independent arm64 iOS Simulator consumer
+on dictator at f24b22e7, including KelpieBrowserResources.bundle in the app.
+The production Nessie consumer then exposed a GitHub archive-redirect 504 for
+the pinned llama source. The build now uses its official direct codeload URL at
+the same commit, with SHA-256 84050e783dbd0c4a4678f90f253b0881df04e90a98c20f73ae3709751c4a4850.

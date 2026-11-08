@@ -26,7 +26,8 @@ if(KELPIE_LOCAL_LLM)
     cmake_policy(SET CMP0135 NEW)
   endif()
   FetchContent_Declare(kelpie_llama
-    URL https://github.com/ggml-org/llama.cpp/archive/8345f333951c661d166b00e6f9362e553768f292.tar.gz)
+    URL https://codeload.github.com/ggml-org/llama.cpp/tar.gz/8345f333951c661d166b00e6f9362e553768f292
+    URL_HASH SHA256=84050e783dbd0c4a4678f90f253b0881df04e90a98c20f73ae3709751c4a4850)
   FetchContent_MakeAvailable(kelpie_llama)
 endif()
 
