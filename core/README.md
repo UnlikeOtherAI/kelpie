@@ -28,7 +28,9 @@ library resource bundle into `Contents/Resources`; iOS copies it through the
 Tuist dependency graph. Apply the matching
 `KelpieBrowserBuild.mac(core:)` or `.ios(core:)` link settings from
 `Tuist/ProjectDescriptionHelpers`; these include the native libraries for the
-consumer and test targets. Create a `KelpieBrowserSession`
+consumer and test targets. Mac consumers must retain `-ObjC` from those settings:
+CEF and other Objective-C category methods live in the static archive and are
+otherwise omitted by the linker. Create a `KelpieBrowserSession`
 with the host's `KelpieUOASession`; use `KelpieBrowserView` or a native controller.
 Keep the session (and the Mac `KelpieBrowserSurface`) alive while changing containers.
 `KelpieBrowserCommands(session:)` supplies the optional Mac application menu and

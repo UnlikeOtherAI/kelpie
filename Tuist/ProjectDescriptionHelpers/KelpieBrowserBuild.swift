@@ -29,7 +29,7 @@ public enum KelpieBrowserBuild {
         let apple = core + "/apple/macos"
         let flags = nativeModules.map { "-lkelpie_core_" + $0 } + [
             "-lllama", "-lggml", "-lggml-base", "-lggml-cpu", "-lggml-metal", "-lggml-blas",
-            "-lc++", "-framework AppIntents", "-framework Metal", "-framework Accelerate"
+            "-ObjC", "-lc++", "-framework AppIntents", "-framework Metal", "-framework Accelerate"
         ] + (webKitOnly ? [] : ["-framework \"Chromium Embedded Framework\""])
         var settings: SettingsDictionary = [
             "SWIFT_VERSION": "5.0",
