@@ -2,7 +2,7 @@
 
 > Read CLAUDE.md and AGENTS.md before starting any work. Update both when policy changes.
 
-The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Apple Store builds use `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` as documented there. Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session.
+The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Apple Store builds use `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` as documented there. Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session. `pnpm check:embedding` checks that ownership boundary locally and in CI.
 
 ## Source of Truth
 
