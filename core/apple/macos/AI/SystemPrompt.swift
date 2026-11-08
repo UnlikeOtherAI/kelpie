@@ -1,3 +1,4 @@
+import KelpieNative
 enum SystemPrompt {
     static let template = """
     You are a browser assistant built into Kelpie. You answer questions about the web page currently loaded in the browser.

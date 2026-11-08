@@ -86,3 +86,14 @@ presentation API accepts a host-selected `UIWindowScene`; that API and container
 reparenting do not establish external-monitor hardware acceptance. Store signing,
 sandbox installation and Store review are separate checks. Production Nessie
 window entry points and its UOA adapter are not included in this extraction.
+
+## Apple consumer modules
+
+The browser library imports the existing C ABI through `KelpieNative` and the
+direct Mac renderer through `KelpieChromium`. Consumers add `core/apple/Native`
+to the Swift import search path alongside the built `KelpieBrowser` module. The
+browser library does not use a Swift bridging header: its module must remain
+importable by an unrelated containing target. The hollow app test targets retain
+their own test-only headers. WebKit-only consumers never import the Chromium
+module. Native archives and the resource bundle are still required at link and
+package time; importing the Swift module alone does not establish packaging.

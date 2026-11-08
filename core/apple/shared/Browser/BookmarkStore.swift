@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// The ordered tree is shared by UI, HTTP and account sync. Start-page consumers

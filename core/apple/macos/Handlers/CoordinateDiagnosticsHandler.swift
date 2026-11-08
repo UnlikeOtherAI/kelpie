@@ -1,3 +1,4 @@
+import KelpieNative
 import AppKit
 
 // swiftlint:disable line_length

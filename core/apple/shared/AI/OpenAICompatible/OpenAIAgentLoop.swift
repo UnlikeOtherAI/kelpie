@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// Executes a router method on behalf of the agent (production: Kelpie's

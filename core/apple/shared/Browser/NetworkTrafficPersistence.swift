@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// One pending snapshot and one serial writer, regardless of the capture rate.

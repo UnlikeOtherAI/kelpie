@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// The same bounded, cancellable GGUF runtime used by Android and Windows.

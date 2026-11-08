@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// Shared native policy for user-entered addresses; API navigation stays URL-only.

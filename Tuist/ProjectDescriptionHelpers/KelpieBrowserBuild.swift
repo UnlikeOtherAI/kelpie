@@ -53,6 +53,7 @@ public enum KelpieBrowserBuild {
         ] + (webKitOnly ? [] : ["-framework \"Chromium Embedded Framework\""])
         var settings: SettingsDictionary = [
             "SWIFT_VERSION": "5.0",
+            "SWIFT_INCLUDE_PATHS": .array([core + "/apple/Native"]),
             "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
             "HEADER_SEARCH_PATHS": .array(nativeModules.map { native + "/core-" + $0 + "/include" } + [
                 apple + "/Renderer", apple + "/Frameworks/cef_include", apple + "/vendor/llama.cpp/include"
@@ -81,6 +82,7 @@ public enum KelpieBrowserBuild {
         ]
         let settings: SettingsDictionary = [
             "SWIFT_VERSION": "5.0",
+            "SWIFT_INCLUDE_PATHS": .array([core + "/apple/Native"]),
             "HEADER_SEARCH_PATHS": .array(nativeModules.map { native + "/core-" + $0 + "/include" }),
             "LIBRARY_SEARCH_PATHS": .array(nativeModules.map { build + "/core-" + $0 } + [
                 build + "/_deps/kelpie_llama-build/src",

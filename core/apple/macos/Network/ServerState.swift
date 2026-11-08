@@ -1,3 +1,6 @@
+#if !KELPIE_WEBKIT_ONLY
+import KelpieChromium
+#endif
 import Foundation
 import AppKit
 import Network

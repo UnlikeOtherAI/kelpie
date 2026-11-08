@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// In-memory navigation history with persistence to UserDefaults.

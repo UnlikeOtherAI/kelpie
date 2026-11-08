@@ -19,7 +19,6 @@ let macBrowser = Target.target(
             "DEFINES_MODULE": "YES",
             "PRODUCT_MODULE_NAME": "KelpieBrowser",
             "ENABLE_TESTABILITY": "YES",
-            "SWIFT_OBJC_BRIDGING_HEADER": "macos/Kelpie-Bridging-Header.h",
             "COMBINE_HIDPI_IMAGES": "YES",
             "ENABLE_APP_SANDBOX": .string(KelpieBrowserBuild.webKitOnly ? "YES" : "NO")
         ])
@@ -43,7 +42,6 @@ let iosBrowser = Target.target(
             "DEFINES_MODULE": "YES",
             "PRODUCT_MODULE_NAME": "KelpieBrowser",
             "ENABLE_TESTABILITY": "YES",
-            "SWIFT_OBJC_BRIDGING_HEADER": "ios/Kelpie-Bridging-Header.h",
             "TARGETED_DEVICE_FAMILY": "1,2"
         ])
     )

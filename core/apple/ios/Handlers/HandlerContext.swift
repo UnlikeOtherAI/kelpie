@@ -1,3 +1,4 @@
+import KelpieNative
 import WebKit
 
 enum ScreenshotResolution: String {

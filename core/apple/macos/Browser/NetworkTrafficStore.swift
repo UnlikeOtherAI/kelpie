@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// Captures HTTP request/response traffic via JS injection for the network inspector.

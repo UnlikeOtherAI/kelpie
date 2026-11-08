@@ -1,4 +1,7 @@
 #if !KELPIE_WEBKIT_ONLY
+import KelpieChromium
+#endif
+#if !KELPIE_WEBKIT_ONLY
 import AppKit
 
 // MARK: - Cookie operations + injection fallbacks

@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 struct HighlightHandler {

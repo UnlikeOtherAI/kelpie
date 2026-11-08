@@ -1,3 +1,4 @@
+import KelpieNative
 import Foundation
 
 /// Thin Swift wrapper around the core-ai C library.
