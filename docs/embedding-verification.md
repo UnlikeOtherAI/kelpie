@@ -63,16 +63,19 @@ The extraction was exercised on 8 November 2026:
 | --- | --- | --- |
 | Maxis, Windows CEF | `0ba03f38` | Build and 56 native tests passed. |
 | Minis, Windows native host | `0ba03f38` | Two saved tabs retained their page across window moves; sign-in delegated to the host; browser close left the host running. Initial tab creation/navigation also passed at `b799295a`. |
-| Maxis, Android | `875b44f3` | Full debug/release build, lint and 158 unit tests passed. |
-| Minis, API 35 tablet emulator, WebView 124 | `875b44f3` | Late creation, two navigated tabs, reparenting, delegated sign-in, settings, close and reopen passed. |
+| Maxis, Android | `875b44f3`, then `fd361de1` | Full debug/release build, lint and 158 unit tests passed; version 0.2.0 build passed. |
+| Minis, API 35 tablet emulator, WebView 124 | `875b44f3`, then `fd361de1` | Late creation, two navigated tabs, reparenting, delegated sign-in, settings, close and reopen passed. The final 0.2.0 APK retained both pages across moves and close/reopen. |
 | dictator, iPad simulator | `17a1f494`, then `962ee0de` | Native embedding UI journey passed; final source build and focused account/resource tests passed. |
-| dictator, Mac WebKit | `962ee0de` | Native unit suite passed, including background-launch parsing and host-window authority checks. |
-| dictator, Mac embedded host | `8a27c940` | AppReveal native controls verified tabs, host sign-in, window moves, detach and reattach. |
-| dictator, signed standalone Mac | `962ee0de` | Background launch answered health on the requested port 18434. |
+| dictator, Mac WebKit | `962ee0de` | 226 native unit tests passed, including background-launch parsing and host-window authority checks. |
+| dictator, Mac embedded WebKit host | `8a27c940`, then `f0298f5e` | AppReveal native controls verified tabs, host sign-in, window moves, detach and reattach. Final source opened a second tab and navigated to IANA. |
+| dictator, Mac Chromium embedded host | `f0298f5e` | Native address-bar navigation, delegated sign-in, window moves, detach and reattach passed with the page retained. Real Chromium helper processes and the packaged resource bundle loaded. |
+| dictator, Mac static-link and tracking-area checks | `f0298f5e` | Both focused native regressions passed through the supported `xctest` interface after `build-for-testing`. SwiftLint passed with no violations. |
+| dictator, signed standalone Mac | `962ee0de`, then `f0298f5e` | Background launch answered health on the requested port 18434. Final candidate passed deep signature verification, timestamp/hardened-runtime checks, notarization, stapling and Gatekeeper assessment. |
 | Fedora 44 on Maxis, GTK/native build without CEF | `1db43445` | Build, 36 native tests and the supported executable help interface passed. |
 
 Mac XCTest UI automation timed out enabling automation mode on this machine.
-The Mac native controls above were exercised through AppReveal; a successful
+The Mac native controls above were exercised through AppReveal, with native
+Accessibility keyboard input for the SwiftUI address field; a successful
 XCTest UI run is not claimed. The iPad XCTest UI journey did pass.
 
 Physical phones and an iPad external monitor were not exercised. The iOS

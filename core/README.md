@@ -127,5 +127,11 @@ WebKit. Chromium code, helper executables and framework packaging are omitted;
 the renderer API rejects unavailable engines. Generate without that variable for
 the existing direct-distribution Chromium build. iOS always uses WebKit.
 
+Apple’s [review guidelines](https://developer.apple.com/app-store/review/guidelines/)
+require the appropriate WebKit framework for ordinary browser submissions and
+App Sandbox for Mac App Store distribution. Microsoft’s
+[Store policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies-and-code-of-conduct)
+permit Chromium or Gecko for browsing products; the Windows component uses Chromium.
+
 This selects build inputs and entitlements; Store signing, review and installed
 sandbox verification remain separate release checks. No Store approval is implied.

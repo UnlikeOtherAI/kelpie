@@ -148,3 +148,5 @@ Each component owns its version in its own manifest — do not create a central 
   readiness cleanup before publishing.
 
 Native browser gateway bindings and reproducible generated contract builds follow [docs/api/native-browser-gateway.md](docs/api/native-browser-gateway.md).
+
+Windows release CI retains unsigned candidates; sign and launch the complete CEF package before publication using [Windows releases](docs/windows-release.md).

@@ -62,3 +62,5 @@ The Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/wi
 loopback readiness-token control and the CLI stdio alias bridge before publication.
 
 Native browser gateway bindings and reproducible generated contract builds follow [docs/api/native-browser-gateway.md](docs/api/native-browser-gateway.md).
+
+Windows release CI retains unsigned candidates; sign and launch the complete CEF package before publication using [Windows releases](docs/windows-release.md).
