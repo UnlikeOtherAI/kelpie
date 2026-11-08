@@ -63,6 +63,31 @@ final class NessieConnection: ObservableObject {
         publishLifecycle()
     }
 
+    /// Terminal detach releases this runtime so a new containing session can bind.
+    func detach(context: HandlerContext) {
+        guard browser?.context === context else { return }
+        stopCurrent(reason: "Browser closed")
+        lifetime?.cancel()
+        lifetime = nil
+        accountSubscription?.cancel()
+        accountSubscription = nil
+        close()
+        epoch = UUID()
+        owner = nil
+        ledger = nil
+        browser = nil
+        controlledTab = nil
+        currentCommand = nil
+        running = false
+        paused = false
+        status = "Signed out"
+        #if os(macOS)
+        if let personInputMonitor { NSEvent.removeMonitor(personInputMonitor) }
+        personInputMonitor = nil
+        acceptsPersonEvent = { _ in true }
+        #endif
+    }
+
     func stop() {
         paused = true
         stopCurrent(reason: "Stopped on device")

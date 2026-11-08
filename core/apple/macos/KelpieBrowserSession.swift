@@ -9,6 +9,8 @@ public final class KelpieBrowserSession: ObservableObject {
     let serverState: ServerState
     private let localControlEnabled: Bool
     private var started = false
+    private var closed = false
+    private var surfaces: [WeakBrowserSurface] = []
     private var windows: [NSWindow] = []
     private var regions: [WeakBrowserRegion] = []
 
@@ -35,7 +37,7 @@ public final class KelpieBrowserSession: ObservableObject {
     public var websiteDataIsPersistent: Bool { KelpieWebsiteData.store.isPersistent }
 
     public func start() {
-        guard !started else { return }
+        guard !started, !closed else { return }
         started = true
         _ = AIState.shared
         serverState.startHTTPServer(rendererState: rendererState, listen: localControlEnabled)
@@ -46,11 +48,35 @@ public final class KelpieBrowserSession: ObservableObject {
     }
 
     public func setForeground(_ foreground: Bool) {
+        guard !closed else { return }
         NessieConnection.shared.setForeground(foreground)
     }
 
     public func makeSurface(ownsWindowChrome: Bool = false) -> KelpieBrowserSurface {
-        KelpieBrowserSurface(session: self, ownsWindowChrome: ownsWindowChrome)
+        precondition(!closed, "A closed browser session cannot create another surface")
+        let surface = KelpieBrowserSurface(session: self, ownsWindowChrome: ownsWindowChrome)
+        surfaces.removeAll { $0.value == nil }
+        surfaces.append(WeakBrowserSurface(surface))
+        return surface
+    }
+
+    /// Terminal close. Detaching a view to move it does not close its session.
+    public func close() {
+        guard !closed else { return }
+        closed = true
+        NessieConnection.shared.detach(context: serverState.handlerContext)
+        serverState.stop()
+        _ = serverState.scriptPlaybackState.requestAbort()
+        serverState.router.invalidateAllBrowserReferences()
+        NetworkTrafficStore.shared.flush()
+        for surface in surfaces.compactMap({ $0.value }) {
+            surface.tabs.closeAll()
+            WindowRegistry.shared.unregister(id: surface.windowID)
+        }
+        windows.forEach { $0.close(); $0.contentViewController = nil }
+        windows = []
+        surfaces = []
+        regions = []
     }
 
     func register(region: NSView) {
@@ -143,4 +169,10 @@ public struct KelpieBrowserView: View {
         .frame(minWidth: surface.ownsWindowChrome ? ViewportState.minimumShellSize.width : nil,
                minHeight: surface.ownsWindowChrome ? ViewportState.minimumShellSize.height : nil)
     }
+}
+
+@MainActor
+private final class WeakBrowserSurface {
+    weak var value: KelpieBrowserSurface?
+    init(_ value: KelpieBrowserSurface) { self.value = value }
 }

@@ -108,3 +108,10 @@ The containing app links the static framework with C++, AppIntents, Accelerate
 and, on Mac, Metal, and copies KelpieBrowserResources.bundle into the bundle that
 contains the linked browser code. These SDK outputs contain no executable app,
 CEF engine or helper, signing identity, host credential or standalone launcher.
+
+Apple sessions expose terminal `close()` for host retirement. It detaches the
+outbound agent connection and input monitor, stops local listeners, aborts script
+playback, invalidates browser references, flushes traffic and closes owned tabs
+and windows. A closed session cannot create a new surface; create a new session
+for a new runtime. Moving a controller between containers retains its session.
+This teardown API alone does not select a different person's local browser profile.

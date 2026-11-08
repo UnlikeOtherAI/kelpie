@@ -10,6 +10,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private let localControlEnabled: Bool
     private let externalDisplaysEnabled: Bool
     private var started = false
+    private var closed = false
 
     public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true, externalDisplaysEnabled: Bool = false) {
         let server = ServerState(port: port)
@@ -26,7 +27,7 @@ public final class KelpieBrowserSession: ObservableObject {
     public var websiteDataIsPersistent: Bool { KelpieWebsiteData.store.isPersistent }
 
     public func start() {
-        guard !started else { return }
+        guard !started, !closed else { return }
         started = true
         serverState.startHTTPServer(listen: localControlEnabled)
         NessieConnection.shared.start(context: serverState.handlerContext)
@@ -43,6 +44,7 @@ public final class KelpieBrowserSession: ObservableObject {
     }
 
     public func setScenePhase(_ phase: ScenePhase) {
+        guard !closed else { return }
         switch phase {
         case .active:
             BookmarkStore.shared.refreshAccountBookmarks()
@@ -57,6 +59,19 @@ public final class KelpieBrowserSession: ObservableObject {
             NessieConnection.shared.setForeground(false)
         @unknown default: break
         }
+    }
+
+    /// Terminal close; presentation moves retain this session instead.
+    public func close() {
+        guard !closed else { return }
+        closed = true
+        NessieConnection.shared.detach(context: serverState.handlerContext)
+        serverState.stop()
+        _ = serverState.scriptPlaybackState.requestAbort()
+        serverState.router.invalidateAllBrowserReferences()
+        NetworkTrafficStore.shared.flush()
+        tabStore.closeAll()
+        if externalDisplaysEnabled { ExternalDisplayManager.shared.detach() }
     }
 
     public func makeViewController() -> UIViewController {

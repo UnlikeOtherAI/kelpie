@@ -176,6 +176,14 @@ final class TabStore: ObservableObject {
         tabSinks.removeValue(forKey: tab.id)
     }
 
+    func closeAll() {
+        persistSession()
+        persistsSession = false
+        for tab in tabs { tab.invalidate(); unbind(tab) }
+        tabs = []
+        activeBrowserTabID = nil
+    }
+
     private func persistSession() {
         guard persistsSession else { return }
         SessionStore.save(tabs: tabs, activeID: activeBrowserTabID)
