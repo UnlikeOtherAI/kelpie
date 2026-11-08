@@ -63,7 +63,7 @@ Android embedding requires the existing multiple-profile WebView capability.
 
 ## Apple Store build
 
-Generate with `KELPIE_WEBKIT_ONLY=1 tuist generate` for a sandboxed macOS
+Generate with `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` for a sandboxed macOS
 consumer. The same browser UI, tabs, settings and automation compile against
 WebKit. Chromium code, helper executables and framework packaging are omitted;
 the renderer API rejects unavailable engines. Generate without that variable for

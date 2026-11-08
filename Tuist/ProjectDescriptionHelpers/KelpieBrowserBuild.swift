@@ -1,9 +1,8 @@
-import Foundation
 import ProjectDescription
 
 /// Link settings for the complete browser library and its existing native core.
 public enum KelpieBrowserBuild {
-    public static var webKitOnly: Bool { ProcessInfo.processInfo.environment["KELPIE_WEBKIT_ONLY"] == "1" }
+    public static var webKitOnly: Bool { Environment.kelpieWebkitOnly.getBoolean(default: false) }
 
     private static let nativeModules = [
         "state", "connect", "protocol", "automation", "mcp", "ai"
