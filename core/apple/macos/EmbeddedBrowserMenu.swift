@@ -59,13 +59,10 @@ final class EmbeddedBrowserMenu: NSObject, NSMenuItemValidation {
     }
 
     private func handleKey(_ event: NSEvent) -> Bool {
-        let modifiers = event.modifierFlags.intersection([.command, .shift, .control, .option])
-        guard modifiers == .command, let session, !session.isClosed, !session.serverState.isScriptRecording,
+        guard let session, !session.isClosed, !session.serverState.isScriptRecording,
               let window = NSApp.keyWindow, event.window === window, window.attachedSheet == nil,
-              session.containsBrowser(in: window), let key = event.charactersIgnoringModifiers?.lowercased(),
-              let command = BrowserMenuCommand.allCases.first(where: { $0.key.map(String.init) == key }) else { return false }
-        command.perform(in: session)
-        return true
+              session.containsBrowser(in: window), let menu = installed?.submenu else { return false }
+        return menu.performKeyEquivalent(with: event)
     }
 
     @objc private func invoke(_ sender: NSMenuItem) {

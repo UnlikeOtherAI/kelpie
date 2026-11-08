@@ -1,6 +1,6 @@
 import AppKit
 
-enum BrowserMenuCommand: String, CaseIterable, Identifiable {
+enum BrowserMenuCommand: String, Identifiable {
     case newTab, closeTab, newWindow, addBookmark, hardRefresh, fullScreen
     case welcome, website, repository, unlikeOtherAI
     var id: String { rawValue }
