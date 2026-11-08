@@ -120,15 +120,14 @@ let kelpieApp = Target.target(
         .glob(pattern: "Kelpie/Assets.xcassets"),
     ],
     entitlements: .file(path: KelpieBrowserBuild.webKitOnly ? "Kelpie/Store.entitlements" : "Kelpie/Kelpie.entitlements"),
-    scripts: KelpieBrowserBuild.webKitOnly ? [] : [
+    scripts: [KelpieBrowserBuild.embedMacResources] + (KelpieBrowserBuild.webKitOnly ? [] : [
         fixCEFStructure,
         embedCEFFramework,
         embedKelpieHelper,
         embedGeckoHelper,
-    ],
+    ]),
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
-        .project(target: "KelpieResourcesMac", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [
         .project(target: "KelpieHelper", path: "../../core/apple")
@@ -154,10 +153,10 @@ let kelpieEmbeddingHost = Target.target(
         "NSBonjourServices": ["_appreveal._tcp"]
     ]),
     sources: [.glob("../apple-embedding-host/macos/**/*.swift")],
-    scripts: KelpieBrowserBuild.webKitOnly ? [] : [fixCEFStructure, embedCEFFramework, embedKelpieHelper],
+    scripts: [KelpieBrowserBuild.embedMacResources] +
+        (KelpieBrowserBuild.webKitOnly ? [] : [fixCEFStructure, embedCEFFramework, embedKelpieHelper]),
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
-        .project(target: "KelpieResourcesMac", path: "../../core/apple"),
         .package(product: "AppReveal")
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [.project(target: "KelpieHelper", path: "../../core/apple")]),
     settings: .settings(base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core"))

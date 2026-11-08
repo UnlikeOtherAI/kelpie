@@ -4,6 +4,21 @@ import ProjectDescription
 public enum KelpieBrowserBuild {
     public static var webKitOnly: Bool { Environment.kelpieWebkitOnly.getBoolean(default: false) }
 
+    /// Tuist does not place transitive resource bundles in a macOS app's Resources phase.
+    public static var embedMacResources: TargetScript {
+        .post(
+            script: """
+            SOURCE="${BUILT_PRODUCTS_DIR:?}/KelpieBrowserResources.bundle"
+            DEST="${TARGET_BUILD_DIR:?}/${UNLOCALIZED_RESOURCES_FOLDER_PATH:?}/KelpieBrowserResources.bundle"
+            test -d "$SOURCE"
+            mkdir -p "$(dirname "$DEST")"
+            rm -rf "$DEST"
+            ditto "$SOURCE" "$DEST"
+            """,
+            name: "Embed Kelpie browser resources"
+        )
+    }
+
     private static let nativeModules = [
         "state", "connect", "protocol", "automation", "mcp", "ai"
     ]

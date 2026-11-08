@@ -22,9 +22,10 @@ fence outstanding browser work. Standalone hosts use the core's existing UOA log
 Browser state, tabs and UI belong to Kelpie, independently of the host's interface.
 
 Apple hosts link the `KelpieBrowserMac` or `KelpieBrowserIOS` target in
-`apple/Project.swift`, add its matching `KelpieResourcesMac` or `KelpieResourcesIOS`
-bundle dependency to the app target, and import `KelpieBrowser`. Static-library
-linking alone does not copy a resource bundle into a Mac application. Apply the matching
+`apple/Project.swift` and import `KelpieBrowser`. Mac consumers add
+`KelpieBrowserBuild.embedMacResources` to their app target scripts to copy the
+library resource bundle into `Contents/Resources`; iOS copies it through the
+Tuist dependency graph. Apply the matching
 `KelpieBrowserBuild.mac(core:)` or `.ios(core:)` link settings from
 `Tuist/ProjectDescriptionHelpers`; these include the native libraries for the
 consumer and test targets. Create a `KelpieBrowserSession`
