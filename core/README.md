@@ -20,6 +20,9 @@ It owns sign-in, refresh, revocation and durable credential storage. Kelpie must
 copy its refresh token or create a second sign-in. Identity and session changes
 fence outstanding browser work. Standalone hosts use the core's existing UOA login.
 Browser state, tabs and UI belong to Kelpie, independently of the host's interface.
+Apple providers throw `KelpieUOASession.Failure(status:)` for HTTP refusals so
+status-dependent recovery, including bookmark conflict retries, remains inside
+the browser library.
 
 Apple hosts link the `KelpieBrowserMac` or `KelpieBrowserIOS` target in
 `apple/Project.swift` and import `KelpieBrowser`. Mac consumers add

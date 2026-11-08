@@ -14,6 +14,12 @@ public final class KelpieUOASession: ObservableObject {
         }
     }
 
+    /// HTTP failures from a host provider retain status-dependent browser recovery.
+    public struct Failure: Error {
+        public let status: Int
+        public init(status: Int) { self.status = status }
+    }
+
     public typealias Request = (String, String, Data?, String?) async throws -> Response
     public typealias SettingsSocket = (String, String) async throws -> URLSessionWebSocketTask
 

@@ -104,9 +104,17 @@ final class UOAAccount: ObservableObject {
     func request(_ path: String, method: String = "GET", body: Data? = nil, version: String? = nil) async throws -> UOATransport.Response {
         let current = generation
         if let hostSession {
-            let value = try await hostSession.request(path, method, body, version)
-            guard current == generation else { throw CancellationError() }
-            return UOATransport.Response(data: value.data, version: value.version)
+            do {
+                let value = try await hostSession.request(path, method, body, version)
+                guard current == generation else { throw CancellationError() }
+                return UOATransport.Response(data: value.data, version: value.version)
+            } catch {
+                guard current == generation else { throw CancellationError() }
+                if let failure = error as? KelpieUOASession.Failure {
+                    throw UOATransport.Failure(status: failure.status)
+                }
+                throw error
+            }
         }
         guard accessToken != nil || credential != nil else { throw UOATransport.Failure(status: 401) }
         do {

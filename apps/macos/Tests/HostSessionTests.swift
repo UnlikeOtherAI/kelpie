@@ -52,6 +52,24 @@ final class HostSessionTests: XCTestCase {
         XCTAssertEqual(storage.clears, 0)
     }
 
+    func testHostHTTPConflictKeepsTheStatusUsedByBookmarkRecovery() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        let account = UOAAccount(storage: Storage(), bookmarks: BookmarkStore(defaults: defaults))
+        let host = KelpieUOASession(
+            subject: nil,
+            request: { _, _, _, _ in throw KelpieUOASession.Failure(status: 409) },
+            settingsSocket: { _, _ in throw KelpieUOASession.Failure(status: 503) },
+            signIn: {}, signOut: {}
+        )
+        account.useHostSession(host)
+        do {
+            _ = try await account.request("/oauth/me/settings/browser/bookmarks", method: "PUT")
+            XCTFail("A conflicting host write must fail")
+        } catch let failure as UOATransport.Failure {
+            XCTAssertEqual(failure.status, 409)
+        }
+    }
+
     func testHostIdentityReplacementRejectsAnOldResponse() async throws {
         let storage = Storage()
         let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
