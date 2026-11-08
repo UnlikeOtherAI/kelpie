@@ -83,7 +83,10 @@ Its signed-out UOA provider reports account callbacks in the host; it stores no
 credentials and is excluded from ordinary release builds.
 
 Apple hosts can build the `KelpieEmbeddingHost` scheme in either app project to
-exercise the complete browser through native Open, Move and Close controls. The
+exercise the complete browser through native Open, Move and Close controls.
+Build the generated `.xcworkspace`, which contains both the app and the
+separate browser-library project; building the app `.xcodeproj` alone omits
+that library on a clean checkout. The
 fixture uses a signed-out host UOA provider and AppReveal for local inspection;
 it is a separate package and is never included in the standalone app. Run its
 local-only UI journey with `xcodebuild -scheme KelpieEmbeddingHost test` and a

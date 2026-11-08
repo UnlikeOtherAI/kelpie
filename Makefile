@@ -15,14 +15,14 @@ ANDROID_SDK   := $(HOME)/Library/Android/sdk
 
 # ── Xcode ──────────────────────────────────────────────────────────────────────
 IOS_SCHEME    := Kelpie
-IOS_PROJECT   := apps/ios/Kelpie.xcodeproj
+IOS_WORKSPACE   := apps/ios/Kelpie.xcworkspace
 
 # Xcode may be configured with a custom build products path (Preferences → Locations → Custom).
 # Read it so ios-run can find the built .app regardless of where Xcode put it.
 XCODE_CUSTOM_PRODUCTS := $(shell defaults read com.apple.dt.Xcode IDECustomBuildProductsPath 2>/dev/null)
 
 MACOS_SCHEME  := Kelpie
-MACOS_PROJECT := apps/macos/Kelpie.xcodeproj
+MACOS_WORKSPACE := apps/macos/Kelpie.xcworkspace
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 CLI_DIR       := packages/cli
@@ -97,13 +97,13 @@ ios-build: lint-swift
 	@if [ "$(IOS_TYPE)" = "device" ]; then \
 		echo "→ Building iOS app (device $(IOS_TARGET))..."; \
 		xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS,id=$(IOS_TARGET)' \
 			-configuration Debug \
 			-derivedDataPath apps/ios/.build \
 			build | xcpretty 2>/dev/null || xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS,id=$(IOS_TARGET)' \
 			-configuration Debug \
@@ -112,13 +112,13 @@ ios-build: lint-swift
 	else \
 		echo "→ Building iOS app (simulator $(IOS_TARGET))..."; \
 		xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS Simulator,id=$(IOS_TARGET)' \
 			-configuration Debug \
 			-derivedDataPath apps/ios/.build \
 			build | xcpretty 2>/dev/null || xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS Simulator,id=$(IOS_TARGET)' \
 			-configuration Debug \
@@ -172,12 +172,12 @@ macos: macos-build macos-run
 macos-build: lint-swift
 	@echo "→ Building macOS app..."
 	xcodebuild \
-		-project $(MACOS_PROJECT) \
+		-workspace $(MACOS_WORKSPACE) \
 		-scheme $(MACOS_SCHEME) \
 		-configuration Debug \
 		-derivedDataPath apps/macos/.build \
 		build | xcpretty 2>/dev/null || xcodebuild \
-		-project $(MACOS_PROJECT) \
+		-workspace $(MACOS_WORKSPACE) \
 		-scheme $(MACOS_SCHEME) \
 		-configuration Debug \
 		-derivedDataPath apps/macos/.build \
