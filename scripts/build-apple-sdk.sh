@@ -27,19 +27,9 @@ build="$root/core/native/.build-sdk-$sdk-$arch"
 derived="$root/core/apple/.build/sdk-$sdk-$arch"
 products="$derived/products"
 mkdir -p "$build" "$derived" "$(dirname "$out")"
-args=(-DCMAKE_OSX_ARCHITECTURES="$arch" -DCMAKE_OSX_SYSROOT="$(xcrun --sdk "$sdk" --show-sdk-path)"
-    -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DKELPIE_BUILD_DESKTOP_ENGINES=OFF -DKELPIE_LOCAL_LLM=ON)
-if [ "$sdk" = macosx ]; then
-    target=KelpieBrowserMac
-    minimum=14.0
-    args+=(-DCMAKE_OSX_DEPLOYMENT_TARGET="$minimum" -DKELPIE_LOCAL_LLM_METAL=ON)
-else
-    target=KelpieBrowserIOS
-    minimum=16.0
-    args+=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET="$minimum")
-fi
-cmake -S "$root/core/native" -B "$build" -G Ninja "${args[@]}"
-cmake --build "$build" --parallel 2
+if [ "$sdk" = macosx ]; then target=KelpieBrowserMac; minimum=14.0
+else target=KelpieBrowserIOS; minimum=16.0; fi
+bash "$root/core/apple/build-native.sh" "$sdk" "$arch" "$build" "$derived/libKelpieNative.a"
 
 # The Mac Swift inference layer uses the same pinned llama C API as the core.
 # These are build-only imports; none enter the browser's public Swift interface.
@@ -60,20 +50,7 @@ stage="$derived/package-$revision"
 if [ -e "$stage" ]; then echo "Staging directory already exists: $stage" >&2; exit 2; fi
 framework="$stage/KelpieBrowser.framework"
 mkdir -p "$framework/Modules"
-archives=("$products/lib$target.a")
-for module in state connect protocol automation mcp ai; do
-    archives+=("$build/core-$module/libkelpie_core_$module.a")
-done
-for library in llama ggml ggml-base ggml-cpu; do
-    found="$(find "$build/_deps/kelpie_llama-build" -name "lib$library.a" -type f)"
-    if [ -z "$found" ] || [ "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" != 1 ]; then
-        echo "Expected exactly one native archive for $library" >&2; exit 1
-    fi
-    archives+=("$found")
-done
-if [ "$sdk" = macosx ]; then
-    archives+=("$build/_deps/kelpie_llama-build/ggml/src/ggml-metal/libggml-metal.a")
-fi
+archives=("$products/lib$target.a" "$derived/libKelpieNative.a")
 xcrun libtool -static -o "$framework/KelpieBrowser" "${archives[@]}"
 cp -R "$products/KelpieBrowser.swiftmodule" "$framework/Modules/"
 cat > "$framework/Info.plist" <<PLIST

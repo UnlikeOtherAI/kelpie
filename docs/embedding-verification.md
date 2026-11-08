@@ -185,3 +185,22 @@ refresh, full screen and help use the same command definitions as the standalone
 SwiftUI app, with the same recording gates and shortcuts. Switching to another
 host window or closing the session removes that menu. Hosts do not rebuild the
 browser’s menu actions or retain keyboard authority in an unrelated window.
+
+## iOS source Pod
+
+An iOS containing app can consume KelpieBrowser from the pinned checkout’s
+core/apple directory as a local source Pod. The Pod compiles the complete UIKit/SwiftUI
+browser, packages KelpieBrowserResources and builds the same six C++ libraries
+through build-native.sh. That native builder is also used by build-apple-sdk.sh;
+the SDK package and source Pod do not maintain different C++ build definitions.
+
+The Pod requires Xcode, CMake, Ninja, Node 20+, pnpm and the SDK’s existing source
+contract dependencies. Its build phase runs before Swift compilation, combines
+the native archives for the requested iOS architectures, and supplies the native
+link path to the containing target. It works from uploaded source without Git
+metadata, so an Expo build does not need a checked-in framework or a mutable SDK
+download. The original source pin remains the containing repository’s gitlink.
+Native compile subprocesses receive an explicit environment allowlist and the
+Pod phase disables environment-variable logging. Browser resources include the
+JSON, HTTP and llama license notices. Installed source-Pod consumption is still
+being verified separately from the existing packaged-framework checks.
