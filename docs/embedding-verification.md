@@ -90,8 +90,8 @@ window entry points and its UOA adapter are not included in this extraction.
 ## Apple consumer modules
 
 The browser library imports the existing C ABI through `KelpieNative` and the
-direct Mac renderer through `KelpieChromium`. Consumers add `core/apple/Native`
-to the Swift import search path alongside the built `KelpieBrowser` module. The
+direct Mac renderer through `KelpieChromium`. These are implementation-only imports: the public Swift module exposes no C ABI
+or renderer types. Consumers import the built `KelpieBrowser` module. The
 browser library does not use a Swift bridging header: its module must remain
 importable by an unrelated containing target. The hollow app test targets retain
 their own test-only headers. WebKit-only consumers never import the Chromium

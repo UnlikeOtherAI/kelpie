@@ -1,5 +1,5 @@
 import Foundation
-import llama
+@_implementationOnly import llama
 
 /// Process-level singleton. Heavy work stays off the main thread.
 final class InferenceEngine: ObservableObject, @unchecked Sendable {

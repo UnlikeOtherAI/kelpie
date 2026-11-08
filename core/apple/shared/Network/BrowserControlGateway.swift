@@ -1,4 +1,4 @@
-import KelpieNative
+@_implementationOnly import KelpieNative
 import Foundation
 
 /// Owns one shared native coordinator, including opaque references and MCP state.

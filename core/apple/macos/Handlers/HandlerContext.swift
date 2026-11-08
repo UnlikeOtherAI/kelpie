@@ -1,4 +1,4 @@
-import KelpieNative
+@_implementationOnly import KelpieNative
 import AppKit
 
 /// Shared context providing access to the active renderer for all handlers.

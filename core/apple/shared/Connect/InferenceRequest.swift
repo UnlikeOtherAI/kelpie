@@ -1,4 +1,4 @@
-import KelpieNative
+@_implementationOnly import KelpieNative
 import Foundation
 
 /// Shared native cancellation belongs to this request, including before queue dispatch.

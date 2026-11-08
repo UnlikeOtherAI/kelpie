@@ -1,4 +1,4 @@
-import KelpieNative
+@_implementationOnly import KelpieNative
 import Foundation
 
 /// Fixed shared reader, registered only in the job-owned router.

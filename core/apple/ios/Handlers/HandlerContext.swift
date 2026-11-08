@@ -1,4 +1,4 @@
-import KelpieNative
+@_implementationOnly import KelpieNative
 import WebKit
 
 enum ScreenshotResolution: String {

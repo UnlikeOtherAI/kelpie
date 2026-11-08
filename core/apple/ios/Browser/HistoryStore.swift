@@ -1,4 +1,4 @@
-import KelpieNative
+@_implementationOnly import KelpieNative
 import Foundation
 
 /// Persists history via the shared native core-state library.

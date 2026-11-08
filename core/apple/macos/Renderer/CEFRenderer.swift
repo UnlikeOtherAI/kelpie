@@ -1,5 +1,5 @@
 #if !KELPIE_WEBKIT_ONLY
-import KelpieChromium
+@_implementationOnly import KelpieChromium
 #endif
 #if !KELPIE_WEBKIT_ONLY
 import AppKit
