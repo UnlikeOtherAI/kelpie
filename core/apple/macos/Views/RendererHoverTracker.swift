@@ -34,7 +34,7 @@ final class RendererHoverTracker: NSObject {
         }
     }
 
-    @objc func mouseMoved(with event: NSEvent) {
+    @objc(mouseMoved:) func mouseMoved(with event: NSEvent) {
         guard let container, let renderer, !renderer.makeView().isHidden else { clear(); return }
         let point = container.convert(event.locationInWindow, from: nil)
         let x = point.x
@@ -57,9 +57,9 @@ final class RendererHoverTracker: NSObject {
         }
     }
 
-    @objc func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+    @objc(mouseEntered:) func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
 
-    @objc func mouseExited(with event: NSEvent) { clear() }
+    @objc(mouseExited:) func mouseExited(with event: NSEvent) { clear() }
 
     func clear() {
         generation += 1
