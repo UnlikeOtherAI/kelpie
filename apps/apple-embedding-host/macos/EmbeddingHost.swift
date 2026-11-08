@@ -86,7 +86,8 @@ private final class HostController: NSViewController {
                 let window = NSWindow(
                     contentRect: NSRect(x: 120, y: 120, width: 920, height: 650),
                     styleMask: [.titled, .closable, .resizable],
-                    backing: .buffered, defer: false
+                    backing: .buffered,
+                    defer: false
                 )
                 window.title = "Second host window"
                 window.isReleasedWhenClosed = false
