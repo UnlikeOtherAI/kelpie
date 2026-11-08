@@ -70,26 +70,31 @@ object UOAAccount {
         credentials = null
         hostSession = session
         hostSubscription?.cancel()
-        hostSubscription = scope.launch {
-            session.identity.collectLatest { identity ->
-                val subject = identity.subject
-                reset(clearStorage = false)
-                if (subject != null) {
-                    val current = generation
-                    try {
-                        if (identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
-                        finishSignIn(current)
-                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        if (generation == current) mutableState.value = State(error = error.message)
+        hostSubscription =
+            scope.launch {
+                session.identity.collectLatest { identity ->
+                    val subject = identity.subject
+                    reset(clearStorage = false)
+                    if (subject != null) {
+                        val current = generation
+                        try {
+                            if (identity.session.isNullOrEmpty()) throw UOATransport.Failure(401)
+                            finishSignIn(current)
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            if (generation == current) mutableState.value = State(error = error.message)
+                        }
                     }
                 }
             }
-        }
     }
 
-    fun attach(activity: ComponentActivity, openLogin: (String, String) -> Unit, context: Context = activity) {
+    fun attach(
+        activity: ComponentActivity,
+        openLogin: (String, String) -> Unit,
+        context: Context = activity,
+    ) {
         this.openLogin = openLogin
         host = WeakReference(activity)
         appContext = context.applicationContext
@@ -101,13 +106,16 @@ object UOAAccount {
     }
 
     fun detach(activity: ComponentActivity) {
-        if (host.get() === activity) { host.clear(); openLogin = null }
+        if (host.get() === activity) {
+            host.clear()
+            openLogin = null
+        }
     }
 
     /** The in-app login shares the tabs' WebView profile, so the Google session reaches every tab. */
     private fun openPendingLogin() {
         val url = pendingUrl ?: return
-        val activity = liveHost() ?: return
+        if (liveHost() == null) return
         pendingUrl = null
         loginOpen = true
         openLogin?.invoke(url, generation.toString())
@@ -133,7 +141,7 @@ object UOAAccount {
         val intent =
             Intent(Intent.ACTION_VIEW, Uri.parse(pending.authorization.url(pending.clientId)))
                 .addCategory(Intent.CATEGORY_BROWSABLE)
-        val activity = liveHost() ?: return fail("Could not open login. Please try again.")
+        if (liveHost() == null) return fail("Could not open login. Please try again.")
         try {
             activity.startActivity(intent)
         } catch (_: android.content.ActivityNotFoundException) {
@@ -152,7 +160,10 @@ object UOAAccount {
     }
 
     fun signIn() {
-        hostSession?.let { it.signIn(); return }
+        hostSession?.let {
+            it.signIn()
+            return
+        }
         if (state.value.signingIn || state.value.profile != null) return
         val current = begin()
         scope.launch {
@@ -290,7 +301,11 @@ object UOAAccount {
     }
 
     fun signOut() {
-        hostSession?.let { reset(clearStorage = false); it.signOut(); return }
+        hostSession?.let {
+            reset(clearStorage = false)
+            it.signOut()
+            return
+        }
         val dropped = reset(clearStorage = true) ?: return
         val tokens = credentials ?: return
         scope.launch { tokens.revoke(dropped) }

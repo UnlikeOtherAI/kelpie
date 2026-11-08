@@ -91,7 +91,14 @@ object PartitionRegistry {
         view: WebView,
         profile: String?,
     ) {
-        val actual = profile ?: if (com.kelpie.browser.KelpieEnvironment.standalone(view.context)) null else "com.unlikeotherai.kelpie.browser"
+        val actual =
+            profile ?: if (com.kelpie.browser.KelpieEnvironment
+                    .standalone(view.context)
+            ) {
+                null
+            } else {
+                "com.unlikeotherai.kelpie.browser"
+            }
         if (actual != null) {
             if (!supported()) throw Failure("PARTITION_UNSUPPORTED", "Update Android System WebView: multiple profiles are unavailable")
             WebViewCompat.setProfile(view, actual)
