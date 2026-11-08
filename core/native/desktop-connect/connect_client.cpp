@@ -53,7 +53,7 @@ void Client::Pause(bool value) {
 }
 void Client::SetForeground(bool value) {
   std::shared_ptr<std::atomic<bool>> guard;
-  { std::lock_guard lock(mutex_);foreground_=value;
+  { std::lock_guard lock(mutex_);if(foreground_==value)return;foreground_=value;
     if(!value) { guard=cancelled_.load();guard->store(true); }
   }
   if(guard && cancel_)cancel_(guard);changed_.notify_all();
