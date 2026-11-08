@@ -42,6 +42,10 @@ The browser resource bundle is a library dependency and owns the artwork, font,
 diagnostics and inspector scripts. Hosts keep only their launch icons. The Mac test scheme loads CEF from the packaged standalone fixture without launching
 its browser or account lifecycle. Chromium hosts also package
 the matching signed CEF framework and helper; the library does not install it.
+Declare `KelpieBrowserBuild.cefHelper(core:)` as a target in the containing
+project and depend on that local target when packaging Chromium. Tuist omits
+cross-project command-line-tool dependencies from the app build graph. The
+packaging script fails if the helper executable was not built.
 
 Android hosts include the Gradle library at `core/android`, create
 `KelpieBrowserSession(activity, uoaSession = ...)` when needed, and

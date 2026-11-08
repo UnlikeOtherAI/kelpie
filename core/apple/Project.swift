@@ -49,34 +49,6 @@ let iosBrowser = Target.target(
     )
 )
 
-let kelpieHelper = Target.target(
-    name: "KelpieHelper",
-    destinations: .macOS,
-    product: .commandLineTool,
-    bundleId: "com.kelpie.browser.helper",
-    deploymentTargets: .macOS("14.0"),
-    infoPlist: .file(path: "Helpers/Info.plist"),
-    sources: [
-        .glob("Helpers/**/*.mm")
-    ],
-    entitlements: .file(path: "Helpers/KelpieHelper.entitlements"),
-    settings: .settings(
-        base: [
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Frameworks/cef_include"
-            ]),
-            "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/macos/Frameworks"
-            ]),
-            "OTHER_LDFLAGS": .array([
-                "-framework \"Chromium Embedded Framework\"",
-                "-lc++"
-            ])
-        ]
-    )
-)
-
 let macResources = Target.target(
     name: "KelpieResourcesMac",
     destinations: .macOS,
@@ -101,5 +73,5 @@ let iosResources = Target.target(
 
 let project = Project(
     name: "KelpieBrowser",
-    targets: [macResources, iosResources, macBrowser, iosBrowser, kelpieHelper]
+    targets: [macResources, iosResources, macBrowser, iosBrowser]
 )

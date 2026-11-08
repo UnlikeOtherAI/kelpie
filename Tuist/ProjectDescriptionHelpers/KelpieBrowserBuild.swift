@@ -20,6 +20,26 @@ public enum KelpieBrowserBuild {
         )
     }
 
+    /// The containing project owns the subprocess executable and its packaging.
+    public static func cefHelper(core: String) -> Target {
+        .target(
+            name: "KelpieHelper",
+            destinations: .macOS,
+            product: .commandLineTool,
+            bundleId: "com.kelpie.browser.helper",
+            deploymentTargets: .macOS("14.0"),
+            infoPlist: .file(path: .relativeToManifest(core + "/apple/Helpers/Info.plist")),
+            sources: [.glob(.relativeToManifest(core + "/apple/Helpers/**/*.mm"))],
+            entitlements: .file(path: .relativeToManifest(core + "/apple/Helpers/KelpieHelper.entitlements")),
+            settings: .settings(base: [
+                "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
+                "HEADER_SEARCH_PATHS": .array(["$(PROJECT_DIR)/" + core + "/apple/macos/Frameworks/cef_include"]),
+                "FRAMEWORK_SEARCH_PATHS": .array(["$(PROJECT_DIR)/" + core + "/apple/macos/Frameworks"]),
+                "OTHER_LDFLAGS": .array(["-framework \"Chromium Embedded Framework\"", "-lc++"])
+            ])
+        )
+    }
+
     private static let nativeModules = [
         "state", "connect", "protocol", "automation", "mcp", "ai"
     ]

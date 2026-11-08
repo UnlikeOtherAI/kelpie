@@ -39,8 +39,10 @@ let embedCEFFramework = TargetScript.post(
 
 let embedKelpieHelper = TargetScript.post(
     script: """
+    set -euo pipefail
     HELPER_EXE="${BUILT_PRODUCTS_DIR}/KelpieHelper"
-    HELPER_ROOT="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"
+    HELPER_ROOT="${BUILT_PRODUCTS_DIR:?}/${FRAMEWORKS_FOLDER_PATH:?}"
+    test -x "$HELPER_EXE"
 
     stage_helper() {
       local helper_name="$1"
@@ -64,7 +66,7 @@ let embedKelpieHelper = TargetScript.post(
       install_name_tool -change \\
         "@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework" \\
         "@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework" \\
-        "$exe_path" 2>/dev/null || true
+        "$exe_path"
 
       if [ "${CODE_SIGNING_ALLOWED}" != "NO" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
         codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --entitlements "${PROJECT_DIR}/../../core/apple/Helpers/KelpieHelper.entitlements" "$app_dir"
@@ -130,7 +132,7 @@ let kelpieApp = Target.target(
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [
-        .project(target: "KelpieHelper", path: "../../core/apple")
+        .target(name: "KelpieHelper")
     ]),
     settings: .settings(
         base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core", additional: [
@@ -158,7 +160,7 @@ let kelpieEmbeddingHost = Target.target(
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
         .package(product: "AppReveal")
-    ] + (KelpieBrowserBuild.webKitOnly ? [] : [.project(target: "KelpieHelper", path: "../../core/apple")]),
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [.target(name: "KelpieHelper")]),
     settings: .settings(base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core"))
 )
 
@@ -234,7 +236,7 @@ let project = Project(
         kelpieEmbeddingHost,
         kelpieEmbeddingUITests,
         kelpieTests,
-    ],
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [KelpieBrowserBuild.cefHelper(core: "../../core")]),
     schemes: [
         kelpieScheme,
         .scheme(name: "KelpieEmbeddingHost", shared: true,
