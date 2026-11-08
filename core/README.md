@@ -72,7 +72,9 @@ credentials and is excluded from ordinary release builds.
 Apple hosts can build the `KelpieEmbeddingHost` scheme in either app project to
 exercise the complete browser through native Open, Move and Close controls. The
 fixture uses a signed-out host UOA provider and AppReveal for local inspection;
-it is a separate package and is never included in the standalone app. Generate
+it is a separate package and is never included in the standalone app. Run its
+local-only UI journey with `xcodebuild -scheme KelpieEmbeddingHost test` and a
+matching native destination; UI tests are excluded from CI. Generate
 the Mac fixture with the WebKit-only flag to verify the Store renderer path.
 
 Use one browser session per process. Keep that session alive while opening and

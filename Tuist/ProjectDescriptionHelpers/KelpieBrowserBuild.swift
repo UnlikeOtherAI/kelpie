@@ -15,7 +15,8 @@ public enum KelpieBrowserBuild {
             rm -rf "$DEST"
             ditto "$SOURCE" "$DEST"
             """,
-            name: "Embed Kelpie browser resources"
+            name: "Embed Kelpie browser resources",
+            basedOnDependencyAnalysis: false
         )
     }
 

@@ -162,6 +162,19 @@ let kelpieEmbeddingHost = Target.target(
     settings: .settings(base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core"))
 )
 
+
+let kelpieEmbeddingUITests = Target.target(
+    name: "KelpieEmbeddingUITests",
+    destinations: .macOS,
+    product: .uiTests,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.macos.uitests",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-embedding-host/UITests/**/*.swift")],
+    dependencies: [.target(name: "KelpieEmbeddingHost")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieLibraryTestHost = Target.target(
     name: "KelpieLibraryTestHost",
     destinations: .macOS,
@@ -219,11 +232,13 @@ let project = Project(
         kelpieApp,
         kelpieLibraryTestHost,
         kelpieEmbeddingHost,
+        kelpieEmbeddingUITests,
         kelpieTests,
     ],
     schemes: [
         kelpieScheme,
         .scheme(name: "KelpieEmbeddingHost", shared: true,
-                buildAction: .buildAction(targets: ["KelpieEmbeddingHost"])),
+                buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),
+                testAction: .targets(["KelpieEmbeddingUITests"])),
     ]
 )
