@@ -1,6 +1,7 @@
 #include "connect_client.h"
 #include <cassert>
 #include <cstdio>
+#include <exception>
 #undef assert
 #define assert(v) do { if(!(v)) { std::fprintf(stderr,"Assertion failed at line %d: %s\n",__LINE__,#v);std::abort(); } } while(false)
 #include <deque>
@@ -63,6 +64,19 @@ bool Terminal(const std::shared_ptr<Wire>& wire) {
 }
 }
 int main() {
+  // MSVC otherwise reports an uncaught exception as a silent 0xc0000409 to CTest.
+  std::set_terminate([] {
+    try {
+      if (auto error=std::current_exception()) std::rethrow_exception(error);
+      std::fprintf(stderr,"Terminated without an active exception\n");
+    } catch (const std::exception& error) {
+      std::fprintf(stderr,"Uncaught exception: %s\n",error.what());
+    } catch (...) {
+      std::fprintf(stderr,"Uncaught non-standard exception\n");
+    }
+    std::fflush(stderr);
+    std::abort();
+  });
   const auto profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
   BookmarkStore bookmarks;
   account::AccountService account(bookmarks,[](const auto& path,const auto&,const auto&,const auto&,const auto&) -> account::AccountResponse {
