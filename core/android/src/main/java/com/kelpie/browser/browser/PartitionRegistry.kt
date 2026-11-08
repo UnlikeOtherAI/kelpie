@@ -97,7 +97,7 @@ object PartitionRegistry {
             ) {
                 null
             } else {
-                "com.unlikeotherai.kelpie.browser"
+                "com.unlikeotherai.kelpie.browser.${com.kelpie.browser.KelpieEnvironment.profileID}"
             }
         if (actual != null) {
             if (!supported()) throw Failure("PARTITION_UNSUPPORTED", "Update Android System WebView: multiple profiles are unavailable")

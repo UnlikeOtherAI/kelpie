@@ -10,22 +10,24 @@ import java.io.File
 class KelpieStorageContext(
     base: Context,
 ) : ContextWrapper(base) {
+    private val directory = "kelpie-browser/${KelpieEnvironment.profileID}"
+    private val preferencePrefix = "kelpie.browser.${KelpieEnvironment.profileID}"
     override fun getApplicationContext(): Context = KelpieEnvironment.app
 
-    override fun getFilesDir(): File = File(baseContext.filesDir, "kelpie-browser").apply { mkdirs() }
+    override fun getFilesDir(): File = File(baseContext.filesDir, directory).apply { mkdirs() }
 
-    override fun getCacheDir(): File = File(baseContext.cacheDir, "kelpie-browser").apply { mkdirs() }
+    override fun getCacheDir(): File = File(baseContext.cacheDir, directory).apply { mkdirs() }
 
-    override fun getExternalFilesDir(type: String?): File? = baseContext.getExternalFilesDir(type)?.let { File(it, "kelpie-browser").apply { mkdirs() } }
+    override fun getExternalFilesDir(type: String?): File? = baseContext.getExternalFilesDir(type)?.let { File(it, directory).apply { mkdirs() } }
 
-    override fun getExternalCacheDir(): File? = baseContext.externalCacheDir?.let { File(it, "kelpie-browser").apply { mkdirs() } }
+    override fun getExternalCacheDir(): File? = baseContext.externalCacheDir?.let { File(it, directory).apply { mkdirs() } }
 
-    override fun getNoBackupFilesDir(): File = File(baseContext.noBackupFilesDir, "kelpie-browser").apply { mkdirs() }
+    override fun getNoBackupFilesDir(): File = File(baseContext.noBackupFilesDir, directory).apply { mkdirs() }
 
     override fun getSharedPreferences(
         name: String,
         mode: Int,
-    ): SharedPreferences = baseContext.getSharedPreferences("kelpie.browser.$name", mode)
+    ): SharedPreferences = baseContext.getSharedPreferences("$preferencePrefix.$name", mode)
 }
 
 internal fun Context.kelpieActivity(): Activity? =

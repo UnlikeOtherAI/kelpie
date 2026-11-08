@@ -5,6 +5,9 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint")
 }
 
+group = "com.unlikeotherai.kelpie"
+version = "0.2.0"
+
 ktlint {
     version.set("1.5.0")
     android.set(true)

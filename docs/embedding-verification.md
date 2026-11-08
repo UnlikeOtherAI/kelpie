@@ -136,3 +136,19 @@ credentials never enter the XCTest process or its failure diagnostics. Confirm
 the expected test count, rather than accepting an empty selector run.
 The allowlist also supplies the containing test host's adjacent MacOS directory
 for Xcode Debug dylib loading; it never inherits a developer DYLD search path.
+
+## Android containing builds and profiles
+
+The Android library can be consumed as an isolated Gradle included build at
+core/android (com.unlikeotherai.kelpie:browser:0.2.0). Its Kotlin and Compose
+compiler versions remain scoped to that build. A host can use a newer Kotlin
+compiler without replacing the browser compiler or duplicating its UI.
+
+For a signed-in embedded browser, verify the bearer owner with UOA before calling
+KelpieEnvironment.configureProfile(issuer, subject). Call it before the first
+browser/environment initialization in that process. Browser files, preferences
+and the default WebView profile are scoped to that person. The process cannot
+switch an initialized browser profile: close it and start a new browser process
+for another person. A signed-out host uses a separate signed-out profile.
+The containing app must require Android 28 and MULTI_PROFILE support for this
+capability; it must not fall back to the containing app’s cookie jar.

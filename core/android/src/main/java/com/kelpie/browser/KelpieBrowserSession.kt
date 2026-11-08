@@ -119,6 +119,7 @@ class KelpieBrowserSession(
     private val pairingCoordinator: PairApprovalCoordinator
 
     init {
+        if (uoaSession != null) KelpieEnvironment.requireProfile(uoaSession.identity.value.subject)
         KelpieEnvironment.initialize(activity.applicationContext)
         uoaSession?.let(com.kelpie.browser.account.UOAAccount::useHostSession)
 
