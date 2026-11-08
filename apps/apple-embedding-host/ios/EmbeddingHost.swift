@@ -48,6 +48,7 @@ private final class HostController: UIViewController {
             view.addSubview(content)
         }
         NSLayoutConstraint.activate([
+            controls.heightAnchor.constraint(equalToConstant: 36),
             controls.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
             controls.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
             controls.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
