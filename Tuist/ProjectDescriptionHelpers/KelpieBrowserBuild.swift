@@ -1,7 +1,10 @@
+import Foundation
 import ProjectDescription
 
 /// Link settings for the complete browser library and its existing native core.
 public enum KelpieBrowserBuild {
+    public static var webKitOnly: Bool { ProcessInfo.processInfo.environment["KELPIE_WEBKIT_ONLY"] == "1" }
+
     private static let nativeModules = [
         "state", "connect", "protocol", "automation", "mcp", "ai"
     ]
@@ -11,10 +14,9 @@ public enum KelpieBrowserBuild {
         let apple = core + "/apple/macos"
         let flags = nativeModules.map { "-lkelpie_core_" + $0 } + [
             "-lllama", "-lggml", "-lggml-base", "-lggml-cpu", "-lggml-metal", "-lggml-blas",
-            "-lc++", "-framework AppIntents", "-framework Metal", "-framework Accelerate",
-            "-framework \"Chromium Embedded Framework\""
-        ]
-        let settings: SettingsDictionary = [
+            "-lc++", "-framework AppIntents", "-framework Metal", "-framework Accelerate"
+        ] + (webKitOnly ? [] : ["-framework \"Chromium Embedded Framework\""])
+        var settings: SettingsDictionary = [
             "SWIFT_VERSION": "5.0",
             "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
             "HEADER_SEARCH_PATHS": .array(nativeModules.map { native + "/core-" + $0 + "/include" } + [
@@ -28,6 +30,10 @@ public enum KelpieBrowserBuild {
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO"
         ]
+        if webKitOnly {
+            settings["SWIFT_ACTIVE_COMPILATION_CONDITIONS"] = "$(inherited) KELPIE_WEBKIT_ONLY"
+            settings["GCC_PREPROCESSOR_DEFINITIONS"] = "$(inherited) KELPIE_WEBKIT_ONLY=1"
+        }
         return settings.merging(additional) { _, value in value }
     }
 

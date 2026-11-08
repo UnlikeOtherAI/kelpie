@@ -1,3 +1,4 @@
+#if !KELPIE_WEBKIT_ONLY
 import AppKit
 
 /// Chromium-based renderer conforming to RendererEngine.
@@ -397,3 +398,4 @@ final class CEFRenderer: RendererEngine {
         capturedDocumentResponseURL = url
     }
 }
+#endif

@@ -7,6 +7,14 @@ final class RendererState: ObservableObject {
         case webkit
         case chromium
 
+        static var allCases: [Engine] {
+            #if KELPIE_WEBKIT_ONLY
+            return [.webkit]
+            #else
+            return [.webkit, .chromium]
+            #endif
+        }
+
         var displayName: String {
             switch self {
             case .webkit: return "Safari (WebKit)"
@@ -25,6 +33,7 @@ final class RendererState: ObservableObject {
 
     init() {
         let saved = KelpieStorage.defaults.string(forKey: "com.kelpie.renderer-engine") ?? ""
-        self.activeEngine = Engine(rawValue: saved) ?? .webkit
+        let selected = Engine(rawValue: saved) ?? .webkit
+        self.activeEngine = Engine.allCases.contains(selected) ? selected : .webkit
     }
 }

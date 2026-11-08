@@ -42,9 +42,11 @@ final class ConnectBrowser {
         #if os(iOS)
         return context.tabStore?.activeBrowserTab != nil
         #else
+        #if !KELPIE_WEBKIT_ONLY
         if let cef = context.renderer as? CEFRenderer {
             return cef.bridge != nil && cef.containerView.window?.isVisible == true && !cef.containerView.isHidden
         }
+        #endif
         return WindowRegistry.shared.defaultEntry()?.window?.isVisible == true
         #endif
     }
@@ -81,12 +83,14 @@ final class ConnectBrowser {
             if context.scriptPlaybackState?.recordingError(for: "new-tab") != nil { throw Failure("Recording is in progress") }
             #if os(macOS)
             guard let parsed = URL(string: url) else { throw Failure("A web URL is required") }
+            #if !KELPIE_WEBKIT_ONLY
             if let cef = context.renderer as? CEFRenderer {
                 NessieConnection.shared.claimTab(cef.connectionTabID)
                 cef.load(url: parsed)
                 try await settle(cef.connectionTabID)
                 return ["tabId": cef.connectionTabID, "tabVersion": try version(cef.connectionTabID), "tabs": tabs()]
             }
+            #endif
             #endif
             #if os(iOS)
             guard let store = context.tabStore else { throw Failure("Browser unavailable") }
@@ -159,6 +163,7 @@ final class ConnectBrowser {
         body["tabId"] = tabID
         let authorized = { NessieConnection.shared.authorizes(command) }
         #if os(macOS)
+        #if !KELPIE_WEBKIT_ONLY
         if let cef = pinned.renderer as? CEFRenderer, let bridge = cef.bridge {
             let count = bridge.documentNavigationCount()
             let changesDocument = operation == "navigate" || operation == "reload" || (operation == "back" ? cef.canGoBack : cef.canGoForward)
@@ -173,6 +178,7 @@ final class ConnectBrowser {
             try await pinned.waitForNavigationRead()
             return ["tabId": tabID, "tabVersion": try version(tabID), "result": result]
         }
+        #endif
         guard let view = pinned.renderer as? WKWebViewRenderer else { throw Failure("Browser unavailable") }
         #else
         guard let view = pinned.webView else { throw Failure("Browser unavailable") }
@@ -226,11 +232,13 @@ final class ConnectBrowser {
              "active": tab.id == context.tabStore?.activeBrowserTabID]
         } ?? []
         #else
+        #if !KELPIE_WEBKIT_ONLY
         if let cef = context.renderer as? CEFRenderer, let bridge = cef.bridge {
             return [[
                 "tabId": cef.connectionTabID, "tabVersion": bridge.documentVersion(),
                 "url": cef.currentURL?.absoluteString ?? "", "title": cef.currentTitle, "loading": cef.isLoading, "active": true]]
         }
+        #endif
         return WindowRegistry.shared.allEntries().flatMap { entry in
             entry.tabStore.tabs.map { tab in
                 ["tabId": tab.id.uuidString, "tabVersion": ConnectDocument.version(tab.renderer),
@@ -249,10 +257,12 @@ final class ConnectBrowser {
         }
         return ConnectDocument.version(tab.webView)
         #else
+        #if !KELPIE_WEBKIT_ONLY
         if let cef = context.renderer as? CEFRenderer, cef.connectionTabID == tabID, let bridge = cef.bridge {
             guard !bridge.isLoading() else { throw Failure("Tab is navigating; refresh its snapshot") }
             return bridge.documentVersion()
         }
+        #endif
         guard let entry = WindowRegistry.shared.entry(containingTabId: uuid),
               let tab = entry.tabStore.tabs.first(where: { $0.id == uuid }), !tab.renderer.isLoading else {
             throw Failure("Tab is missing or navigating; refresh its snapshot")
@@ -280,6 +290,7 @@ final class ConnectBrowser {
         isolated.webView = tab.webView
         isolated.tabStore = store
         #else
+        #if !KELPIE_WEBKIT_ONLY
         if let cef = context.renderer as? CEFRenderer, cef.connectionTabID == tabID {
             isolated.renderer = cef
             isolated.activeEngineIsChromium = true
@@ -290,6 +301,7 @@ final class ConnectBrowser {
             NessieConnection.shared.claimTab(tabID)
             return isolated
         }
+        #endif
         guard let entry = WindowRegistry.shared.entry(containingTabId: uuid),
               let tab = entry.tabStore.tabs.first(where: { $0.id == uuid }) else { throw Failure("Tab not found") }
         NessieConnection.shared.changeTabRemotely { entry.callbacks?.onSwitchTab(uuid) }

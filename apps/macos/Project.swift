@@ -119,8 +119,8 @@ let kelpieApp = Target.target(
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
     ],
-    entitlements: .file(path: "Kelpie/Kelpie.entitlements"),
-    scripts: [
+    entitlements: .file(path: KelpieBrowserBuild.webKitOnly ? "Kelpie/Store.entitlements" : "Kelpie/Kelpie.entitlements"),
+    scripts: KelpieBrowserBuild.webKitOnly ? [] : [
         fixCEFStructure,
         embedCEFFramework,
         embedKelpieHelper,
@@ -128,13 +128,14 @@ let kelpieApp = Target.target(
     ],
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
-        .project(target: "KelpieHelper", path: "../../core/apple"),
         .package(product: "AppReveal"),
-    ],
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [
+        .project(target: "KelpieHelper", path: "../../core/apple")
+    ]),
     settings: .settings(
         base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core", additional: [
             "COMBINE_HIDPI_IMAGES": "YES",
-            "ENABLE_APP_SANDBOX": "NO"
+            "ENABLE_APP_SANDBOX": .string(KelpieBrowserBuild.webKitOnly ? "YES" : "NO")
         ])
     )
 )
@@ -149,7 +150,7 @@ let kelpieTests = Target.target(
     infoPlist: .default,
     sources: [
         .glob("Tests/**/*.swift"),
-        .glob("Tests/**/*.mm"),
+        .glob("Tests/**/*.mm", excluding: KelpieBrowserBuild.webKitOnly ? ["Tests/BrowserControlCDPLifetimeTests.mm"] : []),
     ],
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
@@ -167,7 +168,7 @@ let kelpieScheme = Scheme.scheme(
     buildAction: .buildAction(targets: ["Kelpie"]),
     testAction: .targets(
         ["KelpieTests"],
-        arguments: .arguments(environmentVariables: [
+        arguments: KelpieBrowserBuild.webKitOnly ? nil : .arguments(environmentVariables: [
             "DYLD_FRAMEWORK_PATH": "$(PROJECT_DIR)/../../core/apple/macos/Frameworks"
         ]),
         expandVariableFromTarget: "KelpieTests"

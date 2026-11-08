@@ -130,7 +130,7 @@ struct URLBarView: View {
                 if aiState.isAvailable {
                     popupAction(isAIPanelOpen ? "Hide AI assistant" : "AI assistant", icon: "sparkles", id: "ai", action: onAIToggle)
                 }
-                if rendererState.activeEngine != .chromium {
+                if RendererState.Engine.allCases.contains(.chromium), rendererState.activeEngine != .chromium {
                     popupAction(is3DActive ? "Exit 3D inspector" : "3D inspector", icon: "cube.transparent", id: "snapshot3d", action: onSnapshot3D)
                 }
                 Divider()

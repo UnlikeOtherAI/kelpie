@@ -40,7 +40,9 @@ final class ServerState: ObservableObject {
         handlerContext.renderer = renderer
         handlerContext.activeEngineIsChromium = false
     }
+    #if !KELPIE_WEBKIT_ONLY
     private(set) var cefRenderer: CEFRenderer?
+    #endif
 
     private var httpServer: HTTPServer?
     private var toastDismissTask: Task<Void, Never>?
@@ -224,6 +226,7 @@ final class ServerState: ObservableObject {
 
     /// Switches active renderer with cookie migration.
     func switchRenderer(to engine: RendererState.Engine) async {
+        guard RendererState.Engine.allCases.contains(engine) else { return }
         guard let rendererState else { return }
         guard engine != rendererState.activeEngine else { return }
 
@@ -308,6 +311,9 @@ final class ServerState: ObservableObject {
             wkRenderer = renderer
             return renderer
         case .chromium:
+            #if KELPIE_WEBKIT_ONLY
+            preconditionFailure("Chromium is unavailable in this build")
+            #else
             if let cefRenderer {
                 return cefRenderer
             }
@@ -317,6 +323,7 @@ final class ServerState: ObservableObject {
             }
             cefRenderer = renderer
             return renderer
+            #endif
         }
     }
 

@@ -1,9 +1,11 @@
 #ifndef Kelpie_Bridging_Header_h
 #define Kelpie_Bridging_Header_h
 
+#if !defined(KELPIE_WEBKIT_ONLY)
 #import "CEFBridge.h"
 #import "CEFBridge+Cookies.h"
 #import "CEFBridge+Screenshot.h"
+#endif
 #import "kelpie/state_c_api.h"
 #import "kelpie/connect.h"
 #import "kelpie/address_input.h"

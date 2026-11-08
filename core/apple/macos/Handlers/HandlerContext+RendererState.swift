@@ -8,9 +8,11 @@ extension HandlerContext {
         if let webKit = renderer as? WKWebViewRenderer {
             return webKit.dialogState
         }
+        #if !KELPIE_WEBKIT_ONLY
         if let chromium = renderer as? CEFRenderer {
             return chromium.dialogState
         }
+        #endif
         return nil
     }
 

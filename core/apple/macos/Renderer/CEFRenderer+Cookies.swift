@@ -1,3 +1,4 @@
+#if !KELPIE_WEBKIT_ONLY
 import AppKit
 
 // MARK: - Cookie operations + injection fallbacks
@@ -222,3 +223,4 @@ extension CEFRenderer {
         injectCookiesViaJS(expiredCookies.compactMap { $0 }, reloadAfterInjection: false)
     }
 }
+#endif

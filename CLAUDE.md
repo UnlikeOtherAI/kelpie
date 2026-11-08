@@ -6,7 +6,7 @@ Android release signing requires all four configured secrets and verified APK/AA
 
 Windows/Linux outbound Nessie account connections follow [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 
-The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session.
+The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Apple Store builds use `KELPIE_WEBKIT_ONLY=1 tuist generate` as documented there. Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session.
 
 ## What This Is
 

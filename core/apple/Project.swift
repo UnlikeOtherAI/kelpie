@@ -11,7 +11,7 @@ let macBrowser = Target.target(
     sources: [
         .glob("shared/**/*.swift"),
         .glob("macos/**/*.swift"),
-        .glob("macos/**/*.mm")
+        .glob(KelpieBrowserBuild.webKitOnly ? "macos/AI/**/*.mm" : "macos/**/*.mm")
     ],
     dependencies: [.target(name: "KelpieResourcesMac")],
     settings: .settings(
@@ -21,7 +21,7 @@ let macBrowser = Target.target(
             "ENABLE_TESTABILITY": "YES",
             "SWIFT_OBJC_BRIDGING_HEADER": "macos/Kelpie-Bridging-Header.h",
             "COMBINE_HIDPI_IMAGES": "YES",
-            "ENABLE_APP_SANDBOX": "NO"
+            "ENABLE_APP_SANDBOX": .string(KelpieBrowserBuild.webKitOnly ? "YES" : "NO")
         ])
     )
 )

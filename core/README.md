@@ -58,3 +58,14 @@ Standalone profile locations remain unchanged. Embedded website storage is persi
 on iOS 17+, macOS and current Android WebView providers. iOS 16 embedded browsing uses
 an isolated in-memory website store; websiteDataIsPersistent reports that limit.
 Android embedding requires the existing multiple-profile WebView capability.
+
+## Apple Store build
+
+Generate with `KELPIE_WEBKIT_ONLY=1 tuist generate` for a sandboxed macOS
+consumer. The same browser UI, tabs, settings and automation compile against
+WebKit. Chromium code, helper executables and framework packaging are omitted;
+the renderer API rejects unavailable engines. Generate without that variable for
+the existing direct-distribution Chromium build. iOS always uses WebKit.
+
+This selects build inputs and entitlements; Store signing, review and installed
+sandbox verification remain separate release checks. No Store approval is implied.

@@ -47,36 +47,12 @@ final class ConnectBrowserControlJob {
         active = { store.activeBrowserTabID == id && store.activeBrowserTab?.webView === view }
         accountSurface = { Self.isAccountURL(view.url?.absoluteString) }
         #else
-        if source.activeEngineIsChromium, let renderer = source.renderer as? CEFRenderer,
-           renderer.connectionTabID == tabID, let bridge = renderer.bridge {
-            pinned.renderer = renderer
-            pinned.activeEngineIsChromium = true
-            context = pinned
-            currentVersion = { bridge.isLoading() ? nil : bridge.documentVersion() }
-            stillPinned = { source.activeEngineIsChromium && source.renderer === renderer && renderer.bridge === bridge }
-            active = { source.activeEngineIsChromium && source.renderer === renderer && renderer.bridge === bridge }
-            accountSurface = { Self.isAccountURL(renderer.currentURL?.absoluteString) }
-        } else {
-            guard let entry = WindowRegistry.shared.entry(containingTabId: id),
-                  let tab = entry.tabStore.tabs.first(where: { $0.id == id }) else {
-                throw ConnectBrowser.Failure("Tab not found")
-            }
-            let renderer = tab.renderer
-            pinned.renderer = renderer
-            context = pinned
-            currentVersion = { renderer.isLoading ? nil : ConnectDocument.version(renderer) }
-            stillPinned = {
-                !source.activeEngineIsChromium && source.renderer === renderer
-                    && WindowRegistry.shared.entry(containingTabId: id)?.tabStore.tabs.contains {
-                        $0.id == id && $0.renderer === renderer
-                    } == true
-            }
-            active = {
-                !source.activeEngineIsChromium && source.renderer === renderer
-                    && entry.tabStore.activeTabID == id && entry.tabStore.activeTab?.renderer === renderer
-            }
-            accountSurface = { Self.isAccountURL(renderer.currentURL?.absoluteString) }
-        }
+        let binding = try Self.pinMac(source: source, pinned: pinned, id: id, tabID: tabID)
+        context = pinned
+        currentVersion = binding.currentVersion
+        stillPinned = binding.stillPinned
+        active = binding.active
+        accountSurface = binding.accountSurface
         #endif
 
         #if os(macOS)
@@ -172,22 +148,7 @@ final class ConnectBrowserControlJob {
     private func navigation(method: String, params: [String: Any]) async -> [String: Any] {
         var leasedDocumentOwner: AnyObject?
         #if os(macOS)
-        if let renderer = context.renderer as? CEFRenderer, let bridge = renderer.bridge {
-            let count = bridge.documentNavigationCount()
-            let changesDocument = method == "navigate" || method == "reload"
-                || (method == "back" ? renderer.canGoBack : method == "forward" ? renderer.canGoForward : false)
-            let destination = method == "navigate" ? params["url"] as? String : nil
-            context.remoteNavigationWaitGuard = { [weak self] in
-                guard let self else { return false }
-                return self.authorized() && self.stillPinned() && self.active() && !self.accountSurface()
-                    && bridge.documentNavigationCount() <= count + 1
-            }
-            context.remoteNavigationReadGuard = { [weak self] in
-                guard let self, self.authorized(), self.stillPinned(), self.active(), !self.accountSurface(), !bridge.isLoading(),
-                      bridge.documentNavigationCount() == count + (changesDocument ? 1 : 0) else { return false }
-                return ConnectBrowser.navigationDestinationMatches(current: bridge.currentURL(), destination: destination)
-            }
-        } else {
+        if !installChromiumNavigationLease(method: method, params: params) {
             guard let renderer = context.renderer as? WKWebViewRenderer,
                   let view = renderer.makeView() as? WKWebView else {
                 return errorResponse(code: "NO_WEBVIEW", message: "The pinned renderer is unavailable")
@@ -211,6 +172,74 @@ final class ConnectBrowserControlJob {
             return errorResponse(code: "TAB_CHANGED", message: "Navigation lost its job-owned document")
         }
     }
+
+    #if os(macOS)
+    private struct DocumentBinding {
+        let currentVersion: () -> String?
+        let stillPinned: () -> Bool
+        let active: () -> Bool
+        let accountSurface: () -> Bool
+    }
+
+    private static func pinMac(source: HandlerContext, pinned: HandlerContext, id: UUID, tabID: String) throws -> DocumentBinding {
+        #if !KELPIE_WEBKIT_ONLY
+        if source.activeEngineIsChromium, let renderer = source.renderer as? CEFRenderer,
+           renderer.connectionTabID == tabID, let bridge = renderer.bridge {
+            pinned.renderer = renderer
+            pinned.activeEngineIsChromium = true
+            return DocumentBinding(
+                currentVersion: { bridge.isLoading() ? nil : bridge.documentVersion() },
+                stillPinned: { source.activeEngineIsChromium && source.renderer === renderer && renderer.bridge === bridge },
+                active: { source.activeEngineIsChromium && source.renderer === renderer && renderer.bridge === bridge },
+                accountSurface: { Self.isAccountURL(renderer.currentURL?.absoluteString) }
+            )
+        }
+        #endif
+        guard let entry = WindowRegistry.shared.entry(containingTabId: id),
+              let tab = entry.tabStore.tabs.first(where: { $0.id == id }) else {
+            throw ConnectBrowser.Failure("Tab not found")
+        }
+        let renderer = tab.renderer
+        pinned.renderer = renderer
+        return DocumentBinding(
+            currentVersion: { renderer.isLoading ? nil : ConnectDocument.version(renderer) },
+            stillPinned: {
+                !source.activeEngineIsChromium && source.renderer === renderer
+                    && WindowRegistry.shared.entry(containingTabId: id)?.tabStore.tabs.contains {
+                        $0.id == id && $0.renderer === renderer
+                    } == true
+            },
+            active: {
+                !source.activeEngineIsChromium && source.renderer === renderer
+                    && entry.tabStore.activeTabID == id && entry.tabStore.activeTab?.renderer === renderer
+            },
+            accountSurface: { Self.isAccountURL(renderer.currentURL?.absoluteString) }
+        )
+    }
+
+    private func installChromiumNavigationLease(method: String, params: [String: Any]) -> Bool {
+        #if !KELPIE_WEBKIT_ONLY
+        if let renderer = context.renderer as? CEFRenderer, let bridge = renderer.bridge {
+            let count = bridge.documentNavigationCount()
+            let changesDocument = method == "navigate" || method == "reload"
+                || (method == "back" ? renderer.canGoBack : method == "forward" ? renderer.canGoForward : false)
+            let destination = method == "navigate" ? params["url"] as? String : nil
+            context.remoteNavigationWaitGuard = { [weak self] in
+                guard let self else { return false }
+                return self.authorized() && self.stillPinned() && self.active() && !self.accountSurface()
+                    && bridge.documentNavigationCount() <= count + 1
+            }
+            context.remoteNavigationReadGuard = { [weak self] in
+                guard let self, self.authorized(), self.stillPinned(), self.active(), !self.accountSurface(), !bridge.isLoading(),
+                      bridge.documentNavigationCount() == count + (changesDocument ? 1 : 0) else { return false }
+                return ConnectBrowser.navigationDestinationMatches(current: bridge.currentURL(), destination: destination)
+            }
+            return true
+        }
+        #endif
+        return false
+    }
+    #endif
 
     private func installWebKitNavigationLease(_ view: WKWebView, documentOwner: AnyObject) {
         let lease = ConnectNavigationLease(initial: expectedVersion)
