@@ -166,3 +166,9 @@ the official codeload tag URL with SHA-256
 0d8ef5af7f9794e3263480193c491549b2ba6cc74bb018906202ada498a79406.
 This replaces a release-asset URL that returned repeated HTTP 504 on both build
 hosts; it does not select another JSON version or add a network fallback.
+
+Windows hosts can observe BrowserSession::IsClosing() before IsClosed(). Retire
+the host session provider as soon as closing begins, while continuing the normal
+message pump and Tick until IsClosed(). This unblocks pending account/renewal
+work before the SDK waits for its shutdown barrier and preserves the containing
+app’s lifetime.

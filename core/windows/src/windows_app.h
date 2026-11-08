@@ -73,6 +73,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   bool ProcessMessage(const MSG& message);
   void Tick();
   void RequestClose();
+  bool IsClosing() const { return close_lifecycle_.requested(); }
   bool IsClosed() const { return close_lifecycle_.completed(); }
   HWND window() const { return shell_ ? shell_->hwnd() : nullptr; }
   void AttachTo(HWND parent);
