@@ -2,6 +2,11 @@
 # Build a WebKit-only consumer SDK, including the existing six native libraries.
 set -euo pipefail
 
+# Build tools receive paths and platform selection, never the developer's credential environment.
+if [ "${KELPIE_APPLE_SDK_CLEAN_ENV:-}" != 1 ]; then
+    exec env -i HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)" PATH="$PATH"         TMPDIR="${TMPDIR:-/tmp}" DEVELOPER_DIR="$(xcode-select -p)" KELPIE_APPLE_SDK_CLEAN_ENV=1         /bin/bash "$0" "$@"
+fi
+
 if [ "$#" -ne 3 ]; then
     echo "Usage: $0 <macosx|iphoneos|iphonesimulator> <arm64|x86_64> <new-output-directory>" >&2
     exit 2
