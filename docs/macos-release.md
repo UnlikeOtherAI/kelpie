@@ -25,3 +25,31 @@ Android and iOS CI are filtered to their app source, shared core/native/contract
 and relevant toolchain inputs. A Mac-only change or release-workflow edit does not
 build those apps. Workflow-only changes can be checked with Actionlint; their
 explicit `workflow_dispatch` entry points remain available for a platform build.
+
+## Direct-distribution signing
+
+Build the desired architecture with the existing UnlikeOtherAI Developer ID
+identity. Copy the completed app into a separate release staging directory, then
+run the inside-out signer from this repository:
+
+```sh
+node scripts/sign-macos-app.mjs --app /absolute/staging/Kelpie.app \
+  --identity "Developer ID Application: UnlikeOtherAI s.r.o. (23B7GTLBN7)" \
+  --team 23B7GTLBN7
+```
+
+The signer seals nested Mach-O files, their bundles and the containing app in
+that order, with hardened runtime and secure timestamps. It preserves the
+Chromium helper exceptions in `core/apple/Helpers/KelpieHelper.entitlements`;
+they never apply to the main app. Ad-hoc and development identities are rejected.
+`pnpm check:macos-signing` verifies the signing plan without accessing a certificate.
+
+Submit the staged app as a ZIP through `xcrun notarytool submit --wait` using
+the existing App Store Connect configuration on the signing Mac. Credentials
+stay outside the checkout. Require Accepted, staple and validate the app, then
+require `codesign --verify --deep --strict` and `spctl --assess --type execute`
+before publication. Recreate the published ZIP after stapling; verify its hash
+after downloading it. A successful Xcode signature alone is not notarization.
+
+This direct-distribution procedure is separate from the WebKit-only, sandboxed
+Store build described in [the browser core contract](../core/README.md).

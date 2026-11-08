@@ -4,6 +4,8 @@
 
 The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Apple Store builds use `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` as documented there. Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session. `pnpm check:embedding` checks that ownership boundary locally and in CI.
 
+Direct Mac artifacts use the inside-out signer and notarization checks in [Mac releases](docs/macos-release.md); `pnpm check:macos-signing` checks the signing plan without credentials.
+
 ## Source of Truth
 
 **Static docs — read these to understand the project:**
