@@ -10,4 +10,5 @@ case "$selectors" in ''|*[!A-Za-z0-9_.,/]*) echo "Invalid XCTest selectors" >&2;
 # Xcode's hosted Debug bundles reference the host's adjacent debug dylib.
 host_libraries="$(dirname "$(dirname "$bundle")")/MacOS"
 if [ ! -d "$host_libraries" ]; then host_libraries=''; fi
-exec env -i DYLD_LIBRARY_PATH="$host_libraries" HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)"     PATH=/usr/bin:/bin:/usr/sbin:/sbin     /usr/bin/xcrun xctest -XCTest "$selectors" "$bundle"
+runner="$(/usr/bin/xcrun --find xctest)"
+exec env -i DYLD_LIBRARY_PATH="$host_libraries" HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)"     PATH=/usr/bin:/bin:/usr/sbin:/sbin     "$runner" -XCTest "$selectors" "$bundle"
