@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(kelpie_windows VERSION 0.1.15 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.2.0 LANGUAGES CXX RC)
 include(CTest)
 
 add_subdirectory(../../core/windows kelpie-browser)
