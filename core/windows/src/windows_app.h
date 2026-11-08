@@ -76,6 +76,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void SetForeground(bool foreground);
   bool IsClosing() const { return close_lifecycle_.requested(); }
   bool IsClosed() const { return close_lifecycle_.completed(); }
+  const std::string& connection_installation_id() const { return connection_installation_id_; }
   HWND window() const { return shell_ ? shell_->hwnd() : nullptr; }
   void AttachTo(HWND parent);
 
@@ -126,6 +127,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
 
   HINSTANCE instance_;
   AppConfig config_;
+  std::string connection_installation_id_;
   std::atomic<bool> running_{true};
   CloseLifecycle close_lifecycle_;
 

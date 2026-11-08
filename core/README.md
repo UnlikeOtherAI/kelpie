@@ -105,6 +105,12 @@ local-only UI journey with `xcodebuild -scheme KelpieEmbeddingHost test` and a
 matching native destination; UI tests are excluded from CI. Generate
 the Mac fixture with the WebKit-only flag to verify the Store renderer path.
 
+A session exposes its stable, profile-scoped connection installation reference
+(`connectionInstallationID` on Apple, `connectionInstallationId` on Android and
+`connection_installation_id()` on Windows). A host can match that reference to
+its authenticated Nessie device inventory after connecting. The reference is
+not a credential and does not grant remote access.
+
 Use one browser session per process. Keep that session alive while opening and
 closing its presentation surfaces. Embedded iOS sessions leave external scenes
 to their host; only the standalone app enables the legacy TV display monitor.

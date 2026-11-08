@@ -4,6 +4,7 @@ import SwiftUI
 /// One browser runtime; each surface owns its tabs independently of its host view.
 @MainActor
 public final class KelpieBrowserSession: ObservableObject {
+    public let connectionInstallationID: String
     let browserState = BrowserState()
     let rendererState = RendererState()
     let serverState: ServerState
@@ -18,6 +19,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private var regions: [WeakBrowserRegion] = []
 
     public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true) {
+        connectionInstallationID = NessieConnection.shared.installationID
         serverState = ServerState(port: port)
         self.localControlEnabled = localControlEnabled
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }

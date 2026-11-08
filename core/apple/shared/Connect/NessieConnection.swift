@@ -375,7 +375,7 @@ final class NessieConnection: ObservableObject {
         generation = nil
     }
 
-    private var installationID: String {
+    var installationID: String {
         let defaults = KelpieStorage.defaults
         if let value = defaults.string(forKey: "nessie.connect.installation"), UUID(uuidString: value) != nil { return value }
         let value = UUID().uuidString

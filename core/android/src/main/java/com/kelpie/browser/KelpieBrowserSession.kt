@@ -65,6 +65,8 @@ class KelpieBrowserSession(
 ) {
     private val browserContext get() = KelpieEnvironment.context(activity)
     private val applicationContext get() = KelpieEnvironment.app
+    private val deviceInfo: DeviceInfo
+    val connectionInstallationId: String get() = deviceInfo.id
     private var closed = false
     private val browserView: ComposeView
     private val lifecycleObserver =
@@ -127,7 +129,7 @@ class KelpieBrowserSession(
         KelpieEnvironment.initialize(activity.applicationContext)
         uoaSession?.let(com.kelpie.browser.account.UOAAccount::useHostSession)
 
-        val deviceInfo = DeviceInfo.collect(browserContext)
+        deviceInfo = DeviceInfo.collect(browserContext)
         HomeStore.init(browserContext)
         BookmarkStore.init(browserContext)
         com.kelpie.browser.account.UOAAccount

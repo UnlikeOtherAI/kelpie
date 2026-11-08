@@ -301,6 +301,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   }
   // Public discovery must report the socket that actually bound, never only
   // the requested configuration value.
+  connection_installation_id_ = runtime.device_id;
   device_info_provider_.Configure(bound_port, config_.width, config_.height, runtime.app_version);
   startup_diagnostics_.Enter(StartupStage::kReadinessPublication);
   std::string readiness_error;

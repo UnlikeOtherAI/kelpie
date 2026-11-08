@@ -4,6 +4,7 @@ import UIKit
 /// Keeps the complete browser alive while its host chooses where to present it.
 @MainActor
 public final class KelpieBrowserSession: ObservableObject {
+    public let connectionInstallationID: String
     let browserState = BrowserState()
     let serverState: ServerState
     let tabStore: TabStore
@@ -14,6 +15,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private let runtimeID = UUID()
 
     public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true, externalDisplaysEnabled: Bool = false) {
+        connectionInstallationID = NessieConnection.shared.installationID
         let server = ServerState(port: port)
         serverState = server
         tabStore = TabStore(handlerContext: server.handlerContext)
