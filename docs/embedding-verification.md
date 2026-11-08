@@ -63,6 +63,7 @@ The extraction was exercised on 8 November 2026:
 | --- | --- | --- |
 | Maxis, Windows CEF | `0ba03f38` | Build and 56 native tests passed. |
 | Minis, Windows native host | `0ba03f38` | Two saved tabs retained their page across window moves; sign-in delegated to the host; browser close left the host running. Initial tab creation/navigation also passed at `b799295a`. |
+| Maxis signing, Minis signed Windows package | Native build `0ba03f38`, packager `752cfd0d` | The exact signed ZIP passed publisher, timestamp, profile EKU and matching CEF certificate checks. Native launch, new tab, address-bar navigation and normal close passed. Incorrect input hash was rejected before signing. |
 | Maxis, Android | `875b44f3`, then `fd361de1` | Full debug/release build, lint and 158 unit tests passed; version 0.2.0 build passed. |
 | Minis, API 35 tablet emulator, WebView 124 | `875b44f3`, then `fd361de1` | Late creation, two navigated tabs, reparenting, delegated sign-in, settings, close and reopen passed. The final 0.2.0 APK retained both pages across moves and close/reopen. |
 | dictator, iPad simulator | `17a1f494`, then `962ee0de` | Native embedding UI journey passed; final source build and focused account/resource tests passed. |
@@ -76,7 +77,9 @@ The extraction was exercised on 8 November 2026:
 Mac XCTest UI automation timed out enabling automation mode on this machine.
 The Mac native controls above were exercised through AppReveal, with native
 Accessibility keyboard input for the SwiftUI address field; a successful
-XCTest UI run is not claimed. The iPad XCTest UI journey did pass.
+XCTest UI run is not claimed. The iPad XCTest UI journey did pass. A full direct-CEF Mac unit run through
+`xcodebuild test` did not report test startup on this Mac; the two new regressions
+passed through direct `xctest`, and the earlier WebKit-only 226-test run passed.
 
 Physical phones and an iPad external monitor were not exercised. The iOS
 presentation API accepts a host-selected `UIWindowScene`; that API and container

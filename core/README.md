@@ -67,7 +67,9 @@ the host loop, and drain `RequestClose` before destruction. A hosted browser nev
 posts `WM_QUIT` to the containing app. CEF's bootstrap sandbox contract still applies.
 
 Windows Chromium hosts enter through `BootstrapBrowserHost`, preserving CEF's
-subprocess dispatch, SDK version and sandbox checks. Call
+subprocess dispatch, SDK version and sandbox checks. Signed Chromium hosts must
+sign their launcher, chrome_elf.dll and client DLL with the same primary
+certificate; see [Windows releases](../docs/windows-release.md). Call
 `kelpie_stage_browser_runtime(target)` to stage the matching runtime and, for a
 DLL consumer, its bootstrap launcher. The core never stages a standalone app
 launcher on its own. Embedded views leave resize, caption buttons and window
