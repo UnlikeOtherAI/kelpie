@@ -195,8 +195,7 @@ SwiftUI app, with the same recording gates and shortcuts. Switching to another
 host window or closing the session removes that menu. Hosts do not rebuild the
 browser’s menu actions or retain keyboard authority in an unrelated window.
 A scoped local key monitor gives those shortcuts precedence over duplicate host
-menu equivalents by asking the installed NSMenu to resolve the key event; it
-ignores other windows and attached sheets, and is removed
+menu equivalents; it ignores other windows and attached sheets, and is removed
 on terminal close. Closing the example host window retires its runtime; detaching
 the browser through its Close browser control still preserves tabs for reattachment.
 
