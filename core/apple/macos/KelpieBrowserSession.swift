@@ -10,6 +10,8 @@ public final class KelpieBrowserSession: ObservableObject {
     private let localControlEnabled: Bool
     private var started = false
     private var closed = false
+    var isClosed: Bool { closed }
+    private var browserMenu: EmbeddedBrowserMenu?
     private let runtimeID = UUID()
     private var surfaces: [WeakBrowserSurface] = []
     private var windows: [NSWindow] = []
@@ -66,6 +68,8 @@ public final class KelpieBrowserSession: ObservableObject {
     public func close() {
         guard !closed else { return }
         closed = true
+        browserMenu?.close()
+        browserMenu = nil
         KelpieBrowserProfile.release(runtimeID)
         NessieConnection.shared.detach(context: serverState.handlerContext)
         serverState.stop()
@@ -84,9 +88,16 @@ public final class KelpieBrowserSession: ObservableObject {
     }
 
     func register(region: NSView) {
+        guard !closed else { return }
         regions.removeAll { $0.view == nil }
         if !regions.contains(where: { $0.view === region }) { regions.append(WeakBrowserRegion(region)) }
+        if !KelpieStorage.standalone {
+            if browserMenu == nil { browserMenu = EmbeddedBrowserMenu(session: self) }
+            browserMenu?.refresh()
+        }
     }
+
+    func containsBrowser(in window: NSWindow) -> Bool { regions.contains { $0.view?.window === window } }
 
     private func contains(_ event: NSEvent) -> Bool {
         regions.contains { item in

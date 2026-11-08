@@ -178,3 +178,10 @@ runtime. Containing windows can use the normal app-model identity API; the SDK
 does not advertise a Vista baseline for that browser. iOS tab creation resolves
 its scoped website store inside the main actor rather than in a nonisolated
 default-argument expression.
+
+Embedded Mac surfaces install an SDK-owned Browser menu in the containing app’s
+existing main menu while their window is key. New/close tab, new window, bookmark,
+refresh, full screen and help use the same command definitions as the standalone
+SwiftUI app, with the same recording gates and shortcuts. Switching to another
+host window or closing the session removes that menu. Hosts do not rebuild the
+browser’s menu actions or retain keyboard authority in an unrelated window.

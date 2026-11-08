@@ -8,6 +8,11 @@ final class WeakBrowserRegion {
 }
 
 private final class BrowserRegionView: NSView {
+    weak var session: KelpieBrowserSession?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        session?.register(region: self)
+    }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
@@ -17,6 +22,7 @@ struct BrowserInteractionRegion: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let view = BrowserRegionView(frame: .zero)
+        view.session = session
         session.register(region: view)
         return view
     }
