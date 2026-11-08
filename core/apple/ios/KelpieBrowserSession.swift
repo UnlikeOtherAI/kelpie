@@ -11,6 +11,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private let externalDisplaysEnabled: Bool
     private var started = false
     private var closed = false
+    private let runtimeID = UUID()
 
     public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true, externalDisplaysEnabled: Bool = false) {
         let server = ServerState(port: port)
@@ -20,6 +21,7 @@ public final class KelpieBrowserSession: ObservableObject {
         self.localControlEnabled = localControlEnabled
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }
         self.externalDisplaysEnabled = externalDisplaysEnabled
+        KelpieBrowserProfile.acquire(runtimeID)
     }
 
     public static var supportedOrientations: UIInterfaceOrientationMask { OrientationManager.shared.lock }
@@ -65,10 +67,11 @@ public final class KelpieBrowserSession: ObservableObject {
     public func close() {
         guard !closed else { return }
         closed = true
+        KelpieBrowserProfile.release(runtimeID)
         NessieConnection.shared.detach(context: serverState.handlerContext)
         serverState.stop()
         _ = serverState.scriptPlaybackState.requestAbort()
-        serverState.router.invalidateAllBrowserReferences()
+        serverState.router.retire()
         NetworkTrafficStore.shared.flush()
         tabStore.closeAll()
         if externalDisplaysEnabled { ExternalDisplayManager.shared.detach() }

@@ -8,6 +8,7 @@ final class BrowserControlGateway {
     typealias Dispatch = @MainActor (String, [String: Any], Bool) async -> [String: Any]
     typealias Authorize = @MainActor ([String: Any], Bool) -> Bool
     private let handle: KelpieBrowserGatewayRef?
+    private var retired = false
     private let dispatch: Dispatch
     private let authorize: Authorize
     private let mutatingMethods: Set<String>
@@ -50,6 +51,12 @@ final class BrowserControlGateway {
         kelpie_browser_gateway_destroy(handle)
     }
 
+    func retire() {
+        retired = true
+        _ = cancel()
+        invalidate()
+    }
+
     func invalidate(tabId: String? = nil) {
         if let tabId { tabId.withCString { kelpie_browser_gateway_invalidate_refs(handle, $0) } } else { kelpie_browser_gateway_invalidate_refs(handle, nil) }
     }
@@ -72,6 +79,7 @@ final class BrowserControlGateway {
         authorizeAccountStep: Authorize? = nil,
         dispatchAccountStep: Dispatch? = nil
     ) async -> [String: Any] {
+        guard !retired else { return cancel() }
         guard lease?.begin() != false else {
             let failure: [String: Any] = ["version": 1, "ok": false, "error": ["code": "BUSY", "message": "A browser operation is pending", "mayHaveCompleted": false]]
             return mcp ? ["jsonrpc": "2.0", "id": body["id"] ?? NSNull(), "error": ["code": -32000, "message": "A browser operation is pending"]] : failure
@@ -88,6 +96,7 @@ final class BrowserControlGateway {
             mcp ? kelpie_browser_gateway_begin_mcp(handle, $0) : kelpie_browser_gateway_begin(handle, $0)
         })
         while true {
+            guard !retired else { return cancel() }
             switch step["kind"] as? String {
             case "complete":
                 // JSON-RPC notifications have no body; the HTTP layer emits an empty 202 response.
@@ -172,7 +181,7 @@ final class BrowserControlGateway {
                 Task { @MainActor in
                     let result = await (dispatchOverride ?? dispatch)(method, params, mutates)
                     lease?.retirePending()
-                    completion.finish(result)
+                    completion.finish(retired ? nil : result)
                 }
                 completion.timer = Task { @MainActor in
                     do { try await Task.sleep(nanoseconds: timeoutNanoseconds) } catch { return }

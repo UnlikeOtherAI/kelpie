@@ -8,7 +8,8 @@ import UIKit
 /// triggers are no-ops.
 @MainActor
 final class OpenAIEndpointMonitor {
-    static let shared = OpenAIEndpointMonitor()
+    private static let instance = KelpieProfileValue<OpenAIEndpointMonitor>()
+    static var shared: OpenAIEndpointMonitor { instance.get { OpenAIEndpointMonitor() } }
 
     private let service = OpenAIEndpointService.shared
     private var pathMonitor: NWPathMonitor?
@@ -37,6 +38,13 @@ final class OpenAIEndpointMonitor {
         }
         monitor.start(queue: DispatchQueue(label: "com.unlikeotherai.kelpie.openai-path"))
         pathMonitor = monitor
+    }
+
+    func stop() {
+        pathMonitor?.cancel()
+        pathMonitor = nil
+        if let becameActiveObserver { NotificationCenter.default.removeObserver(becameActiveObserver) }
+        becameActiveObserver = nil
     }
 
     private func pathChanged(to status: NWPath.Status) {

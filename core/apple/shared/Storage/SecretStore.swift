@@ -15,7 +15,8 @@ import Foundation
 /// `NSFileProtectionComplete` (iOS) and chmod 0600 (macOS) to prevent
 /// plaintext exfiltration via app backups or shared sandbox snapshots.
 final class SecretStore {
-    static let shared = SecretStore()
+    private static let instance = KelpieProfileValue<SecretStore>()
+    static var shared: SecretStore { instance.get { SecretStore() } }
 
     private enum Const {
         static let keyDefaultsKey = "secretstore.key.v1"

@@ -62,7 +62,8 @@ struct AINativeModelCard: Identifiable, Equatable {
 
 @MainActor
 final class AIState: ObservableObject {
-    static let shared = AIState()
+    private static let instance = KelpieProfileValue<AIState>()
+    static var shared: AIState { instance.get { AIState() } }
 
     @Published private(set) var isAvailable: Bool
     let isAppleSilicon: Bool
@@ -74,12 +75,16 @@ final class AIState: ObservableObject {
     @Published private(set) var nativeModelCards: [AINativeModelCard] = []
     @Published private(set) var ollamaModels: [AIOllamaModel] = []
     @Published private(set) var lastError: String?
+    private let secrets = SecretStore.shared
+    private let profileDefaults = KelpieStorage.defaults
+    private let endpointService = OpenAIEndpointService.shared
+
     @Published var huggingFaceToken: String {
         didSet {
             if huggingFaceToken.isEmpty {
-                SecretStore.shared.remove(SecretKey.huggingFaceToken)
+                secrets.remove(SecretKey.huggingFaceToken)
             } else {
-                SecretStore.shared.set(SecretKey.huggingFaceToken, value: huggingFaceToken)
+                secrets.set(SecretKey.huggingFaceToken, value: huggingFaceToken)
             }
         }
     }
@@ -135,6 +140,14 @@ final class AIState: ObservableObject {
             }
         }
         return store.get(SecretKey.huggingFaceToken) ?? ""
+    }
+
+    func retireProfile() {
+        refreshTask?.cancel()
+        refreshTask = nil
+        downloadTasks.values.forEach { $0.cancel() }
+        downloadTasks = [:]
+        router = nil
     }
 
     func configure(router: Router) {

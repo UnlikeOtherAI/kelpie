@@ -8,7 +8,8 @@ import AppKit
 /// persisted to the Caches directory so they survive across launches.
 @MainActor
 final class FaviconCache: ObservableObject {
-    static let shared = FaviconCache()
+    private static let instance = KelpieProfileValue<FaviconCache>()
+    static var shared: FaviconCache { instance.get { FaviconCache() } }
 
     @Published private(set) var images: [String: NSImage] = [:]
 

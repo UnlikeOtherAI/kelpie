@@ -4,6 +4,7 @@ import AppKit
 /// Shared context providing access to the active renderer for all handlers.
 @MainActor
 final class HandlerContext {
+    let profileID = KelpieStorage.profileID
     weak var browserRouter: Router?
     /// A remote job's isolated context can only resolve its pinned document.
     var remoteDocumentGuard: (() -> Bool)?

@@ -5,6 +5,8 @@ typealias RouteHandler = @MainActor @Sendable ([String: Any]) async -> [String: 
 
 /// Maps POST /v1/{method} paths to handler functions.
 final class Router: @unchecked Sendable {
+    private let profileID = KelpieStorage.profileID
+    @MainActor private var retired = false
     weak var browserReferenceOwner: Router?
     private var routes: [String: RouteHandler] = [:]
     var handlerContext: HandlerContext?
@@ -14,6 +16,13 @@ final class Router: @unchecked Sendable {
     let browserLease = BrowserControlLease()
     @MainActor var browserGateways: [WeakBrowserGateway] = []
     var registeredMethods: [String] { Array(routes.keys) }
+
+    @MainActor
+    func retire() {
+        retired = true
+        for entry in browserGateways { entry.gateway?.retire() }
+        invalidateAllBrowserReferences()
+    }
 
     func register(_ method: String, handler: @escaping RouteHandler) {
         routes[method] = handler
@@ -31,6 +40,9 @@ final class Router: @unchecked Sendable {
         bypassRecordingGate: Bool = false,
         browserGatewayDispatch: Bool = false
     ) async -> (statusCode: Int, json: [String: Any]) {
+        guard !retired, profileID == KelpieStorage.profileID, browserReferenceOwner?.retired != true else {
+            return (410, errorResponse(code: "BROWSER_CLOSED", message: "Browser session is closed"))
+        }
         if let owner = browserReferenceOwner, !browserGatewayDispatch {
             guard owner.browserLease.begin() else {
                 return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))

@@ -3,7 +3,8 @@ import Foundation
 
 @MainActor
 final class AIState: ObservableObject {
-    static let shared = AIState()
+    private static let instance = KelpieProfileValue<AIState>()
+    static var shared: AIState { instance.get { AIState() } }
 
     private enum DefaultsKey {
         static let backend = "ai.backend"
@@ -21,35 +22,39 @@ final class AIState: ObservableObject {
 
     let isAvailable: Bool
 
+    private let secrets = SecretStore.shared
+    private let profileDefaults = KelpieStorage.defaults
+    private let endpointService = OpenAIEndpointService.shared
+
     @Published var huggingFaceToken: String {
         didSet {
             if huggingFaceToken.isEmpty {
-                SecretStore.shared.remove(SecretKey.huggingFaceToken)
+                secrets.remove(SecretKey.huggingFaceToken)
             } else {
-                SecretStore.shared.set(SecretKey.huggingFaceToken, value: huggingFaceToken)
+                secrets.set(SecretKey.huggingFaceToken, value: huggingFaceToken)
             }
         }
     }
 
     @Published var backend: String {
         didSet {
-            KelpieStorage.defaults.set(backend, forKey: DefaultsKey.backend)
+            profileDefaults.set(backend, forKey: DefaultsKey.backend)
         }
     }
 
     @Published var activeModel: String? {
         didSet {
             if let activeModel {
-                KelpieStorage.defaults.set(activeModel, forKey: DefaultsKey.activeModel)
+                profileDefaults.set(activeModel, forKey: DefaultsKey.activeModel)
             } else {
-                KelpieStorage.defaults.removeObject(forKey: DefaultsKey.activeModel)
+                profileDefaults.removeObject(forKey: DefaultsKey.activeModel)
             }
         }
     }
 
     var ollamaEndpoint: String {
         get {
-            let stored = KelpieStorage.defaults.string(forKey: DefaultsKey.ollamaEndpoint)
+            let stored = profileDefaults.string(forKey: DefaultsKey.ollamaEndpoint)
             return stored?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
                 // swiftlint:disable:next force_unwrapping
                 ? stored!
@@ -57,7 +62,7 @@ final class AIState: ObservableObject {
         }
         set {
             let normalized = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            KelpieStorage.defaults.set(
+            profileDefaults.set(
                 normalized.isEmpty ? Self.defaultOllamaEndpoint : normalized,
                 forKey: DefaultsKey.ollamaEndpoint
             )
@@ -135,6 +140,11 @@ final class AIState: ObservableObject {
         syncOpenAISelection()
     }
 
+    func retireProfile() {
+        selectionGeneration += 1
+        cancellables.removeAll()
+    }
+
     func activatePlatform() {
         selectionGeneration += 1
         backend = "platform"
@@ -173,7 +183,7 @@ final class AIState: ObservableObject {
         guard backend == "openai" else { return }
         let generation = selectionGeneration
         Task { @MainActor [weak self] in
-            let active = await OpenAIEndpointService.shared.activeEndpoint()
+            let active = await self?.endpointService.activeEndpoint()
             guard let self, generation == self.selectionGeneration, self.backend == "openai" else { return }
             if let active {
                 self.activeModel = active.model

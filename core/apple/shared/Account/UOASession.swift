@@ -21,9 +21,10 @@ protocol UOASessionStorage: AnyObject {
 /// Encrypted file storage through `SecretStore` — never the Keychain.
 final class UOASecretSessionStorage: UOASessionStorage {
     static let key = "uoa.session.v1"
+    private let secrets = SecretStore.shared
 
     func load() -> UOAStoredSession? {
-        guard let raw = SecretStore.shared.get(Self.key),
+        guard let raw = secrets.get(Self.key),
               let session = try? JSONDecoder().decode(UOAStoredSession.self, from: Data(raw.utf8)),
               !session.clientID.isEmpty, !session.refreshToken.isEmpty else { return nil }
         return session
@@ -31,10 +32,10 @@ final class UOASecretSessionStorage: UOASessionStorage {
 
     func save(_ session: UOAStoredSession) {
         guard let data = try? JSONEncoder().encode(session), let raw = String(data: data, encoding: .utf8) else { return }
-        SecretStore.shared.set(Self.key, value: raw)
+        secrets.set(Self.key, value: raw)
     }
 
-    func clear() { SecretStore.shared.remove(Self.key) }
+    func clear() { secrets.remove(Self.key) }
 }
 
 /// A successful `/oauth/token` response from either the code or the refresh grant.

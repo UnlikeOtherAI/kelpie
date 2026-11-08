@@ -43,7 +43,8 @@ struct AIEndpointForm: Equatable {
 /// the panel and remote API callers share one code path.
 @MainActor
 final class AIEndpointState: ObservableObject {
-    static let shared = AIEndpointState()
+    private static let instance = KelpieProfileValue<AIEndpointState>()
+    static var shared: AIEndpointState { instance.get { AIEndpointState() } }
 
     @Published private(set) var cards: [AIEndpointCard] = []
     @Published private(set) var working: Set<String> = []
@@ -72,6 +73,16 @@ final class AIEndpointState: ObservableObject {
             Task { @MainActor in self?.networkChanged(path.status) }
         }
         pathMonitor.start(queue: DispatchQueue(label: "com.kelpie.ai.endpoints.path"))
+    }
+
+    func retireProfile() {
+        pathMonitor.cancel()
+        observers.forEach {
+            NotificationCenter.default.removeObserver($0)
+            NSWorkspace.shared.notificationCenter.removeObserver($0)
+        }
+        observers = []
+        router = nil
     }
 
     func configure(router: Router) {

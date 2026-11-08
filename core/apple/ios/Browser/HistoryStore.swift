@@ -5,7 +5,8 @@ import Foundation
 /// Xcode still needs the bridge and static libs configured manually; see apps/ios/NATIVE_INTEGRATION.md.
 @MainActor
 final class HistoryStore: ObservableObject {
-    static let shared = HistoryStore()
+    private static let instance = KelpieProfileValue<HistoryStore>()
+    static var shared: HistoryStore { instance.get { HistoryStore() } }
 
     struct HistoryEntry: Identifiable, Codable {
         let id: UUID
@@ -34,6 +35,8 @@ final class HistoryStore: ObservableObject {
     private static let maxEntries = 500
     private let key = "kelpie_history"
     private let handle: KelpieHistoryStoreRef
+
+    private let defaults = KelpieStorage.defaults
 
     private init() {
         guard let handle = kelpie_history_store_create() else {
@@ -151,14 +154,14 @@ final class HistoryStore: ObservableObject {
         guard let json = encodeEntriesForNative(entries) else {
             return
         }
-        KelpieStorage.defaults.set(Data(json.utf8), forKey: key)
+        defaults.set(Data(json.utf8), forKey: key)
     }
 
     private func persistedData() -> Data? {
-        if let data = KelpieStorage.defaults.data(forKey: key) {
+        if let data = defaults.data(forKey: key) {
             return data
         }
-        if let string = KelpieStorage.defaults.string(forKey: key) {
+        if let string = defaults.string(forKey: key) {
             return Data(string.utf8)
         }
         return nil

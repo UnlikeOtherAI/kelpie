@@ -5,7 +5,8 @@ import Combine
 /// persisted material is UOA's rotating refresh token and the client id it is bound to.
 @MainActor
 final class UOAAccount: ObservableObject {
-    static let shared = UOAAccount()
+    private static let instance = KelpieProfileValue<UOAAccount>()
+    static var shared: UOAAccount { instance.get { UOAAccount() } }
     typealias Transport = (_ path: String, _ method: String, _ token: String?, _ body: Data?, _ version: String?) async throws -> UOATransport.Response
 
     struct Profile: Decodable {
@@ -38,6 +39,13 @@ final class UOAAccount: ObservableObject {
     private var expiresAt = Date.distantPast
     private var hostSession: KelpieUOASession?
     private var hostSubscription: AnyCancellable?
+
+    func retireProfile() {
+        hostSubscription?.cancel()
+        hostSubscription = nil
+        reset(clearStorage: false)
+        hostSession = nil
+    }
 
     func useHostSession(_ session: KelpieUOASession) {
         reset(clearStorage: false)

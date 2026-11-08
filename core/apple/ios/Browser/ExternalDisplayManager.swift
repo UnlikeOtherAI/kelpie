@@ -11,7 +11,8 @@ extension Notification.Name {
 
 @MainActor
 final class ExternalDisplayManager: ObservableObject {
-    static let shared = ExternalDisplayManager()
+    private static let instance = KelpieProfileValue<ExternalDisplayManager>()
+    static var shared: ExternalDisplayManager { instance.get { ExternalDisplayManager() } }
     static let debugTVSize = CGSize(width: 1920, height: 1080)
 
     @Published private(set) var isConnected = false

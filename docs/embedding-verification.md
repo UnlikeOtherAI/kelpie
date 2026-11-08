@@ -115,3 +115,14 @@ playback, invalidates browser references, flushes traffic and closes owned tabs
 and windows. A closed session cannot create a new surface; create a new session
 for a new runtime. Moving a controller between containers retains its session.
 This teardown API alone does not select a different person's local browser profile.
+
+Before opening a signed-in Apple browser, call
+`try await KelpieBrowserProfile.activate(issuer:subject:)` from the host's current
+UOA grant. Close the previous runtime and retire its provider before changing
+people. A profile owns its preference suite, files, secrets, website data store,
+history, bookmarks, inference configuration and partition mappings. Retained
+writers keep the original store; old routers refuse work after a profile change.
+The same issuer/subject preserves that person's data across proof or team changes.
+Concurrent runtimes and profile transitions are refused. The Mac profile API
+requires the WebKit-only consumer build; CEF's process data directory cannot be
+replaced after bootstrap. Standalone browser storage remains unchanged.

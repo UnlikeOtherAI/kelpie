@@ -5,7 +5,8 @@ import Foundation
 /// use the leaf projection; account data never overwrites the local collection.
 @MainActor
 final class BookmarkStore: ObservableObject {
-    static let shared = BookmarkStore()
+    private static let instance = KelpieProfileValue<BookmarkStore>()
+    static var shared: BookmarkStore { instance.get { BookmarkStore() } }
     @Published private(set) var nodes: [Bookmark] = []
     var bookmarks: [Bookmark] { nodes.filter { !$0.isFolder } }
     @Published private(set) var syncError: String?

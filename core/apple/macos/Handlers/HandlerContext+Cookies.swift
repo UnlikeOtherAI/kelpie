@@ -22,7 +22,7 @@ extension HandlerContext {
     }
 
     func allCookies() async -> [HTTPCookie] {
-        guard let renderer else { return [] }
+        guard profileID == KelpieStorage.profileID, let renderer else { return [] }
         if activeRendererIsPartitioned {
             return await renderer.allCookies()
         }
@@ -33,9 +33,9 @@ extension HandlerContext {
     }
 
     func setCookie(_ cookie: HTTPCookie) async {
-        guard let renderer else { return }
+        guard profileID == KelpieStorage.profileID, let renderer else { return }
         await renderer.setCookies([cookie])
-        guard !activeRendererIsPartitioned else { return }
+        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
 
         if renderer.engineName == "chromium" {
             var merged = SharedCookieJar.load().cookies
@@ -56,9 +56,9 @@ extension HandlerContext {
     }
 
     func deleteCookie(_ cookie: HTTPCookie) async {
-        guard let renderer else { return }
+        guard profileID == KelpieStorage.profileID, let renderer else { return }
         await renderer.deleteCookie(cookie)
-        guard !activeRendererIsPartitioned else { return }
+        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
 
         if renderer.engineName == "chromium" {
             var merged = SharedCookieJar.load().cookies
@@ -78,9 +78,9 @@ extension HandlerContext {
     }
 
     func deleteAllCookies() async {
-        guard let renderer else { return }
+        guard profileID == KelpieStorage.profileID, let renderer else { return }
         await renderer.deleteAllCookies()
-        guard !activeRendererIsPartitioned else { return }
+        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
 
         if renderer.engineName == "chromium" {
             SharedCookieJar.save(cookies: [])
@@ -94,8 +94,8 @@ extension HandlerContext {
     }
 
     func syncSharedCookiesIntoRenderer(force: Bool = false) async {
-        guard let renderer else { return }
-        guard !activeRendererIsPartitioned else { return }
+        guard profileID == KelpieStorage.profileID, let renderer else { return }
+        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
         let snapshot = SharedCookieJar.load()
 
         if !force,
@@ -118,10 +118,11 @@ extension HandlerContext {
     }
 
     func persistRendererCookiesToSharedJar() async {
-        guard let renderer else { return }
+        guard profileID == KelpieStorage.profileID, let renderer else { return }
         guard renderer.engineName != "chromium" else { return }
-        guard !activeRendererIsPartitioned else { return }
+        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
         let cookies = await renderer.allCookies()
+        guard profileID == KelpieStorage.profileID else { return }
         let signature = SharedCookieJar.signature(for: cookies)
         if signature == lastSharedCookieSignature { return }
 

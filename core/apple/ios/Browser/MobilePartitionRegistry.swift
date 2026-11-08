@@ -5,7 +5,8 @@ import WebKit
 /// Website identity is shared by default. Named stores never fall back to it.
 @MainActor
 final class MobilePartitionRegistry {
-    static let shared = MobilePartitionRegistry()
+    private static let instance = KelpieProfileValue<MobilePartitionRegistry>()
+    static var shared: MobilePartitionRegistry { instance.get { MobilePartitionRegistry() } }
     private let defaults: UserDefaults
     private let key = "mobilePartitionIdentifiers"
     private var map: PartitionMap

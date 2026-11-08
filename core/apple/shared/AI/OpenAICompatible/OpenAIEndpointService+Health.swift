@@ -216,7 +216,7 @@ extension OpenAIEndpointService {
 
     func restartPolling() {
         pollTask?.cancel()
-        guard let endpointId = active?.endpointId else {
+        guard !retired, let endpointId = active?.endpointId else {
             pollTask = nil
             return
         }

@@ -3,7 +3,8 @@ import Foundation
 
 /// Captures HTTP request/response traffic via JS injection for the network inspector.
 final class NetworkTrafficStore: ObservableObject {
-    static let shared = NetworkTrafficStore()
+    private static let instance = KelpieProfileValue<NetworkTrafficStore>()
+    static var shared: NetworkTrafficStore { instance.get { NetworkTrafficStore() } }
 
     struct TrafficEntry: Identifiable, Codable, Sendable {
         let id: UUID

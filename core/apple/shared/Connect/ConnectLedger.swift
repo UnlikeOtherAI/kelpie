@@ -3,11 +3,12 @@ import Foundation
 
 @MainActor
 final class ConnectLedger {
+    private let secrets = SecretStore.shared
     private let handle: KelpieConnectRef
     private static let key = "nessie.connect.journal.v1"
 
     init(owner: String) throws {
-        let saved = SecretStore.shared.get(Self.key) ?? ""
+        let saved = secrets.get(Self.key) ?? ""
         guard let handle = kelpie_connect_create(saved, owner) else { throw Failure.journal }
         self.handle = handle
     }
@@ -26,7 +27,7 @@ final class ConnectLedger {
         }
         let data = try JSONSerialization.data(withJSONObject: state)
         guard let encodedState = String(data: data, encoding: .utf8) else { throw Failure.protocolViolation }
-        try SecretStore.shared.setDurably(Self.key, value: encodedState)
+        try secrets.setDurably(Self.key, value: encodedState)
         return decision
     }
 

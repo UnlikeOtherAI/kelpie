@@ -6,11 +6,12 @@ import Foundation
 /// Health probing, testing and polling live in
 /// `OpenAIEndpointService+Health.swift`.
 actor OpenAIEndpointService {
-    static let shared = OpenAIEndpointService(
+    private static let instance = KelpieProfileValue<OpenAIEndpointService>()
+    static var shared: OpenAIEndpointService { instance.get { OpenAIEndpointService(
         persistence: OpenAIEndpointPersistence(defaults: KelpieStorage.defaults),
         secrets: SecretStore.shared,
         transport: URLSessionOpenAITransport.shared
-    )
+    ) } }
 
     struct Draft: Sendable {
         var id: String?
@@ -35,6 +36,7 @@ actor OpenAIEndpointService {
     var inFlight: [String: Int] = [:]
     var runs: [UUID: Task<Void, Never>] = [:]
     var pollTask: Task<Void, Never>?
+    var retired = false
 
     init(persistence: OpenAIEndpointPersistence, secrets: OpenAISecretStoring, transport: OpenAIHTTPTransport) {
         self.persistence = persistence
@@ -209,6 +211,13 @@ actor OpenAIEndpointService {
         case .failure(let error): throw UnifiedError.map(error, cancelled: task.isCancelled)
         case nil: throw OpenAIEndpointError.cancelled
         }
+    }
+
+    func retireProfile() {
+        retired = true
+        pollTask?.cancel()
+        pollTask = nil
+        _ = cancelAll()
     }
 
     func cancelAll() -> Int {

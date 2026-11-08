@@ -3,7 +3,8 @@ import Foundation
 
 /// The same bounded, cancellable GGUF runtime used by Android and Windows.
 final class LocalInference: @unchecked Sendable {
-    static let shared = LocalInference()
+    private static let instance = KelpieProfileValue<LocalInference>()
+    static var shared: LocalInference { instance.get { LocalInference() } }
     private let engine = kelpie_local_create()
     private let queue = DispatchQueue(label: "kelpie.local-inference", qos: .userInitiated, attributes: .concurrent)
 
@@ -45,20 +46,22 @@ final class LocalInference: @unchecked Sendable {
         if size * 3 / 2 + 256 * 1024 * 1024 > availableMemory {
             return errorResponse(code: "MODEL_MEMORY_LIMIT", message: "Use a smaller GGUF model or a LAN inference endpoint")
         }
+        let profile = KelpieStorage.profileID
+        let endpointService = OpenAIEndpointService.shared
         let result = await execute("load", body: body)
+        guard profile == KelpieStorage.profileID else { return errorResponse(code: "BROWSER_CLOSED", message: "Browser profile was retired") }
         if result["success"] as? Bool == true {
-            await OpenAIEndpointService.shared.clearActive()
+            await endpointService.clearActive()
             await MainActor.run { AIState.shared.activateNative(model: path) }
         }
         return result
     }
 
     func importModel(_ url: URL) async throws -> String {
-        try await Task.detached {
+        let directory = KelpieStorage.documentsDirectory.appendingPathComponent("local-models", isDirectory: true)
+        return try await Task.detached {
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
-            let directory = KelpieStorage.documentsDirectory
-                .appendingPathComponent("local-models", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let file = directory.appendingPathComponent(UUID().uuidString + ".gguf")
             do {

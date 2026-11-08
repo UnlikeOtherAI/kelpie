@@ -4,7 +4,8 @@ import Foundation
 /// In-memory navigation history with persistence to UserDefaults.
 @MainActor
 final class HistoryStore: ObservableObject {
-    static let shared = HistoryStore()
+    private static let instance = KelpieProfileValue<HistoryStore>()
+    static var shared: HistoryStore { instance.get { HistoryStore() } }
 
     struct HistoryEntry: Identifiable, Codable {
         let id: UUID
@@ -76,6 +77,8 @@ final class HistoryStore: ObservableObject {
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
     }()
+
+    private let defaults = KelpieStorage.defaults
 
     private init() {
         load()
@@ -175,7 +178,7 @@ final class HistoryStore: ObservableObject {
 
     private func persist() {
         let payload = Self.jsonData(from: entries.map(Self.persistedJSONObject)) ?? Data("[]".utf8)
-        KelpieStorage.defaults.set(payload, forKey: key)
+        defaults.set(payload, forKey: key)
     }
 
     private func exportedJSON() -> String? {
@@ -186,11 +189,11 @@ final class HistoryStore: ObservableObject {
     }
 
     private func loadPersistedJSON() -> String? {
-        if let data = KelpieStorage.defaults.data(forKey: key) {
+        if let data = defaults.data(forKey: key) {
             return normalizedPersistedJSON(from: data)
         }
 
-        if let string = KelpieStorage.defaults.string(forKey: key) {
+        if let string = defaults.string(forKey: key) {
             return normalizedPersistedJSON(from: Data(string.utf8))
         }
 

@@ -10,6 +10,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private let localControlEnabled: Bool
     private var started = false
     private var closed = false
+    private let runtimeID = UUID()
     private var surfaces: [WeakBrowserSurface] = []
     private var windows: [NSWindow] = []
     private var regions: [WeakBrowserRegion] = []
@@ -18,6 +19,7 @@ public final class KelpieBrowserSession: ObservableObject {
         serverState = ServerState(port: port)
         self.localControlEnabled = localControlEnabled
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }
+        KelpieBrowserProfile.acquire(runtimeID)
     }
 
     /// Preserves the standalone CLI launch contract, including background launches.
@@ -64,10 +66,12 @@ public final class KelpieBrowserSession: ObservableObject {
     public func close() {
         guard !closed else { return }
         closed = true
+        KelpieBrowserProfile.release(runtimeID)
         NessieConnection.shared.detach(context: serverState.handlerContext)
         serverState.stop()
+        serverState.handlerContext.stopSharedCookieSync()
         _ = serverState.scriptPlaybackState.requestAbort()
-        serverState.router.invalidateAllBrowserReferences()
+        serverState.router.retire()
         NetworkTrafficStore.shared.flush()
         for surface in surfaces.compactMap({ $0.value }) {
             surface.tabs.closeAll()

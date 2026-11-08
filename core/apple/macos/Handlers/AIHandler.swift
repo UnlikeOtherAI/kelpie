@@ -1,7 +1,8 @@
 import Foundation
 
 actor AIBackendStore {
-    static let shared = AIBackendStore()
+    private static let instance = KelpieProfileValue<AIBackendStore>()
+    static var shared: AIBackendStore { instance.get { AIBackendStore() } }
 
     struct Snapshot {
         let backend: String?

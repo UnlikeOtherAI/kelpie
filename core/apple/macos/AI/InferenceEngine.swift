@@ -3,7 +3,8 @@ import Foundation
 
 /// Process-level singleton. Heavy work stays off the main thread.
 final class InferenceEngine: ObservableObject, @unchecked Sendable {
-    static let shared = InferenceEngine()
+    private static let instance = KelpieProfileValue<InferenceEngine>()
+    static var shared: InferenceEngine { instance.get { InferenceEngine() } }
 
     @MainActor @Published private(set) var isLoaded = false
     @MainActor @Published private(set) var modelName: String?

@@ -16,7 +16,8 @@ import WebKit
 /// refcount pinning a partition that has no tabs.
 @MainActor
 final class PartitionRegistry {
-    static let shared = PartitionRegistry()
+    private static let instance = KelpieProfileValue<PartitionRegistry>()
+    static var shared: PartitionRegistry { instance.get { PartitionRegistry() } }
 
     /// A resolved partition, ready to be handed to a new tab's renderer.
     struct Resolution {
@@ -63,8 +64,10 @@ final class PartitionRegistry {
     /// constant across the whole sequence, so the id is what the guard keys on.
     private var deletingIds: Set<String> = []
 
+    private let defaults = KelpieStorage.defaults
+
     private init() {
-        let raw = KelpieStorage.defaults.dictionary(forKey: Self.mapDefaultsKey) as? [String: String] ?? [:]
+        let raw = defaults.dictionary(forKey: Self.mapDefaultsKey) as? [String: String] ?? [:]
         let decoded = PartitionMap.decode(raw)
         map = decoded.map
         for warning in decoded.warnings {
@@ -310,6 +313,6 @@ final class PartitionRegistry {
     }
 
     private func persistMap() {
-        KelpieStorage.defaults.set(map.encoded(), forKey: Self.mapDefaultsKey)
+        defaults.set(map.encoded(), forKey: Self.mapDefaultsKey)
     }
 }

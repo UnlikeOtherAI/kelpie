@@ -4,7 +4,8 @@ import WebKit
 /// Embedded browser cookies and page storage never join the host WebView's profile.
 @MainActor
 enum KelpieWebsiteData {
-    static let store: WKWebsiteDataStore = {
+    private static let instance = KelpieProfileValue<WKWebsiteDataStore>()
+    static var store: WKWebsiteDataStore { instance.get {
         if KelpieStorage.standalone { return .default() }
         if #available(iOS 17.0, macOS 14.0, *) {
             let key = "kelpie.browser.website-store"
@@ -19,5 +20,5 @@ enum KelpieWebsiteData {
         }
         // iOS 16 cannot persist a second isolated WebKit profile.
         return .nonPersistent()
-    }()
+    } }
 }
