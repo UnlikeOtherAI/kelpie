@@ -19,6 +19,7 @@ case "$sdk:$arch" in
     *) echo "Unsupported Apple SDK/architecture" >&2; exit 2 ;;
 esac
 root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
 case "$out" in /*) ;; *) echo "Output directory must be absolute" >&2; exit 2 ;; esac
 if [ -e "$out" ]; then echo "Output already exists: $out" >&2; exit 2; fi
 revision="$(git -C "$root" rev-parse HEAD)"
