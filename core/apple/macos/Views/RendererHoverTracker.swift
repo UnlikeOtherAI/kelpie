@@ -57,6 +57,8 @@ final class RendererHoverTracker: NSObject {
         }
     }
 
+    @objc func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+
     @objc func mouseExited(with event: NSEvent) { clear() }
 
     func clear() {
