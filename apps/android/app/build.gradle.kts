@@ -24,7 +24,6 @@ android {
         versionName = "0.1.19"
         buildConfigField("int", "LOCAL_HTTP_PORT", "8420")
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
-
     }
 
     buildTypes {
@@ -53,8 +52,6 @@ android {
         compose = true
         buildConfig = true
     }
-
-
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.10"

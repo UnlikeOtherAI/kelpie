@@ -1,11 +1,11 @@
 package com.kelpie.browser
 
 import android.view.ViewGroup
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.activity.ComponentActivity
 import com.kelpie.browser.ai.AIHandler
 import com.kelpie.browser.browser.BookmarkStore
 import com.kelpie.browser.browser.HistoryStore
@@ -61,16 +61,17 @@ class KelpieBrowserSession(
     private val browserContext get() = KelpieEnvironment.context(activity)
     private val applicationContext get() = KelpieEnvironment.app
     private var closed = false
-    private lateinit var browserView: ComposeView
-    private val lifecycleObserver = LifecycleEventObserver { _, event ->
-        when (event) {
-            Lifecycle.Event.ON_RESUME -> onResume()
-            Lifecycle.Event.ON_PAUSE -> onPause()
-            Lifecycle.Event.ON_STOP -> onStop()
-            Lifecycle.Event.ON_DESTROY -> close()
-            else -> Unit
+    private val browserView: ComposeView
+    private val lifecycleObserver =
+        LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> onResume()
+                Lifecycle.Event.ON_PAUSE -> onPause()
+                Lifecycle.Event.ON_STOP -> onStop()
+                Lifecycle.Event.ON_DESTROY -> close()
+                else -> Unit
+            }
         }
-    }
 
     fun view(): ComposeView = browserView
 
@@ -109,8 +110,8 @@ class KelpieBrowserSession(
     private var httpServer: HTTPServer? = null
     private var mdnsAdvertiser: MDNSAdvertiser? = null
     private var networkStage: NetworkServiceStage? = null
-    private lateinit var pairingStore: PairingStore
-    private lateinit var pairingCoordinator: PairApprovalCoordinator
+    private val pairingStore: PairingStore
+    private val pairingCoordinator: PairApprovalCoordinator
 
     init {
         KelpieEnvironment.initialize(activity.applicationContext)
@@ -126,24 +127,24 @@ class KelpieBrowserSession(
         pairingStore = PairingStore.forContext(browserContext)
         pairingCoordinator = PairApprovalCoordinator(pairingStore)
 
-        browserView = ComposeView(browserContext).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-            KelpieTheme {
-                BrowserScreen(
-                    deviceInfo = deviceInfo,
-                    router = router,
-                    handlerContext = handlerContext,
-                    scriptPlaybackState = scriptPlaybackState,
-                    activity = activity,
-                    isServerRunning = httpServer?.isRunning == true,
-                    isMDNSAdvertising = mdnsAdvertiser?.isRegistered == true,
-                    pairingCoordinator = pairingCoordinator,
-                )
+        browserView =
+            ComposeView(browserContext).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                    KelpieTheme {
+                        BrowserScreen(
+                            deviceInfo = deviceInfo,
+                            router = router,
+                            handlerContext = handlerContext,
+                            scriptPlaybackState = scriptPlaybackState,
+                            activity = activity,
+                            isServerRunning = httpServer?.isRunning == true,
+                            isMDNSAdvertising = mdnsAdvertiser?.isRegistered == true,
+                            pairingCoordinator = pairingCoordinator,
+                        )
+                    }
+                }
             }
-        }
-
-        }
         registerHandlers(deviceInfo)
         com.kelpie.browser.connect.NessieConnection
             .start(browserContext, handlerContext)

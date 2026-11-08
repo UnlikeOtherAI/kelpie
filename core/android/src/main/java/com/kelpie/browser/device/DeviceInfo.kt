@@ -42,7 +42,11 @@ data class DeviceInfo(
                 ip = getLocalIpAddress(),
                 port = port,
                 version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "",
-                build = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toString(),
+                build =
+                    context.packageManager
+                        .getPackageInfo(context.packageName, 0)
+                        .longVersionCode
+                        .toString(),
             )
         }
 
