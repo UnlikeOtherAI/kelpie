@@ -12,6 +12,7 @@ class KelpieStorageContext(
 ) : ContextWrapper(base) {
     private val directory = "kelpie-browser/${KelpieEnvironment.profileID}"
     private val preferencePrefix = "kelpie.browser.${KelpieEnvironment.profileID}"
+
     override fun getApplicationContext(): Context = KelpieEnvironment.app
 
     override fun getFilesDir(): File = File(baseContext.filesDir, directory).apply { mkdirs() }
