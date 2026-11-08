@@ -20,6 +20,7 @@ Pod::Spec.new do |s|
     'DEFINES_MODULE' => 'YES',
     'BUILD_LIBRARY_FOR_DISTRIBUTION' => 'YES',
     'ENABLE_USER_SCRIPT_SANDBOXING' => 'NO',
+    'HEADER_SEARCH_PATHS' => '$(inherited) "$(PODS_TARGET_SRCROOT)/../native/core-protocol/include"',
     'SWIFT_INCLUDE_PATHS' => '$(inherited) "$(PODS_TARGET_SRCROOT)/Native"'
   }
   s.user_target_xcconfig = {
