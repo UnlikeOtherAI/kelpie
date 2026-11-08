@@ -35,7 +35,7 @@ Pod::Spec.new do |s|
     :name => 'Build Kelpie native core',
     :execution_position => :before_compile,
     :shell_path => '/bin/bash',
-    :show_env_vars_in_log => false,
+    :show_env_vars_in_log => '0',
     :script => 'bash "$PODS_TARGET_SRCROOT/build-pod-native.sh"',
     :input_files => inputs,
     :output_files => ['$(PODS_CONFIGURATION_BUILD_DIR)/KelpieBrowser/Native/libKelpieNative.a']
