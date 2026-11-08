@@ -61,6 +61,7 @@ class KelpieBrowserSession(
     private val activity: ComponentActivity,
     private val localControlEnabled: Boolean = true,
     uoaSession: com.kelpie.browser.account.KelpieUOASession? = null,
+    profileSubject: String? = uoaSession?.identity?.value?.subject,
 ) {
     private val browserContext get() = KelpieEnvironment.context(activity)
     private val applicationContext get() = KelpieEnvironment.app
@@ -119,7 +120,10 @@ class KelpieBrowserSession(
     private val pairingCoordinator: PairApprovalCoordinator
 
     init {
-        if (uoaSession != null) KelpieEnvironment.requireProfile(uoaSession.identity.value.subject)
+        if (uoaSession != null) {
+            KelpieEnvironment.requireProfile(profileSubject)
+            require(uoaSession.identity.value.subject == null || uoaSession.identity.value.subject == profileSubject)
+        }
         KelpieEnvironment.initialize(activity.applicationContext)
         uoaSession?.let(com.kelpie.browser.account.UOAAccount::useHostSession)
 

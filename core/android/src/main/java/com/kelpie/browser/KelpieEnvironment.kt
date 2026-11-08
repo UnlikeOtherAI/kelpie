@@ -14,7 +14,7 @@ object KelpieEnvironment {
         private set
     private var profileSubject: String? = null
 
-    /** Call only after the host verifies the bearer owner, before creating this process's browser. */
+    /** Selects local files before creating this process's browser; it grants no account or agent authority. */
     fun configureProfile(
         issuer: String,
         subject: String,

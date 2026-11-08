@@ -54,6 +54,12 @@ Android hosts include the Gradle library at `core/android`, create
 `KelpieBrowserSession(activity, uoaSession = ...)` when needed, and
 attach its view to their container. `KelpieBrowserActivity` is an optional full-window
 host. The application initializes `KelpieEnvironment` without subclassing its app.
+For local browsing without a live grant, select the local profile first and supply
+a host provider whose identity is signed out. Apple uses `KelpieBrowserProfile.activate`;
+Android uses `KelpieEnvironment.configureProfile` and the session's separate
+`profileSubject` argument. A cached subject selects local data only. Account
+requests and agent connections still require the host's verified live authorization.
+
 The session carries its own view lifecycle owners, supports creation after activity
 startup, and releases its composition and callbacks on close. The standalone
 package registers its OAuth callback; embedded hosts delegate sign-in to their UOA session.
