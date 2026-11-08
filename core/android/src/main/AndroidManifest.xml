@@ -17,14 +17,7 @@
     </queries>
 
     <application>
-        <activity android:name="com.kelpie.browser.account.AccountCallbackActivity" android:exported="true" android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.unlikeotherai.kelpie" android:host="oauth" android:path="/callback" />
-            </intent-filter>
-        </activity>
+        <activity android:name="com.kelpie.browser.account.AccountCallbackActivity" android:theme="@android:style/Theme.NoDisplay" />
         <activity android:name="com.kelpie.browser.account.AccountLoginActivity" android:exported="false" android:excludeFromRecents="true" android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <service

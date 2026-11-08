@@ -1,11 +1,15 @@
 package com.kelpie.browser
 
+import android.view.View
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.kelpie.browser.ai.AIHandler
 import com.kelpie.browser.browser.BookmarkStore
 import com.kelpie.browser.browser.HistoryStore
@@ -81,7 +85,8 @@ class KelpieBrowserSession(
     }
 
     private val accountLogin =
-        activity.registerForActivityResult(
+        activity.activityResultRegistry.register(
+            "com.unlikeotherai.kelpie.account-login",
             androidx.activity.result.contract.ActivityResultContracts
                 .StartActivityForResult(),
         ) { result ->
@@ -129,6 +134,10 @@ class KelpieBrowserSession(
 
         browserView =
             ComposeView(browserContext).apply {
+                id = View.generateViewId()
+                setViewTreeLifecycleOwner(activity)
+                setViewTreeViewModelStoreOwner(activity)
+                setViewTreeSavedStateRegistryOwner(activity)
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                 setContent {
                     KelpieTheme {
@@ -284,12 +293,16 @@ class KelpieBrowserSession(
         if (closed) return
         closed = true
         activity.lifecycle.removeObserver(lifecycleObserver)
+        accountLogin.unregister()
         com.kelpie.browser.connect.NessieConnection
             .detach(handlerContext)
         com.kelpie.browser.account.UOAAccount
             .detach(activity)
         handlerContext.dialogState.dismissPending()
-        handlerContext.tabStore?.destroyAllTabs()
+        val tabs = handlerContext.tabStore
+        browserView.disposeComposition()
+        (browserView.parent as? ViewGroup)?.removeView(browserView)
+        tabs?.destroyAllTabs()
         // Release this Activity's listener before its replacement binds the port.
         // Keep foreground promotion intact across configuration changes.
         networkStage?.let {

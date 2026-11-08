@@ -1,9 +1,9 @@
 package com.kelpie.browser.browser
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
 import android.webkit.WebView
+import com.kelpie.browser.kelpieActivity
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.WebSocketHandler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +15,7 @@ class TabStore(
     private val handlerContext: HandlerContext,
     private val browserState: BrowserState,
 ) {
-    private val previewSampler = (context as? Activity)?.window?.let(::ChromeSampler)
+    private val previewSampler = context.kelpieActivity()?.window?.let(::ChromeSampler)
     private val previewTabs = mutableListOf<String>()
 
     fun captureActivePreview() {

@@ -28,7 +28,10 @@ android {
 
     buildTypes {
         debug {
-            if (providers.gradleProperty("kelpieVerificationProfile").orNull == "true") {
+            if (providers.gradleProperty("kelpieEmbeddingVerificationProfile").orNull == "true") {
+                applicationIdSuffix = ".embeddingverify"
+                buildConfigField("int", "LOCAL_HTTP_PORT", "18431")
+            } else if (providers.gradleProperty("kelpieVerificationProfile").orNull == "true") {
                 applicationIdSuffix = ".nessieverify"
                 buildConfigField("int", "LOCAL_HTTP_PORT", "18420")
             }

@@ -34,9 +34,17 @@ its browser or account lifecycle. Chromium hosts also package
 the matching signed CEF framework and helper; the library does not install it.
 
 Android hosts include the Gradle library at `core/android`, create
-`KelpieBrowserSession(activity, uoaSession = ...)` before the activity starts, and
+`KelpieBrowserSession(activity, uoaSession = ...)` when needed, and
 attach its view to their container. `KelpieBrowserActivity` is an optional full-window
 host. The application initializes `KelpieEnvironment` without subclassing its app.
+The session carries its own view lifecycle owners, supports creation after activity
+startup, and releases its composition and callbacks on close. The standalone
+package registers its OAuth callback; embedded hosts delegate sign-in to their UOA session.
+
+For the debug-only Android host, build with `-PkelpieEmbeddingVerificationProfile=true`
+and launch `com.kelpie.browser.embeddingverify/com.kelpie.browser.EmbeddingHostActivity`.
+Open the browser after startup, move its view between containers, and close it
+without closing the host. This fixture is absent from release packages.
 
 Windows hosts link `Kelpie::Browser` from `core/windows` and include
 `kelpie/browser.h`. Set `AppConfig.hosted`, `parent_window` and `uoa_session`, then
