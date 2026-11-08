@@ -29,6 +29,17 @@ let kelpieApp = Target.target(
     )
 )
 
+let kelpieLibraryTestHost = Target.target(
+    name: "KelpieLibraryTestHost",
+    destinations: [.iPhone, .iPad],
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.tests.ios.host",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-test-host/**/*.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieTests = Target.target(
     name: "KelpieTests",
     destinations: [.iPhone, .iPad],
@@ -50,6 +61,7 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
     dependencies: [
+        .target(name: "KelpieLibraryTestHost"),
         .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
     ],
     settings: .settings(
@@ -87,6 +99,7 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
+        kelpieLibraryTestHost,
         kelpieTests,
         kelpieUITests,
     ],

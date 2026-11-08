@@ -12,7 +12,7 @@ final class UOALoginStorageTests: XCTestCase {
         defer { surface.close() }
         let window = try XCTUnwrap(NSApp.windows.first { !previousWindows.contains(ObjectIdentifier($0)) })
         let login = try XCTUnwrap(window.contentView?.subviews.compactMap { $0 as? WKWebView }.first)
-        XCTAssertTrue(login.configuration.websiteDataStore === WKWebsiteDataStore.default())
+        XCTAssertTrue(login.configuration.websiteDataStore === KelpieWebsiteData.store)
         let cookie = try XCTUnwrap(HTTPCookie(properties: [
             .name: "kelpie-login-\(UUID().uuidString)", .value: "fixture-session", .domain: "kelpie-login-fixture.invalid", .path: "/",
             .secure: "TRUE", HTTPCookiePropertyKey("HttpOnly"): "TRUE"

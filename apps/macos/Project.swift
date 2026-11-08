@@ -141,6 +141,17 @@ let kelpieApp = Target.target(
 )
 
 
+let kelpieLibraryTestHost = Target.target(
+    name: "KelpieLibraryTestHost",
+    destinations: .macOS,
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.tests.macos.host",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-test-host/**/*.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieTests = Target.target(
     name: "KelpieTests",
     destinations: .macOS,
@@ -153,6 +164,7 @@ let kelpieTests = Target.target(
         .glob("Tests/**/*.mm", excluding: KelpieBrowserBuild.webKitOnly ? ["Tests/BrowserControlCDPLifetimeTests.mm"] : []),
     ],
     dependencies: [
+        .target(name: "KelpieLibraryTestHost"),
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
     ],
     settings: .settings(
@@ -184,6 +196,7 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
+        kelpieLibraryTestHost,
         kelpieTests,
     ],
     schemes: [

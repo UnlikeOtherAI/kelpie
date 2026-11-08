@@ -25,12 +25,12 @@ Apple hosts link the `KelpieBrowserMac` or `KelpieBrowserIOS` target in
 `apple/Project.swift` and import `KelpieBrowser`. Apply the matching
 `KelpieBrowserBuild.mac(core:)` or `.ios(core:)` link settings from
 `Tuist/ProjectDescriptionHelpers`; these include the native libraries for the
-consumer and any unhosted test target. Create a `KelpieBrowserSession`
+consumer and test targets. Create a `KelpieBrowserSession`
 with the host's `KelpieUOASession`; use `KelpieBrowserView` or a native controller.
 Keep the session (and the Mac `KelpieBrowserSurface`) alive while changing containers.
 The browser resource bundle is a library dependency and owns the artwork, font,
 diagnostics and inspector scripts. Hosts keep only their launch icons. The Mac test scheme loads CEF from the packaged standalone fixture without launching
-its app or account lifecycle. Chromium hosts also package
+its browser or account lifecycle. Chromium hosts also package
 the matching signed CEF framework and helper; the library does not install it.
 
 Android hosts include the Gradle library at `core/android`, create
@@ -56,6 +56,10 @@ The opt-in Windows fixture is built with `-DKELPIE_BUILD_EMBEDDING_HOST=ON` in
 complete browser between windows, request sign-in, and close only the browser.
 Its signed-out UOA provider reports account callbacks in the host; it stores no
 credentials and is excluded from ordinary release builds.
+
+Apple unit tests use a hollow test app to provide the native application lifecycle
+required by persistent WebKit profiles. It never starts the standalone browser,
+restores its UOA credentials or binds its local control service.
 
 ## Verification and delivery
 
