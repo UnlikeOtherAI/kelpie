@@ -64,7 +64,7 @@ bool Terminal(const std::shared_ptr<Wire>& wire) {
 }
 }
 int main() {
-  // MSVC otherwise reports an uncaught exception as a silent 0xc0000409 to CTest.
+  // Keep unexpected exceptions visible in CTest output on Windows.
   std::set_terminate([] {
     try {
       if (auto error=std::current_exception()) std::rethrow_exception(error);

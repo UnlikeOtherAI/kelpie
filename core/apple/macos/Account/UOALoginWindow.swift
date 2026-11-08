@@ -23,7 +23,7 @@ final class UOALoginWindowController: NSObject, NSWindowDelegate, UOALoginSurfac
     }
 
     private init(url: URL, finish: @escaping (UOALoginResult) -> Void) {
-        web = UOALoginWebController(dataStore: .default(), userAgent: WKWebViewRenderer.safariUserAgent)
+        web = UOALoginWebController(dataStore: KelpieWebsiteData.store, userAgent: WKWebViewRenderer.safariUserAgent)
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 720),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
