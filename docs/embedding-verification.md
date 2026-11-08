@@ -73,6 +73,7 @@ The extraction was exercised on 8 November 2026:
 | dictator, Mac WebKit | `962ee0de` | 226 native unit tests passed, including background-launch parsing and host-window authority checks. |
 | dictator, Mac embedded WebKit host | `8a27c940`, then `f0298f5e` | AppReveal native controls verified tabs, host sign-in, window moves, detach and reattach. Final source opened a second tab and navigated to IANA. |
 | dictator, Mac Chromium embedded host | `f0298f5e` | Native address-bar navigation, delegated sign-in, window moves, detach and reattach passed with the page retained. Real Chromium helper processes and the packaged resource bundle loaded. |
+| dictator, Developer ID signed independent Mac consumer | `a3638da6` | Native Accessibility verified Command-T (1→2 tabs), Command-W (2→1, host retained), Command-N, New Tab after moving windows, retained tabs on return, menu removal on empty-host focus/detach, and terminal host close followed by fresh runtime creation. |
 | dictator, Mac static-link and tracking-area checks | `f0298f5e` | Both focused native regressions passed through the supported `xctest` interface after `build-for-testing`. SwiftLint passed with no violations. |
 | dictator, signed standalone Mac | `962ee0de`, then `f0298f5e` | Background launch answered health on the requested port 18434. Final candidate passed deep signature verification, timestamp/hardened-runtime checks, notarization, stapling and Gatekeeper assessment. |
 | Fedora 44 on Maxis, GTK/native build without CEF | `1db43445` | Build, 36 native tests and the supported executable help interface passed. |
@@ -83,6 +84,11 @@ Accessibility keyboard input for the SwiftUI address field; a successful
 XCTest UI run is not claimed. The iPad XCTest UI journey did pass. A full direct-CEF Mac unit run through
 `xcodebuild test` did not report test startup on this Mac; the two new regressions
 passed through direct `xctest`, and the earlier WebKit-only 226-test run passed.
+
+The a3638da6 menu check used the independently packaged public WebKit SDK and
+a Developer ID signed consumer. No authenticated Nessie flow or current Mac
+XCTest UI run is claimed. Current menu screenshot capture requested an additional
+macOS desktop permission, which was left unapproved; screenshot evidence remains open.
 
 Physical phones and an iPad external monitor were not exercised. The iOS
 presentation API accepts a host-selected `UIWindowScene`; that API and container
