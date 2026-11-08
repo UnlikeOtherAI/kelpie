@@ -1,3 +1,4 @@
+import KelpieNative
 import XCTest
 @testable import KelpieBrowser
 

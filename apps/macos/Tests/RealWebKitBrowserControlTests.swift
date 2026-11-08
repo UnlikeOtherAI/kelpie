@@ -1,3 +1,4 @@
+import KelpieNative
 import WebKit
 #if os(iOS)
 import Network
