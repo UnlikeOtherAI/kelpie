@@ -29,6 +29,25 @@ let kelpieApp = Target.target(
     )
 )
 
+
+let kelpieEmbeddingHost = Target.target(
+    name: "KelpieEmbeddingHost",
+    destinations: [.iPhone, .iPad],
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.ios",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .extendingDefault(with: [
+        "NSLocalNetworkUsageDescription": "Inspect the local embedding verification host.",
+        "NSBonjourServices": ["_appreveal._tcp"]
+    ]),
+    sources: [.glob("../apple-embedding-host/ios/**/*.swift")],
+    dependencies: [
+        .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
+        .package(product: "AppReveal")
+    ],
+    settings: .settings(base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core"))
+)
+
 let kelpieLibraryTestHost = Target.target(
     name: "KelpieLibraryTestHost",
     destinations: [.iPhone, .iPad],
@@ -100,10 +119,13 @@ let project = Project(
     targets: [
         kelpieApp,
         kelpieLibraryTestHost,
+        kelpieEmbeddingHost,
         kelpieTests,
         kelpieUITests,
     ],
     schemes: [
         kelpieScheme,
+        .scheme(name: "KelpieEmbeddingHost", shared: true,
+                buildAction: .buildAction(targets: ["KelpieEmbeddingHost"])),
     ]
 )

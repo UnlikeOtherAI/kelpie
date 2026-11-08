@@ -3,6 +3,8 @@
 included:
   - Tuist/ProjectDescriptionHelpers
   - core/apple
+  - apps/apple-embedding-host
+  - apps/apple-test-host
   - apps/ios/Kelpie
   - apps/macos/Kelpie
 

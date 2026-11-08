@@ -13,7 +13,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct KelpieApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var browser = KelpieBrowserSession()
+    @StateObject private var browser = KelpieBrowserSession(externalDisplaysEnabled: true)
 
     var body: some Scene {
         WindowGroup { KelpieBrowserView(session: browser) }

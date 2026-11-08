@@ -66,6 +66,16 @@ complete browser between windows, request sign-in, and close only the browser.
 Its signed-out UOA provider reports account callbacks in the host; it stores no
 credentials and is excluded from ordinary release builds.
 
+Apple hosts can build the `KelpieEmbeddingHost` scheme in either app project to
+exercise the complete browser through native Open, Move and Close controls. The
+fixture uses a signed-out host UOA provider and AppReveal for local inspection;
+it is a separate package and is never included in the standalone app. Generate
+the Mac fixture with the WebKit-only flag to verify the Store renderer path.
+
+Use one browser session per process. Keep that session alive while opening and
+closing its presentation surfaces. Embedded iOS sessions leave external scenes
+to their host; only the standalone app enables the legacy TV display monitor.
+
 Apple unit tests use a hollow test app to provide the native application lifecycle
 required by persistent WebKit profiles. It never starts the standalone browser,
 restores its UOA credentials or binds its local control service.

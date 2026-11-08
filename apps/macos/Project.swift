@@ -141,6 +141,26 @@ let kelpieApp = Target.target(
 )
 
 
+
+let kelpieEmbeddingHost = Target.target(
+    name: "KelpieEmbeddingHost",
+    destinations: .macOS,
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.macos",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .extendingDefault(with: [
+        "NSLocalNetworkUsageDescription": "Inspect the local embedding verification host.",
+        "NSBonjourServices": ["_appreveal._tcp"]
+    ]),
+    sources: [.glob("../apple-embedding-host/macos/**/*.swift")],
+    scripts: KelpieBrowserBuild.webKitOnly ? [] : [fixCEFStructure, embedCEFFramework, embedKelpieHelper],
+    dependencies: [
+        .project(target: "KelpieBrowserMac", path: "../../core/apple"),
+        .package(product: "AppReveal")
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [.project(target: "KelpieHelper", path: "../../core/apple")]),
+    settings: .settings(base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core"))
+)
+
 let kelpieLibraryTestHost = Target.target(
     name: "KelpieLibraryTestHost",
     destinations: .macOS,
@@ -197,9 +217,12 @@ let project = Project(
     targets: [
         kelpieApp,
         kelpieLibraryTestHost,
+        kelpieEmbeddingHost,
         kelpieTests,
     ],
     schemes: [
         kelpieScheme,
+        .scheme(name: "KelpieEmbeddingHost", shared: true,
+                buildAction: .buildAction(targets: ["KelpieEmbeddingHost"])),
     ]
 )

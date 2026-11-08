@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'apps/ios/**'
+      - 'apps/apple-embedding-host/**'
+      - 'apps/apple-test-host/**'
       - 'core/native/**'
       - 'core/apple/**'
       - 'Tuist/**'
@@ -21,6 +23,8 @@ on:
       - main
     paths:
       - 'apps/ios/**'
+      - 'apps/apple-embedding-host/**'
+      - 'apps/apple-test-host/**'
       - 'core/native/**'
       - 'core/apple/**'
       - 'Tuist/**'

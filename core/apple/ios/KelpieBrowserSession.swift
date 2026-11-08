@@ -11,7 +11,7 @@ public final class KelpieBrowserSession: ObservableObject {
     private let externalDisplaysEnabled: Bool
     private var started = false
 
-    public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true, externalDisplaysEnabled: Bool = true) {
+    public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true, externalDisplaysEnabled: Bool = false) {
         let server = ServerState(port: port)
         serverState = server
         tabStore = TabStore(handlerContext: server.handlerContext)
