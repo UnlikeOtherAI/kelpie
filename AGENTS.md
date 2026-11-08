@@ -155,3 +155,6 @@ Build Apple apps from their generated `.xcworkspace` so Xcode includes the separ
 
 Apple containing-app SDK packaging uses `scripts/build-apple-sdk.sh`; see
 [embedding verification](docs/embedding-verification.md#apple-consumer-modules).
+
+Direct macOS library tests use `scripts/test-macos-library.sh` with its explicit
+environment allowlist; see [embedding verification](docs/embedding-verification.md).

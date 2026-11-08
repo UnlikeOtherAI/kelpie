@@ -126,3 +126,11 @@ The same issuer/subject preserves that person's data across proof or team change
 Concurrent runtimes and profile transitions are refused. The Mac profile API
 requires the WebKit-only consumer build; CEF's process data directory cannot be
 replaced after bootstrap. Standalone browser storage remains unchanged.
+
+The supported direct macOS library test interface is
+`bash scripts/test-macos-library.sh /absolute/KelpieTests.xctest
+KelpieTests.HostSessionTests,KelpieTests.BrowserProfileTests`. Run it in the
+logged-in GUI session when WebKit needs WindowServer. The launcher validates
+the bundle and selectors and supplies an explicit environment allowlist; developer
+credentials never enter the XCTest process or its failure diagnostics. Confirm
+the expected test count, rather than accepting an empty selector run.
