@@ -125,6 +125,21 @@ an isolated in-memory website store; websiteDataIsPersistent reports that limit.
 Android embedding requires the existing multiple-profile WebView capability.
 It keeps the containing app's process-wide WebView debugging policy intact.
 
+## Apple source Pod
+
+An iOS host can add KelpieBrowser from the pinned core/apple directory to its
+Podfile. This compiles the complete Swift UI and six C++ libraries from source,
+including CPU inference, and stages KelpieBrowserResources.bundle and licenses.
+The build needs CMake, Ninja, Node and pnpm. It does not need Git metadata or
+committed framework binaries; see [consumer verification](../docs/embedding-verification.md).
+
+The containing iOS app must omit WKAppBoundDomains entirely to automate arbitrary
+websites. WebKit applies that opt-in to every WKWebView in the app, including
+views that do not limit their own navigation. A host using service-worker caching
+must resolve that conflict before advertising the full browser. External display
+scenes belong to the host; iOS 27 uses a registered UISceneAccessory, while older
+iOS versions use the noninteractive external scene role.
+
 ## Apple Store build
 
 Generate all Apple projects in a checkout with the same renderer flag: they share
