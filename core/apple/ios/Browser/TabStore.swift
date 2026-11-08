@@ -118,13 +118,13 @@ final class TabStore: ObservableObject {
 
     private func createBrowserTab(
         isStartPage: Bool = true,
-        dataStore: WKWebsiteDataStore = WebViewDefaults.sharedWebsiteDataStore,
+        dataStore: WKWebsiteDataStore? = nil,
         partition: String? = nil,
         name: String? = nil
     ) -> BrowserTab {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
-        config.websiteDataStore = dataStore
+        config.websiteDataStore = dataStore ?? WebViewDefaults.sharedWebsiteDataStore
 
         if let handlerContext {
             let ucc = config.userContentController

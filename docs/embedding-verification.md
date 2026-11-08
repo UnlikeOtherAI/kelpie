@@ -172,3 +172,9 @@ the host session provider as soon as closing begins, while continuing the normal
 message pump and Tick until IsClosed(). This unblocks pending account/renewal
 work before the SDK waits for its shutdown barrier and preserves the containing
 app’s lifetime.
+
+The Windows SDK declares the Windows 10 API baseline used by the shipping CEF
+runtime. Containing windows can use the normal app-model identity API; the SDK
+does not advertise a Vista baseline for that browser. iOS tab creation resolves
+its scoped website store inside the main actor rather than in a nonisolated
+default-argument expression.
