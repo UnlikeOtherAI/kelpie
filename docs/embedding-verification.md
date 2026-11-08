@@ -134,3 +134,5 @@ logged-in GUI session when WebKit needs WindowServer. The launcher validates
 the bundle and selectors and supplies an explicit environment allowlist; developer
 credentials never enter the XCTest process or its failure diagnostics. Confirm
 the expected test count, rather than accepting an empty selector run.
+The allowlist also supplies the containing test host's adjacent MacOS directory
+for Xcode Debug dylib loading; it never inherits a developer DYLD search path.
