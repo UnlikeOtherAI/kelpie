@@ -247,23 +247,10 @@ if(HAS_CEF)
     message(FATAL_ERROR "Windows CEF requires a built libcef_dll_wrapper; set CEF_WRAPPER")
   endif()
 
-  file(GLOB CEF_RUNTIME_FILES LIST_DIRECTORIES false
-    "${CEF_ROOT}/Release/*.dll"
-    "${CEF_ROOT}/Release/*.bin"
-    "${CEF_ROOT}/Release/*.dat"
-    "${CEF_ROOT}/Release/*.json"
-    "${CEF_ROOT}/Resources/*.pak"
-    "${CEF_ROOT}/Resources/*.dat"
-  )
-  foreach(runtime_file IN LISTS CEF_RUNTIME_FILES)
-    add_custom_command(TARGET kelpie_windows_browser POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${runtime_file}" "$<TARGET_FILE_DIR:kelpie_windows_browser>")
-  endforeach()
-  add_custom_command(TARGET kelpie_windows_browser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources/locales" "$<TARGET_FILE_DIR:kelpie_windows_browser>/locales"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CEF_ROOT}/Release/bootstrap.exe" "$<TARGET_FILE_DIR:kelpie_windows_browser>/kelpie.exe"
-    COMMENT "Bundling sandboxed CEF bootstrap and locale resources")
+
 endif()
+
+include(runtime.cmake)
 
 if(BUILD_TESTING)
   add_windows_inference_tests()

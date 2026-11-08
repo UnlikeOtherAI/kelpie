@@ -54,6 +54,15 @@ void WindowChrome::Attach(HWND window, HINSTANCE instance) {
   }
 }
 
+void WindowChrome::SetEmbedded(bool embedded) {
+  embedded_ = embedded;
+  for (HWND control : {minimize_button_, maximize_button_, close_button_}) {
+    if (control != nullptr) ShowWindow(control, embedded ? SW_HIDE : SW_SHOWNA);
+  }
+  UpdateDwmFrame();
+  if (window_ != nullptr) InvalidateRect(window_, nullptr, TRUE);
+}
+
 void WindowChrome::Draw(HDC device_context) const {
   if (window_ == nullptr) return;
   RECT rect{};
@@ -62,7 +71,7 @@ void WindowChrome::Draw(HDC device_context) const {
   RECT title_rect{rect.left, rect.top, rect.right,
                   std::min(rect.bottom, static_cast<LONG>(title_bar_height))};
   ui::FillSolid(device_context, title_rect, palette_.caption);
-  if (!IsZoomed(window_)) {
+  if (!embedded_ && !IsZoomed(window_)) {
     HBRUSH border_brush = CreateSolidBrush(palette_.line);
     FrameRect(device_context, &rect, border_brush);
     DeleteObject(border_brush);
@@ -128,6 +137,7 @@ LRESULT WindowChrome::CalcClientArea(NCCALCSIZE_PARAMS* params) const {
 
 LRESULT WindowChrome::HitTest(WPARAM wparam, LPARAM lparam) const {
   if (window_ == nullptr) return HTNOWHERE;
+  if (embedded_) return HTCLIENT;
   LRESULT dwm_result = 0;
   if (DwmDefWindowProc(window_, WM_NCHITTEST, wparam, lparam, &dwm_result))
     return dwm_result;
@@ -157,7 +167,7 @@ LRESULT WindowChrome::HitTest(WPARAM wparam, LPARAM lparam) const {
 }
 
 int WindowChrome::Inset() const {
-  return window_ != nullptr && IsZoomed(window_) ? 0 : 1;
+  return embedded_ || (window_ != nullptr && IsZoomed(window_)) ? 0 : 1;
 }
 
 void WindowChrome::LayoutControls() {
@@ -199,7 +209,7 @@ void WindowChrome::TrackMouseLeave() { SetControlsHovered(false); }
 int WindowChrome::TitleBarHeight() const { return Scale(kTitleBarHeight); }
 
 void WindowChrome::UpdateDwmFrame() {
-  if (window_ == nullptr) return;
+  if (window_ == nullptr || embedded_) return;
   const DWORD corner_preference =
       IsZoomed(window_) ? kDwmDoNotRound : kDwmRound;
   DwmSetWindowAttribute(
@@ -263,6 +273,7 @@ int WindowChrome::Scale(int value) const {
 }
 
 std::vector<HWND> WindowChrome::FocusableControls() const {
+  if (embedded_) return {};
   std::vector<HWND> controls;
   for (HWND control : {close_button_, minimize_button_, maximize_button_}) {
     if (control != nullptr && IsWindowVisible(control) && IsWindowEnabled(control)) controls.push_back(control);

@@ -16,7 +16,8 @@ namespace kelpie::windows {
 class WindowChrome {
  public:
   void SetPalette(ui::ChromePalette palette) { palette_ = palette; }
-  int ControlsWidth() const { return Scale(150); }
+  int ControlsWidth() const { return embedded_ ? 0 : Scale(150); }
+  void SetEmbedded(bool embedded);
   void Attach(HWND window, HINSTANCE instance);
   void Draw(HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
@@ -48,6 +49,7 @@ class WindowChrome {
   HWND close_button_ = nullptr;
   HWND minimize_button_ = nullptr;
   HWND maximize_button_ = nullptr;
+  bool embedded_ = false;
   bool active_ = true;
   bool controls_hovered_ = false;
 };

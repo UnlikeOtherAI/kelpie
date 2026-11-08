@@ -88,6 +88,7 @@ void Win32Shell::AttachTo(HWND parent) {
   if (parent) style = (style & ~WS_POPUP & ~WS_OVERLAPPEDWINDOW) | WS_CHILD;
   else style = (style & ~WS_CHILD) | WS_OVERLAPPEDWINDOW;
   SetWindowLongPtrW(hwnd_, GWL_STYLE, style);
+  window_chrome_.SetEmbedded(parent != nullptr);
   RECT bounds{};
   if (parent && GetClientRect(parent, &bounds)) {
     SetWindowPos(hwnd_, nullptr, 0, 0, bounds.right, bounds.bottom,

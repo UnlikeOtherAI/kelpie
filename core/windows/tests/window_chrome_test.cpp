@@ -181,6 +181,19 @@ int main() {
                          (close_rect.top + close_rect.bottom) / 2)) == HTCLIENT,
       "window controls are covered by the drag region");
 
+  chrome.SetEmbedded(true);
+  passed &= Expect(chrome.ControlsWidth() == 0, "embedded browser reserves host caption controls");
+  passed &= Expect(chrome.HitTest(0, ScreenPoint(window_rect.left + 2, window_rect.top + 2)) == HTCLIENT,
+                   "embedded browser exposes a resize region inside its host");
+  passed &= Expect(chrome.HitTest(0, ScreenPoint(window_rect.left + 100, window_rect.top + 20)) == HTCLIENT,
+                   "embedded browser exposes a window drag region inside its host");
+  passed &= Expect((GetWindowLongPtrW(GetDlgItem(window, IDC_WINDOW_CLOSE), GWL_STYLE) & WS_VISIBLE) == 0,
+                   "embedded browser displays its own close-window control");
+  chrome.SetEmbedded(false);
+  passed &= Expect(chrome.ControlsWidth() > 0, "detached browser did not restore caption space");
+  passed &= Expect((GetWindowLongPtrW(GetDlgItem(window, IDC_WINDOW_CLOSE), GWL_STYLE) & WS_VISIBLE) != 0,
+                   "detached browser did not restore its close-window control");
+
   DestroyWindow(window);
   passed &= MaximizedClientAreaIsTheWorkArea(instance);
   return passed ? 0 : 1;

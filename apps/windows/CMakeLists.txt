@@ -23,3 +23,21 @@ set_target_properties(kelpie PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
+
+kelpie_stage_browser_runtime(kelpie)
+
+# Opt-in native embedding fixture; it is excluded from standalone releases.
+option(KELPIE_BUILD_EMBEDDING_HOST "Build the native parent-window SDK fixture" OFF)
+if(KELPIE_BUILD_EMBEDDING_HOST AND CEF_ROOT)
+  add_library(kelpie_embed_host SHARED test/embedding_host.cpp resources/kelpie.rc)
+  target_link_libraries(kelpie_embed_host PRIVATE Kelpie::Browser)
+  target_compile_features(kelpie_embed_host PRIVATE cxx_std_20)
+  target_include_directories(kelpie_embed_host PRIVATE ../../core/windows/resources)
+  set_target_properties(kelpie_embed_host PROPERTIES
+    PREFIX ""
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  )
+  kelpie_stage_browser_runtime(kelpie_embed_host)
+endif()

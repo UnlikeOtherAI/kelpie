@@ -99,7 +99,7 @@ bool WindowsApp::Start(int show_command) {
 
 int WindowsApp::Run(int show_command) {
   const bool browser_ready = Start(show_command);
-  if (shell_->hwnd() == nullptr || (!browser_ready && !IsWindowVisible(shell_->hwnd()))) return 1;
+  if (!shell_ || shell_->hwnd() == nullptr || (!browser_ready && !IsWindowVisible(shell_->hwnd()))) return 1;
 
   MSG message{};
   while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
