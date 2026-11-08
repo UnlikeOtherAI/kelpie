@@ -6,10 +6,15 @@ final class EmbeddedBrowserMenu: NSObject, NSMenuItemValidation {
     private weak var session: KelpieBrowserSession?
     private var observers: [NSObjectProtocol] = []
     private var installed: NSMenuItem?
+    private var keyMonitor: Any?
 
     init(session: KelpieBrowserSession) {
         self.session = session
         super.init()
+        // SwiftUI host commands can win duplicate menu equivalents such as Cmd+W.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKey(event) == true ? nil : event
+        }
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.willCloseNotification] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.refresh() }
@@ -43,12 +48,24 @@ final class EmbeddedBrowserMenu: NSObject, NSMenuItemValidation {
     func close() {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
         remove()
     }
 
     private func remove() {
         if let installed { installed.menu?.removeItem(installed) }
         installed = nil
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .control, .option])
+        guard modifiers == .command, let session, !session.isClosed, !session.serverState.isScriptRecording,
+              let window = NSApp.keyWindow, event.window === window, window.attachedSheet == nil,
+              session.containsBrowser(in: window), let key = event.charactersIgnoringModifiers?.lowercased(),
+              let command = BrowserMenuCommand.allCases.first(where: { $0.key.map(String.init) == key }) else { return false }
+        command.perform(in: session)
+        return true
     }
 
     @objc private func invoke(_ sender: NSMenuItem) {

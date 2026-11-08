@@ -34,6 +34,32 @@ final class EmbeddingHostUITests: XCTestCase {
         app.terminate()
     }
 
+    #if os(macOS)
+    @MainActor
+    func testBrowserShortcutsTakePrecedenceOverHostCommands() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-hideWelcomeCard", "YES", "-sessionTabURLs", "()", "-homeURL", "about:blank"]
+        app.launch()
+        app.buttons["Open browser"].tap()
+        XCTAssertTrue(addressField(app).waitForExistence(timeout: 15))
+        navigate("First shortcut page", app)
+        XCTAssertTrue(app.webViews.staticTexts["First shortcut page"].waitForExistence(timeout: 15))
+        app.typeKey("t", modifierFlags: .command)
+        navigate("Second shortcut page", app)
+        XCTAssertTrue(app.webViews.staticTexts["Second shortcut page"].waitForExistence(timeout: 15))
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(app.webViews.staticTexts["First shortcut page"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.windows["Kelpie embedding host"].exists)
+        app.typeKey("n", modifierFlags: .command)
+        let twoWindows = NSPredicate { _, _ in app.windows.count == 2 }
+        expectation(for: twoWindows, evaluatedWith: nil)
+        waitForExpectations(timeout: 10)
+        capture("embedded-browser-shortcuts", app)
+        app.terminate()
+    }
+    #endif
+
     @MainActor
     private func addressField(_ app: XCUIApplication) -> XCUIElement {
         #if os(macOS)

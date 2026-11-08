@@ -50,6 +50,9 @@ the flag and verify Chromium in addition to WebKit.
 Check a standalone Mac background launch with `--port` on a free port and
 `GET /health`. The service must start before a browser window appears. Optional
 Mac menu commands must follow the browser when its controller moves windows.
+The Mac-only testBrowserShortcutsTakePrecedenceOverHostCommands journey opens
+two navigated tabs with Command-T, closes the selected tab with Command-W while
+retaining the containing window, and opens a browser window with Command-N.
 
 On Linux, build `apps/linux` and run its native tests. The app consumes
 `core/native` and keeps its own UI. A build without CEF proves source/dependency
@@ -185,6 +188,10 @@ refresh, full screen and help use the same command definitions as the standalone
 SwiftUI app, with the same recording gates and shortcuts. Switching to another
 host window or closing the session removes that menu. Hosts do not rebuild the
 browser’s menu actions or retain keyboard authority in an unrelated window.
+A scoped local key monitor gives those shortcuts precedence over duplicate host
+menu equivalents; it ignores other windows and attached sheets, and is removed
+on terminal close. Closing the example host window retires its runtime; detaching
+the browser through its Close browser control still preserves tabs for reattachment.
 
 ## iOS source Pod
 

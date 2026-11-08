@@ -24,6 +24,7 @@ private final class HostController: NSViewController {
     private var browser: NSViewController?
     private var other: NSWindow?
     private var moved = false
+    private var closingObserver: NSObjectProtocol?
 
     override func loadView() {
         view = NSView()
@@ -54,6 +55,26 @@ private final class HostController: NSViewController {
         super.viewDidAppear()
         view.window?.title = "Kelpie embedding host"
         AppReveal.start()
+        if closingObserver == nil, let window = view.window {
+            closingObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main
+            ) { [weak self] _ in MainActor.assumeIsolated { self?.retireBrowser() } }
+        }
+    }
+
+    deinit {
+        if let closingObserver { NotificationCenter.default.removeObserver(closingObserver) }
+    }
+
+    private func retireBrowser() {
+        session?.close()
+        browser?.view.removeFromSuperview()
+        browser?.removeFromParent()
+        browser = nil
+        surface = nil
+        session = nil
+        other?.close()
+        other = nil
     }
 
     @objc private func openBrowser() {
