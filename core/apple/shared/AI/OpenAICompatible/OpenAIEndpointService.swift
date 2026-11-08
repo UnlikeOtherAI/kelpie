@@ -7,11 +7,15 @@ import Foundation
 /// `OpenAIEndpointService+Health.swift`.
 actor OpenAIEndpointService {
     private static let instance = KelpieProfileValue<OpenAIEndpointService>()
-    static var shared: OpenAIEndpointService { instance.get { OpenAIEndpointService(
-        persistence: OpenAIEndpointPersistence(defaults: KelpieStorage.defaults),
-        secrets: SecretStore.shared,
-        transport: URLSessionOpenAITransport.shared
-    ) } }
+    static var shared: OpenAIEndpointService {
+        instance.get {
+            OpenAIEndpointService(
+                persistence: OpenAIEndpointPersistence(defaults: KelpieStorage.defaults),
+                secrets: SecretStore.shared,
+                transport: URLSessionOpenAITransport.shared
+            )
+        }
+    }
 
     struct Draft: Sendable {
         var id: String?

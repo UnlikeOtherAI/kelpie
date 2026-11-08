@@ -18,7 +18,7 @@ case "$out" in /*) ;; *) echo "Output directory must be absolute" >&2; exit 2 ;;
 if [ -e "$out" ]; then echo "Output already exists: $out" >&2; exit 2; fi
 revision="$(git -C "$root" rev-parse HEAD)"
 build="$root/core/native/.build-sdk-$sdk-$arch"
-derived="$root/core/apple/.build-sdk-$sdk-$arch"
+derived="$root/core/apple/.build/sdk-$sdk-$arch"
 products="$derived/products"
 mkdir -p "$build" "$derived" "$(dirname "$out")"
 args=(-DCMAKE_OSX_ARCHITECTURES="$arch" -DCMAKE_OSX_SYSROOT="$(xcrun --sdk "$sdk" --show-sdk-path)"
