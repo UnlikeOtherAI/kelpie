@@ -92,9 +92,10 @@ restores its UOA credentials or binds its local control service.
 
 ## Verification and delivery
 
-This extraction is under implementation. Native compilation, installed flows,
-external-display behavior, Store compatibility and Nessie host integration must be
-recorded before claiming delivery. Source relocation alone is not release evidence.
+Focused checks, native host journeys and their limits are recorded in
+[embedding verification](../docs/embedding-verification.md). Production Nessie
+host wiring and physical external-display verification remain separate work;
+source extraction does not establish Store acceptance.
 
 Embedded Mac views draw their own tabs without changing the host window chrome.
 Only input inside the browser pauses its agent work. Fullscreen and recording

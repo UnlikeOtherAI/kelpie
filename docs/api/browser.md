@@ -718,7 +718,9 @@ Response:
 ```
 
 ### `setFullscreen`
-Enable or disable fullscreen mode for the desktop browser window.
+Enable or disable fullscreen mode for the desktop browser window. Embedded Mac
+and Windows views leave containing-app window control to the host; fullscreen
+requests require a browser-owned window.
 
 This endpoint is macOS-only. It returns `NO_WINDOW` if there is no active browser window.
 
@@ -738,7 +740,8 @@ Response:
 ```
 
 ### `getFullscreen`
-Get whether the desktop browser window is currently fullscreen.
+Get whether the desktop browser window is currently fullscreen. An embedded Mac
+view returns `PLATFORM_NOT_SUPPORTED` because its containing app controls the window.
 
 This endpoint is macOS-only. It returns `NO_WINDOW` if there is no active browser window.
 
