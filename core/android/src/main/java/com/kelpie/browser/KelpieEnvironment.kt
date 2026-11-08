@@ -19,8 +19,8 @@ object KelpieEnvironment {
         app = if (standalone(context)) context.applicationContext else KelpieStorageContext(context.applicationContext)
         com.kelpie.browser.browser.PartitionRegistry
             .initialize(app)
-        // Enable Chrome DevTools Protocol for WebView
-        WebView.setWebContentsDebuggingEnabled(true)
+        // Embedded browsing leaves the containing app's process-wide debug policy intact.
+        if (standalone(context)) WebView.setWebContentsDebuggingEnabled(true)
         NetworkTrafficStore.init(app)
         TabletViewportPresetStore.init(app)
         AIState.initialize(app)

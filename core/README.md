@@ -86,6 +86,7 @@ Standalone profile locations remain unchanged. Embedded website storage is persi
 on iOS 17+, macOS and current Android WebView providers. iOS 16 embedded browsing uses
 an isolated in-memory website store; websiteDataIsPersistent reports that limit.
 Android embedding requires the existing multiple-profile WebView capability.
+It keeps the containing app's process-wide WebView debugging policy intact.
 
 ## Apple Store build
 
