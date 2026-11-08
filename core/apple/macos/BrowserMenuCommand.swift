@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 
 enum BrowserMenuCommand: String, Identifiable {
     case newTab, closeTab, newWindow, addBookmark, hardRefresh, fullScreen

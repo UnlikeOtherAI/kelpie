@@ -29,7 +29,6 @@ public struct KelpieBrowserCommands: Commands {
     private func commandButton(_ command: BrowserMenuCommand) -> some View {
         let button = Button(command.title) { command.perform(in: session) }
             .disabled(serverState.isScriptRecording)
-        if let key = command.key { button.keyboardShortcut(KeyEquivalent(key), modifiers: .command) }
-        else { button }
+        if let key = command.key { button.keyboardShortcut(KeyEquivalent(key), modifiers: .command) } else { button }
     }
 }
