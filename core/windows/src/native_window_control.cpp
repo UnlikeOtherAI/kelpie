@@ -44,9 +44,9 @@ bool NativeWindowControl::Invoke(std::function<bool()> task, std::chrono::millis
 }
 
 bool NativeWindowControl::SetFullscreen(bool enabled) {
-  if (!ValidBrowser() || enabled == fullscreen_) return ValidBrowser();
-  HWND top = GetAncestor(browser_, GA_ROOT);
+  const HWND top = ControlledWindow();
   if (!top) return false;
+  if (enabled == fullscreen_) return true;
   if (enabled) {
     SetLastError(ERROR_SUCCESS);
     const LONG_PTR style = GetWindowLongPtrW(top, GWL_STYLE);
@@ -76,7 +76,7 @@ bool NativeWindowControl::SetFullscreen(bool enabled) {
 
 bool NativeWindowControl::Resize(int width, int height) {
   if (!ValidBrowser() || width < 1 || height < 1) return false;
-  HWND top = GetAncestor(browser_, GA_ROOT);
+  const HWND top = ControlledWindow();
   RECT current{};
   RECT outer{};
   if (!top || !GetClientRect(browser_, &current) || !GetWindowRect(top, &outer)) return false;
@@ -104,6 +104,14 @@ LRESULT CALLBACK NativeWindowControl::Proc(HWND hwnd, UINT message, WPARAM wpara
   }
   if (message == kRunOwnerTask && self) { self->queue_.RunOne(); return 0; }
   return DefWindowProcW(hwnd, message, wparam, lparam);
+}
+
+HWND NativeWindowControl::ControlledWindow() const {
+  if (!ValidBrowser()) return nullptr;
+  HWND owner = GetParent(browser_);
+  if (!owner) owner = browser_;
+  // An embedded shell may control its browser, never the containing app window.
+  return (GetWindowLongPtrW(owner, GWL_STYLE) & WS_CHILD) == 0 ? owner : nullptr;
 }
 
 bool NativeWindowControl::ValidBrowser() const { return browser_ && IsWindow(browser_); }

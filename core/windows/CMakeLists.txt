@@ -452,4 +452,5 @@ if(BUILD_TESTING)
   add_test(NAME kelpie_windows_theme_test COMMAND kelpie_windows_theme_test)
 
   include(tests/close_tab.cmake)
+  include(tests/native_window_control.cmake)
 endif()

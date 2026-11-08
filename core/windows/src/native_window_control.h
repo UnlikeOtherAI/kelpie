@@ -26,6 +26,7 @@ class NativeWindowControl {
  private:
   static LRESULT CALLBACK Proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
   bool ValidBrowser() const;
+  HWND ControlledWindow() const;
 
   DWORD owner_thread_id_ = 0;
   HWND dispatcher_ = nullptr;
