@@ -26,8 +26,17 @@ class EmbeddingHostActivity : ComponentActivity() {
         val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val controls = LinearLayout(this)
         status = TextView(this).apply { text = "Host ready; browser not created." }
-        fun button(label: String, action: () -> Unit) {
-            controls.addView(Button(this).apply { text = label; setOnClickListener { action() } })
+
+        fun button(
+            label: String,
+            action: () -> Unit,
+        ) {
+            controls.addView(
+                Button(this).apply {
+                    text = label
+                    setOnClickListener { action() }
+                },
+            )
         }
         button("Open browser") {
             if (browser == null) {
@@ -59,10 +68,22 @@ class EmbeddingHostActivity : ComponentActivity() {
 
     private inner class HostSession : KelpieUOASession {
         override val identity = MutableStateFlow(KelpieUOAIdentity(null, null))
-        override suspend fun request(path: String, method: String, body: String?, version: String?): UOATransport.Response =
-            throw UOATransport.Failure(401)
+
+        override suspend fun request(
+            path: String,
+            method: String,
+            body: String?,
+            version: String?,
+        ): UOATransport.Response = throw UOATransport.Failure(401)
+
         override suspend fun settingsRequest(): Request = throw UOATransport.Failure(401)
-        override fun signIn() { status.text = "Sign-in delegated to host UOA session." }
-        override fun signOut() { status.text = "Sign-out delegated to host UOA session." }
+
+        override fun signIn() {
+            status.text = "Sign-in delegated to host UOA session."
+        }
+
+        override fun signOut() {
+            status.text = "Sign-out delegated to host UOA session."
+        }
     }
 }

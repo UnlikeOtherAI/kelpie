@@ -16,11 +16,9 @@ class KelpieStorageContext(
 
     override fun getCacheDir(): File = File(baseContext.cacheDir, "kelpie-browser").apply { mkdirs() }
 
-    override fun getExternalFilesDir(type: String?): File? =
-        baseContext.getExternalFilesDir(type)?.let { File(it, "kelpie-browser").apply { mkdirs() } }
+    override fun getExternalFilesDir(type: String?): File? = baseContext.getExternalFilesDir(type)?.let { File(it, "kelpie-browser").apply { mkdirs() } }
 
-    override fun getExternalCacheDir(): File? =
-        baseContext.externalCacheDir?.let { File(it, "kelpie-browser").apply { mkdirs() } }
+    override fun getExternalCacheDir(): File? = baseContext.externalCacheDir?.let { File(it, "kelpie-browser").apply { mkdirs() } }
 
     override fun getNoBackupFilesDir(): File = File(baseContext.noBackupFilesDir, "kelpie-browser").apply { mkdirs() }
 

@@ -3,9 +3,9 @@ package com.kelpie.browser.browser
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.WebView
-import com.kelpie.browser.kelpieActivity
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.WebSocketHandler
+import com.kelpie.browser.kelpieActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
