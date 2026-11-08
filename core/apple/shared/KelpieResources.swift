@@ -1,7 +1,15 @@
 import Foundation
 
-/// The browser's assets travel with the library rather than the containing app's UI.
+private final class BrowserResourceAnchor: NSObject {}
+
+/// Resource lookup follows the library's containing bundle, including unhosted tests.
 enum KelpieResources {
-    static let bundle: Bundle? = Bundle.main.url(forResource: "KelpieBrowserResources", withExtension: "bundle")
-        .flatMap { Bundle(url: $0) }
+    static let bundle: Bundle = {
+        let owner = Bundle(for: BrowserResourceAnchor.self)
+        guard let url = owner.url(forResource: "KelpieBrowserResources", withExtension: "bundle"),
+              let bundle = Bundle(url: url) else {
+            preconditionFailure("KelpieBrowserResources.bundle must be packaged with the browser library")
+        }
+        return bundle
+    }()
 }

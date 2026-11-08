@@ -444,10 +444,10 @@ final class HTTPServer: @unchecked Sendable {
     }
 
     private func coordinateCalibrationPage() -> Data? {
-        if let url = KelpieResources.bundle?.url(forResource: "coordinate-calibration", withExtension: "html") {
+        if let url = KelpieResources.bundle.url(forResource: "coordinate-calibration", withExtension: "html") {
             return try? Data(contentsOf: url)
         }
-        if let url = KelpieResources.bundle?.url(
+        if let url = KelpieResources.bundle.url(
             forResource: "coordinate-calibration",
             withExtension: "html",
             subdirectory: "Resources"

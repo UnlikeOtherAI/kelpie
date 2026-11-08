@@ -27,12 +27,12 @@ enum FontAwesome {
 
     private static func fontURL() -> URL? {
         // Search multiple possible locations in the bundle
-        let resourcesDir = KelpieResources.bundle?.resourceURL
+        let resourcesDir = KelpieResources.bundle.resourceURL
         let candidates: [URL?] = [
             resourcesDir?.appendingPathComponent("FontAwesome6Brands-Regular.otf"),
             resourcesDir?.appendingPathComponent("Resources/FontAwesome6Brands-Regular.otf"),
-            KelpieResources.bundle?.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf"),
-            KelpieResources.bundle?.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf", subdirectory: "Resources")
+            KelpieResources.bundle.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf"),
+            KelpieResources.bundle.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf", subdirectory: "Resources")
         ]
         return candidates.compactMap { $0 }.first { FileManager.default.fileExists(atPath: $0.path) }
     }

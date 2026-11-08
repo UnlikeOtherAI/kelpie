@@ -84,7 +84,7 @@ let macResources = Target.target(
     bundleId: "com.unlikeotherai.kelpie.browser.resources.macos",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .default,
-    resources: [.glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
+    resources: [.glob(pattern: "shared/BrowserAssets.xcassets"), .glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
     settings: .settings(base: ["PRODUCT_NAME": "KelpieBrowserResources"])
 )
 
@@ -95,7 +95,7 @@ let iosResources = Target.target(
     bundleId: "com.unlikeotherai.kelpie.browser.resources.ios",
     deploymentTargets: .iOS("16.0"),
     infoPlist: .default,
-    resources: [.glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
+    resources: [.glob(pattern: "shared/BrowserAssets.xcassets"), .glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
     settings: .settings(base: ["PRODUCT_NAME": "KelpieBrowserResources"])
 )
 

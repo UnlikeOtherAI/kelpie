@@ -19,7 +19,7 @@ struct StartPageView: View {
                 // App icon header
                 HStack {
                     Spacer()
-                    if let img = NSImage(named: "WelcomeIcon") {
+                    if let img = KelpieResources.bundle.image(forResource: "WelcomeIcon") {
                         Image(nsImage: img)
                             .resizable()
                             .frame(width: 120, height: 120)
@@ -80,7 +80,7 @@ struct StartPageView: View {
         .background {
             ZStack {
                 pageBackgroundColor
-                if let img = NSImage(named: "KelpieMark") {
+                if let img = KelpieResources.bundle.image(forResource: "KelpieMark") {
                     Image(nsImage: img)
                         .resizable()
                         .scaledToFill()

@@ -302,7 +302,7 @@ final class SegmentedStripButton: NSButton {
         if let imageName = item.imageName {
             let view = NSImageView()
             view.translatesAutoresizingMaskIntoConstraints = false
-            view.image = NSImage(named: imageName)
+            view.image = KelpieResources.bundle.image(forResource: imageName)
             view.imageScaling = .scaleProportionallyUpOrDown
             view.symbolConfiguration = nil
             self.iconView = view

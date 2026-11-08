@@ -7,7 +7,7 @@ final class RendererState: ObservableObject {
         case webkit
         case chromium
 
-        static var allCases: [Engine] {
+        static var allCases: [Self] {
             #if KELPIE_WEBKIT_ONLY
             return [.webkit]
             #else

@@ -373,7 +373,7 @@ final class HTTPServer: @unchecked Sendable {
     }
 
     private func coordinateCalibrationPage() -> Data? {
-        guard let url = KelpieResources.bundle?.url(forResource: "coordinate-calibration", withExtension: "html") else {
+        guard let url = KelpieResources.bundle.url(forResource: "coordinate-calibration", withExtension: "html") else {
             return nil
         }
         return try? Data(contentsOf: url)

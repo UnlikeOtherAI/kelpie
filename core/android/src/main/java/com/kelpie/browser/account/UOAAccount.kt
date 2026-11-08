@@ -141,7 +141,7 @@ object UOAAccount {
         val intent =
             Intent(Intent.ACTION_VIEW, Uri.parse(pending.authorization.url(pending.clientId)))
                 .addCategory(Intent.CATEGORY_BROWSABLE)
-        if (liveHost() == null) return fail("Could not open login. Please try again.")
+        val activity = liveHost() ?: return fail("Could not open login. Please try again.")
         try {
             activity.startActivity(intent)
         } catch (_: android.content.ActivityNotFoundException) {

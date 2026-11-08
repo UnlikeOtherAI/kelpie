@@ -12,7 +12,7 @@ extension BrowserView {
         HStack(spacing: 0) {
             if rendererState.activeEngine == .chromium {
                 HStack(spacing: 12) {
-                    Image("ChromeLogo").resizable().frame(width: 16, height: 16)
+                    Image("ChromeLogo", bundle: KelpieResources.bundle).resizable().frame(width: 16, height: 16)
                     Text(tabStore.activeTab?.isStartPage == true ? "Start Page" : windowTitle)
                         .font(.system(size: 12)).lineLimit(1)
                     AppKitToolbarButton(

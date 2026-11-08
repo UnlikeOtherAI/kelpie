@@ -92,7 +92,7 @@ struct WelcomeCardView: View {
 
     @ViewBuilder
     private var appIcon: some View {
-        if let icon = UIImage(named: "WelcomeIcon") {
+        if let icon = UIImage(named: "WelcomeIcon", in: KelpieResources.bundle, compatibleWith: nil) {
             Image(uiImage: icon)
                 .resizable()
                 .scaledToFit()

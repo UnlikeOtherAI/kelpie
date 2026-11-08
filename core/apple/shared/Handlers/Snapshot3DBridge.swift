@@ -55,7 +55,7 @@ enum Snapshot3DBridge {
 
     /// Xcode flattens globbed resources into the bundle root. Also accept
     /// directory-preserving bundles. Packaging errors must not terminate the app.
-    static func loadResource(named name: String, bundle: Bundle = .main) throws -> String {
+    static func loadResource(named name: String, bundle: Bundle = KelpieResources.bundle) throws -> String {
         let url = bundle.url(forResource: name, withExtension: "js", subdirectory: "Snapshot3D")
             ?? bundle.url(forResource: name, withExtension: "js")
         guard let url else {
