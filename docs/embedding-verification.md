@@ -141,7 +141,9 @@ for Xcode Debug dylib loading; it never inherits a developer DYLD search path.
 
 The Android library can be consumed as an isolated Gradle included build at
 core/android (com.unlikeotherai.kelpie:browser:0.2.0). Its Kotlin and Compose
-compiler versions remain scoped to that build. A host can use a newer Kotlin
+compiler versions remain scoped to that build. The consumer build uses AGP 8.12
+and requires Gradle 8.13 or newer; Android variant matching requires the host
+to use that same AGP version. A host can use a newer Kotlin
 compiler without replacing the browser compiler or duplicating its UI.
 
 For a signed-in embedded browser, verify the bearer owner with UOA before calling
