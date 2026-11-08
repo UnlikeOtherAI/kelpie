@@ -128,6 +128,7 @@ let kelpieApp = Target.target(
     ],
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
+        .project(target: "KelpieResourcesMac", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [
         .project(target: "KelpieHelper", path: "../../core/apple")
@@ -156,6 +157,7 @@ let kelpieEmbeddingHost = Target.target(
     scripts: KelpieBrowserBuild.webKitOnly ? [] : [fixCEFStructure, embedCEFFramework, embedKelpieHelper],
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
+        .project(target: "KelpieResourcesMac", path: "../../core/apple"),
         .package(product: "AppReveal")
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [.project(target: "KelpieHelper", path: "../../core/apple")]),
     settings: .settings(base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core"))
@@ -186,6 +188,7 @@ let kelpieTests = Target.target(
     dependencies: [
         .target(name: "KelpieLibraryTestHost"),
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
+        .project(target: "KelpieResourcesMac", path: "../../core/apple"),
     ],
     settings: .settings(
         base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core")

@@ -17,6 +17,7 @@ let kelpieApp = Target.target(
     ],
     dependencies: [
         .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
+        .project(target: "KelpieResourcesIOS", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ],
     settings: .settings(
@@ -43,6 +44,7 @@ let kelpieEmbeddingHost = Target.target(
     sources: [.glob("../apple-embedding-host/ios/**/*.swift")],
     dependencies: [
         .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
+        .project(target: "KelpieResourcesIOS", path: "../../core/apple"),
         .package(product: "AppReveal")
     ],
     settings: .settings(base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core"))
@@ -82,6 +84,7 @@ let kelpieTests = Target.target(
     dependencies: [
         .target(name: "KelpieLibraryTestHost"),
         .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
+        .project(target: "KelpieResourcesIOS", path: "../../core/apple"),
     ],
     settings: .settings(
         base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core")

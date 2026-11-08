@@ -22,7 +22,9 @@ fence outstanding browser work. Standalone hosts use the core's existing UOA log
 Browser state, tabs and UI belong to Kelpie, independently of the host's interface.
 
 Apple hosts link the `KelpieBrowserMac` or `KelpieBrowserIOS` target in
-`apple/Project.swift` and import `KelpieBrowser`. Apply the matching
+`apple/Project.swift`, add its matching `KelpieResourcesMac` or `KelpieResourcesIOS`
+bundle dependency to the app target, and import `KelpieBrowser`. Static-library
+linking alone does not copy a resource bundle into a Mac application. Apply the matching
 `KelpieBrowserBuild.mac(core:)` or `.ios(core:)` link settings from
 `Tuist/ProjectDescriptionHelpers`; these include the native libraries for the
 consumer and test targets. Create a `KelpieBrowserSession`
@@ -100,7 +102,9 @@ It keeps the containing app's process-wide WebView debugging policy intact.
 
 ## Apple Store build
 
-Generate with `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` for a sandboxed macOS
+Generate all Apple projects in a checkout with the same renderer flag: they share
+the generated `core/apple` project. Use
+`TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` for a sandboxed macOS
 consumer. The same browser UI, tabs, settings and automation compile against
 WebKit. Chromium code, helper executables and framework packaging are omitted;
 the renderer API rejects unavailable engines. Generate without that variable for
