@@ -135,6 +135,26 @@ int main() {
     client.Shutdown();assert(Wait([&] { return client.Drain(); }));
   }
   std::filesystem::remove_all(cancelling_profile);
+  const auto foreground_profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
+  auto foreground=std::make_shared<Wire>();std::atomic<int> foreground_effects=0;std::atomic<bool> hidden_cancelled=false;
+  {
+    Client client(account,foreground_profile,"windows",kDevice,[&](const Json&,const auto& guard) {
+      ++foreground_effects;assert(Wait([&] { return guard->load(); }));hidden_cancelled=true;
+      return Json{{"state","cancelled"}};
+    },{},[foreground] { return std::make_unique<Socket>(foreground); });
+    client.Update(false);assert(Wait([&] { return foreground_effects==1; }));
+    client.SetForeground(false);assert(Wait([&] { return hidden_cancelled.load(); }));
+    assert(!client.paused()); // Hiding must not persist a person-requested pause.
+    constexpr auto hidden_job="10000000-0000-4000-8000-000000000007";
+    { std::lock_guard lock(foreground->mutex);foreground->incoming.push_back(Json{{"type","command"},
+      {"generation",kGeneration},{"jobId",hidden_job},{"attemptId",hidden_job},{"seq",1},{"deadline",Deadline()},
+      {"operation","click"},{"tabId","owned"},{"tabVersion","document"},{"input",{{"selector","#hidden"}}}}.dump()); }
+    assert(Wait([&] { std::lock_guard lock(foreground->mutex);for(const auto& frame:foreground->sent)
+      if(frame["type"]=="event" && frame["jobId"]==hidden_job && frame["state"]=="failed")return true;return false; }));
+    assert(foreground_effects==1);client.Pause(true);client.SetForeground(true);assert(client.paused());
+    client.Shutdown();assert(Wait([&] { return client.Drain(); }));
+  }
+  std::filesystem::remove_all(foreground_profile);
   const auto resume_profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
   auto resumed=std::make_shared<Wire>();std::mutex guards_mutex;
   std::vector<std::shared_ptr<const std::atomic<bool>>> guards;

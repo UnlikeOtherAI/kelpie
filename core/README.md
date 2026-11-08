@@ -73,7 +73,10 @@ Windows hosts link `Kelpie::Browser` from `core/windows` and include
 `kelpie/browser.h`. Set `AppConfig.hosted`, `parent_window` and `uoa_session`, then
 call `Start`. Forward browser messages through `ProcessMessage`, call `Tick` from
 the host loop, and drain `RequestClose` before destruction. A hosted browser never
-posts `WM_QUIT` to the containing app. CEF's bootstrap sandbox contract still applies.
+posts `WM_QUIT` to the containing app. Use `SetForeground(false)` when hiding
+a retained session: it cancels current agent work and rejects new commands without
+changing the person's Pause choice. Restore foreground on presentation. CEF's
+bootstrap sandbox contract still applies.
 
 Windows Chromium hosts enter through `BootstrapBrowserHost`, preserving CEF's
 subprocess dispatch, SDK version and sandbox checks. Signed Chromium hosts must

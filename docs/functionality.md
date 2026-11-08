@@ -1,6 +1,6 @@
 # Kelpie — Feature Catalogue
 
-The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. A cached host identity may select local browser data without a fresh grant; account requests and remote agent control still require verified live authorization. See [the embedding contract](../core/README.md).
+The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. A cached host identity may select local browser data without a fresh grant; account requests and remote agent control still require verified live authorization. A host may hide a retained Windows session while pausing agent work without changing the person’s saved Pause choice. See [the embedding contract](../core/README.md).
 
 
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.

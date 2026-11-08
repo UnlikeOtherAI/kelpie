@@ -18,6 +18,7 @@ class Client {
   ~Client();
   void Update(bool model_ready,bool model_installed=false);
   void Pause(bool paused);
+  void SetForeground(bool foreground);
   void Enable(bool enabled);
   void SignOut();
   void UserTabChanged();
@@ -36,7 +37,7 @@ class Client {
   Execute execute_; Cancel cancel_; Factory factory_;
   mutable std::mutex mutex_; std::condition_variable changed_;
   std::string owner_,status_="Nessie: signed out";
-  bool paused_=false,enabled_=true,model_ready_=false,model_installed_=false,working_=false;
+  bool paused_=false,foreground_=true,enabled_=true,model_ready_=false,model_installed_=false,working_=false;
   std::atomic<bool> shutdown_{false},discard_{false};
   std::atomic<std::shared_ptr<std::atomic<bool>>> cancelled_{std::make_shared<std::atomic<bool>>(false)};
   std::future<void> worker_;

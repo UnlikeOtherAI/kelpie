@@ -134,6 +134,7 @@ void WindowsApp::Tick() {
 }
 
 void WindowsApp::RequestClose() { OnWindowCloseRequested(); }
+void WindowsApp::SetForeground(bool foreground) { if(connection_)connection_->SetForeground(foreground); }
 
 void WindowsApp::AttachTo(HWND parent) {
   if (shell_) shell_->AttachTo(parent);

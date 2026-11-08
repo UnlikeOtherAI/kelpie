@@ -51,6 +51,13 @@ void Client::Pause(bool value) {
   }
   if(guard && cancel_)cancel_(guard);changed_.notify_all();
 }
+void Client::SetForeground(bool value) {
+  std::shared_ptr<std::atomic<bool>> guard;
+  { std::lock_guard lock(mutex_);foreground_=value;
+    if(!value) { guard=cancelled_.load();guard->store(true); }
+  }
+  if(guard && cancel_)cancel_(guard);changed_.notify_all();
+}
 void Client::Enable(bool value) {
   bool cancel=!value;
   std::shared_ptr<std::atomic<bool>> guard;
@@ -99,7 +106,7 @@ void Client::Run() {
   unsigned failures=0;
   while(!shutdown_) {
     std::string owner; bool enabled,paused,ready,installed;
-    { std::unique_lock lock(mutex_); owner=owner_; enabled=enabled_; paused=paused_; ready=model_ready_;installed=model_installed_;
+    { std::unique_lock lock(mutex_); owner=owner_; enabled=enabled_; paused=paused_ || !foreground_; ready=model_ready_;installed=model_installed_;
       if(owner.empty() || !enabled) {
         status_=owner.empty()?"Nessie: signed out":"Nessie: stopped";
         changed_.wait_for(lock,std::chrono::milliseconds(250));
@@ -132,7 +139,7 @@ void Client::Run() {
       auto beat=Clock::now(); const auto welcome_deadline=Clock::now()+std::chrono::seconds(10);
       auto send=[&](const Json& decision) { for(const auto& frame:decision.value("frames",Json::array()))socket->Send(frame.dump()); };
       while(!shutdown_) {
-        { std::lock_guard lock(mutex_); if(owner!=owner_ || !enabled_)break; paused=paused_; ready=model_ready_;installed=model_installed_; }
+        { std::lock_guard lock(mutex_); if(owner!=owner_ || !enabled_)break; paused=paused_ || !foreground_; ready=model_ready_;installed=model_installed_; }
         if(Clock::now()>=expiry)throw std::runtime_error("Connection ticket expired");
         if(generation.empty() && Clock::now()>welcome_deadline)throw std::runtime_error("Gateway unavailable");
         if(!generation.empty() && Clock::now()>=renewal) {
@@ -160,7 +167,7 @@ void Client::Run() {
         if(kind=="command") {
           const auto command=decision.at("command");
           bool allowed;
-          { std::lock_guard lock(mutex_); allowed=owner==owner_ && enabled_ && !paused_ && !shutdown_ && !task.valid();
+          { std::lock_guard lock(mutex_); allowed=owner==owner_ && enabled_ && !paused_ && foreground_ && !shutdown_ && !task.valid();
             if(allowed) { cancelled_.store(std::make_shared<std::atomic<bool>>(false));working_=true; } }
           if(!allowed) { send(persist("complete",Json{{"jobId",command.at("jobId")},{"attemptId",command.at("attemptId")},
               {"state","failed"},{"error",paused?"DEVICE_PAUSED":"DEVICE_BUSY"}})); continue; }
