@@ -31,6 +31,8 @@ Tuist dependency graph. Apply the matching
 consumer and test targets. Create a `KelpieBrowserSession`
 with the host's `KelpieUOASession`; use `KelpieBrowserView` or a native controller.
 Keep the session (and the Mac `KelpieBrowserSurface`) alive while changing containers.
+`KelpieBrowserCommands(session:)` supplies the optional Mac application menu and
+keyboard commands; the containing app chooses whether to install those global entries.
 The browser resource bundle is a library dependency and owns the artwork, font,
 diagnostics and inspector scripts. Hosts keep only their launch icons. The Mac test scheme loads CEF from the packaged standalone fixture without launching
 its browser or account lifecycle. Chromium hosts also package

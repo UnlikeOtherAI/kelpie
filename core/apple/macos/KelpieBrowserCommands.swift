@@ -93,6 +93,6 @@ public struct KelpieBrowserCommands: Commands {
     }
 
     private func toggleFullScreenForActiveWindow() {
-        (NSApp.keyWindow ?? NSApp.mainWindow)?.toggleFullScreen(nil)
+        WindowRegistry.shared.defaultEntry()?.ownedWindow?.toggleFullScreen(nil)
     }
 }
