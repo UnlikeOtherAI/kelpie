@@ -5,7 +5,7 @@ final class EmbeddingHostUITests: XCTestCase {
     func testCompleteBrowserMovesWithoutLosingTabs() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-hideWelcomeCard", "YES", "-sessionTabURLs", "()"]
+        app.launchArguments = ["-hideWelcomeCard", "YES", "-sessionTabURLs", "()", "-homeURL", "about:blank"]
         app.launch()
         app.buttons["Open browser"].tap()
         let field = addressField(app)
@@ -49,6 +49,14 @@ final class EmbeddingHostUITests: XCTestCase {
         let url = "data:text/html;base64," + Data(html.utf8).base64EncodedString()
         let field = addressField(app)
         field.tap()
+        #if os(macOS)
+        field.typeKey("a", modifierFlags: .command)
+        #else
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let initial = field.value as? String ?? ""
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: initial.count))
+        #endif
         field.typeText(url + "\n")
     }
 
