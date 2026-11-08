@@ -18,6 +18,20 @@ public final class KelpieBrowserSession: ObservableObject {
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }
     }
 
+    /// Preserves the standalone CLI launch contract, including background launches.
+    public static func standalone(arguments: [String] = ProcessInfo.processInfo.arguments) -> KelpieBrowserSession {
+        let session = KelpieBrowserSession(port: standalonePort(arguments: arguments))
+        Task { @MainActor in session.start() }
+        return session
+    }
+
+    static func standalonePort(arguments: [String]) -> UInt16 {
+        guard let index = arguments.firstIndex(of: "--port"),
+              arguments.indices.contains(index + 1),
+              let port = UInt16(arguments[index + 1]), port > 0 else { return 8420 }
+        return port
+    }
+
     public var websiteDataIsPersistent: Bool { KelpieWebsiteData.store.isPersistent }
 
     public func start() {

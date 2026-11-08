@@ -31,7 +31,13 @@ public final class KelpieBrowserSession: ObservableObject {
         serverState.startHTTPServer(listen: localControlEnabled)
         NessieConnection.shared.start(context: serverState.handlerContext)
         if localControlEnabled { serverState.ensureMDNSAdvertising() }
-        if externalDisplaysEnabled { ExternalDisplayManager.shared.startMonitoring() }
+        if externalDisplaysEnabled {
+            let displays = ExternalDisplayManager.shared
+            displays.startMonitoring()
+            if ProcessInfo.processInfo.environment["KELPIE_DEBUG_ATTACH_LOCAL_TV"] == "1", !displays.isConnected {
+                displays.attachDebugLocalTV()
+            }
+        }
         OpenAIEndpointMonitor.shared.start()
         UOAAccount.shared.restoreSession()
     }

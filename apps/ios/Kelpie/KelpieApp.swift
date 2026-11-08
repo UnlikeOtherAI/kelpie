@@ -15,6 +15,8 @@ struct KelpieApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var browser = KelpieBrowserSession(externalDisplaysEnabled: true)
 
+    init() { AppRevealSetup.configure() }
+
     var body: some Scene {
         WindowGroup { KelpieBrowserView(session: browser) }
             .commands { KelpieBrowserCommands() }
