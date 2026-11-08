@@ -28,7 +28,8 @@ Apple hosts link the `KelpieBrowserMac` or `KelpieBrowserIOS` target in
 consumer and any unhosted test target. Create a `KelpieBrowserSession`
 with the host's `KelpieUOASession`; use `KelpieBrowserView` or a native controller.
 Keep the session (and the Mac `KelpieBrowserSurface`) alive while changing containers.
-The browser resource bundle is a library dependency. Chromium hosts also package
+The browser resource bundle is a library dependency. The Mac test scheme loads CEF from the packaged standalone fixture without launching
+its app or account lifecycle. Chromium hosts also package
 the matching signed CEF framework and helper; the library does not install it.
 
 Android hosts include the Gradle library at `core/android`, create

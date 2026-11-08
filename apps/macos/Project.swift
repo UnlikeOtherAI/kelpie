@@ -169,7 +169,7 @@ let kelpieScheme = Scheme.scheme(
     testAction: .targets(
         ["KelpieTests"],
         arguments: KelpieBrowserBuild.webKitOnly ? nil : .arguments(environmentVariables: [
-            "DYLD_FRAMEWORK_PATH": "$(PROJECT_DIR)/../../core/apple/macos/Frameworks"
+            "DYLD_FRAMEWORK_PATH": "$(BUILT_PRODUCTS_DIR)/Kelpie.app/Contents/Frameworks"
         ]),
         expandVariableFromTarget: "KelpieTests"
     )
