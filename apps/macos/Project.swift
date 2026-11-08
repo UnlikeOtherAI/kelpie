@@ -188,7 +188,6 @@ let kelpieTests = Target.target(
     dependencies: [
         .target(name: "KelpieLibraryTestHost"),
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
-        .project(target: "KelpieResourcesMac", path: "../../core/apple"),
     ],
     settings: .settings(
         base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core")
