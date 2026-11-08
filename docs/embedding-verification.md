@@ -97,3 +97,14 @@ importable by an unrelated containing target. The hollow app test targets retain
 their own test-only headers. WebKit-only consumers never import the Chromium
 module. Native archives and the resource bundle are still required at link and
 package time; importing the Swift module alone does not establish packaging.
+
+Build a containing-app SDK with `bash scripts/build-apple-sdk.sh macosx arm64
+/absolute/new/output` (or iphoneos/iphonesimulator and the supported architecture).
+It builds the six C++ libraries and pinned llama runtime, compiles the complete
+WebKit browser, combines the static archives, stages its public Swift module and
+resource bundle, and checks an unrelated import from the staged framework. The
+macOS package retains Metal inference; iOS uses the portable native runtime.
+The containing app links the static framework with C++, AppIntents, Accelerate
+and, on Mac, Metal, and copies KelpieBrowserResources.bundle into the bundle that
+contains the linked browser code. These SDK outputs contain no executable app,
+CEF engine or helper, signing identity, host credential or standalone launcher.

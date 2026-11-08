@@ -152,3 +152,6 @@ Native browser gateway bindings and reproducible generated contract builds follo
 Windows release CI retains unsigned candidates; sign and launch the complete CEF package before publication using [Windows releases](docs/windows-release.md).
 
 Build Apple apps from their generated `.xcworkspace` so Xcode includes the separate browser library; see [embedding](core/README.md).
+
+Apple containing-app SDK packaging uses `scripts/build-apple-sdk.sh`; see
+[embedding verification](docs/embedding-verification.md#apple-consumer-modules).
