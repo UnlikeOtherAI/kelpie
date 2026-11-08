@@ -155,6 +155,16 @@ and requires Gradle 8.13 or newer; Android variant matching requires the host
 to use that same AGP version. A host can use a newer Kotlin
 compiler without replacing the browser compiler or duplicating its UI.
 
+The containing application also owns transitive Java-resource packaging. An AAR's
+resource exclusions do not propagate to its consumer. In the app's Android
+packaging.resources block, exclude META-INF/INDEX.LIST and merge
+META-INF/io.netty.versions.properties, META-INF/DEPENDENCIES,
+META-INF/LICENSE.md and META-INF/NOTICE.md. Merging retains the dependency,
+license and notice contents; the JAR index is unused by the Android DEX runtime.
+For Expo, configure the application's android.packagingOptions.excludes and
+android.packagingOptions.merges Gradle properties during Prebuild. Verify the
+final APK, rather than accepting a successful library compile as packaging proof.
+
 For a signed-in embedded browser, verify the bearer owner with UOA before calling
 KelpieEnvironment.configureProfile(issuer, subject). Call it before the first
 browser/environment initialization in that process. Browser files, preferences
