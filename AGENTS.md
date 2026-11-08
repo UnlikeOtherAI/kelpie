@@ -119,7 +119,7 @@ Each component owns its version in its own manifest — do not create a central 
 | macOS app | `apps/macos/Kelpie/Info.plist` → `CFBundleShortVersionString` |
 | iOS app   | `apps/ios/Project.swift` → `MARKETING_VERSION` build setting |
 | Android   | `apps/android/app/build.gradle.kts` → `versionName` |
-| Windows   | `apps/windows/CMakeLists.txt` → `project(kelpie_windows VERSION …)`, mirrored in `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp` |
+| Windows   | `apps/windows/CMakeLists.txt` → `project(kelpie_windows VERSION …)`, mirrored in `resources/kelpie.rc`, `core/windows/src/device_info_windows.h` and `core/windows/src/windows_runtime.cpp` |
 | Linux     | `apps/linux/CMakeLists.txt` → `KELPIE_LINUX_VERSION` |
 | CLI       | `packages/cli/package.json` → `version` |
 
@@ -138,7 +138,7 @@ Each component owns its version in its own manifest — do not create a central 
 
 ## Windows release ownership
 
-- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`; keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
+- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`; keep `resources/kelpie.rc`, `core/windows/src/device_info_windows.h` and `core/windows/src/windows_runtime.cpp`
   in step with it.
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.

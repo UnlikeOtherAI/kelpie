@@ -4,6 +4,10 @@
 
 namespace {
 
+bool IsShown(HWND window) {
+  return (GetWindowLongPtrW(window, GWL_STYLE) & WS_VISIBLE) != 0;
+}
+
 HWND Fallback(HWND view) {
   return FindWindowExW(view, nullptr, L"STATIC", nullptr);
 }
@@ -18,7 +22,7 @@ struct HostWindow {
 }  // namespace
 
 int main() {
-  // Own the parent window: the SSH/session desktop may itself be invisible.
+  // Inspect each control’s visibility style independently of SSH desktop visibility.
   HostWindow host;
   if (host.handle == nullptr) return 5;
   kelpie::windows::Win32BrowserView view;
@@ -27,9 +31,9 @@ int main() {
   const LONG_PTR style = GetWindowLongPtrW(view.hwnd(), GWL_STYLE);
   if ((style & WS_CLIPCHILDREN) == 0 || (style & WS_CLIPSIBLINGS) == 0) return 2;
   const HWND fallback = Fallback(view.hwnd());
-  if (fallback == nullptr || !IsWindowVisible(fallback)) return 3;
+  if (fallback == nullptr || !IsShown(fallback)) return 3;
   view.ShowFallback(false);
-  if (IsWindowVisible(fallback)) return 4;
+  if (IsShown(fallback)) return 4;
   view.Destroy();
   return 0;
 }

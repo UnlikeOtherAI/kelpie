@@ -165,7 +165,13 @@ let kelpieScheme = Scheme.scheme(
     name: "Kelpie",
     shared: true,
     buildAction: .buildAction(targets: ["Kelpie"]),
-    testAction: .targets(["KelpieTests"])
+    testAction: .targets(
+        ["KelpieTests"],
+        arguments: .arguments(environmentVariables: [
+            "DYLD_FRAMEWORK_PATH": "$(PROJECT_DIR)/../../core/apple/macos/Frameworks"
+        ]),
+        expandVariableFromTarget: "KelpieTests"
+    )
 )
 
 // MARK: - Project
