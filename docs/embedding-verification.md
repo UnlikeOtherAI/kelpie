@@ -154,3 +154,9 @@ switch an initialized browser profile: close it and start a new browser process
 for another person. A signed-out host uses a separate signed-out profile.
 The containing app must require Android 28 and MULTI_PROFILE support for this
 capability; it must not fall back to the containing app’s cookie jar.
+
+Native Windows/Curl host providers can reuse AccountTransport for the fixed
+embedded profile, avatar, browser bookmark and connection endpoints. Other
+embedded routes and query-bearing paths are refused. The containing app still
+owns the grant and verifies its returned UOA subject before selecting a profile;
+this transport does not create a standalone sign-in or refresh session.

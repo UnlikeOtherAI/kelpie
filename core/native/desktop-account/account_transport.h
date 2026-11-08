@@ -6,6 +6,14 @@
 
 
 namespace kelpie::account {
+// Embedded hosts use the same fixed-origin, cancellable transport without a public OAuth identity.
+inline bool IsAccountTransportPath(const std::string& path) {
+  if (path.find("..") != std::string::npos) return false;
+  return path.starts_with("/oauth/") || path == "/embedded/kelpie/me" ||
+      path == "/embedded/kelpie/me/avatar" || path == "/embedded/kelpie/me/settings/browser/bookmarks" ||
+      path == "/embedded/kelpie/connect";
+}
+
 struct AccountResponse { std::string body, version; };
 struct AccountFailure : std::runtime_error {
   int status;

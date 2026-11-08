@@ -7,7 +7,7 @@ namespace kelpie::account {
 void AccountTransport::Cancel() { std::lock_guard lock(mutex_); ++generation_; cancelled_=true; }
 AccountResponse AccountTransport::Request(const std::string& path,const std::string& method,
     const std::string& token,const std::string& body,const std::string& version) {
-  if (!path.starts_with("/oauth/") || path.find("..")!=std::string::npos ||
+  if (!IsAccountTransportPath(path) ||
       token.find_first_of("\r\n")!=std::string::npos || version.find_first_of("\r\n")!=std::string::npos)
     throw AccountFailure(400);
   static const int initialized=curl_global_init(CURL_GLOBAL_DEFAULT);

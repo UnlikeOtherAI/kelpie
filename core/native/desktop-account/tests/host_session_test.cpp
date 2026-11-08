@@ -96,6 +96,13 @@ void ReplacedSessionFencesInflightWrites() {
 }
 }
 int main() {
+  for (const auto* path : {"/embedded/kelpie/me", "/embedded/kelpie/me/avatar",
+      "/embedded/kelpie/me/settings/browser/bookmarks", "/embedded/kelpie/connect"})
+    assert(IsAccountTransportPath(path));
+  for (const auto* path : {"/embedded/kelpie/me/settings/security/factors",
+      "/embedded/kelpie/me?redirect=https://example.test", "/embedded/kelpie/../me",
+      "https://authentication.unlikeotherai.com/embedded/kelpie/me", "//example.test/oauth/me"})
+    assert(!IsAccountTransportPath(path));
   HostOwnsCredentials();
   WrongIdentityIsRejected();
   ReplacedSessionFencesInflightWrites();

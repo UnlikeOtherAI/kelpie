@@ -24,7 +24,7 @@ void AccountTransport::Cancel() {
 }
 AccountResponse AccountTransport::Request(const std::string& path, const std::string& method,
     const std::string& token, const std::string& body, const std::string& version) {
-  if (!path.starts_with("/oauth/") || path.find("..") != std::string::npos ||
+  if (!IsAccountTransportPath(path) ||
       token.find_first_of("\r\n") != std::string::npos || version.find_first_of("\r\n") != std::string::npos)
     throw AccountFailure(400);
   unsigned generation;
