@@ -160,3 +160,9 @@ embedded profile, avatar, browser bookmark and connection endpoints. Other
 embedded routes and query-bearing paths are refused. The containing app still
 owns the grant and verifies its returned UOA subject before selecting a profile;
 this transport does not create a standalone sign-in or refresh session.
+
+The native JSON dependency remains v3.11.3. Its source archive is fetched from
+the official codeload tag URL with SHA-256
+0d8ef5af7f9794e3263480193c491549b2ba6cc74bb018906202ada498a79406.
+This replaces a release-asset URL that returned repeated HTTP 504 on both build
+hosts; it does not select another JSON version or add a network fallback.
