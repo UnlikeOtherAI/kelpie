@@ -92,7 +92,9 @@ external-display behavior, Store compatibility and Nessie host integration must 
 recorded before claiming delivery. Source relocation alone is not release evidence.
 
 Embedded Mac views draw their own tabs without changing the host window chrome.
-Only input inside the browser pauses its agent work. KelpieBrowserPresentation on
+Only input inside the browser pauses its agent work. Fullscreen and recording
+may change browser-owned windows only, and reparenting refreshes the registered
+native window. KelpieBrowserPresentation on
 iOS moves one complete browser controller between a parent and a host-selected
 UIWindowScene, including an iPad external display, without replacing its tabs.
 

@@ -138,7 +138,8 @@ extension BrowserView {
         // Ensure the entry exists even before the bridge fires so callbacks
         // can be installed immediately. The window reference is filled in by
         // the bridge when the NSWindow becomes available.
-        WindowRegistry.shared.register(id: windowId, window: nil, tabStore: tabStore)
+        let window = WindowRegistry.shared.entry(for: windowId)?.window
+        WindowRegistry.shared.register(id: windowId, window: window, tabStore: tabStore, ownsWindowChrome: ownsWindowChrome)
         WindowRegistry.shared.installCallbacks(
             for: windowId,
             callbacks: WindowRegistry.Callbacks(

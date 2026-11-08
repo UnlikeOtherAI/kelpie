@@ -38,11 +38,14 @@ final class WindowRegistry {
         weak var window: NSWindow?
         let tabStore: TabStore
         var callbacks: Callbacks?
+        var ownsWindowChrome: Bool
+        var ownedWindow: NSWindow? { ownsWindowChrome ? window : nil }
 
-        init(id: String, window: NSWindow?, tabStore: TabStore) {
+        init(id: String, window: NSWindow?, tabStore: TabStore, ownsWindowChrome: Bool) {
             self.id = id
             self.window = window
             self.tabStore = tabStore
+            self.ownsWindowChrome = ownsWindowChrome
         }
     }
 
@@ -55,12 +58,13 @@ final class WindowRegistry {
     /// call repeatedly with the same id; subsequent calls refresh the weak
     /// window reference but preserve any installed callbacks.
     @discardableResult
-    func register(id: String, window: NSWindow?, tabStore: TabStore) -> String {
+    func register(id: String, window: NSWindow?, tabStore: TabStore, ownsWindowChrome: Bool = true) -> String {
         if let existing = entries[id] {
             existing.window = window
+            existing.ownsWindowChrome = ownsWindowChrome
             return id
         }
-        entries[id] = Entry(id: id, window: window, tabStore: tabStore)
+        entries[id] = Entry(id: id, window: window, tabStore: tabStore, ownsWindowChrome: ownsWindowChrome)
         registrationOrder.append(id)
         return id
     }
@@ -153,26 +157,39 @@ final class WindowRegistry {
     }
 }
 
-/// Hidden bridge view that captures the hosting `NSWindow` after SwiftUI
-/// attaches it and forwards the live reference to `WindowRegistry`. We
-/// cannot read the actual window from `.onAppear` because the SwiftUI view
-/// is hosted inside an `NSHostingView` whose `.window` is only populated
-/// after the view enters the AppKit view hierarchy.
+/// Keeps the registry attached to the current native window when a host reparents the browser.
 struct WindowRegistrationBridge: NSViewRepresentable {
     let windowId: String
     let tabStore: TabStore
+    let ownsWindowChrome: Bool
 
     func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        view.translatesAutoresizingMaskIntoConstraints = true
+        let view = RegistrationView()
+        configure(view)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        guard let view = nsView as? RegistrationView else { return }
+        configure(view)
+    }
+
+    private func configure(_ view: RegistrationView) {
         let id = windowId
         let store = tabStore
-        DispatchQueue.main.async {
-            WindowRegistry.shared.register(id: id, window: nsView.window, tabStore: store)
+        let ownsWindow = ownsWindowChrome
+        view.didMove = { [weak view] in
+            WindowRegistry.shared.register(id: id, window: view?.window, tabStore: store, ownsWindowChrome: ownsWindow)
         }
+        DispatchQueue.main.async { view.didMove?() }
+    }
+}
+
+private final class RegistrationView: NSView {
+    var didMove: (() -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        didMove?()
     }
 }

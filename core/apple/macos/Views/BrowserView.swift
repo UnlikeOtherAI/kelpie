@@ -218,7 +218,7 @@ struct BrowserView: View {
             }
         }
         .background(
-            WindowRegistrationBridge(windowId: windowId, tabStore: tabStore)
+            WindowRegistrationBridge(windowId: windowId, tabStore: tabStore, ownsWindowChrome: ownsWindowChrome)
                 .frame(width: 0, height: 0)
         )
         .background(

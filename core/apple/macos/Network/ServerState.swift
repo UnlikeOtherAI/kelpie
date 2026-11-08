@@ -277,7 +277,7 @@ final class ServerState: ObservableObject {
         self.isScriptRecording = isRecording
 
         if isRecording {
-            let window = NSApplication.shared.keyWindow
+            let window = WindowRegistry.shared.defaultEntry()?.ownedWindow
             scriptRecordingWindow = window
             scriptRecordingWasFullscreen = window?.styleMask.contains(.fullScreen) ?? false
             if let window, !scriptRecordingWasFullscreen {
@@ -286,7 +286,7 @@ final class ServerState: ObservableObject {
             return
         }
 
-        let window = scriptRecordingWindow ?? NSApplication.shared.keyWindow
+        let window = scriptRecordingWindow
         if let window, !scriptRecordingWasFullscreen, window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
         }

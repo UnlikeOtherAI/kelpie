@@ -148,8 +148,12 @@ struct BrowserManagementHandler {
     @MainActor
     private func setFullscreen(_ body: [String: Any]) async -> [String: Any] {
         let enabled = body["enabled"] as? Bool ?? true
-        guard let window = NSApplication.shared.keyWindow else {
-            return errorResponse(code: "NO_WINDOW", message: "No active window")
+        guard let entry = context.resolveWindow(windowId: body["windowId"] as? String, tabId: HandlerContext.tabId(from: body)),
+              let window = entry.window else {
+            return errorResponse(code: "NO_WINDOW", message: "No browser window")
+        }
+        guard entry.ownsWindowChrome else {
+            return errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "The containing app controls fullscreen")
         }
         let isFullscreen = window.styleMask.contains(.fullScreen)
         if enabled != isFullscreen {
@@ -160,8 +164,12 @@ struct BrowserManagementHandler {
 
     @MainActor
     private func getFullscreen(_ body: [String: Any]) async -> [String: Any] {
-        guard let window = NSApplication.shared.keyWindow else {
-            return errorResponse(code: "NO_WINDOW", message: "No active window")
+        guard let entry = context.resolveWindow(windowId: body["windowId"] as? String, tabId: HandlerContext.tabId(from: body)),
+              let window = entry.window else {
+            return errorResponse(code: "NO_WINDOW", message: "No browser window")
+        }
+        guard entry.ownsWindowChrome else {
+            return errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "The containing app controls fullscreen")
         }
         return successResponse(["enabled": window.styleMask.contains(.fullScreen)])
     }
