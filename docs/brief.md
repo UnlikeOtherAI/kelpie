@@ -1,5 +1,8 @@
 # Kelpie — Product Brief
 
+The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](../core/README.md).
+
+
 ## What It Is
 
 Kelpie is an **LLM-first browser** for iOS/iPadOS, Android, macOS, Windows and Linux.

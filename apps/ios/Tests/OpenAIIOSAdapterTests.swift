@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// iOS adaptation of the shared OpenAI-compatible core: execution-host
 /// metadata, `ai-load` failure semantics and visible-tab pinning.

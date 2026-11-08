@@ -48,7 +48,7 @@ sign-in landing page without entering user credentials.
 
 ## Cross-Provider Review
 
-The account implementation lives in native/desktop-account so Windows and Linux use the same state machine and merge behavior, with native WinHTTP and curl transports.
+The account implementation lives in core/native/desktop-account so Windows and Linux use the same state machine and merge behavior, with native WinHTTP and curl transports.
 
 Review completed by Claude Code before account implementation. Accepted: exclusive
 loopback bind, validated denial handling, callback limits, cancellation before

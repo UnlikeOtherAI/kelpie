@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'apps/android/**'
-      - 'native/**'
+      - 'core/native/**'
+      - 'core/android/**'
+      - '.editorconfig'
       - 'packages/shared/**'
       - 'scripts/native/**'
       - 'pnpm-lock.yaml'
@@ -16,7 +18,9 @@ on:
       - main
     paths:
       - 'apps/android/**'
-      - 'native/**'
+      - 'core/native/**'
+      - 'core/android/**'
+      - '.editorconfig'
       - 'packages/shared/**'
       - 'scripts/native/**'
       - 'pnpm-lock.yaml'
@@ -54,7 +58,7 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             apps/android/.gradle
-          key: gradle-${{ runner.os }}-${{ hashFiles('apps/android/**/*.gradle*', 'apps/android/**/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('core/android/**/*.gradle*', 'apps/android/**/*.gradle*', 'apps/android/**/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 

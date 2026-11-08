@@ -1,9 +1,33 @@
 import AppKit
 import WebKit
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class BrowserUnderlapTests: XCTestCase {
+    @MainActor
+    func testTrackingAreaOwnerHandlesBothEntryAndExitEvents() throws {
+        let tracker = RendererHoverTracker()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        var changes: [String] = []
+        tracker.update(container: container, renderer: nil, topInset: 0) { changes.append($0) }
+        defer { tracker.detach() }
+        let area = try XCTUnwrap(container.trackingAreas.first)
+        XCTAssertTrue(area.options.contains(.mouseEnteredAndExited))
+        let owner = try XCTUnwrap(area.owner as? NSObject)
+        for type: NSEvent.EventType in [.mouseEntered, .mouseExited] {
+            let selector = NSSelectorFromString(type == .mouseEntered ? "mouseEntered:" : "mouseExited:")
+            guard owner.responds(to: selector) else {
+                return XCTFail("Tracking-area owner must handle \(selector)")
+            }
+            let event = try XCTUnwrap(NSEvent.enterExitEvent(
+                with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                context: nil, eventNumber: 0, trackingNumber: 0, userData: nil
+            ))
+            owner.perform(selector, with: event)
+        }
+        XCTAssertEqual(changes, ["", ""])
+    }
+
     @MainActor
     func testWebKitUnderlapPreservesVisibleViewportAndSnapshot() async throws {
         guard #available(macOS 26.0, *) else { throw XCTSkip("Native underlap requires macOS 26") }

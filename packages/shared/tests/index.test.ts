@@ -95,7 +95,7 @@ describe("MCP tools", () => {
 
   it("keeps native MCP registry names and HTTP endpoints aligned with the shared catalogue", () => {
     const source = readFileSync(
-      new URL("../../../native/core-mcp/src/mcp_tool.cpp", import.meta.url),
+      new URL("../../../core/native/core-mcp/src/mcp_tool.cpp", import.meta.url),
       "utf8",
     );
     const nativeTools = [...source.matchAll(/Tool\("(kelpie_[^"]+)",\s*"([^"]+)"/g)];

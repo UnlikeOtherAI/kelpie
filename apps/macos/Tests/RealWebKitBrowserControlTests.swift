@@ -1,3 +1,4 @@
+import KelpieNative
 import WebKit
 #if os(iOS)
 import Network
@@ -8,7 +9,7 @@ import AppKit
 import UIKit
 #endif
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 @MainActor
 final class RealWebKitBrowserControlTests: XCTestCase {

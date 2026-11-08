@@ -28,7 +28,7 @@ per the parent plan's resolved review finding #9 — the
 
 ## Engine scope
 
-**WKWebView path only.** macOS Kelpie can run on either WKWebView or CEF (`RendererState.activeEngine`). For the CEF path, `new-tab` with `partition` returns `{"success": false, "error": "PARTITION_UNSUPPORTED_ON_CHROMIUM"}`. Engine-agnostic partition support is a follow-up requiring `native/engine-chromium-desktop` extensions and is explicitly out of scope.
+**WKWebView path only.** macOS Kelpie can run on either WKWebView or CEF (`RendererState.activeEngine`). For the CEF path, `new-tab` with `partition` returns `{"success": false, "error": "PARTITION_UNSUPPORTED_ON_CHROMIUM"}`. Engine-agnostic partition support is a follow-up requiring `core/native/engine-chromium-desktop` extensions and is explicitly out of scope.
 
 ## Pre-conditions
 
@@ -37,7 +37,7 @@ per the parent plan's resolved review finding #9 — the
 
 ## Files
 
-### `apps/macos/Kelpie/Browser/TabStore.swift`
+### `core/apple/macos/Browser/TabStore.swift`
 
 Extend `Tab` struct / class with:
 ```swift
@@ -48,7 +48,7 @@ var persistent: Bool
 
 Extend `TabStore.addTab(...)` to accept `name`, `partition`, `persistent`.
 
-### `apps/macos/Kelpie/Browser/PartitionRegistry.swift` (new)
+### `core/apple/macos/Browser/PartitionRegistry.swift` (new)
 
 Mirror of the iOS `PartitionRegistry` (same API, same validation, same UserDefaults persistence, same reconciliation policy, same `deleting`-flag race protection, same orphan handling). The two registries can later be lifted into a shared Swift package if duplication becomes a problem — defer that.
 
@@ -60,7 +60,7 @@ Extend init to accept an optional `WKWebsiteDataStore`. When provided, use it on
 
 Cookie-touching code that reads `webView.configuration.websiteDataStore.httpCookieStore` continues to work — it just now points at the partition store when one is set.
 
-### `apps/macos/Kelpie/Handlers/HandlerContext.swift` — `SharedCookieJar` exclusion (CRITICAL)
+### `core/apple/macos/Handlers/HandlerContext.swift` — `SharedCookieJar` exclusion (CRITICAL)
 
 Verified during planning: `SharedCookieJar` (file at `~/.kelpie/session/cookies.json`) is *not* passive — `HandlerContext` actively syncs cookies between every WKWebView tab through it (`persistRendererCookiesToSharedJar` writes, `syncSharedCookiesIntoRenderer` reads-and-pushes). Without intervention, partitioned tabs would leak cookies into the shared jar and have every other tab's cookies pushed back on next sync. This defeats partition isolation.
 
@@ -73,11 +73,11 @@ Verified during planning: `SharedCookieJar` (file at `~/.kelpie/session/cookies.
 
 No changes to `SharedCookieJar.swift` itself — it remains the snapshot/restore helper for the default store. All filtering happens at the callsites.
 
-### `apps/macos/Kelpie/Browser/SessionStore.swift`
+### `core/apple/macos/Browser/SessionStore.swift`
 
 Persist `name`, `partition`, `persistent` per tab. On restart, restore tabs with `persistent: true` partitions; discard tabs with `persistent: false`.
 
-### `apps/macos/Kelpie/Handlers/BrowserManagementHandler.swift`
+### `core/apple/macos/Handlers/BrowserManagementHandler.swift`
 
 - `newTab`:
   - If `context.renderer?.engineName == "chromium"` and `body["partition"]` is set, return `PARTITION_UNSUPPORTED_ON_CHROMIUM`.

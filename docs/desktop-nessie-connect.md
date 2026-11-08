@@ -7,8 +7,8 @@ doorway for granting the new permission. Pause stops current work and keeps a pa
 connection; Stop disconnects. Both choices persist across launches. Sign-out cancels
 work and removes the prior account's journal. The Linux no-CEF fallback cannot connect.
 
-The common implementation is `native/desktop-connect`, using `native/core-connect`'s
-ledger and `native/desktop-account`'s existing rotating refresh lifecycle. A dedicated
+The common implementation is `core/native/desktop-connect`, using `core/native/core-connect`'s
+ledger and `core/native/desktop-account`'s existing rotating refresh lifecycle. A dedicated
 encrypted blob store reuses the session store's atomic, flushed DPAPI (Windows) and
 AES-GCM/file-permission (Linux) implementations, with separate journal/control names.
 Journal corruption or persistence failure disables dispatch instead of starting an
@@ -98,7 +98,7 @@ deadlines, URL restrictions, snapshot/extraction boundaries, unchanged refresh s
 encrypted namespace isolation and result retention. Native Windows requires the pinned
 sandboxed CEF SDK; Linux requires its CEF runtime, curl/OpenSSL and GTK for menu checks.
 Portable mocks do not verify production provisioning, real WSS revocation, installed
-model inference or the rendered platform menus. Those require native/integration checks.
+model inference or the rendered platform menus. Those require core/native/integration checks.
 
 GTK viewport resize/reset uses the current allocated browser widget dimensions,
 independent of missing or stale CEF paint frames. Native Linux acceptance exercises

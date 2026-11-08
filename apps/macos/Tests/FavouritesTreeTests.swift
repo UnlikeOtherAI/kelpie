@@ -1,5 +1,6 @@
+import KelpieNative
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 @MainActor
 final class FavouritesTreeTests: XCTestCase {

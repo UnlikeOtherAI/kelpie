@@ -1,5 +1,8 @@
 # Kelpie — System Architecture
 
+The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](../core/README.md).
+
+
 ## Overview
 
 Kelpie is a two-component system: native browser apps on iOS, Android, macOS, and Linux devices and a CLI orchestrator on the developer's machine. All components communicate over the local network via HTTP/JSON. Discovery is automatic via mDNS.
@@ -89,13 +92,13 @@ Each browser app has four internal layers:
 
 **Network Layer** — Embedded HTTP server (Swifter/Telegraph on iOS, Ktor on Android, Network.framework-based server on macOS, shared desktop HTTP/MCP server on Windows and Linux Chromium), MCP server over the same transport, and mDNS service advertisement. The Windows and Linux Chromium listeners are authenticated loopback-only and are not advertised through mDNS. On macOS, advertisement stays tied to the long-lived server process. On iOS and Android, the app reasserts advertisement on foreground entry so discovery recovers after background suspension.
 
-### Shared Native Libraries (`native/`)
+### Shared Native Libraries (`core/native/`)
 
 Windows/Linux account gateway coordination and owner-thread document leases follow
 [desktop Nessie connection](desktop-nessie-connect.md), using `desktop-connect`,
 `desktop-account` encrypted storage and the shared `core-connect` durable ledger.
 
-Cross-platform C++17 static libraries with C ABI, shared by all platforms via bridging headers (Swift) or JNI (Kotlin). Each module lives under `native/core-*` and follows the same pattern: opaque pointer handle, `extern "C"` API, nlohmann_json, CMake build, assert-based tests.
+Cross-platform C++17 static libraries with C ABI, shared by all platforms via bridging headers (Swift) or JNI (Kotlin). Each module lives under `core/native/core-*` and follows the same pattern: opaque pointer handle, `extern "C"` API, nlohmann_json, CMake build, assert-based tests.
 
 | Module | Purpose |
 |--------|---------|

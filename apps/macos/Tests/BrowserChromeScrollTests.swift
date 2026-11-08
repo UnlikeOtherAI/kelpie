@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class BrowserChromeScrollTests: XCTestCase {
     func testDownHidesAndFirstUpwardTickReveals() {

@@ -1,5 +1,8 @@
 # Kelpie — Tech Stack
 
+The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](../core/README.md).
+
+
 ## Platform Matrix
 
 | Component | Technology | Language | Notes |
@@ -155,7 +158,7 @@ packages/
 | **mDNS TXT Records** | `id`, `name`, `model`, `platform`, `width`, `height`, `port`, `version` | Device metadata for discovery |
 | **API Versioning** | URL prefix `/v1/` | Forward-compatible |
 | **Image Format** | PNG (screenshots) | Lossless, LLM-friendly |
-| **Shared Native Core** | C++17 static libraries under `native/` | Shared protocol, state, automation, MCP, and desktop Chromium engine foundations |
+| **Shared Native Core** | C++17 static libraries under `core/native/` | Shared protocol, state, automation, MCP, and desktop Chromium engine foundations |
 | **Monorepo** | pnpm workspaces | CLI, shared types, and native app projects all in one repo |
 
 ---
@@ -164,7 +167,7 @@ packages/
 
 ```
 kelpie/
-  native/
+  core/native/
     core-protocol/        # Shared native protocol constants and enums
     core-state/           # Shared native bookmark/history/console/network stores
     core-automation/      # Shared handler context and renderer abstraction

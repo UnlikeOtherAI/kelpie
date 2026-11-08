@@ -10,7 +10,7 @@ function rawScript(source: string, name: string): string {
 
 describe("desktop inspection JavaScript", () => {
   it("parses each reusable browser expression before native evaluation", async () => {
-    const source = await readFile(resolve("../../native/engine-chromium-desktop/src/handlers/inspection_scripts.h"), "utf8");
+    const source = await readFile(resolve("../../core/native/engine-chromium-desktop/src/handlers/inspection_scripts.h"), "utf8");
     for (const name of ["kVisibleElementsScript", "kPageTextScript", "kFormStateScript"]) {
       // The browser engine executes these expressions; compile them with V8 first.
       // eslint-disable-next-line @typescript-eslint/no-implied-eval

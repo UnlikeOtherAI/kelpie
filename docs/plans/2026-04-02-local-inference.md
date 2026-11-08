@@ -255,7 +255,7 @@ kelpie ai ask "describe this page" --device mac --context screenshot
 │                                             │
 │  AIHandler (HTTP handler)                   │
 │  ┌─────────────────────────────────────┐    │
-│  │ ai-load: load model (native/ollama) │    │
+│  │ ai-load: load model (core/native/ollama) │    │
 │  │ ai-unload: free model from memory   │    │
 │  │ ai-status: report loaded model      │    │
 │  │ ai-infer: route to active backend   │    │
@@ -1340,7 +1340,7 @@ git commit -m "feat(mcp): add AI inference and model management tools"
 
 **Files:**
 - Modify: `apps/macos/Kelpie.xcodeproj/project.pbxproj` — add llama.cpp SPM dependency
-- Create: `apps/macos/Kelpie/AI/InferenceEngine.swift`
+- Create: `core/apple/macos/AI/InferenceEngine.swift`
 
 **Step 1: Add llama.cpp Swift Package**
 
@@ -1348,7 +1348,7 @@ Add the `ggerganov/llama.cpp` Swift package to the Xcode project via SPM. The pa
 
 **Step 2: Implement InferenceEngine**
 
-`apps/macos/Kelpie/AI/InferenceEngine.swift`:
+`core/apple/macos/AI/InferenceEngine.swift`:
 
 ```swift
 import Foundation
@@ -1420,13 +1420,13 @@ git commit -m "feat(macos): integrate llama.cpp Swift package and InferenceEngin
 ### Task 8: macOS — Inference Harness & System Prompt
 
 **Files:**
-- Create: `apps/macos/Kelpie/AI/InferenceHarness.swift`
-- Create: `apps/macos/Kelpie/AI/SystemPrompt.swift`
+- Create: `core/apple/macos/AI/InferenceHarness.swift`
+- Create: `core/apple/macos/AI/SystemPrompt.swift`
 - Create: `apps/macos/Kelpie/AI/PageSummary.swift`
 
 **Step 1: Implement the system prompt**
 
-`apps/macos/Kelpie/AI/SystemPrompt.swift`:
+`core/apple/macos/AI/SystemPrompt.swift`:
 
 ```swift
 enum SystemPrompt {
@@ -1517,7 +1517,7 @@ struct PageSummary {
 
 **Step 3: Implement InferenceHarness**
 
-`apps/macos/Kelpie/AI/InferenceHarness.swift`:
+`core/apple/macos/AI/InferenceHarness.swift`:
 
 The harness orchestrates the agent loop:
 1. Build prompt: system prompt + page summary + user question
@@ -1582,12 +1582,12 @@ git commit -m "feat(macos): add inference harness with agent loop, system prompt
 ### Task 9: macOS — AIHandler HTTP Endpoints
 
 **Files:**
-- Create: `apps/macos/Kelpie/Handlers/AIHandler.swift`
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift` — register AI handlers
+- Create: `core/apple/macos/Handlers/AIHandler.swift`
+- Modify: `core/apple/macos/Network/ServerState.swift` — register AI handlers
 
 **Step 1: Implement AIHandler**
 
-`apps/macos/Kelpie/Handlers/AIHandler.swift`:
+`core/apple/macos/Handlers/AIHandler.swift`:
 
 ```swift
 import Foundation
@@ -1639,7 +1639,7 @@ Build macOS app, verify new endpoints appear when calling `GET /health` or testi
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Handlers/AIHandler.swift apps/macos/Kelpie/Network/ServerState.swift
+git add core/apple/macos/Handlers/AIHandler.swift core/apple/macos/Network/ServerState.swift
 git commit -m "feat(macos): add AI HTTP endpoints for model loading and inference"
 ```
 
@@ -1648,12 +1648,12 @@ git commit -m "feat(macos): add AI HTTP endpoints for model loading and inferenc
 ### Task 10: macOS — Apple Silicon Detection Gate
 
 **Files:**
-- Create: `apps/macos/Kelpie/AI/AIState.swift`
+- Create: `core/apple/macos/AI/AIState.swift`
 - Modify: `apps/macos/Kelpie/KelpieApp.swift` — check at startup
 
 **Step 1: Implement AIState**
 
-`apps/macos/Kelpie/AI/AIState.swift`:
+`core/apple/macos/AI/AIState.swift`:
 
 ```swift
 import Foundation
@@ -1698,7 +1698,7 @@ Run: Build macOS app, verify brain pill appears on Apple Silicon.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Kelpie/AI/AIState.swift apps/macos/Kelpie/KelpieApp.swift
+git add core/apple/macos/AI/AIState.swift apps/macos/Kelpie/KelpieApp.swift
 git commit -m "feat(macos): gate AI features behind Apple Silicon detection"
 ```
 
@@ -1707,12 +1707,12 @@ git commit -m "feat(macos): gate AI features behind Apple Silicon detection"
 ### Task 11: macOS — Audio Recording & ai-record Endpoint
 
 **Files:**
-- Create: `apps/macos/Kelpie/AI/AudioRecorder.swift`
-- Modify: `apps/macos/Kelpie/Handlers/AIHandler.swift` — add ai-record handler
+- Create: `core/apple/macos/AI/AudioRecorder.swift`
+- Modify: `core/apple/macos/Handlers/AIHandler.swift` — add ai-record handler
 
 **Step 1: Implement AudioRecorder**
 
-`apps/macos/Kelpie/AI/AudioRecorder.swift`:
+`core/apple/macos/AI/AudioRecorder.swift`:
 
 ```swift
 import AVFoundation
@@ -1768,7 +1768,7 @@ Build macOS app, verify `ai-record` endpoint responds.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Kelpie/AI/AudioRecorder.swift apps/macos/Kelpie/Handlers/AIHandler.swift
+git add core/apple/macos/AI/AudioRecorder.swift core/apple/macos/Handlers/AIHandler.swift
 git commit -m "feat(macos): add audio recorder and ai-record HTTP endpoint"
 ```
 
@@ -1777,10 +1777,10 @@ git commit -m "feat(macos): add audio recorder and ai-record HTTP endpoint"
 ### Task 12: iOS — Platform AI Handler
 
 **Files:**
-- Create: `apps/ios/Kelpie/AI/AIState.swift`
-- Create: `apps/ios/Kelpie/AI/PlatformAIEngine.swift`
-- Create: `apps/ios/Kelpie/Handlers/AIHandler.swift`
-- Modify: `apps/ios/Kelpie/Network/Router.swift` — register AI routes
+- Create: `core/apple/ios/AI/AIState.swift`
+- Create: `core/apple/ios/AI/PlatformAIEngine.swift`
+- Create: `core/apple/ios/Handlers/AIHandler.swift`
+- Modify: `core/apple/ios/Network/Router.swift` — register AI routes
 
 **Step 1: Implement PlatformAIEngine**
 
@@ -1835,7 +1835,7 @@ Build iOS app, verify AI endpoints respond with platform backend.
 **Step 5: Commit**
 
 ```bash
-git add apps/ios/Kelpie/AI/ apps/ios/Kelpie/Handlers/AIHandler.swift apps/ios/Kelpie/Network/Router.swift
+git add apps/ios/Kelpie/AI/ core/apple/ios/Handlers/AIHandler.swift core/apple/ios/Network/Router.swift
 git commit -m "feat(ios): add platform AI (Apple Intelligence) as default backend"
 ```
 
@@ -1855,10 +1855,10 @@ git commit -m "feat(ios): add platform AI (Apple Intelligence) as default backen
 ### Task 13: Android — Platform AI Handler
 
 **Files:**
-- Create: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIState.kt`
-- Create: `apps/android/app/src/main/java/com/kelpie/browser/ai/PlatformAIEngine.kt`
-- Create: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIHandler.kt`
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/network/Router.kt` — register AI routes
+- Create: `core/android/src/main/java/com/kelpie/browser/ai/AIState.kt`
+- Create: `core/android/src/main/java/com/kelpie/browser/ai/PlatformAIEngine.kt`
+- Create: `core/android/src/main/java/com/kelpie/browser/ai/AIHandler.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/network/Router.kt` — register AI routes
 
 **Step 1: Add AI Edge SDK dependency**
 

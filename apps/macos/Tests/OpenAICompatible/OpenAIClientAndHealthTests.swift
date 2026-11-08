@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class OpenAIClientAndHealthTests: XCTestCase {
     private func client(_ transport: FakeOpenAITransport, key: String? = nil) throws -> OpenAIEndpointClient {

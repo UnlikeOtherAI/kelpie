@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class OpenAIEndpointURLTests: XCTestCase {
     private func normalized(_ raw: String) throws -> String {

@@ -133,7 +133,7 @@ release acceptance command documented above; CI packaging does not bypass a loca
 rejected browser launch.
 
 The shared native HTTP/MCP journey can also run against a built desktop executable:
-`node tests/native/run-control-acceptance.mjs <absolute-executable>` (add `--fallback`
+`node tests/core/native/run-control-acceptance.mjs <absolute-executable>` (add `--fallback`
 for the Linux build without CEF). It owns its temporary profile, listener and fixture,
 uses the standard MCP SDK handshake, measures the default and discovered rich catalog,
 and verifies snapshots, captured-node actions, stale refs and timeout/recovery.

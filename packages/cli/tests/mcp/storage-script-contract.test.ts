@@ -24,7 +24,7 @@ function run(expression: string, storage: Storage, sessionStorage = storage): un
 
 describe("desktop storage expressions", () => {
   it("uses quoted storage types and executes list, key, set, and clear forms", async () => {
-    const source = await readFile(resolve("../../native/engine-chromium-desktop/src/handlers/cookie_handler.cpp"), "utf8");
+    const source = await readFile(resolve("../../core/native/engine-chromium-desktop/src/handlers/cookie_handler.cpp"), "utf8");
     expect(source).toContain("const std::string type_literal = JsStringLiteral(type)");
     expect(source).not.toContain('return {type:"" + type + ""');
     const storage = memory({ language: "en" });

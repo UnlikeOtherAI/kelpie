@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// Mirrors `packages/shared/tests/partition.test.ts`. The two validators must
 /// agree on the verdict *and* on the reason, so these cases are deliberately

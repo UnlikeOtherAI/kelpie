@@ -16,7 +16,7 @@ The current repo already has the right external seam:
 
 - shared HTTP contract in [`packages/shared/src/api-types.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/api-types.ts)
 - shared MCP tool names in [`packages/shared/src/mcp-tools.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/mcp-tools.ts)
-- renderer abstraction and handler context on macOS in [`apps/macos/Kelpie/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Renderer/RendererEngine.swift) and [`apps/macos/Kelpie/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Handlers/HandlerContext.swift)
+- renderer abstraction and handler context on macOS in [`core/apple/macos/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/core/apple/macos/Renderer/RendererEngine.swift) and [`core/apple/macos/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/core/apple/macos/Handlers/HandlerContext.swift)
 
 What is missing is a reusable internal core. Right now the external contract is shared, but the browser-app implementation is not.
 
@@ -326,7 +326,7 @@ Share:
 packages/
   cli/                       # existing Node CLI
   shared/                    # TS schemas consumed by CLI/docs if retained
-native/
+core/native/
   core-protocol/
   core-state/
   core-automation/
@@ -344,7 +344,7 @@ apps/
   windows/
 ```
 
-If we do not want a new `native/` top-level folder, place these under `apps/native/`. The important part is module separation, not the exact path.
+If we do not want a new `core/native/` top-level folder, place these under `apps/core/native/`. The important part is module separation, not the exact path.
 
 ---
 

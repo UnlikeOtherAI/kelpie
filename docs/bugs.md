@@ -8,7 +8,7 @@ Active bugs to fix. Move to done/ once resolved and reference the commit.
 
 **Status:** Fixed — see commit after this entry is filed.
 
-**Location:** `apps/macos/Kelpie/Views/AIChatPanel.swift`
+**Location:** `core/apple/macos/Views/AIChatPanel.swift`
 
 ### Issue 1: Section labelled "NATIVE" instead of "HUGGING FACE"
 

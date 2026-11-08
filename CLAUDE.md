@@ -6,6 +6,10 @@ Android release signing requires all four configured secrets and verified APK/AA
 
 Windows/Linux outbound Nessie account connections follow [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 
+The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Apple Store builds use `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` as documented there. Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session. `pnpm check:embedding` checks that ownership boundary locally and in CI.
+
+Direct Mac artifacts use the inside-out signer and notarization checks in [Mac releases](docs/macos-release.md); `pnpm check:macos-signing` checks the signing plan without credentials.
+
 ## What This Is
 
 Kelpie is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.
@@ -58,3 +62,7 @@ The Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/wi
 loopback readiness-token control and the CLI stdio alias bridge before publication.
 
 Native browser gateway bindings and reproducible generated contract builds follow [docs/api/native-browser-gateway.md](docs/api/native-browser-gateway.md).
+
+Windows release CI retains unsigned candidates; sign and launch the complete CEF package before publication using [Windows releases](docs/windows-release.md).
+
+Build Apple apps from their generated `.xcworkspace` so Xcode includes the separate browser library; see [embedding](core/README.md).

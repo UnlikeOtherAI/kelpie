@@ -6,7 +6,7 @@
 
 ## Current Implementation Notes
 
-The repo does not yet contain `native/engine-chromium-desktop/`, so the first Windows cut in `apps/windows/` is intentionally thin:
+The repo does not yet contain `core/native/engine-chromium-desktop/`, so the first Windows cut in `apps/windows/` is intentionally thin:
 
 - Build and shell code exist now under `apps/windows/`.
 - The app links the existing native protocol/state/automation/MCP libraries directly.
@@ -43,11 +43,11 @@ apps/windows/
 ### Dependencies on shared native core
 
 Same as Linux — consumes:
-- `native/core-protocol/`
-- `native/core-state/`
-- `native/core-automation/`
-- `native/core-mcp/`
-- `native/engine-chromium-desktop/`
+- `core/native/core-protocol/`
+- `core/native/core-state/`
+- `core/native/core-automation/`
+- `core/native/core-mcp/`
+- `core/native/engine-chromium-desktop/`
 
 ---
 
@@ -191,7 +191,7 @@ Recommendation: Start with Option B (native), fall back to Option A.
 - C++17 compiler (MSVC 2019+ or MinGW-w64)
 - CEF binary distribution (Windows 64-bit)
 - cpp-httplib (header-only)
-- nlohmann/json (already in native/ CMake)
+- nlohmann/json (already in core/native/ CMake)
 - Windows SDK 10.0.17763+ (for native mDNS)
 
 ### Cross-compilation from macOS (for development)

@@ -40,7 +40,7 @@ Firefox must already be installed at one of the standard paths:
 ## Task 1: Add gecko case to RendererState
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Renderer/RendererState.swift`
+- Modify: `core/apple/macos/Renderer/RendererState.swift`
 
 **Step 1: Open the file and add the `.gecko` case**
 
@@ -69,7 +69,7 @@ Open Xcode → Product → Build (⌘B). Expect: build succeeds. The `RendererHa
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Renderer/RendererState.swift
+git add core/apple/macos/Renderer/RendererState.swift
 git commit -m "feat(macos): add gecko case to RendererState.Engine"
 ```
 
@@ -677,7 +677,7 @@ git commit -m "feat(macos): add GeckoRenderer - Firefox via CDP Remote Protocol"
 ## Task 6: Wire gecko into ServerState
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift`
+- Modify: `core/apple/macos/Network/ServerState.swift`
 
 **Step 1: Add geckoRenderer stored property**
 
@@ -711,7 +711,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Network/ServerState.swift
+git add core/apple/macos/Network/ServerState.swift
 git commit -m "feat(macos): wire GeckoRenderer into ServerState"
 ```
 
@@ -720,8 +720,8 @@ git commit -m "feat(macos): wire GeckoRenderer into ServerState"
 ## Task 7: Update RendererHandler and CookieMigrator
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Handlers/RendererHandler.swift`
-- Modify: `apps/macos/Kelpie/Renderer/CookieMigrator.swift`
+- Modify: `core/apple/macos/Handlers/RendererHandler.swift`
+- Modify: `core/apple/macos/Renderer/CookieMigrator.swift`
 
 **Step 1: Update RendererHandler error message**
 
@@ -756,7 +756,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Kelpie/Handlers/RendererHandler.swift
+git add core/apple/macos/Handlers/RendererHandler.swift
 git commit -m "feat(macos): update RendererHandler to accept gecko engine"
 ```
 

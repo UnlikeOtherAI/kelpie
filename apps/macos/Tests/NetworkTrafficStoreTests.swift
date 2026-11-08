@@ -1,5 +1,6 @@
+import KelpieNative
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class NetworkTrafficStoreTests: XCTestCase {
     private var directory: URL!

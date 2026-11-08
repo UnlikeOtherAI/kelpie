@@ -27,12 +27,12 @@ C4, C5, C7, C9, C17, C18, C20, I2, I5, I22, I26, I28
 ## Stream A: Swift JS Escaping (C8, I11)
 
 **Files:**
-- Create: `apps/macos/Kelpie/Handlers/JSEscape.swift`
-- Modify: `apps/macos/Kelpie/Handlers/InteractionHandler.swift`
-- Modify: `apps/macos/Kelpie/Handlers/EvaluateHandler.swift`
-- Modify: `apps/macos/Kelpie/Handlers/HandlerContext.swift`
-- Modify: `apps/macos/Kelpie/Handlers/MutationHandler.swift`
-- Mirror: `apps/ios/Kelpie/Handlers/JSEscape.swift` (same file)
+- Create: `core/apple/macos/Handlers/JSEscape.swift`
+- Modify: `core/apple/macos/Handlers/InteractionHandler.swift`
+- Modify: `core/apple/macos/Handlers/EvaluateHandler.swift`
+- Modify: `core/apple/macos/Handlers/HandlerContext.swift`
+- Modify: `core/apple/macos/Handlers/MutationHandler.swift`
+- Mirror: `core/apple/ios/Handlers/JSEscape.swift` (same file)
 - Mirror: same fixes in iOS InteractionHandler, EvaluateHandler, MutationHandler
 
 **New utility:**
@@ -68,7 +68,7 @@ enum JSEscape {
 
 ## Stream B: HTTPServer (C1, C3)
 
-**File:** `apps/macos/Kelpie/Network/HTTPServer.swift`
+**File:** `core/apple/macos/Network/HTTPServer.swift`
 
 **C1 fix:** In `receiveData`, when Content-Length is absent on a POST, reject with 411 Length Required instead of assuming 0.
 
@@ -78,7 +78,7 @@ enum JSEscape {
 
 ## Stream C: SharedCookieJar SameSite (C10)
 
-**File:** `apps/macos/Kelpie/Browser/SharedCookieJar.swift`
+**File:** `core/apple/macos/Browser/SharedCookieJar.swift`
 
 Add `sameSite: String?` field to `StoredCookie`. Populate from `HTTPCookiePropertyKey("SameSite")`. Include in `signature()`. Set during `makeCookie()`.
 
@@ -86,7 +86,7 @@ Add `sameSite: String?` field to `StoredCookie`. Populate from `HTTPCookieProper
 
 ## Stream D: CookieMigrator (C11)
 
-**File:** `apps/macos/Kelpie/Renderer/CookieMigrator.swift`
+**File:** `core/apple/macos/Renderer/CookieMigrator.swift`
 
 When source is chromium, try to use SharedCookieJar as the cookie source instead of silently returning empty. The shared jar already has cookies persisted from the last sync.
 
@@ -103,7 +103,7 @@ guard source.engineName != "chromium" else {
 
 ## Stream E: HistoryStore (I4)
 
-**File:** `apps/macos/Kelpie/Browser/HistoryStore.swift`
+**File:** `core/apple/macos/Browser/HistoryStore.swift`
 
 Add `@MainActor` to the class declaration. All mutations of `@Published var entries` already happen from SwiftUI contexts; this makes the requirement explicit and catches off-main-thread callers at compile time.
 
@@ -111,7 +111,7 @@ Add `@MainActor` to the class declaration. All mutations of `@Published var entr
 
 ## Stream F: InferenceHarness JSON Parser (I17)
 
-**File:** `apps/macos/Kelpie/AI/InferenceHarness.swift`
+**File:** `core/apple/macos/AI/InferenceHarness.swift`
 
 Replace brace-counting `parseJSONObject` with a string-aware version that tracks whether we're inside a JSON string literal (between unescaped `"`):
 
@@ -150,8 +150,8 @@ private func parseJSONObject(from text: String) -> [String: Any]? {
 
 ## Stream G: NavigationHandler Scheme Allowlist (C2)
 
-**File:** `apps/macos/Kelpie/Handlers/NavigationHandler.swift`
-**Mirror:** `apps/ios/Kelpie/Handlers/NavigationHandler.swift`
+**File:** `core/apple/macos/Handlers/NavigationHandler.swift`
+**Mirror:** `core/apple/ios/Handlers/NavigationHandler.swift`
 
 Add scheme check after URL parsing:
 ```swift
@@ -167,8 +167,8 @@ guard let url = URL(string: urlString),
 
 ## Stream H: MutationHandler ID Collisions (C6)
 
-**File:** `apps/macos/Kelpie/Handlers/MutationHandler.swift`
-**Mirror:** `apps/ios/Kelpie/Handlers/MutationHandler.swift`
+**File:** `core/apple/macos/Handlers/MutationHandler.swift`
+**Mirror:** `core/apple/ios/Handlers/MutationHandler.swift`
 
 Replace `Date.now()` with `crypto.randomUUID()` (or fallback):
 ```javascript
@@ -181,7 +181,7 @@ var id = 'mut_' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + 
 
 ### C12 — Add wait-for-element and wait-for-navigation
 
-**File:** `native/engine-chromium-desktop/src/handlers/evaluate_handler.cpp` + header
+**File:** `core/native/engine-chromium-desktop/src/handlers/evaluate_handler.cpp` + header
 
 Add two new methods. Register them in `Register()`:
 ```cpp
@@ -195,25 +195,25 @@ router.Register("wait-for-navigation", [this](const json& p) { return WaitForNav
 
 ### C13 — Fix scroll-to-bottom
 
-**File:** `native/engine-chromium-desktop/src/handlers/scroll_handler.cpp`
+**File:** `core/native/engine-chromium-desktop/src/handlers/scroll_handler.cpp`
 
 Change line 13 from `document.body.scrollHeight` to `document.documentElement.scrollHeight`.
 
 ### C14 — Fix type to dispatch per-character events
 
-**File:** `native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`
+**File:** `core/native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`
 
 Replace the simple `element.value = next` loop with per-character event dispatching (keydown, input, keyup) matching Swift's pattern.
 
 ### C15 — Fix navigate to wait for page load
 
-**File:** `native/engine-chromium-desktop/src/handlers/navigation_handler.cpp`
+**File:** `core/native/engine-chromium-desktop/src/handlers/navigation_handler.cpp`
 
 After `LoadUrl`, add a polling loop on `IsLoading()` with `std::this_thread::sleep_for(100ms)`, timeout 10s.
 
 ### C16 — Fix fill to use property descriptor trick
 
-**File:** `native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`
+**File:** `core/native/engine-chromium-desktop/src/handlers/interaction_handler.cpp`
 
 Replace `element.value = VALUE;` with:
 ```js
@@ -225,13 +225,13 @@ else element.value = VALUE;
 
 ### I8 — Align query-selector response schema
 
-**File:** `native/engine-chromium-desktop/src/handlers/dom_handler.cpp`
+**File:** `core/native/engine-chromium-desktop/src/handlers/dom_handler.cpp`
 
 Match Swift response: `{found, element: {tag, id, text, classes, rect, visible}}`. Remove `attributes` from default response.
 
 ### I10 — Align text extraction
 
-**Files:** `native/engine-chromium-desktop/src/handlers/dom_handler.cpp`
+**Files:** `core/native/engine-chromium-desktop/src/handlers/dom_handler.cpp`
 
 Use `(element.textContent || '')` consistently to match Swift. The `innerText` behavior difference is a semantic change that could break consumers.
 
@@ -240,9 +240,9 @@ Use `(element.textContent || '')` consistently to match Swift. The `innerText` b
 ## Stream J: RendererInterface Cookie Methods (C21)
 
 **Files:**
-- `native/core-automation/include/kelpie/renderer_interface.h`
-- `native/engine-chromium-desktop/include/kelpie/cef_renderer.h`
-- `native/engine-chromium-desktop/src/cef_renderer.cpp`
+- `core/native/core-automation/include/kelpie/renderer_interface.h`
+- `core/native/engine-chromium-desktop/include/kelpie/cef_renderer.h`
+- `core/native/engine-chromium-desktop/src/cef_renderer.cpp`
 
 Add virtual stubs to RendererInterface:
 ```cpp
@@ -255,7 +255,7 @@ virtual void DeleteAllCookies() {}
 
 ## Stream K: Android mDNS (I29)
 
-**File:** `apps/android/app/src/main/java/com/kelpie/browser/network/MDNSAdvertiser.kt`
+**File:** `core/android/src/main/java/com/kelpie/browser/network/MDNSAdvertiser.kt`
 
 Add `setAttribute("engine", "webview")` after the existing TXT attributes.
 
@@ -264,15 +264,15 @@ Add `setAttribute("engine", "webview")` after the existing TXT attributes.
 ## Stream L: iOS Parity (I29, I30)
 
 **Files:**
-- `apps/ios/Kelpie/Device/DeviceInfo.swift` — add `"engine": "webkit"` to txtRecord
-- `apps/ios/Kelpie/Handlers/Snapshot3DHandler.swift` — add `set-mode`, `zoom`, `reset-view`
-- `apps/ios/Kelpie/Network/Router.swift` — add stubs for the three new routes
+- `core/apple/ios/Device/DeviceInfo.swift` — add `"engine": "webkit"` to txtRecord
+- `core/apple/ios/Handlers/Snapshot3DHandler.swift` — add `set-mode`, `zoom`, `reset-view`
+- `core/apple/ios/Network/Router.swift` — add stubs for the three new routes
 
 ---
 
 ## Stream M: Port Collision Guard (C19)
 
-**File:** `native/engine-chromium-desktop/include/kelpie/desktop_http_server.h`
+**File:** `core/native/engine-chromium-desktop/include/kelpie/desktop_http_server.h`
 
 Add a comment documenting that Swift ServerState has port fallback logic and that if both servers ever run simultaneously, the C++ side should also attempt fallback. No code change needed now since only one server runs at a time.
 
@@ -280,7 +280,7 @@ Add a comment documenting that Swift ServerState has port fallback logic and tha
 
 ## Stream N: NetworkBridge Closure Cap (I16)
 
-**File:** `apps/macos/Kelpie/Handlers/NetworkBridge.swift`
-**Mirror:** `apps/ios/Kelpie/Handlers/NetworkBridge.swift`
+**File:** `core/apple/macos/Handlers/NetworkBridge.swift`
+**Mirror:** `core/apple/ios/Handlers/NetworkBridge.swift`
 
 Add an `AbortSignal` check on the fetch interception to avoid leaking closures for aborted requests. Add a max-pending counter.

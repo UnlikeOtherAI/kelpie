@@ -105,7 +105,7 @@ with `RESULT_TOO_LARGE` and discards the output.
 
 ## Shared native ledger
 
-`native/core-connect` owns validation, generation checks, idempotency and the result
+`core/native/core-connect` owns validation, generation checks, idempotency and the result
 outbox. Its C ABI is `kelpie/connect.h`; platform calls are serialized. `create` takes
 previous journal JSON and a stable UOA account reference (never copied profile data).
 `execute` takes `receive`, `complete`, or `replay` plus a JSON object and returns

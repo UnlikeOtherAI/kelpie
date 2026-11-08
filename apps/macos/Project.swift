@@ -1,10 +1,11 @@
 import ProjectDescription
+import ProjectDescriptionHelpers
 
 // MARK: - Script phases
 
 let fixCEFStructure = TargetScript.pre(
     script: """
-    CEF_FW="${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework"
+    CEF_FW="${PROJECT_DIR}/../../core/apple/macos/Frameworks/Chromium Embedded Framework.framework"
     if [ -d "$CEF_FW/Resources" ] && [ ! -e "$CEF_FW/Info.plist" ]; then
       ln -sf Resources/Info.plist "$CEF_FW/Info.plist"
     fi
@@ -14,7 +15,7 @@ let fixCEFStructure = TargetScript.pre(
 
 let embedCEFFramework = TargetScript.post(
     script: """
-    CEF_SRC="${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework"
+    CEF_SRC="${PROJECT_DIR}/../../core/apple/macos/Frameworks/Chromium Embedded Framework.framework"
     CEF_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Chromium Embedded Framework.framework"
     rm -rf "$CEF_DST"
     mkdir -p "$CEF_DST/Versions/A"
@@ -38,8 +39,10 @@ let embedCEFFramework = TargetScript.post(
 
 let embedKelpieHelper = TargetScript.post(
     script: """
+    set -euo pipefail
     HELPER_EXE="${BUILT_PRODUCTS_DIR}/KelpieHelper"
-    HELPER_ROOT="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"
+    HELPER_ROOT="${BUILT_PRODUCTS_DIR:?}/${FRAMEWORKS_FOLDER_PATH:?}"
+    test -x "$HELPER_EXE"
 
     stage_helper() {
       local helper_name="$1"
@@ -63,10 +66,10 @@ let embedKelpieHelper = TargetScript.post(
       install_name_tool -change \\
         "@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework" \\
         "@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework" \\
-        "$exe_path" 2>/dev/null || true
+        "$exe_path"
 
       if [ "${CODE_SIGNING_ALLOWED}" != "NO" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
-        codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --entitlements "${PROJECT_DIR}/KelpieHelper/KelpieHelper.entitlements" "$app_dir"
+        codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --entitlements "${PROJECT_DIR}/../../core/apple/Helpers/KelpieHelper.entitlements" "$app_dir"
       fi
     }
 
@@ -88,7 +91,7 @@ let embedKelpieHelper = TargetScript.post(
 
 let embedGeckoHelper = TargetScript.post(
     script: """
-    GECKO_SRC="${PROJECT_DIR}/Frameworks/KelpieGeckoHelper.app"
+    GECKO_SRC="${PROJECT_DIR}/../../core/apple/macos/Frameworks/KelpieGeckoHelper.app"
     GECKO_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/KelpieGeckoHelper.app"
     if [ -d "$GECKO_SRC" ]; then
       rm -rf "$GECKO_DST"
@@ -104,29 +107,8 @@ let embedGeckoHelper = TargetScript.post(
     name: "Embed Gecko Helper"
 )
 
-// MARK: - Linker flags
-
-let macOSLinkerFlags: SettingValue = .array([
-    "-lkelpie_core_state",
-    "-lkelpie_core_connect",
-    "-lkelpie_core_protocol",
-    "-lkelpie_core_automation",
-    "-lkelpie_core_mcp",
-    "-lkelpie_core_ai",
-    "-lllama",
-    "-lggml",
-    "-lggml-base",
-    "-lggml-cpu",
-    "-lggml-metal",
-    "-lggml-blas",
-    "-lc++",
-    "-framework AppIntents",
-    "-framework Metal",
-    "-framework Accelerate",
-    "-framework \"Chromium Embedded Framework\"",
-])
-
 // MARK: - Targets
+
 
 let kelpieApp = Target.target(
     name: "Kelpie",
@@ -135,88 +117,75 @@ let kelpieApp = Target.target(
     bundleId: "com.kelpie.browser.macos",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [
-        .glob("Kelpie/**/*.swift"),
-        .glob("Kelpie/**/*.mm"),
-    ],
+    sources: [.glob("Kelpie/**/*.swift")],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
-        .glob(pattern: "Kelpie/Resources/**"),
     ],
-    entitlements: .file(path: "Kelpie/Kelpie.entitlements"),
-    scripts: [
+    entitlements: .file(path: KelpieBrowserBuild.webKitOnly ? "Kelpie/Store.entitlements" : "Kelpie/Kelpie.entitlements"),
+    scripts: [KelpieBrowserBuild.embedMacResources] + (KelpieBrowserBuild.webKitOnly ? [] : [
         fixCEFStructure,
         embedCEFFramework,
         embedKelpieHelper,
         embedGeckoHelper,
-    ],
+    ]),
     dependencies: [
-        .target(name: "KelpieHelper"),
+        .project(target: "KelpieBrowserMac", path: "../../core/apple"),
         .package(product: "AppReveal"),
-    ],
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [
+        .target(name: "KelpieHelper")
+    ]),
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "SWIFT_OBJC_BRIDGING_HEADER": "Kelpie/Kelpie-Bridging-Header.h",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Kelpie/Renderer",
-                "$(PROJECT_DIR)/../../native/core-state/include",
-                "$(PROJECT_DIR)/../../native/core-connect/include",
-                "$(PROJECT_DIR)/../../native/core-protocol/include",
-                "$(PROJECT_DIR)/../../native/core-automation/include",
-                "$(PROJECT_DIR)/../../native/core-mcp/include",
-                "$(PROJECT_DIR)/../../native/core-ai/include",
-                "$(PROJECT_DIR)/Frameworks/cef_include",
-                "$(PROJECT_DIR)/vendor/llama.cpp/include",
-            ]),
-            "LIBRARY_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../native/.build/core-state",
-                "$(PROJECT_DIR)/../../native/.build/core-connect",
-                "$(PROJECT_DIR)/../../native/.build/core-protocol",
-                "$(PROJECT_DIR)/../../native/.build/core-automation",
-                "$(PROJECT_DIR)/../../native/.build/core-mcp",
-                "$(PROJECT_DIR)/../../native/.build/core-ai",
-                "$(PROJECT_DIR)/vendor/llama.cpp/lib",
-            ]),
-            "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Frameworks",
-            ]),
-            "OTHER_LDFLAGS": macOSLinkerFlags,
+        base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core", additional: [
             "COMBINE_HIDPI_IMAGES": "YES",
-            "ENABLE_APP_SANDBOX": "NO",
-            "GENERATE_APP_INTENTS_METADATA": "NO",
-            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-        ]
+            "ENABLE_APP_SANDBOX": .string(KelpieBrowserBuild.webKitOnly ? "YES" : "NO")
+        ])
     )
 )
 
-let kelpieHelper = Target.target(
-    name: "KelpieHelper",
+
+
+let kelpieEmbeddingHost = Target.target(
+    name: "KelpieEmbeddingHost",
     destinations: .macOS,
-    product: .commandLineTool,
-    bundleId: "com.kelpie.browser.helper",
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.macos",
     deploymentTargets: .macOS("14.0"),
-    infoPlist: .file(path: "KelpieHelper/Info.plist"),
-    sources: [
-        .glob("KelpieHelper/**/*.mm"),
-    ],
-    entitlements: .file(path: "KelpieHelper/KelpieHelper.entitlements"),
-    settings: .settings(
-        base: [
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Frameworks/cef_include",
-            ]),
-            "FRAMEWORK_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Frameworks",
-            ]),
-            "OTHER_LDFLAGS": .array([
-                "-framework \"Chromium Embedded Framework\"",
-                "-lc++",
-            ]),
-        ]
-    )
+    infoPlist: .extendingDefault(with: [
+        "NSLocalNetworkUsageDescription": "Inspect the local embedding verification host.",
+        "NSBonjourServices": ["_appreveal._tcp"]
+    ]),
+    sources: [.glob("../apple-embedding-host/macos/**/*.swift")],
+    scripts: [KelpieBrowserBuild.embedMacResources] +
+        (KelpieBrowserBuild.webKitOnly ? [] : [fixCEFStructure, embedCEFFramework, embedKelpieHelper]),
+    dependencies: [
+        .project(target: "KelpieBrowserMac", path: "../../core/apple"),
+        .package(product: "AppReveal")
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [.target(name: "KelpieHelper")]),
+    settings: .settings(base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core"))
+)
+
+
+let kelpieEmbeddingUITests = Target.target(
+    name: "KelpieEmbeddingUITests",
+    destinations: .macOS,
+    product: .uiTests,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.macos.uitests",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-embedding-host/UITests/**/*.swift")],
+    dependencies: [.target(name: "KelpieEmbeddingHost")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
+let kelpieLibraryTestHost = Target.target(
+    name: "KelpieLibraryTestHost",
+    destinations: .macOS,
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.tests.macos.host",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-test-host/**/*.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
 
 let kelpieTests = Target.target(
@@ -228,20 +197,14 @@ let kelpieTests = Target.target(
     infoPlist: .default,
     sources: [
         .glob("Tests/**/*.swift"),
-        .glob("Tests/**/*.mm"),
+        .glob("Tests/**/*.mm", excluding: KelpieBrowserBuild.webKitOnly ? ["Tests/BrowserControlCDPLifetimeTests.mm"] : []),
     ],
     dependencies: [
-        .target(name: "Kelpie"),
+        .target(name: "KelpieLibraryTestHost"),
+        .project(target: "KelpieBrowserMac", path: "../../core/apple"),
     ],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
-            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/Kelpie/Renderer",
-                "$(PROJECT_DIR)/Frameworks/cef_include",
-            ]),
-        ]
+        base: KelpieBrowserBuild.mac(core: "$(PROJECT_DIR)/../../core")
     )
 )
 
@@ -251,7 +214,13 @@ let kelpieScheme = Scheme.scheme(
     name: "Kelpie",
     shared: true,
     buildAction: .buildAction(targets: ["Kelpie"]),
-    testAction: .targets(["KelpieTests"])
+    testAction: .targets(
+        ["KelpieTests"],
+        arguments: KelpieBrowserBuild.webKitOnly ? nil : .arguments(environmentVariables: [
+            "DYLD_FRAMEWORK_PATH": "$(BUILT_PRODUCTS_DIR)/Kelpie.app/Contents/Frameworks"
+        ]),
+        expandVariableFromTarget: "KelpieTests"
+    )
 )
 
 // MARK: - Project
@@ -263,10 +232,15 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
-        kelpieHelper,
+        kelpieLibraryTestHost,
+        kelpieEmbeddingHost,
+        kelpieEmbeddingUITests,
         kelpieTests,
-    ],
+    ] + (KelpieBrowserBuild.webKitOnly ? [] : [KelpieBrowserBuild.cefHelper(core: "../../core")]),
     schemes: [
         kelpieScheme,
+        .scheme(name: "KelpieEmbeddingHost", shared: true,
+                buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),
+                testAction: .targets(["KelpieEmbeddingUITests"])),
     ]
 )

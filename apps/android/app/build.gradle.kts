@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jlleitschuh.gradle.ktlint")
 }
 
@@ -13,7 +12,7 @@ ktlint {
 }
 
 android {
-    namespace = "com.kelpie.browser"
+    namespace = "com.unlikeotherai.kelpie.app"
     compileSdk = 34
 
     defaultConfig {
@@ -21,28 +20,24 @@ android {
         minSdk = 28
         targetSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 19
-        versionName = "0.1.19"
+        versionCode = 20
+        versionName = "0.2.0"
         buildConfigField("int", "LOCAL_HTTP_PORT", "8420")
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += "-std=c++17"
-            }
-        }
     }
 
     buildTypes {
         debug {
-            if (providers.gradleProperty("kelpieVerificationProfile").orNull == "true") {
+            if (providers.gradleProperty("kelpieEmbeddingVerificationProfile").orNull == "true") {
+                applicationIdSuffix = ".embeddingverify"
+                buildConfigField("int", "LOCAL_HTTP_PORT", "18431")
+            } else if (providers.gradleProperty("kelpieVerificationProfile").orNull == "true") {
                 applicationIdSuffix = ".nessieverify"
                 buildConfigField("int", "LOCAL_HTTP_PORT", "18420")
             }
         }
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -58,19 +53,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-        }
-    }
-
-    sourceSets {
-        getByName("main") {
-            assets.srcDir("../../../assets")
-            assets.srcDir("../../../native/licenses")
-        }
     }
 
     composeOptions {
@@ -92,41 +74,7 @@ android {
 }
 
 dependencies {
-    // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-
-    // Core
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.webkit:webkit:1.10.0")
-
-    // Encrypted credential storage (HF token etc.)
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-
-    // HTTP Server (Ktor)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("io.ktor:ktor-server-netty:2.3.8")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
-    implementation("io.ktor:ktor-server-cors:2.3.8")
-
-    // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
-
-    // Gemini Nano (AI Edge) — accessed via reflection in PlatformAIEngine to avoid hard dependency.
-    // Uncomment when the SDK stabilizes: implementation("com.google.ai.edge.aicore:aicore:0.0.1-exp02")
-
-    // Unit tests (plain JVM, no Android runtime)
-    testImplementation("junit:junit:4.13.2")
+    implementation(project(":kelpie-browser"))
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))

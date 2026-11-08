@@ -31,5 +31,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check embedding boundary
+        run: pnpm check:embedding
+
+      - name: Check Mac signing plan
+        run: pnpm check:macos-signing
+
       - name: Run lint
         run: pnpm lint

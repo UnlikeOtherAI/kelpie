@@ -15,7 +15,7 @@
 Fullscreen SwiftUI view containing just a WKWebView — no URL bar, no floating menu, no welcome card. This is what renders on the Apple TV.
 
 **Files:**
-- Create: `apps/ios/Kelpie/Views/ExternalBrowserView.swift`
+- Create: `core/apple/ios/Views/ExternalBrowserView.swift`
 
 **Step 1: Write the view**
 
@@ -53,7 +53,7 @@ Add `ExternalBrowserView.swift` to the Views group in `Kelpie.xcodeproj/project.
 **Step 3: Commit**
 
 ```bash
-git add apps/ios/Kelpie/Views/ExternalBrowserView.swift apps/ios/Kelpie.xcodeproj/project.pbxproj
+git add core/apple/ios/Views/ExternalBrowserView.swift apps/ios/Kelpie.xcodeproj/project.pbxproj
 git commit -m "feat(ios): add ExternalBrowserView for Apple TV display"
 ```
 
@@ -64,8 +64,8 @@ git commit -m "feat(ios): add ExternalBrowserView for Apple TV display"
 Singleton that monitors screen connections and manages the external window + server lifecycle.
 
 **Files:**
-- Create: `apps/ios/Kelpie/Browser/ExternalDisplayManager.swift`
-- Modify: `apps/ios/Kelpie/Device/DeviceInfo.swift` — add `externalDisplay(port:screenSize:)` factory
+- Create: `core/apple/ios/Browser/ExternalDisplayManager.swift`
+- Modify: `core/apple/ios/Device/DeviceInfo.swift` — add `externalDisplay(port:screenSize:)` factory
 
 **Step 1: Add `externalDisplay` factory to DeviceInfo**
 
@@ -187,8 +187,8 @@ Add `ExternalDisplayManager.swift` to the Browser group in `project.pbxproj`:
 **Step 4: Commit**
 
 ```bash
-git add apps/ios/Kelpie/Browser/ExternalDisplayManager.swift \
-        apps/ios/Kelpie/Device/DeviceInfo.swift \
+git add core/apple/ios/Browser/ExternalDisplayManager.swift \
+        core/apple/ios/Device/DeviceInfo.swift \
         apps/ios/Kelpie.xcodeproj/project.pbxproj
 git commit -m "feat(ios): add ExternalDisplayManager for Apple TV AirPlay"
 ```

@@ -54,7 +54,7 @@ RUN if [ "$(uname -m)" = "x86_64" ] && [ -f /opt/cef/CMakeLists.txt ]; then \
     fi
 
 WORKDIR /src
-COPY native/ native/
+COPY core/native/ core/native/
 COPY apps/linux/ apps/linux/
 
 # Build the Linux app and the native core in one configure step.

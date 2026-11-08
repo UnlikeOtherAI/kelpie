@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// Deterministic unit tests for `NetworkHandler`'s pure status/`since` parsing.
 /// These call the static helpers directly — no `HandlerContext`, network, or IO.

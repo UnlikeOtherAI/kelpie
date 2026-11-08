@@ -1,0 +1,11 @@
+module KelpieNative {
+    header "KelpieNative.h"
+    export *
+}
+
+module KelpieChromium {
+    header "../macos/Renderer/CEFBridge.h"
+    header "../macos/Renderer/CEFBridge+Cookies.h"
+    header "../macos/Renderer/CEFBridge+Screenshot.h"
+    export *
+}

@@ -34,14 +34,14 @@ JavaScript `alert()`, `confirm()`, and `prompt()` calls trigger native delegate 
 ### Task 1.1: iOS — Add dialog state and WKUIDelegate interception
 
 **Files:**
-- Create: `apps/ios/Kelpie/Browser/DialogState.swift`
-- Modify: `apps/ios/Kelpie/Browser/WebViewCoordinator.swift`
-- Modify: `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`
+- Create: `core/apple/ios/Browser/DialogState.swift`
+- Modify: `core/apple/ios/Browser/WebViewCoordinator.swift`
+- Modify: `core/apple/ios/Handlers/BrowserManagementHandler.swift`
 
 **Step 1: Create DialogState model**
 
 ```swift
-// apps/ios/Kelpie/Browser/DialogState.swift
+// core/apple/ios/Browser/DialogState.swift
 import Foundation
 
 @MainActor
@@ -114,11 +114,11 @@ The `dialogState` property needs to be added to Coordinator and passed in from t
 
 **Step 3: Wire dialog state into HandlerContext**
 
-The `HandlerContext` (in `apps/ios/Kelpie/Handlers/HandlerContext.swift`) needs a reference to `DialogState` so the HTTP handler can read/write it. Add a `dialogState` property.
+The `HandlerContext` (in `core/apple/ios/Handlers/HandlerContext.swift`) needs a reference to `DialogState` so the HTTP handler can read/write it. Add a `dialogState` property.
 
 **Step 4: Replace stubs in BrowserManagementHandler**
 
-In `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`, replace the three dialog stubs (lines 46-53) with:
+In `core/apple/ios/Handlers/BrowserManagementHandler.swift`, replace the three dialog stubs (lines 46-53) with:
 
 ```swift
 router.register("get-dialog") { [weak self] _ in
@@ -166,15 +166,15 @@ feat(ios): implement dialog interception via WKUIDelegate
 ### Task 1.2: Android — Add dialog state and WebChromeClient interception
 
 **Files:**
-- Create: `apps/android/app/src/main/java/com/kelpie/browser/browser/DialogState.kt`
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/browser/WebViewContainer.kt`
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
+- Create: `core/android/src/main/java/com/kelpie/browser/browser/DialogState.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/browser/WebViewContainer.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
 
 **Step 1: Create DialogState**
 
 ```kotlin
-// apps/android/app/src/main/java/com/kelpie/browser/browser/DialogState.kt
+// core/android/src/main/java/com/kelpie/browser/browser/DialogState.kt
 package com.kelpie.browser.browser
 
 import android.webkit.JsResult
@@ -313,7 +313,7 @@ kelpie dialog
 ### Task 2.1: iOS — Real keyboard state via NotificationCenter
 
 **Files:**
-- Modify: `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`
+- Modify: `core/apple/ios/Handlers/BrowserManagementHandler.swift`
 
 **Step 1: Add keyboard tracking**
 
@@ -378,8 +378,8 @@ feat(ios): detect real keyboard state via NotificationCenter
 ### Task 2.2: Android — Real keyboard state via WindowInsets
 
 **Files:**
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/handlers/HandlerContext.kt`
 
 **Step 1: Add keyboard height tracking**
 
@@ -469,7 +469,7 @@ kelpie keyboard state
 ### Task 3.1: iOS — Use keyboard height for obscured check
 
 **Files:**
-- Modify: `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`
+- Modify: `core/apple/ios/Handlers/BrowserManagementHandler.swift`
 
 Replace `isElementObscured` (lines 250-264) to use the real keyboard height:
 
@@ -514,7 +514,7 @@ feat(ios): detect elements obscured by keyboard
 ### Task 3.2: Android — Same pattern with WindowInsets height
 
 **Files:**
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
+- Modify: `core/android/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
 
 Same approach — use `ctx.keyboardObserver.height` and element's bounding rect bottom to determine overlap.
 
@@ -559,9 +559,9 @@ macOS already has HF token persistence (`@AppStorage("huggingFaceToken")` in AIS
 ### Task 4.1: iOS — HF token persistence and download gating
 
 **Files:**
-- Modify: `apps/ios/Kelpie/AI/AIState.swift` — add `@AppStorage("huggingFaceToken")` property
-- Modify: `apps/ios/Kelpie/Views/SettingsView.swift` — add HF token section with SecureField
-- Modify: `apps/ios/Kelpie/AI/AIManager.swift` — gate downloads on token presence
+- Modify: `core/apple/ios/AI/AIState.swift` — add `@AppStorage("huggingFaceToken")` property
+- Modify: `core/apple/ios/Views/SettingsView.swift` — add HF token section with SecureField
+- Modify: `core/apple/ios/AI/AIManager.swift` — gate downloads on token presence
 
 **Step 1: Add token persistence to AIState**
 
@@ -658,8 +658,8 @@ feat(ios): add HuggingFace API key gating with settings UI
 ### Task 4.2: Android — HF token persistence and download gating
 
 **Files:**
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIState.kt` — add SharedPreferences token
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/ui/SettingsScreen.kt` — add HF section
+- Modify: `core/android/src/main/java/com/kelpie/browser/ai/AIState.kt` — add SharedPreferences token
+- Modify: `core/android/src/main/java/com/kelpie/browser/ui/SettingsScreen.kt` — add HF section
 - Modify: AI handler to gate downloads
 
 **Step 1: Add token to AIState**
@@ -696,7 +696,7 @@ feat(android): add HuggingFace API key gating with settings UI
 ### Task 4.3: macOS — Align with mobile pattern
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Views/SettingsView.swift` — add HF token section (currently only in AIChatPanel)
+- Modify: `core/apple/macos/Views/SettingsView.swift` — add HF token section (currently only in AIChatPanel)
 - Verify: download gating already works (AIState.swift line 179)
 
 macOS already has the token popover in AIChatPanel. Add the same section to SettingsView for consistency. The "Open HuggingFace" button should navigate the browser to the tokens page (use the existing `onAuthFailureNavigate` pattern from BrowserView.swift line 313).

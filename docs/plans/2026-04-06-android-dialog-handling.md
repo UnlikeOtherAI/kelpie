@@ -8,7 +8,7 @@ Android currently advertises dialog support in the API docs, but the browser man
 
 ## Design
 
-1. Add a small `DialogState` holder in `apps/android/app/src/main/java/com/kelpie/browser/browser/DialogState.kt`.
+1. Add a small `DialogState` holder in `core/android/src/main/java/com/kelpie/browser/browser/DialogState.kt`.
    - Track one pending dialog at a time via `current`.
    - Store dialog type, message, default text, and the WebView completion object (`JsResult` or `JsPromptResult`).
    - Support an optional `autoHandler` mode: `null` means queue, `"accept"` auto-confirms, `"dismiss"` auto-cancels.

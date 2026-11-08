@@ -2,19 +2,19 @@
 
 **Goal:** Make the Linux app show and control a real Chromium page through CEF instead of the current stub renderer.
 
-**Current defect:** The Linux GUI now launches, but it never renders a browser because `apps/linux/src/linux_app.cpp` always constructs `StubRenderer`, while the shared desktop Chromium engine lives separately under `native/engine-chromium-desktop/` and is not used by the Linux shell. Even when GTK is available, the app only shows placeholder text.
+**Current defect:** The Linux GUI now launches, but it never renders a browser because `apps/linux/src/linux_app.cpp` always constructs `StubRenderer`, while the shared desktop Chromium engine lives separately under `core/native/engine-chromium-desktop/` and is not used by the Linux shell. Even when GTK is available, the app only shows placeholder text.
 
 ## Root Cause
 
 There are two disconnected browser paths:
 
 1. `apps/linux/` owns app lifecycle, HTTP server, stores, mDNS, and UI, but binds handlers to `StubRenderer`.
-2. `native/engine-chromium-desktop/` owns the real `DesktopEngine`, `CefRenderer`, router, HTTP server, MCP server, and store wiring, but Linux never instantiates it.
+2. `core/native/engine-chromium-desktop/` owns the real `DesktopEngine`, `CefRenderer`, router, HTTP server, MCP server, and store wiring, but Linux never instantiates it.
 
 Build-time CEF support is also incomplete on Linux:
 
 - `apps/linux/CMakeLists.txt` can optionally detect a `CEF_ROOT`, but the current build path does not provision one.
-- `native/engine-chromium-desktop/CMakeLists.txt` intentionally falls back to `desktop_engine_stub.cpp` unless `KELPIE_ENABLE_CHROMIUM_DESKTOP=ON` and `CEF_ROOT` is supplied.
+- `core/native/engine-chromium-desktop/CMakeLists.txt` intentionally falls back to `desktop_engine_stub.cpp` unless `KELPIE_ENABLE_CHROMIUM_DESKTOP=ON` and `CEF_ROOT` is supplied.
 - `scripts/download-cef.sh` only handles macOS ARM64 today.
 
 The broken invariant is that Linux claims to be a Chromium desktop shell, but the runtime path in `apps/linux/` is not actually connected to the shared Chromium engine.
@@ -42,7 +42,7 @@ Linux should:
 - Keep GTK and Avahi optional.
 - Keep Linux building without CEF for fresh machines and CI.
 - When `CEF_ROOT` is present:
-  - build `native/engine-chromium-desktop` with `KELPIE_ENABLE_CHROMIUM_DESKTOP=ON`
+  - build `core/native/engine-chromium-desktop` with `KELPIE_ENABLE_CHROMIUM_DESKTOP=ON`
   - link the Linux app against the real desktop engine
   - stage the required runtime files next to the Linux binary so launching does not depend on ad hoc environment setup
 

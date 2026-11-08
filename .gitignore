@@ -32,8 +32,8 @@ apps/ios/build/
 apps/ios/build-*/
 apps/macos/.build/
 apps/windows/.build-*/
-native/.build/
-native/.build-*/
+core/native/.build/
+core/native/.build-*/
 
 # Test
 coverage/
@@ -57,3 +57,16 @@ assets/old/
 .build-browser-contract.lock
 # Local iOS release verification output
 apps/ios/.releasebuild/
+
+# Embeddable browser build outputs and downloaded runtimes
+core/apple/macos/Frameworks/
+core/apple/macos/vendor/
+core/apple/*.xcodeproj/
+core/apple/.build/
+core/android/build/
+core/android/.cxx/
+
+# Generated Apple consumer SDK projects and native intermediates
+core/apple/*.xcworkspace/
+core/apple/.build-sdk-*/
+core/native/.build-sdk-*/

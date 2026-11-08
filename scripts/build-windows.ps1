@@ -86,5 +86,5 @@ if (-not ((& dumpbin.exe /exports (Join-Path $build "kelpie.dll") | Out-String) 
 }
 # A test with no TIMEOUT of its own otherwise inherits CTest's 1500 s default,
 # so one that hangs holds the job for 25 minutes before anything names it.
-if (-not $SkipTests) { Invoke-Checked "Windows CTest" { ctest.exe --test-dir $build -C Release --output-on-failure --timeout 120 } }
+if (-not $SkipTests) { Invoke-Checked "Windows CTest" { ctest.exe --test-dir $build -C Release --output-on-failure --no-tests=error --timeout 120 } }
 Write-Output "BUILD_DIR=$build"

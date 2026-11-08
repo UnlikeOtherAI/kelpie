@@ -36,7 +36,7 @@ Append the core-state public headers to `HEADER_SEARCH_PATHS` for the `Kelpie`
 target:
 
 ```text
-$(PROJECT_DIR)/../native/core-state/include
+$(PROJECT_DIR)/../core/native/core-state/include
 ```
 
 Keep the existing CEF include path. The final setting should append the new path,
@@ -73,4 +73,4 @@ xcodebuild -project apps/macos/Kelpie.xcodeproj -scheme Kelpie -configuration De
 ```
 
 If the bridging header import fails, the usual cause is a missing
-`../native/core-state/include` entry in `HEADER_SEARCH_PATHS`.
+`../core/native/core-state/include` entry in `HEADER_SEARCH_PATHS`.

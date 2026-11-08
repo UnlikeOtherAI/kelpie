@@ -1,0 +1,365 @@
+import UIKit
+import WebKit
+
+/// Handles getViewport, getDeviceInfo, getCapabilities.
+struct DeviceHandler {
+    let context: HandlerContext
+    let deviceInfo: DeviceInfo
+
+    func register(on router: Router) {
+        router.register("get-viewport") { _ in await getViewport() }
+        router.register("get-viewport-presets") { _ in await getViewportPresets() }
+        router.register("get-device-info") { _ in await getDeviceInfoResponse() }
+        router.register("get-capabilities") { _ in getCapabilities() }
+        router.register("set-orientation") { body in await setOrientation(body) }
+        router.register("get-orientation") { _ in await getOrientation() }
+        router.register("debug-screens") { _ in await debugScreens() }
+        router.register("debug-attach-local-tv") { _ in await debugAttachLocalTV() }
+        router.register("debug-detach-tv") { _ in await debugDetachTV() }
+        router.register("set-tv-sync") { body in setTVSync(body) }
+        router.register("get-tv-sync") { _ in getTVSync() }
+        router.register("set-debug-overlay") { body in setDebugOverlay(body) }
+        router.register("get-debug-overlay") { _ in getDebugOverlay() }
+    }
+
+    @MainActor
+    private func getViewport() async -> [String: Any] {
+        guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
+        let bounds = webView.bounds
+        let scale = UIScreen.main.scale
+        let orientation = UIDevice.current.orientation.isLandscape ? "landscape" : "portrait"
+        return [
+            "width": Int(bounds.width),
+            "height": Int(bounds.height),
+            "devicePixelRatio": scale,
+            "platform": "ios",
+            "deviceName": deviceInfo.name,
+            "orientation": orientation
+        ]
+    }
+
+    @MainActor
+    private func getViewportPresets() async -> [String: Any] {
+        let availablePresetIDs = currentTabletViewportAvailablePresetIDs()
+        let storedPresetID = KelpieStorage.defaults.string(forKey: ipadMobileStagePresetDefaultsKey) ?? ""
+        let activePresetID: Any = availablePresetIDs.contains(storedPresetID) ? storedPresetID : NSNull()
+
+        return successResponse([
+            "supportsViewportPresets": true,
+            "presets": tabletViewportPresets.map(viewportPresetPayload),
+            "availablePresetIds": availablePresetIDs,
+            "activePresetId": activePresetID
+        ])
+    }
+
+    @MainActor
+    private func getDeviceInfoResponse() async -> [String: Any] {
+        let device = UIDevice.current
+        let screen = UIScreen.main
+        return [
+            "device": [
+                "id": deviceInfo.id,
+                "name": deviceInfo.name,
+                "model": deviceInfo.model,
+                "platform": "ios"
+            ],
+            "display": [
+                "width": deviceInfo.width,
+                "height": deviceInfo.height,
+                "scale": screen.scale
+            ],
+            "network": ["ip": "0.0.0.0", "port": deviceInfo.port],
+            "browser": ["engine": "WebKit", "version": device.systemVersion],
+            "app": ["version": deviceInfo.version, "build": deviceInfo.build],
+            "system": ["os": "iOS", "osVersion": device.systemVersion]
+        ]
+    }
+
+    @MainActor
+    private func getOrientation() async -> [String: Any] {
+        let isLandscape = UIDevice.current.orientation.isLandscape
+        let lock = OrientationManager.shared.lock
+        let locked: String? = switch lock {
+        case .landscape, .landscapeLeft, .landscapeRight: "landscape"
+        case .portrait, .portraitUpsideDown: "portrait"
+        default: nil
+        }
+        return successResponse([
+            "orientation": isLandscape ? "landscape" : "portrait",
+            "locked": locked as Any
+        ])
+    }
+
+    @MainActor
+    private func setOrientation(_ body: [String: Any]) async -> [String: Any] {
+        guard let orientation = body["orientation"] as? String else {
+            return errorResponse(code: "MISSING_PARAM", message: "orientation is required (portrait|landscape|auto)")
+        }
+        let manager = OrientationManager.shared
+        switch orientation.lowercased() {
+        case "landscape":
+            manager.lock = .landscape
+            // Request geometry update on the window scene
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
+                scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+        case "portrait":
+            manager.lock = .portrait
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+                scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+        case "auto":
+            manager.lock = .all
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+        default:
+            return errorResponse(code: "INVALID_PARAM", message: "orientation must be portrait, landscape, or auto")
+        }
+        return successResponse(["orientation": orientation])
+    }
+
+    @MainActor
+    // swiftlint:disable:next function_body_length
+    private func debugScreens() async -> [String: Any] {
+        let screens = Array(Set(UIApplication.shared.connectedScenes.compactMap { scene in
+            (scene as? UIWindowScene)?.screen
+        }))
+        let scenes = UIApplication.shared.connectedScenes.map { scene -> [String: Any] in
+            [
+                "role": scene.session.role.rawValue,
+                "state": "\(scene.activationState.rawValue)",
+                "configuration": scene.session.configuration.name ?? "nil"
+            ]
+        }
+        let mgr = ExternalDisplayManager.shared
+
+        // Native layers — include origin coordinates for all frames
+        var windowInfo: [String: Any] = ["exists": false]
+        var webViewInfo: [String: Any] = ["exists": false]
+        var vcViewInfo: [String: Any] = ["exists": false]
+        if let win = mgr.externalWindow {
+            windowInfo = [
+                "exists": true,
+                "hidden": win.isHidden,
+                "hasScene": win.windowScene != nil,
+                "frame": ["x": win.frame.origin.x, "y": win.frame.origin.y, "w": win.frame.width, "h": win.frame.height],
+                "bounds": ["x": win.bounds.origin.x, "y": win.bounds.origin.y, "w": win.bounds.width, "h": win.bounds.height]
+            ]
+            if let vcView = win.rootViewController?.view {
+                vcViewInfo = [
+                    "exists": true,
+                    "frame": ["x": vcView.frame.origin.x, "y": vcView.frame.origin.y, "w": vcView.frame.width, "h": vcView.frame.height],
+                    "bounds": ["x": vcView.bounds.origin.x, "y": vcView.bounds.origin.y, "w": vcView.bounds.width, "h": vcView.bounds.height]
+                ]
+            }
+        }
+        if let wv = context.webView {
+            let sv = wv.scrollView
+            webViewInfo = [
+                "exists": true,
+                "frame": ["x": wv.frame.origin.x, "y": wv.frame.origin.y, "w": wv.frame.width, "h": wv.frame.height],
+                "bounds": ["x": wv.bounds.origin.x, "y": wv.bounds.origin.y, "w": wv.bounds.width, "h": wv.bounds.height],
+                "contentScaleFactor": wv.contentScaleFactor,
+                "pageZoom": wv.pageZoom,
+                "scrollView": [
+                    "contentSize": ["w": sv.contentSize.width, "h": sv.contentSize.height],
+                    "contentOffset": ["x": sv.contentOffset.x, "y": sv.contentOffset.y],
+                    "zoomScale": sv.zoomScale,
+                    "contentInset": ["t": sv.contentInset.top, "l": sv.contentInset.left, "b": sv.contentInset.bottom, "r": sv.contentInset.right]
+                ]
+            ]
+        }
+
+        // HTML layer — get CSS viewport and document size via JS
+        var htmlInfo: [String: Any] = [:]
+        if let wv = context.webView {
+            let js = """
+            JSON.stringify({
+                innerWidth: window.innerWidth,
+                innerHeight: window.innerHeight,
+                outerWidth: window.outerWidth,
+                outerHeight: window.outerHeight,
+                screenX: window.screenX,
+                screenY: window.screenY,
+                scrollX: window.scrollX,
+                scrollY: window.scrollY,
+                devicePixelRatio: window.devicePixelRatio,
+                documentWidth: document.documentElement.scrollWidth,
+                documentHeight: document.documentElement.scrollHeight,
+                clientWidth: document.documentElement.clientWidth,
+                clientHeight: document.documentElement.clientHeight,
+                bodyWidth: document.body ? document.body.scrollWidth : null,
+                bodyHeight: document.body ? document.body.scrollHeight : null,
+                bodyOffsetLeft: document.body ? document.body.offsetLeft : null,
+                bodyOffsetTop: document.body ? document.body.offsetTop : null,
+                viewportMeta: (function(){ var m = document.querySelector('meta[name=viewport]'); return m ? m.content : null; })(),
+                visualViewport: window.visualViewport ? {
+                    width: window.visualViewport.width,
+                    height: window.visualViewport.height,
+                    offsetLeft: window.visualViewport.offsetLeft,
+                    offsetTop: window.visualViewport.offsetTop,
+                    pageLeft: window.visualViewport.pageLeft,
+                    pageTop: window.visualViewport.pageTop,
+                    scale: window.visualViewport.scale
+                } : null
+            })
+            """
+            if let result = try? await wv.evaluateJavaScript(js) as? String,
+               let data = result.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                htmlInfo = parsed
+            }
+        }
+
+        return successResponse([
+            "screenCount": screens.count,
+            "screens": screens.enumerated().map { i, screen in
+                [
+                    "index": i,
+                    "width": screen.bounds.width,
+                    "height": screen.bounds.height,
+                    "scale": screen.scale,
+                    "nativeScale": screen.nativeScale,
+                    "mirrored": screen.mirrored != nil
+                ]
+            },
+            "scenes": scenes,
+            "externalDisplay": [
+                "connected": mgr.isConnected,
+                "attachPath": mgr.attachPath ?? "none",
+                "port": mgr.externalPort,
+                "syncEnabled": mgr.isSyncEnabled
+            ],
+            "window": windowInfo,
+            "vcView": vcViewInfo,
+            "webView": webViewInfo,
+            "html": htmlInfo
+        ])
+    }
+
+    @MainActor
+    private func debugAttachLocalTV() async -> [String: Any] {
+        ExternalDisplayManager.shared.attachDebugLocalTV()
+        return successResponse([
+            "connected": ExternalDisplayManager.shared.isConnected,
+            "attachPath": ExternalDisplayManager.shared.attachPath ?? "none",
+            "port": ExternalDisplayManager.shared.externalPort
+        ])
+    }
+
+    @MainActor
+    private func debugDetachTV() async -> [String: Any] {
+        ExternalDisplayManager.shared.detach()
+        return successResponse(["connected": false])
+    }
+
+    @MainActor
+    private func setTVSync(_ body: [String: Any]) -> [String: Any] {
+        let enabled = body["enabled"] as? Bool ?? true
+        ExternalDisplayManager.shared.setSyncEnabled(enabled)
+        return successResponse([
+            "enabled": enabled,
+            "connected": ExternalDisplayManager.shared.isConnected
+        ])
+    }
+
+    @MainActor
+    private func getTVSync() -> [String: Any] {
+        successResponse([
+            "enabled": ExternalDisplayManager.shared.isSyncEnabled,
+            "connected": ExternalDisplayManager.shared.isConnected,
+            "attachPath": ExternalDisplayManager.shared.attachPath as Any
+        ])
+    }
+
+    private func setDebugOverlay(_ body: [String: Any]) -> [String: Any] {
+        let enabled = body["enabled"] as? Bool ?? true
+        KelpieStorage.defaults.set(enabled, forKey: "debugOverlay")
+        return successResponse(["enabled": enabled])
+    }
+
+    private func getDebugOverlay() -> [String: Any] {
+        successResponse(["enabled": KelpieStorage.defaults.bool(forKey: "debugOverlay")])
+    }
+
+    private func getCapabilities() -> [String: Any] {
+        var unsupported = Set([
+            "set-geolocation",
+            "clear-geolocation",
+            "set-request-interception",
+            "get-intercepted-requests",
+            "clear-request-interception",
+            "set-fullscreen",
+            "get-fullscreen",
+            "set-renderer",
+            "get-renderer"
+        ])
+        if #unavailable(iOS 17.0) { unsupported.formUnion(["get-partitions", "delete-partition"]) }
+        let partial = Set<String>()
+        let supported = iosCapabilityMethods.filter { !unsupported.contains($0) && !partial.contains($0) }
+        return successResponse([
+            "version": deviceInfo.version,
+            "platform": "ios",
+            "supported": supported,
+            "partial": Array(partial).sorted(),
+            "unsupported": Array(unsupported).sorted()
+        ])
+    }
+
+    private func viewportPresetPayload(_ preset: TabletViewportPreset) -> [String: Any] {
+        [
+            "id": preset.id,
+            "name": preset.name,
+            "inches": preset.displaySizeLabel,
+            "pixels": preset.pixelResolutionLabel,
+            "viewport": [
+                "portrait": [
+                    "width": Int(preset.portraitSize.width),
+                    "height": Int(preset.portraitSize.height)
+                ],
+                "landscape": [
+                    "width": Int(preset.portraitSize.height),
+                    "height": Int(preset.portraitSize.width)
+                ]
+            ]
+        ]
+    }
+}
+
+private let iosCapabilityMethods = [
+    "navigate", "back", "forward", "reload", "get-current-url", "set-home", "get-home",
+    "debug-screens", "set-debug-overlay", "get-debug-overlay",
+    "screenshot", "get-dom", "query-selector", "query-selector-all", "get-element-text", "get-attributes",
+    "click", "tap", "fill", "type", "select-option", "check", "uncheck", "swipe", "coordinate-diagnostics",
+    "scroll", "scroll2", "scroll-to-top", "scroll-to-bottom", "scroll-to-y",
+    "get-viewport", "get-device-info", "get-viewport-presets", "get-capabilities", "report-issue",
+    "wait-for-element", "wait-for-navigation",
+    "find-element", "find-button", "find-link", "find-input",
+    "evaluate", "toast", "get-console-messages", "get-js-errors", "get-network-log",
+    "get-resource-timeline", "get-websockets", "get-websocket-messages", "clear-console",
+    "get-accessibility-tree", "screenshot-annotated", "click-annotation", "fill-annotation",
+    "get-visible-elements", "get-page-text", "get-form-state",
+    "get-dialog", "handle-dialog", "set-dialog-auto-handler",
+    "get-tabs", "new-tab", "switch-tab", "close-tab", "get-partitions", "delete-partition",
+    "get-iframes", "switch-to-iframe", "switch-to-main", "get-iframe-context",
+    "get-cookies", "set-cookie", "delete-cookies",
+    "get-storage", "set-storage", "clear-storage",
+    "watch-mutations", "get-mutations", "stop-watching",
+    "query-shadow-dom", "get-shadow-roots",
+    "get-clipboard", "set-clipboard",
+    "set-geolocation", "clear-geolocation",
+    "set-request-interception", "get-intercepted-requests", "clear-request-interception",
+    "show-keyboard", "hide-keyboard", "get-keyboard-state",
+    "resize-viewport", "reset-viewport", "set-viewport-preset", "is-element-obscured",
+    "set-orientation", "get-orientation",
+    "show-commentary", "hide-commentary", "highlight", "hide-highlight",
+    "play-script", "abort-script", "get-script-status",
+    "snapshot-3d-enter", "snapshot-3d-exit", "snapshot-3d-status", "snapshot-3d-set-mode", "snapshot-3d-zoom", "snapshot-3d-reset-view",
+    "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record",
+    "set-fullscreen", "get-fullscreen",
+    "set-renderer", "get-renderer",
+    "get-tap-calibration", "set-tap-calibration"
+]

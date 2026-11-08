@@ -1,0 +1,113 @@
+import Foundation
+
+/// Route handler receives parsed JSON body and returns a JSON-serializable response.
+typealias RouteHandler = @MainActor @Sendable ([String: Any]) async -> [String: Any]
+
+/// Maps POST /v1/{method} paths to handler functions.
+final class Router: @unchecked Sendable {
+    private let profileID = KelpieStorage.profileID
+    @MainActor private var retired = false
+    weak var browserReferenceOwner: Router?
+    private var routes: [String: RouteHandler] = [:]
+    var handlerContext: HandlerContext?
+    var scriptPlaybackState: ScriptPlaybackState?
+    @MainActor var browserGateway: BrowserControlGateway?
+    @MainActor var browserGatewayProfile: String?
+    let browserLease = BrowserControlLease()
+    @MainActor var browserGateways: [WeakBrowserGateway] = []
+    var registeredMethods: [String] { Array(routes.keys) }
+
+    @MainActor
+    func retire() {
+        retired = true
+        for entry in browserGateways { entry.gateway?.retire() }
+        invalidateAllBrowserReferences()
+    }
+
+    func register(_ method: String, handler: @escaping RouteHandler) {
+        routes[method] = handler
+    }
+
+    @MainActor
+    func handle(
+        method: String,
+        body: [String: Any],
+        bypassRecordingGate: Bool = false,
+        browserGatewayDispatch: Bool = false
+    ) async -> (statusCode: Int, json: [String: Any]) {
+        guard !retired, profileID == KelpieStorage.profileID, browserReferenceOwner?.retired != true else {
+            return (410, errorResponse(code: "BROWSER_CLOSED", message: "Browser session is closed"))
+        }
+        if let owner = browserReferenceOwner, !browserGatewayDispatch {
+            guard owner.browserLease.begin() else {
+                return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
+            }
+            defer { owner.browserLease.end() }
+            owner.invalidateBrowserReferences(method: method, body: body)
+            return await handle(method: method, body: body, bypassRecordingGate: bypassRecordingGate, browserGatewayDispatch: true)
+        }
+        if method == "browser-control" {
+            return (200, await browserControl(body))
+        }
+        let mutatingMethod = isBrowserMutation(method: method)
+        let legacyMutation = !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
+        if legacyMutation, browserLease.begin() == false {
+            return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
+        }
+        defer { if legacyMutation { browserLease.end() } }
+        invalidateBrowserReferences(method: method, body: body)
+        guard let handler = routes[method] else {
+            return (404, [
+                "success": false,
+                "error": ["code": "NOT_FOUND", "message": "Unknown method: \(method)"]
+            ])
+        }
+        if !bypassRecordingGate, let gateError = scriptPlaybackState?.recordingError(for: method) {
+            return (409, gateError)
+        }
+        let result = await handler(body)
+        let success = result["success"] as? Bool ?? false
+        let errorCode = (result["error"] as? [String: Any])?["code"] as? String
+        let status: Int
+        if success {
+            status = 200
+        } else if errorCode == "SCRIPT_PARTIAL_FAILURE" || errorCode == "SCRIPT_ABORTED" {
+            status = 200
+        } else if result["error"] != nil {
+            status = statusCode(forErrorCode: errorCode)
+        } else {
+            status = 200
+        }
+
+        // Auto-show toast if the request includes a "message" param
+        if let message = body["message"] as? String, !message.isEmpty, let ctx = handlerContext {
+            await ctx.showToast(message)
+        }
+
+        return (status, result)
+    }
+}
+
+private func statusCode(forErrorCode code: String?) -> Int {
+    switch code {
+    case "ELEMENT_NOT_FOUND", "WATCH_NOT_FOUND":
+        return 404
+    case "TIMEOUT":
+        return 408
+    case "NAVIGATION_ERROR":
+        return 502
+    case "PLATFORM_NOT_SUPPORTED":
+        return 501
+    case "IFRAME_ACCESS_DENIED", "PERMISSION_REQUIRED", "SHADOW_ROOT_CLOSED":
+        return 403
+    case "RECORDING_IN_PROGRESS", "PARTITION_DELETING", "PARTITION_IN_USE",
+         "ENGINE_SWITCH_BLOCKED_BY_PARTITION":
+        return 409
+    case "PARTITION_UNSUPPORTED":
+        return 501
+    case "WEBVIEW_ERROR":
+        return 500
+    default:
+        return 400
+    }
+}

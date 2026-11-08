@@ -64,7 +64,7 @@ else()
   set(KELPIE_ENABLE_CHROMIUM_DESKTOP OFF CACHE BOOL
       "Build the shared Chromium desktop engine with CEF for the Linux app" FORCE)
 endif()
-set(KELPIE_NATIVE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../native")
+set(KELPIE_NATIVE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../core/native")
 add_subdirectory("${KELPIE_NATIVE_ROOT}" "${CMAKE_BINARY_DIR}/kelpie-native")
 
 set(KELPIE_LINUX_HAS_GTK 0)
@@ -115,7 +115,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.1.15"
+    KELPIE_LINUX_VERSION="0.2.0"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -154,13 +154,13 @@ set_target_properties(kelpie-linux PROPERTIES
 
 add_custom_command(TARGET kelpie-linux POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/../macos/Kelpie/Resources/FontAwesome6Brands-Regular.otf"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../core/native/resources/FontAwesome6Brands-Regular.otf"
     "$<TARGET_FILE_DIR:kelpie-linux>/FontAwesome6Brands-Regular.otf"
 )
 
 add_custom_command(TARGET kelpie-linux POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/../macos/Kelpie/Assets.xcassets/AppIcon.appiconset/icon-1024.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../assets/kelpie-icon-1024.png"
     "$<TARGET_FILE_DIR:kelpie-linux>/icon-1024.png"
 )
 

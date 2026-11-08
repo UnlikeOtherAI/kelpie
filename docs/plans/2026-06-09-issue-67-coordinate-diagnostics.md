@@ -12,7 +12,7 @@ Kelpie already exposes the individual MCP primitives needed for most coordinate 
 - screenshot metadata and image payload when requested
 - pass/fail classification fields for regression tests
 
-Issue #67 asks for native/input-subsystem actions. The current iOS WKWebView public API cannot inject trusted OS touch events into web content, and Kelpie's existing cross-platform tap/swipe path dispatches browser-visible coordinate events from the page bridge. Android can dispatch `MotionEvent`s to `WebView`, and macOS can synthesize AppKit events in some renderer modes, but those paths are not equivalent across iOS, macOS, and Android. This change should therefore expose the input source explicitly instead of pretending all platforms can produce trusted native events today.
+Issue #67 asks for core/native/input-subsystem actions. The current iOS WKWebView public API cannot inject trusted OS touch events into web content, and Kelpie's existing cross-platform tap/swipe path dispatches browser-visible coordinate events from the page bridge. Android can dispatch `MotionEvent`s to `WebView`, and macOS can synthesize AppKit events in some renderer modes, but those paths are not equivalent across iOS, macOS, and Android. This change should therefore expose the input source explicitly instead of pretending all platforms can produce trusted native events today.
 
 ## Goals
 

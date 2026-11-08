@@ -1,6 +1,6 @@
 # iOS Native Core Integration
 
-The iOS store wrappers in `apps/ios/Kelpie/Browser/` now call the shared C API from `native/core-state/include/kelpie/state_c_api.h`.
+The iOS store wrappers in `apps/ios/Kelpie/Browser/` now call the shared C API from `core/native/core-state/include/kelpie/state_c_api.h`.
 
 The Xcode project is not updated automatically. Do not edit `project.pbxproj` by hand unless you have to. Configure the target in Xcode instead.
 
@@ -12,21 +12,21 @@ For the `Kelpie` target, set:
 
 The header itself is already in the repo at:
 
-- `apps/ios/Kelpie/Kelpie-Bridging-Header.h`
+- `core/apple/ios/Kelpie-Bridging-Header.h`
 
 ## 2. Add header search paths
 
 For the `Kelpie` target, add these to `Header Search Paths`:
 
-- `$(SRCROOT)/../native/core-state/include`
-- `$(SRCROOT)/../native/core-protocol/include`
+- `$(SRCROOT)/../core/native/core-state/include`
+- `$(SRCROOT)/../core/native/core-protocol/include`
 
 Mark them `recursive = No`.
 
 Notes:
 
 - `$(SRCROOT)` here is `apps/ios`.
-- The bridging header imports `kelpie/state_c_api.h`, so `native/core-state/include` must be visible to Clang.
+- The bridging header imports `kelpie/state_c_api.h`, so `core/native/core-state/include` must be visible to Clang.
 - `libkelpie_core_state.a` depends on `libkelpie_core_protocol.a`, so both headers and both libraries must be configured together.
 
 ## 3. Add the static libraries

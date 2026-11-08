@@ -1,6 +1,6 @@
 import XCTest
 import WebKit
-@testable import Kelpie
+@testable import KelpieBrowser
 
 final class AIPageContextTests: XCTestCase {
     func testCompleteConversationSurvivesPromptComposition() throws {

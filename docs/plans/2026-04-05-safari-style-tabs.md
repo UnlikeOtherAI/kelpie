@@ -13,8 +13,8 @@
 ## Task 1 — Tab model and store
 
 **Files:**
-- Create: `apps/macos/Kelpie/Browser/TabStore.swift`
-- Modify: `apps/macos/Kelpie/Network/ServerState.swift`
+- Create: `core/apple/macos/Browser/TabStore.swift`
+- Modify: `core/apple/macos/Network/ServerState.swift`
 
 ### Step 1: Write failing test
 
@@ -137,7 +137,7 @@ final class TabStore: ObservableObject {
 
 ### Step 3: Add `setActiveWebKitRenderer` to `ServerState`
 
-In `apps/macos/Kelpie/Network/ServerState.swift`, change:
+In `core/apple/macos/Network/ServerState.swift`, change:
 ```swift
 private(set) var wkRenderer: WKWebViewRenderer?
 ```
@@ -166,8 +166,8 @@ Build the project. No regressions; single-tab behaviour identical to before. `Ta
 ### Step 5: Commit
 
 ```bash
-git add apps/macos/Kelpie/Browser/TabStore.swift \
-        apps/macos/Kelpie/Network/ServerState.swift
+git add core/apple/macos/Browser/TabStore.swift \
+        core/apple/macos/Network/ServerState.swift
 git commit -m "feat(macos/tabs): add Tab/TabStore model with per-tab WKWebViewRenderer"
 ```
 
@@ -176,7 +176,7 @@ git commit -m "feat(macos/tabs): add Tab/TabStore model with per-tab WKWebViewRe
 ## Task 2 — Tab bar view (AppKit)
 
 **Files:**
-- Create: `apps/macos/Kelpie/Views/TabBarView.swift`
+- Create: `core/apple/macos/Views/TabBarView.swift`
 
 This is the most visual task. Build the whole view as a single `NSViewRepresentable` that owns all AppKit subviews. No SwiftUI inside — everything is NSView/NSButton.
 
@@ -617,7 +617,7 @@ Build. Fix any compile errors. At this point the view exists but isn't placed in
 ### Step 3: Commit
 
 ```bash
-git add apps/macos/Kelpie/Views/TabBarView.swift
+git add core/apple/macos/Views/TabBarView.swift
 git commit -m "feat(macos/tabs): add AppKit-backed TabBarView with pill spreading and active indicator"
 ```
 
@@ -626,7 +626,7 @@ git commit -m "feat(macos/tabs): add AppKit-backed TabBarView with pill spreadin
 ## Task 3 — Wire BrowserView
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Views/BrowserView.swift`
+- Modify: `core/apple/macos/Views/BrowserView.swift`
 
 ### Step 1: Add TabStore and insert TabBarView
 
@@ -814,7 +814,7 @@ In `BrowserView.body`, add to the chain of `.onReceive` modifiers:
 ### Step 8: Commit
 
 ```bash
-git add apps/macos/Kelpie/Views/BrowserView.swift \
+git add core/apple/macos/Views/BrowserView.swift \
         apps/macos/Kelpie/KelpieApp.swift
 git commit -m "feat(macos/tabs): wire BrowserView to TabStore; disable tabs in CEF mode; Cmd+T/Cmd+W"
 ```
@@ -824,7 +824,7 @@ git commit -m "feat(macos/tabs): wire BrowserView to TabStore; disable tabs in C
 ## Task 4 — RendererContainerView: multi-tab view management
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Views/BrowserView.swift` (the `RendererContainerView` struct inside it)
+- Modify: `core/apple/macos/Views/BrowserView.swift` (the `RendererContainerView` struct inside it)
 
 ### Step 1: Add TabStore observation
 
@@ -869,7 +869,7 @@ private func removeClosedTabViews(from container: NSView) {
 ### Step 4: Commit
 
 ```bash
-git add apps/macos/Kelpie/Views/BrowserView.swift
+git add core/apple/macos/Views/BrowserView.swift
 git commit -m "feat(macos/tabs): RendererContainerView tracks TabStore; cleans up closed tab views"
 ```
 
@@ -878,7 +878,7 @@ git commit -m "feat(macos/tabs): RendererContainerView tracks TabStore; cleans u
 ## Task 5 — Favicon extraction
 
 **Files:**
-- Create: `apps/macos/Kelpie/Browser/FaviconExtractor.swift`
+- Create: `core/apple/macos/Browser/FaviconExtractor.swift`
 
 ### Step 1: Write `FaviconExtractor`
 
@@ -925,7 +925,7 @@ Navigate to a page with a favicon (e.g., `https://github.com`). The tab pill sho
 ### Step 3: Commit
 
 ```bash
-git add apps/macos/Kelpie/Browser/FaviconExtractor.swift
+git add core/apple/macos/Browser/FaviconExtractor.swift
 git commit -m "feat(macos/tabs): favicon extraction with letter-avatar fallback"
 ```
 
@@ -934,7 +934,7 @@ git commit -m "feat(macos/tabs): favicon extraction with letter-avatar fallback"
 ## Task 6 — Tab bar layout: spreading + overflow scroll
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Views/TabBarView.swift`
+- Modify: `core/apple/macos/Views/TabBarView.swift`
 
 The spreading and scroll logic is already included in Task 2's Coordinator.relayout. This task is about making it respond to window width changes.
 
@@ -990,7 +990,7 @@ if let pill = pillsByID[tabStore.activeTabID ?? UUID()] {
 ### Step 4: Commit
 
 ```bash
-git add apps/macos/Kelpie/Views/TabBarView.swift
+git add core/apple/macos/Views/TabBarView.swift
 git commit -m "feat(macos/tabs): responsive pill spreading and overflow horizontal scroll"
 ```
 
@@ -999,7 +999,7 @@ git commit -m "feat(macos/tabs): responsive pill spreading and overflow horizont
 ## Task 7 — Hide 3D Inspector button in CEF mode
 
 **Files:**
-- Modify: `apps/macos/Kelpie/Views/URLBarView.swift`
+- Modify: `core/apple/macos/Views/URLBarView.swift`
 
 The 3D Inspector relies on WKWebView JS injection and is meaningless in CEF mode. Hide it (with the same fade) when Chromium is active.
 
@@ -1034,7 +1034,7 @@ Switch to Chromium — 3D button fades out (0.3 s). Switch back to WebKit — fa
 ### Step 3: Commit
 
 ```bash
-git add apps/macos/Kelpie/Views/URLBarView.swift
+git add core/apple/macos/Views/URLBarView.swift
 git commit -m "feat(macos): hide 3D inspector button in CEF/Chromium mode"
 ```
 

@@ -1,0 +1,69 @@
+package com.kelpie.browser.device
+
+import android.content.Context
+import android.os.Build
+import android.util.DisplayMetrics
+import android.view.WindowManager
+import com.kelpie.browser.BuildConfig
+import java.net.Inet4Address
+import java.net.NetworkInterface
+
+data class DeviceInfo(
+    val id: String,
+    val name: String,
+    val model: String,
+    val width: Int,
+    val height: Int,
+    val ip: String,
+    val port: Int,
+    val version: String,
+    val build: String,
+) {
+    companion object {
+        fun collect(
+            context: Context,
+            port: Int = BuildConfig.LOCAL_HTTP_PORT,
+        ): DeviceInfo {
+            val id = DeviceIdentity.getOrCreate(context)
+            val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
+            val model = Build.MODEL
+
+            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            wm.defaultDisplay.getRealMetrics(metrics)
+
+            return DeviceInfo(
+                id = id,
+                name = name,
+                model = model,
+                width = metrics.widthPixels,
+                height = metrics.heightPixels,
+                ip = getLocalIpAddress(),
+                port = port,
+                version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "",
+                build =
+                    context.packageManager
+                        .getPackageInfo(context.packageName, 0)
+                        .longVersionCode
+                        .toString(),
+            )
+        }
+
+        private fun getLocalIpAddress(): String {
+            try {
+                val interfaces = NetworkInterface.getNetworkInterfaces() ?: return "0.0.0.0"
+                for (intf in interfaces) {
+                    if (!intf.isUp || intf.isLoopback) continue
+                    for (addr in intf.inetAddresses) {
+                        if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                            return addr.hostAddress ?: continue
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+            return "0.0.0.0"
+        }
+    }
+}

@@ -1,21 +1,8 @@
 import ProjectDescription
-
-// MARK: - Linker flags
-
-let iOSLinkerFlags: SettingValue = .array([
-    "-lkelpie_core_state",
-    "-lkelpie_core_connect",
-    "-lkelpie_core_protocol",
-    "-lkelpie_core_automation",
-    "-lkelpie_core_mcp",
-    "-lkelpie_core_ai",
-    "-lllama", "-lggml", "-lggml-base", "-lggml-cpu",
-    "-framework AppIntents",
-    "-framework Accelerate",
-    "-lc++",
-])
+import ProjectDescriptionHelpers
 
 // MARK: - Target
+
 
 let kelpieApp = Target.target(
     name: "Kelpie",
@@ -24,77 +11,65 @@ let kelpieApp = Target.target(
     bundleId: "com.unlikeotherai.kelpie",
     deploymentTargets: .iOS("16.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [
-        .glob("Kelpie/**/*.swift"),
-        // Shared from macOS — cross-project source references
-        .glob("../macos/Kelpie/Handlers/Snapshot3DBridge.swift"),
-        .glob("../macos/Kelpie/Storage/SecretStore.swift"),
-        .glob("../macos/Kelpie/Views/BrowserChromeAppearance.swift"),
-        .glob("../macos/Kelpie/Views/BrowserChromeSampler.swift"),
-        .glob("../macos/Kelpie/Account/UOAAccount.swift"),
-        .glob("../macos/Kelpie/Connect/**/*.swift"),
-        .glob("../macos/Kelpie/Account/UOASession.swift"),
-        .glob("../macos/Kelpie/Account/UOAPresentation.swift"),
-        .glob("../macos/Kelpie/Account/UOALoginWebView.swift"),
-        .glob("../macos/Kelpie/Account/UOAAuthorization.swift"),
-        .glob("../macos/Kelpie/Account/UOATransport.swift"),
-        .glob("../macos/Kelpie/Account/AccountBookmarks.swift"),
-        .glob("../macos/Kelpie/Account/UOASettingsStream.swift"),
-        .glob("../macos/Kelpie/Browser/BookmarkStore.swift"),
-        .glob("../macos/Kelpie/Browser/BookmarkNode.swift"),
-        .glob("../macos/Kelpie/Browser/BookmarkTree.swift"),
-        .glob("../macos/Kelpie/Browser/AddressInput.swift"),
-        .glob("../macos/Kelpie/Browser/NetworkTrafficPersistence.swift"),
-        .glob("../macos/Kelpie/Browser/PartitionMap.swift"),
-        .glob("../macos/Kelpie/Browser/PartitionValidator.swift"),
-        .glob("../macos/Kelpie/AI/OpenAICompatible/**/*.swift"),
-        .glob("../macos/Kelpie/Network/BrowserControlGateway.swift"),
-        .glob("../macos/Kelpie/Network/Router+BrowserControl.swift"),
-        .glob("../macos/Kelpie/Network/AccountPairingAuthorization.swift"),
-    ],
+    sources: [.glob("Kelpie/**/*.swift")],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
-        .glob(pattern: "../../native/licenses/*.txt"),
-        .glob(pattern: "../macos/Kelpie/Resources/Snapshot3D/*.js"),
     ],
     dependencies: [
+        .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
         .package(product: "AppReveal"),
     ],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
-            "SWIFT_OBJC_BRIDGING_HEADER": "Kelpie/Kelpie-Bridging-Header.h",
-            "HEADER_SEARCH_PATHS": .array([
-                "$(PROJECT_DIR)/../../native/core-state/include",
-                "$(PROJECT_DIR)/../../native/core-connect/include",
-                "$(PROJECT_DIR)/../../native/core-protocol/include",
-                "$(PROJECT_DIR)/../../native/core-automation/include",
-                "$(PROJECT_DIR)/../../native/core-mcp/include",
-                "$(PROJECT_DIR)/../../native/core-ai/include",
-            ]),
-            "LIBRARY_SEARCH_PATHS": .array([
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-state",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-connect",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-protocol",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-automation",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-mcp",
-                "$(KELPIE_NATIVE_BUILD_DIR)/core-ai",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/src",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src",
-                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src/ggml-cpu",
-            ]),
-            "OTHER_LDFLAGS": iOSLinkerFlags,
-            "GENERATE_APP_INTENTS_METADATA": "NO",
-            "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.22",
-            "CURRENT_PROJECT_VERSION": "21",
+        base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core", additional: [
+            "MARKETING_VERSION": "0.2.0",
+            "CURRENT_PROJECT_VERSION": "22",
             "TARGETED_DEVICE_FAMILY": "1,2",
-            "DEVELOPMENT_TEAM": "59S95D279D",
-            // Conditional native build dir — device vs simulator
-            "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../native/.build-iphoneos",
-            "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../native/.build-ios-sim",
-        ]
+            "DEVELOPMENT_TEAM": "59S95D279D"
+        ])
     )
+)
+
+
+let kelpieEmbeddingHost = Target.target(
+    name: "KelpieEmbeddingHost",
+    destinations: [.iPhone, .iPad],
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.ios",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .extendingDefault(with: [
+        "NSLocalNetworkUsageDescription": "Inspect the local embedding verification host.",
+        "NSBonjourServices": ["_appreveal._tcp"]
+    ]),
+    sources: [.glob("../apple-embedding-host/ios/**/*.swift")],
+    dependencies: [
+        .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
+        .package(product: "AppReveal")
+    ],
+    settings: .settings(base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core"))
+)
+
+
+let kelpieEmbeddingUITests = Target.target(
+    name: "KelpieEmbeddingUITests",
+    destinations: [.iPhone, .iPad],
+    product: .uiTests,
+    bundleId: "com.unlikeotherai.kelpie.embeddingverify.ios.uitests",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-embedding-host/UITests/**/*.swift")],
+    dependencies: [.target(name: "KelpieEmbeddingHost")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
+let kelpieLibraryTestHost = Target.target(
+    name: "KelpieLibraryTestHost",
+    destinations: [.iPhone, .iPad],
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.tests.ios.host",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [.glob("../apple-test-host/**/*.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
 
 let kelpieTests = Target.target(
@@ -110,6 +85,7 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/NetworkTrafficStoreTests.swift"),
         .glob("../macos/Tests/FavouritesTreeTests.swift"),
         .glob("../macos/Tests/UOASessionTests.swift"),
+        .glob("../macos/Tests/HostSessionTests.swift"),
         .glob("../macos/Tests/ConnectAuthorizationTests.swift"),
         .glob("../macos/Tests/ConnectScreenshotBudgetTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
@@ -117,12 +93,11 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
     dependencies: [
-        .target(name: "Kelpie"),
+        .target(name: "KelpieLibraryTestHost"),
+        .project(target: "KelpieBrowserIOS", path: "../../core/apple"),
     ],
     settings: .settings(
-        base: [
-            "SWIFT_VERSION": "5.0",
-        ]
+        base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core")
     )
 )
 
@@ -156,10 +131,16 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
+        kelpieLibraryTestHost,
+        kelpieEmbeddingHost,
+        kelpieEmbeddingUITests,
         kelpieTests,
         kelpieUITests,
     ],
     schemes: [
         kelpieScheme,
+        .scheme(name: "KelpieEmbeddingHost", shared: true,
+                buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),
+                testAction: .targets(["KelpieEmbeddingUITests"])),
     ]
 )

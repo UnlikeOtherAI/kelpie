@@ -143,18 +143,18 @@ Keep `reset-viewport` as the way to leave named preset mode and return to the pl
 
 ## Files
 
-- `apps/ios/Kelpie/Views/BrowserView.swift`
-- `apps/ios/Kelpie/Views/FloatingMenuView.swift`
-- `apps/ios/Kelpie/Handlers/DeviceHandler.swift`
-- `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`
-- `apps/android/app/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/ui/FloatingMenu.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/DeviceHandler.kt`
-- `apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
-- `apps/macos/Kelpie/Browser/ViewportState.swift`
-- `apps/macos/Kelpie/Views/URLBarView.swift`
-- `apps/macos/Kelpie/Handlers/DeviceHandler.swift`
-- `apps/macos/Kelpie/Handlers/BrowserManagementHandler.swift`
+- `core/apple/ios/Views/BrowserView.swift`
+- `core/apple/ios/Views/FloatingMenuView.swift`
+- `core/apple/ios/Handlers/DeviceHandler.swift`
+- `core/apple/ios/Handlers/BrowserManagementHandler.swift`
+- `core/android/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
+- `core/android/src/main/java/com/kelpie/browser/ui/FloatingMenu.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/DeviceHandler.kt`
+- `core/android/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
+- `core/apple/macos/Browser/ViewportState.swift`
+- `core/apple/macos/Views/URLBarView.swift`
+- `core/apple/macos/Handlers/DeviceHandler.swift`
+- `core/apple/macos/Handlers/BrowserManagementHandler.swift`
 - `packages/cli/src/mcp/tools.ts`
 - `docs/api/README.md`
 - `docs/api/core.md`

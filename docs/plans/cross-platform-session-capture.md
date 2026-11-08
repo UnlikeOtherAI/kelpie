@@ -84,7 +84,7 @@ partition isolation concerns website identity/storage and does not promise to
 hide requests from the app's inspector. Login surfaces have no capture bridge.
 No new redaction policy or partition-tagged network schema is introduced here.
 
-Release requires iOS/Android and CLI/shared version bumps, docs, focused/native/manual checks,
+Release requires iOS/Android and CLI/shared version bumps, docs, focused/core/native/manual checks,
 one merged PR and published/installed artifacts. Windows 0.1.15 also normalizes the profile directory before deriving any CEF
 cache paths; the restart check found mixed separators triggering CEF's off-the-record fallback. Linux 0.1.14 shares the desktop restoration guard: all named contexts must
 be ready before any restored page opens. A failed context stops initialization

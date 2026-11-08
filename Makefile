@@ -15,14 +15,14 @@ ANDROID_SDK   := $(HOME)/Library/Android/sdk
 
 # ── Xcode ──────────────────────────────────────────────────────────────────────
 IOS_SCHEME    := Kelpie
-IOS_PROJECT   := apps/ios/Kelpie.xcodeproj
+IOS_WORKSPACE   := apps/ios/Kelpie.xcworkspace
 
 # Xcode may be configured with a custom build products path (Preferences → Locations → Custom).
 # Read it so ios-run can find the built .app regardless of where Xcode put it.
 XCODE_CUSTOM_PRODUCTS := $(shell defaults read com.apple.dt.Xcode IDECustomBuildProductsPath 2>/dev/null)
 
 MACOS_SCHEME  := Kelpie
-MACOS_PROJECT := apps/macos/Kelpie.xcodeproj
+MACOS_WORKSPACE := apps/macos/Kelpie.xcworkspace
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 CLI_DIR       := packages/cli
@@ -78,10 +78,7 @@ cli-link:
 # ── SwiftLint ─────────────────────────────────────────────────────────────────
 
 lint-swift:
-	@echo "→ Linting Swift (iOS)..."
-	$(SWIFTLINT) lint --strict apps/ios/Kelpie
-	@echo "→ Linting Swift (macOS)..."
-	$(SWIFTLINT) lint --strict apps/macos/Kelpie
+	$(SWIFTLINT) lint --strict
 
 # ── iOS ────────────────────────────────────────────────────────────────────────
 
@@ -100,13 +97,13 @@ ios-build: lint-swift
 	@if [ "$(IOS_TYPE)" = "device" ]; then \
 		echo "→ Building iOS app (device $(IOS_TARGET))..."; \
 		xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS,id=$(IOS_TARGET)' \
 			-configuration Debug \
 			-derivedDataPath apps/ios/.build \
 			build | xcpretty 2>/dev/null || xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS,id=$(IOS_TARGET)' \
 			-configuration Debug \
@@ -115,13 +112,13 @@ ios-build: lint-swift
 	else \
 		echo "→ Building iOS app (simulator $(IOS_TARGET))..."; \
 		xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS Simulator,id=$(IOS_TARGET)' \
 			-configuration Debug \
 			-derivedDataPath apps/ios/.build \
 			build | xcpretty 2>/dev/null || xcodebuild \
-			-project $(IOS_PROJECT) \
+			-workspace $(IOS_WORKSPACE) \
 			-scheme $(IOS_SCHEME) \
 			-destination 'platform=iOS Simulator,id=$(IOS_TARGET)' \
 			-configuration Debug \
@@ -175,12 +172,12 @@ macos: macos-build macos-run
 macos-build: lint-swift
 	@echo "→ Building macOS app..."
 	xcodebuild \
-		-project $(MACOS_PROJECT) \
+		-workspace $(MACOS_WORKSPACE) \
 		-scheme $(MACOS_SCHEME) \
 		-configuration Debug \
 		-derivedDataPath apps/macos/.build \
 		build | xcpretty 2>/dev/null || xcodebuild \
-		-project $(MACOS_PROJECT) \
+		-workspace $(MACOS_WORKSPACE) \
 		-scheme $(MACOS_SCHEME) \
 		-configuration Debug \
 		-derivedDataPath apps/macos/.build \
@@ -209,14 +206,14 @@ linux:
 	fi
 	@if [ -d "$(LINUX_CEF_ROOT)" ]; then \
 		echo "→ Using Linux CEF SDK at $(LINUX_CEF_ROOT)"; \
-		cmake -S native -B native/.build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DKELPIE_ENABLE_CHROMIUM_DESKTOP=ON; \
-		cmake --build native/.build-linux; \
-		cmake -S apps/linux -B apps/linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
+		cmake -S core/native -B core/native/.build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DKELPIE_ENABLE_CHROMIUM_DESKTOP=ON; \
+		cmake --build core/native/.build-linux; \
+		cmake -S apps/linux -B apps/linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DNATIVE_BUILD_DIR=$(REPO_ROOT)core/native/.build-linux; \
 	else \
 		echo "→ No Linux CEF SDK found at $(LINUX_CEF_ROOT); building fallback renderer"; \
-		cmake -S native -B native/.build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release; \
-		cmake --build native/.build-linux; \
-		cmake -S apps/linux -B apps/linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
+		cmake -S core/native -B core/native/.build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release; \
+		cmake --build core/native/.build-linux; \
+		cmake -S apps/linux -B apps/linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNATIVE_BUILD_DIR=$(REPO_ROOT)core/native/.build-linux; \
 	fi
 	cmake --build apps/linux/build
 

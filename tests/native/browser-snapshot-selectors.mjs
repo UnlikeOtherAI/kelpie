@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const fixture = process.argv[2];
-if (!fixture) throw new Error("Usage: node tests/native/browser-snapshot-selectors.mjs <browser_snapshot_fixture>");
+if (!fixture) throw new Error("Usage: node tests/core/native/browser-snapshot-selectors.mjs <browser_snapshot_fixture>");
 const require = createRequire(new URL("../../packages/shared/package.json", import.meta.url));
 const { chromium } = require("playwright-core");
 const expression = execFileSync(fixture, ["--snapshot"], { encoding: "utf8" });

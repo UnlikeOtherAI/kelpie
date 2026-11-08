@@ -2,6 +2,10 @@
 
 > Read CLAUDE.md and AGENTS.md before starting any work. Update both when policy changes.
 
+The complete embeddable browser and thin standalone host boundary follow [core/README.md](core/README.md). Apple Store builds use `TUIST_KELPIE_WEBKIT_ONLY=true tuist generate` as documented there. Shared C++ lives in `core/native`; browser UI, tabs and behavior belong to the platform core, and embedded hosts supply only their UOA session. `pnpm check:embedding` checks that ownership boundary locally and in CI.
+
+Direct Mac artifacts use the inside-out signer and notarization checks in [Mac releases](docs/macos-release.md); `pnpm check:macos-signing` checks the signing plan without credentials.
+
 ## Source of Truth
 
 **Static docs — read these to understand the project:**
@@ -117,7 +121,7 @@ Each component owns its version in its own manifest — do not create a central 
 | macOS app | `apps/macos/Kelpie/Info.plist` → `CFBundleShortVersionString` |
 | iOS app   | `apps/ios/Project.swift` → `MARKETING_VERSION` build setting |
 | Android   | `apps/android/app/build.gradle.kts` → `versionName` |
-| Windows   | `apps/windows/CMakeLists.txt` → `project(kelpie_windows VERSION …)`, mirrored in `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp` |
+| Windows   | `apps/windows/CMakeLists.txt` → `project(kelpie_windows VERSION …)`, mirrored in `resources/kelpie.rc`, `core/windows/src/device_info_windows.h` and `core/windows/src/windows_runtime.cpp` |
 | Linux     | `apps/linux/CMakeLists.txt` → `KELPIE_LINUX_VERSION` |
 | CLI       | `packages/cli/package.json` → `version` |
 
@@ -136,7 +140,7 @@ Each component owns its version in its own manifest — do not create a central 
 
 ## Windows release ownership
 
-- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`; keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
+- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`; keep `resources/kelpie.rc`, `core/windows/src/device_info_windows.h` and `core/windows/src/windows_runtime.cpp`
   in step with it.
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.
@@ -144,3 +148,13 @@ Each component owns its version in its own manifest — do not create a central 
   readiness cleanup before publishing.
 
 Native browser gateway bindings and reproducible generated contract builds follow [docs/api/native-browser-gateway.md](docs/api/native-browser-gateway.md).
+
+Windows release CI retains unsigned candidates; sign and launch the complete CEF package before publication using [Windows releases](docs/windows-release.md).
+
+Build Apple apps from their generated `.xcworkspace` so Xcode includes the separate browser library; see [embedding](core/README.md).
+
+Apple containing-app SDK packaging uses `scripts/build-apple-sdk.sh`; see
+[embedding verification](docs/embedding-verification.md#apple-consumer-modules).
+
+Direct macOS library tests use `scripts/test-macos-library.sh` with its explicit
+environment allowlist; see [embedding verification](docs/embedding-verification.md).

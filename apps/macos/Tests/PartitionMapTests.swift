@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 /// Covers the corruption and reconciliation policy the plan specifies. These
 /// are the parts of the partition registry that can be tested without a live

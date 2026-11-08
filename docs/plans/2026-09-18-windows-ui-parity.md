@@ -56,7 +56,7 @@ the combined build has been observed. Unit tests did not catch that failure.
 [2026-05-16-per-tab-partition-and-name.md](2026-05-16-per-tab-partition-and-name.md)
 defines `new-tab { name, partition, persistent }`, `get-partitions`, `delete-partition`,
 the partition validator, and error codes. `grep partition` finds **no implementation** in
-`packages/shared`, `packages/cli`, `native/`, or `apps/macos`. macOS tabs share one
+`packages/shared`, `packages/cli`, `core/native/`, or `apps/macos`. macOS tabs share one
 `WKWebView` data store today. Windows will be the first platform to implement it.
 
 ### Toolchain on this machine
@@ -231,7 +231,7 @@ before this.
 
 ### Phase 1 — Theme and drawing foundation (M)
 
-`apps/windows/src/theme/{palette,metrics,paint,icons}.{h,cpp}` replacing `ui_theme.h` and
+`core/windows/src/theme/{palette,metrics,paint,icons}.{h,cpp}` replacing `ui_theme.h` and
 `panel_theme.h`: light/dark/high-contrast palettes, per-window DPI, font cache, GDI+
 rounded primitives, Fluent/MDL2 glyph lookup, theme-change notification. Dark-mode frame
 and child controls. Tests: palette selection, DPI math, hidden-HWND paint smoke tests in

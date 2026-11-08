@@ -13,7 +13,7 @@ Parent: [../2026-05-16-per-tab-partition-and-name.md](../2026-05-16-per-tab-part
 
 Bump `MARKETING_VERSION` per release policy, bump iOS deployment target to 17.0. Regenerate Xcode project with `tuist generate`.
 
-### `apps/ios/Kelpie/Browser/Tab.swift`
+### `core/apple/ios/Browser/Tab.swift`
 
 Add fields:
 ```swift
@@ -64,7 +64,7 @@ final class PartitionRegistry {
 
 `PartitionValidator.swift` (separate file, mirrors `packages/shared/src/partition.ts` rules exactly): regex `^[A-Za-z0-9._\-]{1,128}$`, must contain alnum, reject `.`, `..`, case-insensitive `default`, reject `ephemeral-` prefix.
 
-### `apps/ios/Kelpie/Browser/TabStore.swift`
+### `core/apple/ios/Browser/TabStore.swift`
 
 Extend `addBrowserTab(url:)` to `addBrowserTab(url:name:partition:persistent:)`:
 - If `partition` is set, ask `PartitionRegistry.resolve` for the data store; configure `WKWebViewConfiguration.websiteDataStore` with it.
@@ -72,15 +72,15 @@ Extend `addBrowserTab(url:)` to `addBrowserTab(url:name:partition:persistent:)`:
 - Store `name`, `partition`, `persistent` on the `Tab`.
 - On `closeBrowserTab(id:)`, if tab had a partition, call `PartitionRegistry.release`.
 
-### `apps/ios/Kelpie/Browser/BrowserState.swift`
+### `core/apple/ios/Browser/BrowserState.swift`
 
 `WebViewDefaults.sharedWebsiteDataStore` stays — it's the default-container store, still used when no partition is requested. Add no new fields here; partition lifetime lives in `PartitionRegistry`.
 
-### `apps/ios/Kelpie/Browser/SessionStore.swift`
+### `core/apple/ios/Browser/SessionStore.swift`
 
 Persist `name`, `partition`, `persistent` per tab. On restart, restore non-`persistent: false` tabs with their original partition.
 
-### `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`
+### `core/apple/ios/Handlers/BrowserManagementHandler.swift`
 
 - `newTab`: read `body["name"]`, `body["partition"]`, `body["persistent"]` (default true). Validate. Call new `tabStore.addBrowserTab(url:name:partition:persistent:)`. On `PartitionRegistry.InvalidPartition` return `{"success": false, "error": "INVALID_PARTITION"}`.
 - `getTabs`: include `name`, `partition`, `persistent` in each tab entry (omit when nil).

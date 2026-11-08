@@ -1,10 +1,17 @@
 # Kelpie SwiftLint — strict rules, build must fail on violations.
 
 included:
+  - Tuist/ProjectDescriptionHelpers
+  - core/apple
+  - apps/apple-embedding-host
+  - apps/apple-test-host
   - apps/ios/Kelpie
   - apps/macos/Kelpie
 
 excluded:
+  - core/apple/macos/Frameworks
+  - core/apple/macos/vendor
+  - core/apple/.build
   - apps/ios/.build
   - apps/macos/.build
   - apps/macos/Frameworks

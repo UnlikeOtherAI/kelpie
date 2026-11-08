@@ -1,6 +1,7 @@
+import KelpieNative
 import WebKit
 import XCTest
-@testable import Kelpie
+@testable import KelpieBrowser
 
 @MainActor
 final class BrowserControlGatewayTests: XCTestCase {

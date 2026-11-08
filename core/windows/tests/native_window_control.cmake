@@ -1,0 +1,8 @@
+add_executable(native_window_control_test
+  tests/native_window_control_test.cpp
+  src/native_window_control.cpp
+  src/owner_task_queue.cpp
+)
+target_include_directories(native_window_control_test PRIVATE src)
+target_link_libraries(native_window_control_test PRIVATE user32)
+add_test(NAME native_window_control_test COMMAND native_window_control_test)

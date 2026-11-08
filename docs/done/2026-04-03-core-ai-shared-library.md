@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Move all AI model management, HF token auth, Ollama integration, and HF cloud inference into a shared C++ library (`native/core-ai`) so every platform (macOS, iOS, Android) uses the same logic, with only the UI and local inference engines remaining platform-specific.
+**Goal:** Move all AI model management, HF token auth, Ollama integration, and HF cloud inference into a shared C++ library (`core/native/core-ai`) so every platform (macOS, iOS, Android) uses the same logic, with only the UI and local inference engines remaining platform-specific.
 
-**Architecture:** A new `native/core-ai` static library following the exact patterns of `core-state`. Exposes a C ABI via opaque `KelpieAiManagerRef` handle. Manages the model catalog, HF token, model downloads with auth, Ollama HTTP client, and HF Inference API cloud calls. Platforms call the C API from Swift (bridging header) or Kotlin (JNI). Local inference engines (llama.cpp, Apple Foundation Models, Google AI Edge) stay platform-specific and are plugged in via a callback the platform registers.
+**Architecture:** A new `core/native/core-ai` static library following the exact patterns of `core-state`. Exposes a C ABI via opaque `KelpieAiManagerRef` handle. Manages the model catalog, HF token, model downloads with auth, Ollama HTTP client, and HF Inference API cloud calls. Platforms call the C API from Swift (bridging header) or Kotlin (JNI). Local inference engines (llama.cpp, Apple Foundation Models, Google AI Edge) stay platform-specific and are plugged in via a callback the platform registers.
 
 **Tech Stack:** C++17, nlohmann_json, cpp-httplib (for Ollama + HF cloud HTTP), CMake, C ABI
 
@@ -28,14 +28,14 @@
 
 ---
 
-### Task 1: Scaffold `native/core-ai` with CMake and empty C API header
+### Task 1: Scaffold `core/native/core-ai` with CMake and empty C API header
 
 **Files:**
-- Create: `native/core-ai/CMakeLists.txt`
-- Create: `native/core-ai/include/kelpie/ai_c_api.h`
-- Create: `native/core-ai/src/ai_c_api.cpp`
-- Create: `native/core-ai/src/ai_c_api_internal.h`
-- Modify: `native/CMakeLists.txt:36` — add `add_subdirectory(core-ai)`
+- Create: `core/native/core-ai/CMakeLists.txt`
+- Create: `core/native/core-ai/include/kelpie/ai_c_api.h`
+- Create: `core/native/core-ai/src/ai_c_api.cpp`
+- Create: `core/native/core-ai/src/ai_c_api_internal.h`
+- Modify: `core/native/CMakeLists.txt:36` — add `add_subdirectory(core-ai)`
 
 **Step 1: Create CMakeLists.txt**
 
@@ -63,7 +63,7 @@ endif()
 **Step 2: Create the C API header**
 
 ```c
-// native/core-ai/include/kelpie/ai_c_api.h
+// core/native/core-ai/include/kelpie/ai_c_api.h
 #pragma once
 
 #include <stdbool.h>
@@ -128,7 +128,7 @@ char* kelpie_ai_hf_infer(KelpieAiManagerRef mgr,
 **Step 3: Create stub implementation**
 
 ```cpp
-// native/core-ai/src/ai_c_api.cpp
+// core/native/core-ai/src/ai_c_api.cpp
 #include "kelpie/ai_c_api.h"
 #include "ai_c_api_internal.h"
 
@@ -173,7 +173,7 @@ char* kelpie_ai_hf_infer(KelpieAiManagerRef, const char*, const char*) { return 
 **Step 4: Create internal header**
 
 ```cpp
-// native/core-ai/src/ai_c_api_internal.h
+// core/native/core-ai/src/ai_c_api_internal.h
 #pragma once
 
 #include <cstring>
@@ -210,7 +210,7 @@ struct KelpieAiManager {
 
 **Step 5: Add to root CMakeLists**
 
-In `native/CMakeLists.txt`, add before `engine-chromium-desktop`:
+In `core/native/CMakeLists.txt`, add before `engine-chromium-desktop`:
 
 ```cmake
 add_subdirectory(core-ai)
@@ -218,7 +218,7 @@ add_subdirectory(core-ai)
 
 **Step 6: Create empty test scaffold**
 
-Create `native/core-ai/tests/CMakeLists.txt`:
+Create `core/native/core-ai/tests/CMakeLists.txt`:
 
 ```cmake
 function(add_ai_test name)
@@ -230,7 +230,7 @@ endfunction()
 add_ai_test(test_ai_catalog test_ai_catalog.cpp)
 ```
 
-Create `native/core-ai/tests/test_ai_catalog.cpp`:
+Create `core/native/core-ai/tests/test_ai_catalog.cpp`:
 
 ```cpp
 #include "kelpie/ai_c_api.h"
@@ -261,7 +261,7 @@ ctest -R test_ai_catalog --output-on-failure
 **Step 8: Commit**
 
 ```bash
-git add native/core-ai/ native/CMakeLists.txt
+git add core/native/core-ai/ core/native/CMakeLists.txt
 git commit -m "feat(native): scaffold core-ai shared library with C API"
 ```
 
@@ -270,12 +270,12 @@ git commit -m "feat(native): scaffold core-ai shared library with C API"
 ### Task 2: Model catalog and fitness evaluation
 
 **Files:**
-- Create: `native/core-ai/src/model_catalog.h`
-- Create: `native/core-ai/src/model_catalog.cpp`
-- Modify: `native/core-ai/src/ai_c_api_internal.h`
-- Modify: `native/core-ai/src/ai_c_api.cpp`
-- Modify: `native/core-ai/CMakeLists.txt`
-- Modify: `native/core-ai/tests/test_ai_catalog.cpp`
+- Create: `core/native/core-ai/src/model_catalog.h`
+- Create: `core/native/core-ai/src/model_catalog.cpp`
+- Modify: `core/native/core-ai/src/ai_c_api_internal.h`
+- Modify: `core/native/core-ai/src/ai_c_api.cpp`
+- Modify: `core/native/core-ai/CMakeLists.txt`
+- Modify: `core/native/core-ai/tests/test_ai_catalog.cpp`
 
 **Step 1: Write tests**
 
@@ -324,12 +324,12 @@ void TestModelFitnessNoStorage() {
 **Step 2: Build, verify tests fail**
 
 ```bash
-cd native/.build && cmake --build . && ctest -R test_ai_catalog --output-on-failure
+cd core/native/.build && cmake --build . && ctest -R test_ai_catalog --output-on-failure
 ```
 
 **Step 3: Implement model_catalog.h/cpp**
 
-`native/core-ai/src/model_catalog.h`:
+`core/native/core-ai/src/model_catalog.h`:
 
 ```cpp
 #pragma once
@@ -377,7 +377,7 @@ class ModelCatalog {
 }  // namespace kelpie
 ```
 
-`native/core-ai/src/model_catalog.cpp` — implement with the two Gemma models (same data as `AIModelCatalog.swift`), `download_url()` returns `https://huggingface.co/{repo}/resolve/main/{file}`, `fitness()` checks disk/RAM thresholds.
+`core/native/core-ai/src/model_catalog.cpp` — implement with the two Gemma models (same data as `AIModelCatalog.swift`), `download_url()` returns `https://huggingface.co/{repo}/resolve/main/{file}`, `fitness()` checks disk/RAM thresholds.
 
 **Step 4: Wire into C API**
 
@@ -392,7 +392,7 @@ cmake --build . && ctest -R test_ai_catalog --output-on-failure
 **Step 6: Commit**
 
 ```bash
-git add native/core-ai/
+git add core/native/core-ai/
 git commit -m "feat(native): model catalog and fitness evaluation in core-ai"
 ```
 
@@ -401,11 +401,11 @@ git commit -m "feat(native): model catalog and fitness evaluation in core-ai"
 ### Task 3: HF token and model store (download, validate, remove)
 
 **Files:**
-- Create: `native/core-ai/src/model_store.h`
-- Create: `native/core-ai/src/model_store.cpp`
-- Modify: `native/core-ai/src/ai_c_api.cpp`
-- Modify: `native/core-ai/CMakeLists.txt`
-- Create: `native/core-ai/tests/test_ai_store.cpp`
+- Create: `core/native/core-ai/src/model_store.h`
+- Create: `core/native/core-ai/src/model_store.cpp`
+- Modify: `core/native/core-ai/src/ai_c_api.cpp`
+- Modify: `core/native/core-ai/CMakeLists.txt`
+- Create: `core/native/core-ai/tests/test_ai_store.cpp`
 
 **Step 1: Write tests**
 
@@ -475,7 +475,7 @@ Key methods:
 
 **Step 3: Add cpp-httplib dependency**
 
-In `native/core-ai/CMakeLists.txt`, fetch httplib:
+In `core/native/core-ai/CMakeLists.txt`, fetch httplib:
 
 ```cmake
 FetchContent_Declare(
@@ -522,7 +522,7 @@ cmake --build . && ctest -R test_ai_store --output-on-failure
 **Step 7: Commit**
 
 ```bash
-git add native/core-ai/
+git add core/native/core-ai/
 git commit -m "feat(native): HF token, model store, and authenticated downloads"
 ```
 
@@ -531,11 +531,11 @@ git commit -m "feat(native): HF token, model store, and authenticated downloads"
 ### Task 4: Ollama HTTP client
 
 **Files:**
-- Create: `native/core-ai/src/ollama_client.h`
-- Create: `native/core-ai/src/ollama_client.cpp`
-- Modify: `native/core-ai/src/ai_c_api.cpp`
-- Modify: `native/core-ai/CMakeLists.txt`
-- Create: `native/core-ai/tests/test_ai_ollama.cpp`
+- Create: `core/native/core-ai/src/ollama_client.h`
+- Create: `core/native/core-ai/src/ollama_client.cpp`
+- Modify: `core/native/core-ai/src/ai_c_api.cpp`
+- Modify: `core/native/core-ai/CMakeLists.txt`
+- Create: `core/native/core-ai/tests/test_ai_ollama.cpp`
 
 **Step 1: Write tests**
 
@@ -570,10 +570,10 @@ git commit -m "feat(native): Ollama HTTP client in core-ai"
 ### Task 5: HF cloud inference
 
 **Files:**
-- Create: `native/core-ai/src/hf_cloud_client.h`
-- Create: `native/core-ai/src/hf_cloud_client.cpp`
-- Modify: `native/core-ai/src/ai_c_api.cpp`
-- Create: `native/core-ai/tests/test_ai_hf_cloud.cpp`
+- Create: `core/native/core-ai/src/hf_cloud_client.h`
+- Create: `core/native/core-ai/src/hf_cloud_client.cpp`
+- Modify: `core/native/core-ai/src/ai_c_api.cpp`
+- Create: `core/native/core-ai/tests/test_ai_hf_cloud.cpp`
 
 **Step 1: Write tests**
 
@@ -607,22 +607,22 @@ git commit -m "feat(native): HF cloud inference client in core-ai"
 
 **Files:**
 - Modify: `apps/macos/project.yml` — add header/library search paths and linker flag
-- Modify: `apps/macos/Kelpie/Kelpie-Bridging-Header.h` — import `ai_c_api.h`
-- Create: `apps/macos/Kelpie/AI/AIManager.swift` — Swift wrapper around C API
-- Modify: `apps/macos/Kelpie/AI/AIState.swift` — delegate to AIManager instead of inline logic
-- Modify: `apps/macos/Kelpie/Views/AIChatPanel.swift` — add HF token button + popover
-- Modify: `apps/macos/Kelpie/Views/BrowserView.swift` — wire auth-failure navigation
+- Modify: `core/apple/macos/Kelpie-Bridging-Header.h` — import `ai_c_api.h`
+- Create: `core/apple/macos/AI/AIManager.swift` — Swift wrapper around C API
+- Modify: `core/apple/macos/AI/AIState.swift` — delegate to AIManager instead of inline logic
+- Modify: `core/apple/macos/Views/AIChatPanel.swift` — add HF token button + popover
+- Modify: `core/apple/macos/Views/BrowserView.swift` — wire auth-failure navigation
 
 **Step 1: Update project.yml**
 
 Add to `HEADER_SEARCH_PATHS`:
 ```yaml
-- "$(PROJECT_DIR)/../../native/core-ai/include"
+- "$(PROJECT_DIR)/../../core/native/core-ai/include"
 ```
 
 Add to `LIBRARY_SEARCH_PATHS`:
 ```yaml
-- "$(PROJECT_DIR)/../../native/.build/core-ai"
+- "$(PROJECT_DIR)/../../core/native/.build/core-ai"
 ```
 
 Add to `OTHER_LDFLAGS`:
@@ -689,7 +689,7 @@ When a download returns `auth_required`, navigate the browser to `https://huggin
 **Step 7: Build the native library for macOS**
 
 ```bash
-cd native/.build && cmake .. && cmake --build . --target kelpie_core_ai
+cd core/native/.build && cmake .. && cmake --build . --target kelpie_core_ai
 ```
 
 **Step 8: Build and launch the macOS app**
@@ -701,7 +701,7 @@ cd apps/macos && xcodebuild -project Kelpie.xcodeproj -scheme Kelpie -configurat
 **Step 9: Commit**
 
 ```bash
-git add apps/macos/ native/core-ai/
+git add apps/macos/ core/native/core-ai/
 git commit -m "feat(macos): wire core-ai shared library into macOS app"
 ```
 
@@ -710,10 +710,10 @@ git commit -m "feat(macos): wire core-ai shared library into macOS app"
 ### Task 7: Wire core-ai into Android app
 
 **Files:**
-- Modify: `apps/android/app/src/main/cpp/CMakeLists.txt` — link `kelpie_core_ai`
-- Modify: `apps/android/app/src/main/cpp/kelpie_jni.cpp` — add JNI wrappers for ai C API
-- Create: `apps/android/app/src/main/java/com/kelpie/browser/nativecore/AiManager.kt` — Kotlin wrapper
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIHandler.kt` — delegate to AiManager
+- Modify: `core/android/src/main/cpp/CMakeLists.txt` — link `kelpie_core_ai`
+- Modify: `core/android/src/main/cpp/kelpie_jni.cpp` — add JNI wrappers for ai C API
+- Create: `core/android/src/main/java/com/kelpie/browser/nativecore/AiManager.kt` — Kotlin wrapper
+- Modify: `core/android/src/main/java/com/kelpie/browser/ai/AIHandler.kt` — delegate to AiManager
 
 **Step 1: Update Android CMakeLists**
 
@@ -763,8 +763,8 @@ git commit -m "feat(android): wire core-ai shared library into Android app"
 **Files:**
 - Modify: iOS Xcode project settings — add header/library paths
 - Modify: iOS bridging header — import `ai_c_api.h`
-- Create: `apps/ios/Kelpie/AI/AIManager.swift` — same wrapper as macOS
-- Modify: `apps/ios/Kelpie/AI/AIState.swift` — delegate to AIManager
+- Create: `core/apple/ios/AI/AIManager.swift` — same wrapper as macOS
+- Modify: `core/apple/ios/AI/AIState.swift` — delegate to AIManager
 
 Same approach as Task 6 but for iOS target. iOS won't use `download_model` for local GGUF files (no llama.cpp on iOS), but will use HF cloud inference and Ollama.
 
@@ -779,8 +779,8 @@ git commit -m "feat(ios): wire core-ai shared library into iOS app"
 ### Task 9: Remove duplicated Swift/Kotlin AI logic
 
 **Files:**
-- Modify: `apps/macos/Kelpie/AI/AIState.swift` — remove inline model catalog, download logic, Ollama HTTP calls
-- Modify: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIHandler.kt` — remove Ollama HTTP duplication
+- Modify: `core/apple/macos/AI/AIState.swift` — remove inline model catalog, download logic, Ollama HTTP calls
+- Modify: `core/android/src/main/java/com/kelpie/browser/ai/AIHandler.kt` — remove Ollama HTTP duplication
 - Delete: model catalog data from platform code (single source of truth is now `model_catalog.cpp`)
 
 **Step 1: Audit remaining duplication**
@@ -810,7 +810,7 @@ git commit -m "refactor: remove platform-duplicated AI logic, single source in c
 **Files:**
 - Modify: `docs/functionality.md` — add HF token flow, HF cloud inference backend
 - Modify: `docs/architecture.md` — document core-ai library in native layer
-- Create: `native/core-ai/README.md` — module overview, C API reference
+- Create: `core/native/core-ai/README.md` — module overview, C API reference
 
 **Commit:**
 
@@ -824,7 +824,7 @@ git commit -m "docs: document core-ai shared library and HF token/cloud inferenc
 
 | Task | What | Tests |
 |------|------|-------|
-| 1 | Scaffold `native/core-ai` + CMake + stubs | create/destroy |
+| 1 | Scaffold `core/native/core-ai` + CMake + stubs | create/destroy |
 | 2 | Model catalog + fitness | catalog listing, fitness levels |
 | 3 | HF token + model store + authenticated downloads | token get/set, download validation |
 | 4 | Ollama HTTP client | endpoint, list, infer |
