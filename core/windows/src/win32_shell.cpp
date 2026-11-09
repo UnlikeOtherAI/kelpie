@@ -56,8 +56,10 @@ void Win32Shell::Show(int show_command) {
 
 void Win32Shell::UpdateBrowserState(const BrowserState& state) {
   if (hwnd_ == nullptr) return;
-  const bool favorites_changed = favorites_bar_.Update(delegate_->GetBookmarksJson());
+  const std::string bookmarks = delegate_->GetBookmarksJson();
+  const bool favorites_changed = favorites_bar_.Update(bookmarks);
   if (favorites_changed) { RECT r{}; GetClientRect(hwnd_, &r); LayoutChildren(r.right, r.bottom); }
+  if (favorites_changed && bookmarks_view_.IsShowing()) bookmarks_view_.UpdateFromJson(bookmarks);
   const bool tab_changed = RefreshTabs();
   const bool state_changed = !has_browser_state_ || state.url != browser_state_.url ||
       state.title != browser_state_.title || state.is_loading != browser_state_.is_loading ||
@@ -120,6 +122,15 @@ bool Win32Shell::HandleKeyboardNavigation(const MSG& message) {
   }
   SetFocus(controls[next]);
   return true;
+}
+
+bool Win32Shell::HandlePanelMessage(const MSG& message) {
+  if (message.hwnd == nullptr) return false;
+  const HWND root = GetAncestor(message.hwnd, GA_ROOT);
+  for (const HWND panel : {bookmarks_view_.hwnd(), history_view_.hwnd(), network_view_.hwnd()}) {
+    if (panel != nullptr && panel == root) return IsDialogMessageW(panel, const_cast<MSG*>(&message)) != FALSE;
+  }
+  return false;
 }
 
 LRESULT CALLBACK Win32Shell::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -194,6 +205,8 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       toast_.Create(hwnd_, instance_);
       bookmarks_view_.SetNavigateCallback([this](const std::string& url) { delegate_->OnNavigateRequested(url); });
       history_view_.SetNavigateCallback([this](const std::string& url) { delegate_->OnNavigateRequested(url); });
+      network_view_.SetSource([this] { return delegate_->GetNetworkJson(); },
+                              [this] { delegate_->OnClearNetworkRequested(); });
       LayoutChildren(rect.right, rect.bottom);
       RefreshTabs();
       return 0;
@@ -334,9 +347,15 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
 }
 
 void Win32Shell::ShowPanel(UINT command) {
-  if (command == IDM_VIEW_BOOKMARKS) { bookmarks_view_.EnsureCreated(instance_, hwnd_); bookmarks_view_.UpdateFromJson(delegate_->GetBookmarksJson()); bookmarks_view_.ToggleVisible(); }
-  if (command == IDM_VIEW_HISTORY) { history_view_.EnsureCreated(instance_, hwnd_); history_view_.UpdateFromJson(delegate_->GetHistoryJson()); history_view_.ToggleVisible(); }
-  if (command == IDM_VIEW_NETWORK) { network_view_.EnsureCreated(instance_, hwnd_); network_view_.UpdateFromJson(delegate_->GetNetworkJson()); network_view_.ToggleVisible(); }
+  if (command == IDM_VIEW_BOOKMARKS) {
+    bookmarks_view_.UpdateFromJson(delegate_->GetBookmarksJson());
+    bookmarks_view_.Toggle(instance_, hwnd_);
+  }
+  if (command == IDM_VIEW_HISTORY) {
+    history_view_.UpdateFromJson(delegate_->GetHistoryJson());
+    history_view_.Toggle(instance_, hwnd_);
+  }
+  if (command == IDM_VIEW_NETWORK) network_view_.Toggle(instance_, hwnd_);
 }
 
 void Win32Shell::ApplyAppearance() {

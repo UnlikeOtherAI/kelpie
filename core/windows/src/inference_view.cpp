@@ -1,4 +1,5 @@
 #include "inference_view.h"
+#include "theme/theme.h"
 #include "windows_utf.h"
 #include <commdlg.h>
 #include <future>
@@ -113,11 +114,12 @@ struct State {
     Set(window, Result, operation == "ai-infer" ? Transcript() + (result.value("success", false) ? "" : message) : message); Reload();
   }
 };
+// Positions are device-independent pixels, scaled to the window's monitor.
 HWND Add(HWND parent, int id, const wchar_t* kind, const wchar_t* text, int x, int y, int w, int h, DWORD style = 0) {
   auto control = CreateWindowExW(kind == std::wstring(L"EDIT") ? WS_EX_CLIENTEDGE : 0, kind, text,
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | style, x, y, w, h, parent,
-      reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
-  SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+      WS_CHILD | WS_VISIBLE | WS_TABSTOP | style, ui::Dip(parent, x), ui::Dip(parent, y), ui::Dip(parent, w),
+      ui::Dip(parent, h), parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), nullptr, nullptr);
+  SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(ui::CachedFont(parent, 12)), TRUE);
   return control;
 }
 void CreateControls(HWND window) {
@@ -208,8 +210,11 @@ void ShowInferenceSettings(HINSTANCE instance, HWND owner, InferenceService& ser
   const auto captured = engine.GetChatSession(std::nullopt, &session, std::chrono::seconds(2));
   if (!captured.ok || !captured.tab || !session) return;
   State state{service, session, {captured.tab->id, captured.tab->generation}};
-  auto window = CreateWindowExW(WS_EX_DLGMODALFRAME, klass.lpszClassName, L"Local AI", WS_CAPTION | WS_SYSMENU,
-      CW_USEDEFAULT, CW_USEDEFAULT, 706, 690, owner, nullptr, instance, &state);
+  // Centred over the window that opened it, at that window's DPI.
+  constexpr DWORD style = WS_CAPTION | WS_SYSMENU;
+  const RECT frame = ui::OwnedWindowRect(owner, {690, 656}, style, WS_EX_DLGMODALFRAME);
+  auto window = CreateWindowExW(WS_EX_DLGMODALFRAME, klass.lpszClassName, L"Local AI", style, frame.left,
+      frame.top, frame.right - frame.left, frame.bottom - frame.top, owner, nullptr, instance, &state);
   if (!window) return;
   EnableWindow(owner, FALSE); ShowWindow(window, SW_SHOW);
   MSG message{};
