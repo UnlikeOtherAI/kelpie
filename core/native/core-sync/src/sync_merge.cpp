@@ -67,8 +67,8 @@ bool SyncStore::WithinCaps(const Cookie& cookie, std::map<std::string, std::size
                            std::size_t* live_count) const {
   const auto it = entries_.find(CookieKey(cookie));
   if (it != entries_.end() && it->second.Live()) return true;  // replaces an existing cookie
-  std::size_t& host_count = (*host_counts)[cookie.host()];
-  if (host_count >= kMaxCookiesPerHost || *live_count >= kMaxLiveEntries) return false;
+  std::size_t& host_count = (*host_counts)[SiteOf(cookie.host())];
+  if (host_count >= kMaxCookiesPerSite || *live_count >= kMaxLiveEntries) return false;
   ++host_count;
   ++*live_count;
   return true;
@@ -95,7 +95,7 @@ nlohmann::json SyncStore::PlanMerge(const nlohmann::json& records, const nlohman
   for (const auto& [key, entry] : entries_) {
     if (!entry.Live()) continue;
     ++live_count;
-    ++host_counts[entry.Shape().host()];
+    ++host_counts[SiteOf(entry.Shape().host())];
   }
 
   std::map<std::string, std::size_t> index_by_key;

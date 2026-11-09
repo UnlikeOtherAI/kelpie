@@ -70,4 +70,10 @@ bool CookieMatchesUrl(const Cookie& cookie, const std::string& url);
 
 std::string CookieProblemName(CookieProblem problem);
 
+// The registrable domain a browser counts cookie limits against, approximated
+// without the Public Suffix List: the last two labels, or three when the
+// second-level label is a common country-code suffix (co.uk, com.au, …).
+// IP literals and single-label hosts are their own site.
+std::string SiteOf(const std::string& host);
+
 }  // namespace kelpie::sync

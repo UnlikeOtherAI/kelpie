@@ -100,7 +100,8 @@ struct MobileCookieHandler {
             if let domain = body["domain"] as? String { cookies = cookies.filter { Self.inDomain($0.domain, domain) } }
             if let scope = body["url"] as? String ?? (all ? nil : target.page) { cookies = CookieScope.scoped(cookies, toURL: scope) }
             let described = cookies.compactMap(SyncCookieWire.json(from:)).map(CookieAPIFormat.apiJSON(fromWire:))
-            var result: [String: Any] = ["cookies": described, "count": described.count, "complete": described.count == cookies.count]
+            var result: [String: Any] = ["cookies": described, "count": described.count]
+            if all { result["complete"] = described.count == cookies.count }
             if described.count != cookies.count { result["skipped"] = cookies.count - described.count }
             return successResponse(result)
         } catch let refusal as Refusal {

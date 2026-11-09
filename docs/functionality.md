@@ -434,7 +434,7 @@ Kelpie devices signed in to the same UOA account share their website cookies. Si
 - **Shared computer.** When a different account signs in, the cookies already on that device stay local and never reach the new account's devices.
 - **Clearing is local.** Signing out of one site reaches every device. Removing more than 20 cookies that are also more than a quarter of the store at once — clearing all cookies, or the system purging them — is treated as a purge and clears that device only.
 - **Some sites refuse copies.** A site that ties its session to one device, address or user agent may reject a synced cookie. Kelpie delivers it; the site decides whether to accept it.
-- **Limits.** Up to 150 cookies per site and 3 000 in total sync. Devices whose clocks differ by more than 2 minutes do not sync; status shows `clock-skew`.
+- **Limits.** Up to 150 cookies per site (a domain and its subdomains, as browsers count it) and 3 000 in total sync. Devices whose clocks differ by more than 2 minutes do not sync; status shows `clock-skew`.
 
 **Who can read synced cookies.** Every signed-in device holds the shared set, so **any client paired with any one device can read and plant cookies for all of them**. Pair a client only if you would trust it with the sessions on all your devices.
 

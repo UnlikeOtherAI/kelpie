@@ -195,8 +195,17 @@ void TestCapsKeepStoresBelowEngineLimits() {
   for (int i = 0; i < 160; ++i) a.engine.Put(MakeCookie(".big.com", "c" + std::to_string(i), "v"));
   a.Scan(kNow + 1000);
   Sync(b, a, kNow + 2000);
-  assert(b.engine.cookies.size() == kMaxCookiesPerHost);
+  assert(b.engine.cookies.size() == kMaxCookiesPerSite);
   assert(b.store->Status()["skipped"] == 10);
+
+  // Subdomains of one site share its limit, as in Chromium.
+  Device c("a-caps-sub"), d("b-caps-sub");
+  Ready(c, kNow);
+  Ready(d, kNow);
+  for (int i = 0; i < 200; ++i) c.engine.Put(MakeCookie("a" + std::to_string(i) + ".big.co.uk", "c", "v"));
+  c.Scan(kNow + 1000);
+  Sync(d, c, kNow + 2000);
+  assert(d.engine.cookies.size() == kMaxCookiesPerSite);
 }
 
 void TestBusyDuringMerge() {

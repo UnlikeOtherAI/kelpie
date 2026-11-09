@@ -15,7 +15,9 @@ namespace kelpie::sync {
 
 // Limits shared by every platform. See docs/plans/2026-11-09-p2p-cookie-sync.md.
 inline constexpr std::size_t kPageSize = 500;
-inline constexpr std::size_t kMaxCookiesPerHost = 150;
+// Chromium evicts beyond 180 cookies per registrable domain, so the synced set
+// stays under that for every site, counted the same way (see SiteOf).
+inline constexpr std::size_t kMaxCookiesPerSite = 150;
 inline constexpr std::size_t kMaxLiveEntries = 3000;
 inline constexpr std::size_t kMaxTombstones = 20000;
 inline constexpr std::size_t kPurgeMinimum = 20;

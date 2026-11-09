@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <set>
+#include <vector>
 
 #include "sha256.h"
 
@@ -207,6 +209,31 @@ bool CookieMatchesUrl(const Cookie& cookie, const UrlParts& url) {
 bool CookieMatchesUrl(const Cookie& cookie, const std::string& url) {
   const auto parts = ParseUrl(url);
   return parts && CookieMatchesUrl(cookie, *parts);
+}
+
+std::string SiteOf(const std::string& host) {
+  if (host.empty() || host.front() == '[' ||
+      std::all_of(host.begin(), host.end(), [](char c) { return c == '.' || std::isdigit(static_cast<unsigned char>(c)); })) {
+    return host;
+  }
+  std::vector<std::string> labels;
+  std::size_t start = 0;
+  while (true) {
+    const auto dot = host.find('.', start);
+    labels.push_back(host.substr(start, dot == std::string::npos ? std::string::npos : dot - start));
+    if (dot == std::string::npos) break;
+    start = dot + 1;
+  }
+  if (labels.size() <= 2) return host;
+  static const std::set<std::string> kSecondLevel = {"ac", "co", "com", "edu", "gob", "go", "gov", "mil",
+                                                     "ne", "net", "or", "org"};
+  const std::size_t keep = labels.back().size() == 2 && kSecondLevel.count(labels[labels.size() - 2]) ? 3 : 2;
+  std::string site;
+  for (std::size_t i = labels.size() - std::min(keep, labels.size()); i < labels.size(); ++i) {
+    if (!site.empty()) site += '.';
+    site += labels[i];
+  }
+  return site;
 }
 
 std::string CookieProblemName(CookieProblem problem) {

@@ -285,7 +285,7 @@ Response:
 | `store.entries`, `store.tombstones` | Live cookies and remembered deletions in the sync metadata |
 | `store.localOnly` | Cookies kept from a different UOA account on this device. They never sync |
 | `store.unapplied` | Synced cookies this engine refused |
-| `store.skipped` | Synced cookies ignored to stay under 150 per domain and 3 000 in total |
+| `store.skipped` | Synced cookies ignored to stay under 150 per site (a domain and its subdomains) and 3 000 in total |
 | `store.warming` | `true` for up to 30 s after launch while peers' cookies arrive |
 | `store.lastPurgeAt` | Unix milliseconds of the last scan treated as a purge, or `null` |
 

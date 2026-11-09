@@ -107,6 +107,16 @@ void TestUrlMatching() {
   assert(!CookieMatchesUrl(domain_cookie, "not a url"));
 }
 
+void TestSiteOf() {
+  assert(SiteOf("example.com") == "example.com");
+  assert(SiteOf("a.b.example.com") == "example.com");
+  assert(SiteOf("www.bbc.co.uk") == "bbc.co.uk");
+  assert(SiteOf("shop.example.com.au") == "example.com.au");
+  assert(SiteOf("www.example.de") == "example.de");
+  assert(SiteOf("192.168.1.10") == "192.168.1.10");
+  assert(SiteOf("router") == "router");
+}
+
 }  // namespace
 
 int main() {
@@ -115,5 +125,6 @@ int main() {
   TestKeysCannotCollide();
   TestFingerprint();
   TestUrlMatching();
+  TestSiteOf();
   return 0;
 }
