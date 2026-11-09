@@ -60,8 +60,8 @@ final class FavouriteDragGhost {
 
         // A red disc with a white minus, overlapping the chip's top-right corner.
         let diameter: CGFloat = 16
-        badge.frame = NSRect(x: chip.frame.maxX - diameter * 0.7, y: chip.frame.maxY - diameter * 0.7,
-                             width: diameter, height: diameter)
+        let corner = NSPoint(x: chip.frame.maxX - diameter * 0.7, y: chip.frame.maxY - diameter * 0.7)
+        badge.frame = NSRect(origin: corner, size: NSSize(width: diameter, height: diameter))
         badge.path = CGPath(ellipseIn: badge.bounds, transform: nil)
         badge.fillColor = NSColor.systemRed.cgColor
         badge.strokeColor = NSColor.white.cgColor
