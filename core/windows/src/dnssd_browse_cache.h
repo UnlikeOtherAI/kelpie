@@ -53,7 +53,6 @@ class DnsSdBrowseCache {
                   const std::vector<std::string>& txt, const std::vector<std::string>& addresses,
                   Clock::time_point now);
   Result Expire(Clock::time_point now);
-  std::optional<Clock::time_point> NextExpiry() const;
   void Clear();
 
   // An address stays usable at least this long after it was last seen, so a

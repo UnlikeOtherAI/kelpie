@@ -192,7 +192,6 @@ void TestBrowseCacheResolveAndExpiry() {
   // The PTR TTL ends the instance.
   result = cache.Expire(now + std::chrono::seconds(4501));
   assert(result.changes.size() == 1 && !result.changes[0].view);
-  assert(!cache.NextExpiry() || *cache.NextExpiry() > now);
 
   // A resolve answer that arrives after the goodbye never resurrects it.
   cache.Apply({Ptr("kelpie-Late")}, now);

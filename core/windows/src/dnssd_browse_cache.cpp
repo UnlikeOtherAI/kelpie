@@ -164,21 +164,6 @@ DnsSdBrowseCache::Result DnsSdBrowseCache::Expire(Clock::time_point now) {
   return result;
 }
 
-std::optional<DnsSdBrowseCache::Clock::time_point> DnsSdBrowseCache::NextExpiry() const {
-  std::optional<Clock::time_point> next;
-  auto consider = [&next](Clock::time_point when) {
-    if (!next || when < *next) next = when;
-  };
-  for (const auto& [key, instance] : instances_) {
-    consider(instance.expires);
-    for (const auto& [address, expires] : instance.resolved_addresses) consider(expires);
-  }
-  for (const auto& [host, addresses] : hosts_) {
-    for (const auto& [address, expires] : addresses) consider(expires);
-  }
-  return next;
-}
-
 void DnsSdBrowseCache::Clear() {
   instances_.clear();
   hosts_.clear();
