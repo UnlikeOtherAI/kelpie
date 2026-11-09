@@ -9,7 +9,7 @@ extension BrowserView {
             return
         }
 
-        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.enterScript)
+        try? await serverState.handlerContext.enter3DInspector()
         let active = try? await serverState.handlerContext.evaluateJSReturningString("window.__m3d ? 'true' : 'false'")
         guard active == "true" else { return }
 

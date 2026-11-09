@@ -1,10 +1,38 @@
-import Foundation
+import AppKit
 
 extension HandlerContext {
-    /// The inspector follows the visible page, including in windows with several tabs.
-    /// General automation still requires an explicit tab when several are open.
+    func enter3DInspector(windowId: String? = nil) async throws {
+        let target = try visible3DInspectorRenderer(windowId: windowId)
+        let snapshot = try? await target.takeSnapshot()
+        let image = snapshot?.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?
+            .representation(using: .png, properties: [:])?.base64EncodedString()
+        guard try visible3DInspectorRenderer(windowId: windowId) === target else { throw HandlerError.rendererHidden }
+        _ = try await target.evaluateJS(Snapshot3DBridge.enterScript)
+        if let image {
+            _ = try? await target.evaluateJS(Snapshot3DBridge.previewScript(image))
+        }
+    }
+
+    /// The inspector operates on the same live renderer as RendererContainerView.
+    /// Restored tab bookkeeping can name a renderer that is not attached to the
+    /// visible browser. It must never receive the scene or its preview instead.
     func evaluate3DInspectorJS(_ script: String, windowId: String? = nil) async throws -> Any? {
-        let tabId = tabStore(windowId: windowId, tabId: nil)?.activeTab?.id.uuidString
-        return try await evaluateJS(script, windowId: windowId, tabId: tabId)
+        try await visible3DInspectorRenderer(windowId: windowId).evaluateJS(script)
+    }
+
+    private func visible3DInspectorRenderer(windowId: String?) throws -> any RendererEngine {
+        try Task.checkCancellation()
+        if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
+        guard let renderer else { throw HandlerError.noWebView }
+        if let browserControlEngineName, browserControlEngineName != renderer.engineName {
+            throw HandlerError.rendererHidden
+        }
+        if let windowId {
+            guard let entry = WindowRegistry.shared.entry(for: windowId) else {
+                throw HandlerError.windowNotFound(windowId)
+            }
+            guard renderer.makeView().window === entry.window else { throw HandlerError.rendererHidden }
+        }
+        return renderer
     }
 }
