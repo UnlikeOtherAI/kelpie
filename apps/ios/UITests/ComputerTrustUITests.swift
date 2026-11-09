@@ -3,6 +3,7 @@ import XCTest
 
 final class ComputerTrustUITests: XCTestCase {
     private let port = 18430
+    private let computerName = "UI test \(UUID().uuidString.prefix(8))"
 
     @MainActor
     func testApproveReconnectAndRevokeComputerThroughSettings() async throws {
@@ -33,10 +34,10 @@ final class ComputerTrustUITests: XCTestCase {
         XCTAssertTrue(clients.waitForExistence(timeout: 5))
         clients.tap()
         XCTAssertTrue(app.staticTexts["Trusted computers"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["UI test computer"].exists)
+        XCTAssertTrue(app.staticTexts[computerName].exists)
         capture(app, "trusted-computers")
-        app.buttons["Revoke"].firstMatch.tap()
-        XCTAssertFalse(app.staticTexts["UI test computer"].exists)
+        app.cells.containing(.staticText, identifier: computerName).buttons["Revoke"].tap()
+        XCTAssertFalse(app.staticTexts[computerName].exists)
         app.buttons["Done"].tap()
         app.swipeDown()
         let revoked = try await prove(key)
@@ -48,7 +49,7 @@ final class ComputerTrustUITests: XCTestCase {
     private func prove(_ key: Curve25519.Signing.PrivateKey) async throws -> [String: Any] {
         let publicKey = key.publicKey.rawRepresentation.map { String(format: "%02x", $0) }.joined()
         var body: [String: Any] = [
-            "clientId": UUID().uuidString, "clientName": "UI test computer", "computerPublicKey": publicKey
+            "clientId": UUID().uuidString, "clientName": computerName, "computerPublicKey": publicKey
         ]
         let challenge = try await request("/v1/pair", body: body)
         let id = try XCTUnwrap(challenge["requestId"] as? String)
