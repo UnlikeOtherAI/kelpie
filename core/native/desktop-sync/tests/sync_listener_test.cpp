@@ -1,14 +1,16 @@
 // Listener admission over real loopback sockets: refusals happen on the
-// headers, before any body byte is read, and nothing but the three sync
-// endpoints is ever routed.
+// headers, before any body byte is read, nothing but the three sync endpoints
+// is ever routed, and a slow peer cannot hold a worker past its deadline.
 #include <httplib.h>
 
 #include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
+#include <csignal>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "sync_listener.h"
 
@@ -26,7 +28,9 @@ void CloseSocket(Socket s) { close(s); }
 
 struct FakeResponder : SyncResponder {
   std::atomic<int> hellos{0}, auths{0}, exchanges{0}, checks{0};
+  std::chrono::milliseconds hello_delay{0};
   SyncReply Hello(const std::string& body, const std::string&) override {
+    std::this_thread::sleep_for(hello_delay);
     ++hellos;
     return {200, {{"echo", body.size()}}};
   }
@@ -62,6 +66,23 @@ void SendAll(Socket s, const std::string& data) {
     assert(n > 0);
     sent += static_cast<std::size_t>(n);
   }
+}
+
+bool TrySend(Socket s, const std::string& data) {
+  return send(s, data.data(), static_cast<int>(data.size()), 0) == static_cast<int>(data.size());
+}
+
+// True once the peer has closed the connection (recv returns 0 or fails).
+bool PeerClosed(Socket s, std::chrono::milliseconds wait) {
+  fd_set read_set;
+  FD_ZERO(&read_set);
+  FD_SET(s, &read_set);
+  timeval timeout{};
+  timeout.tv_sec = static_cast<decltype(timeout.tv_sec)>(wait.count() / 1000);
+  timeout.tv_usec = static_cast<decltype(timeout.tv_usec)>(wait.count() % 1000 * 1000);
+  if (select(static_cast<int>(s + 1), &read_set, nullptr, nullptr, &timeout) <= 0) return false;
+  char byte;
+  return recv(s, &byte, 1, 0) <= 0;
 }
 
 // Reads until the server closes, at most `limit`. A refusal must arrive well
@@ -145,12 +166,13 @@ void Admission() {
   assert(Status(Raw(port, "GET /v1/sync/hello HTTP/1.1\r\nHost: peer\r\n\r\n")) == 405);
   assert(Status(Raw(port, "GET /health HTTP/1.1\r\nHost: peer\r\n\r\n")) == 404);
 
-  // A body that arrives after the read deadline is refused.
+  // A body still unfinished at its deadline is cut off; it never reaches the responder.
   Socket slow = Connect(port);
   SendAll(slow, Post("/v1/sync/hello", Json(10), "{\"a\":"));
   std::this_thread::sleep_for(std::chrono::milliseconds(1300));
-  SendAll(slow, "1}   ");
-  assert(Status(ReadResponse(slow)) == 408);
+  TrySend(slow, "1}   ");
+  const int late = Status(ReadResponse(slow));
+  assert(late == 0 || late == 408);
   CloseSocket(slow);
   assert(responder.hellos == 1);  // no refused request ever reached the responder
   assert(responder.auths == 0);
@@ -166,10 +188,86 @@ void Admission() {
   assert(listener.port() == 0);
 }
 
+
+using Clock = std::chrono::steady_clock;
+
+// Sends one header byte every 200 ms, never finishing the headers, and returns
+// how long the server kept the connection open. cpp-httplib's per-read
+// timeout alone would never fire: every read makes progress.
+std::chrono::milliseconds Trickle(int port, const std::string& start) {
+  Socket s = Connect(port);
+  const auto opened = Clock::now();
+  TrySend(s, start);
+  while (Clock::now() - opened < std::chrono::seconds(10)) {
+    if (PeerClosed(s, std::chrono::milliseconds(200))) break;
+    if (!TrySend(s, "x")) break;
+  }
+  CloseSocket(s);
+  return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - opened);
+}
+
+void SlowPeers() {
+  FakeResponder responder;
+  SyncListener::Limits limits;
+  limits.header_read = std::chrono::milliseconds(1000);
+  limits.handshake_read = std::chrono::seconds(1);
+  limits.connections_per_source = 4;
+  limits.workers = 8;  // more workers than one source may hold
+  SyncListener listener(&responder, limits);
+  assert(listener.Start("127.0.0.1"));
+  const int port = listener.port();
+
+  // Three peers trickle unfinished headers; a fourth connection is still served.
+  std::vector<std::thread> trickles;
+  std::vector<std::chrono::milliseconds> held(3);
+  for (int i = 0; i < 3; ++i) {
+    trickles.emplace_back([&, i] { held[i] = Trickle(port, "POST /v1/sync/hello HTTP/1.1\r\nHost: peer\r\nX-Pad: "); });
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  assert(Status(Raw(port, Post("/v1/sync/hello", Json(2), "{}"))) == 200);
+
+  // At the per-source cap a further connection is closed before anything is read.
+  std::thread fourth([&] { Trickle(port, "POST /v1/sync/hello HTTP/1.1\r\nX-Pad: "); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  Socket capped = Connect(port);
+  const auto attempted = Clock::now();
+  assert(PeerClosed(capped, std::chrono::milliseconds(700)));
+  assert(Clock::now() - attempted < std::chrono::milliseconds(700));  // well before any deadline
+  CloseSocket(capped);
+
+  for (auto& trickle : trickles) trickle.join();
+  fourth.join();
+  // Each trickling peer was cut off at the 1 s header deadline despite steady progress.
+  for (const auto& duration : held) {
+    assert(duration >= std::chrono::milliseconds(800) && duration < std::chrono::milliseconds(2500));
+  }
+
+  // A body trickled after complete headers is cut off at the body deadline.
+  const auto body = Trickle(port, Post("/v1/sync/hello", Json(64), "{"));
+  assert(body >= std::chrono::milliseconds(800) && body < std::chrono::milliseconds(2500));
+
+  // The slots are free again, and a handler slower than every deadline still answers.
+  responder.hello_delay = std::chrono::milliseconds(1500);
+  assert(Status(Raw(port, Post("/v1/sync/hello", Json(2), "{}"))) == 200);
+  assert(responder.hellos == 2);
+
+  // Stop never waits for a slow peer.
+  std::thread last([&] { Trickle(port, "POST /v1/sync/hello HTTP/1.1\r\n"); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  const auto stopping = Clock::now();
+  listener.Stop();
+  assert(Clock::now() - stopping < std::chrono::milliseconds(800));
+  last.join();
+}
+
 }  // namespace
 
 int main() {
+#ifndef _WIN32
+  std::signal(SIGPIPE, SIG_IGN);  // writes to a socket the server shut down
+#endif
   Admission();
+  SlowPeers();
   std::puts("sync_listener_test passed");
   return 0;
 }

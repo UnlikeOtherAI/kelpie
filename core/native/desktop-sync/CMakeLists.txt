@@ -1,6 +1,7 @@
 add_library(kelpie_desktop_sync STATIC
   src/sync_channel.cpp
   src/sync_client.cpp
+  src/sync_connection_guard.cpp
   src/sync_crypto_hkdf.cpp
   src/sync_listener.cpp
   src/sync_net.cpp

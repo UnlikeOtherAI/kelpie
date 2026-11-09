@@ -4,8 +4,10 @@
 // that serves exactly POST /v1/sync/hello, /v1/sync/auth and
 // /v1/sync/exchange. It never routes to DesktopRouter or the automation API.
 //
-// Admission runs on the request headers, before any body byte is read: the
-// address rule, Origin/Transfer-Encoding/duplicate Content-Length refusal,
+// Before any byte is read, a connection must fit the per-source connection
+// cap and the address rule (sync_connection_guard.h); every phase then runs
+// under an absolute deadline. Admission runs on the request headers, before
+// any body byte is read: Origin/Transfer-Encoding/duplicate Content-Length refusal,
 // per-endpoint body limits, the hello rate limit and, for exchange, a live
 // X-Kelpie-Sync-Session. Every connection carries one request.
 
@@ -38,8 +40,14 @@ class SyncResponder {
 struct SyncListenerLimits {
   std::size_t handshake_body = 16 * 1024;
   std::size_t exchange_body = 4 * 1024 * 1024;
+  // Absolute deadlines per phase, enforced on the socket whatever the peer
+  // keeps sending: headers from accept, then the body, then the response.
+  std::chrono::milliseconds header_read{5000};
   std::chrono::seconds handshake_read{5};
   std::chrono::seconds exchange_read{15};
+  std::chrono::seconds response_write{15};
+  // Concurrent connections from one source address; more are closed unread.
+  std::size_t connections_per_source = 8;
   int hello_per_source_per_minute = 10;
   int hello_per_minute = 60;
   std::size_t workers = 32;
