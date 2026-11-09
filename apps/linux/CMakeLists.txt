@@ -77,6 +77,18 @@ if(NOT KELPIE_LINUX_HEADLESS_ONLY)
   endif()
 endif()
 
+# Cookie-sync discovery loads libavahi-client at runtime (dlopen), so only the
+# headers are needed here and the app still starts on systems without Avahi.
+set(KELPIE_LINUX_HAS_AVAHI_HEADERS 0)
+if(PkgConfig_FOUND)
+  pkg_check_modules(AVAHI_CLIENT avahi-client)
+endif()
+if(AVAHI_CLIENT_FOUND)
+  set(KELPIE_LINUX_HAS_AVAHI_HEADERS 1)
+elseif(KELPIE_LINUX_HAS_CEF)
+  message(FATAL_ERROR "The Chromium Linux build needs the Avahi client headers for cookie-sync discovery: install libavahi-client-dev (Debian/Ubuntu) or avahi-devel (Fedora)")
+endif()
+
 set(KELPIE_LINUX_HAS_FONTCONFIG 0)
 if(PkgConfig_FOUND)
   pkg_check_modules(FONTCONFIG IMPORTED_TARGET fontconfig)
@@ -229,8 +241,31 @@ if(BUILD_TESTING)
   add_test(NAME linux_profile_session_test COMMAND linux_profile_session_test)
 endif()
 
+# Discovery is portable C++ over a dlopen'ed Avahi; its tests run in both
+# configurations. Only the Chromium build syncs.
+add_library(kelpie_linux_sync_discovery STATIC src/avahi_sync_discovery.cpp src/sync_peer_events.cpp)
+target_include_directories(kelpie_linux_sync_discovery PUBLIC src)
+target_compile_definitions(kelpie_linux_sync_discovery PRIVATE
+  KELPIE_LINUX_HAS_AVAHI_HEADERS=${KELPIE_LINUX_HAS_AVAHI_HEADERS})
+if(KELPIE_LINUX_HAS_AVAHI_HEADERS)
+  target_include_directories(kelpie_linux_sync_discovery PRIVATE ${AVAHI_CLIENT_INCLUDE_DIRS})
+endif()
+target_link_libraries(kelpie_linux_sync_discovery PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+if(BUILD_TESTING)
+  add_executable(linux_sync_discovery_test tests/sync_discovery_test.cpp)
+  target_compile_options(linux_sync_discovery_test PRIVATE -UNDEBUG)
+  target_link_libraries(linux_sync_discovery_test PRIVATE kelpie_linux_sync_discovery)
+  add_test(NAME linux_sync_discovery_test COMMAND linux_sync_discovery_test)
+  # A real Avahi round trip; it runs only with KELPIE_SYNC_MDNS_LIVE=1.
+  add_executable(linux_avahi_sync_discovery_live_test tests/avahi_sync_discovery_live_test.cpp)
+  target_compile_options(linux_avahi_sync_discovery_live_test PRIVATE -UNDEBUG)
+  target_link_libraries(linux_avahi_sync_discovery_live_test PRIVATE kelpie_linux_sync_discovery)
+  add_test(NAME linux_avahi_sync_discovery_live_test COMMAND linux_avahi_sync_discovery_live_test)
+endif()
+
 if(KELPIE_LINUX_HAS_CEF)
   target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp)
+  target_link_libraries(kelpie-linux PRIVATE kelpie_linux_sync_discovery)
 else()
   target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_browser_gateway.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/stub_renderer.cpp)
   if(BUILD_TESTING)
