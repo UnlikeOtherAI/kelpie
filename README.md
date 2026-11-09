@@ -69,7 +69,7 @@ kelpie discover
 For a discovered macOS, iOS or Android browser, replace `DEVICE_ID` with the identifier returned by discovery. Approve the pairing request in the browser when prompted:
 
 ```sh
-kelpie pair "DEVICE_ID"
+kelpie --device "DEVICE_ID" pair
 kelpie --device "DEVICE_ID" navigate https://example.com
 kelpie --device "DEVICE_ID" screenshot
 ```
