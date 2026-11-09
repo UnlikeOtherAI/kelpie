@@ -206,18 +206,26 @@ final class TabStore: ObservableObject {
         persistSession()
     }
 
+    /// Everything a tab derives from its renderer's navigation state: title,
+    /// URL, loading, history and the start page screenshot. The renderer has a
+    /// single state callback, so whoever installs it (this store, or a window
+    /// adopting the tab) must route through here.
+    func rendererStateChanged(_ tab: Tab) {
+        let renderer = tab.renderer
+        let rawTitle = renderer.currentTitle
+        let nextURL = renderer.currentURL?.absoluteString ?? ""
+        tab.title = rawTitle.isEmpty ? "Start Page" : rawTitle
+        tab.currentURL = nextURL
+        tab.isLoading = renderer.isLoading
+        tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
+        tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
+        capturePreviewIfSettled(tab)
+    }
+
     private func bind(_ tab: Tab) {
-        tab.renderer.onStateChange = { [weak self, weak tab, weak renderer = tab.renderer] in
-            guard let tab, let renderer else { return }
-            let nextTitle = renderer.currentTitle.isEmpty ? "Start Page" : renderer.currentTitle
-            let nextURL = renderer.currentURL?.absoluteString ?? ""
-            let rawTitle = renderer.currentTitle
-            tab.title = nextTitle
-            tab.currentURL = nextURL
-            tab.isLoading = renderer.isLoading
-            tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
-            tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
-            self?.capturePreviewIfSettled(tab)
+        tab.renderer.onStateChange = { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            self.rendererStateChanged(tab)
         }
         tabSinks[tab.id] = tab.objectWillChange
             .sink { [weak self] _ in
