@@ -3,7 +3,7 @@ import Foundation
 
 // This app is a separate, non-shipping target. It never opens the browser,
 // touches Kelpie's profile or runs an installer. Fixtures cannot enter real apps.
-private final class VerificationFeed: URLProtocol {
+private final class VerificationFeed: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {

@@ -46,7 +46,7 @@ final class AppUpdates: ObservableObject {
         self.performUpdate = performUpdate
     }
 
-    static var platformTarget: String {
+    nonisolated static var platformTarget: String {
         #if os(iOS)
         return "ios"
         #elseif arch(arm64)

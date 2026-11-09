@@ -32,7 +32,7 @@ apps/ios/build/
 apps/ios/build-*/
 apps/macos/.build/
 apps/windows/.build-*/
-core/native/.build/
+core/native/.build
 core/native/.build-*/
 
 # Test
