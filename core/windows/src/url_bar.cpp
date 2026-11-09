@@ -29,15 +29,15 @@ bool IsIconButton(UINT id) {
 
 wchar_t IconFor(UINT id, bool loading) {
   switch (id) {
-    case IDC_HOME_BUTTON: return L'';
-    case IDC_ADD_FAVORITE_BUTTON: return ui::icon::kBookmarks;
+    case IDC_HOME_BUTTON: return ui::icon::kHome;
+    case IDC_ADD_FAVORITE_BUTTON: return ui::icon::kFavoriteStar;
     case IDC_BACK_BUTTON: return ui::icon::kBack;
     case IDC_FORWARD_BUTTON: return ui::icon::kForward;
     case IDC_RELOAD_BUTTON: return loading ? ui::icon::kStop : ui::icon::kReload;
-    case IDC_BOOKMARKS_BUTTON: return L'\ue80a';
+    case IDC_BOOKMARKS_BUTTON: return ui::icon::kBookmarks;
     case IDC_HISTORY_BUTTON: return ui::icon::kHistory;
     case IDC_NETWORK_BUTTON: return ui::icon::kNetwork;
-    default: return L'';
+    default: return ui::icon::kSettings;
   }
 }
 

@@ -91,6 +91,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::string GetBookmarksJson() const override;
   std::string GetHistoryJson() const override;
   std::string GetNetworkJson() const override;
+  void OnClearNetworkRequested() override;
   std::string GetTabsJson() const override;
   std::optional<std::wstring> BestUrlCompletion(std::wstring_view typed) const override;
   SettingsValues CurrentSettings() const override;

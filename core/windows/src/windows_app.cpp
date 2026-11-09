@@ -122,6 +122,7 @@ int WindowsApp::Run(int show_command) {
 
 bool WindowsApp::ProcessMessage(const MSG& message) {
   if (!shell_ || !shell_->hwnd()) return false;
+  if (shell_->HandlePanelMessage(message)) return true;
   if (message.hwnd != shell_->hwnd() && !IsChild(shell_->hwnd(), message.hwnd)) return false;
   return TranslateAcceleratorW(shell_->hwnd(), shell_->accelerators(), const_cast<MSG*>(&message)) ||
       shell_->HandleKeyboardNavigation(message);
@@ -191,6 +192,10 @@ std::string WindowsApp::GetHistoryJson() const {
 
 std::string WindowsApp::GetNetworkJson() const {
   return desktop_app_ ? desktop_app_->network_store().ToJson() : "[]";
+}
+
+void WindowsApp::OnClearNetworkRequested() {
+  if (desktop_app_) desktop_app_->network_store().Clear();
 }
 
 std::string WindowsApp::GetTabsJson() const {
