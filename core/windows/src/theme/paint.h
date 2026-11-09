@@ -30,6 +30,10 @@ void PaintRounded(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius,
 // affordance on the macOS address field.
 void PaintFocusRing(HDC dc, RECT rect, COLORREF color, int radius, int width);
 
+// Fills the ellipse inscribed in `rect` with `image`, scaled to fit, with an
+// antialiased edge. Used for the circular account avatar.
+void PaintCircularImage(HDC dc, RECT rect, HBITMAP image);
+
 // Draws one icon-font glyph centred in `rect`. `dip_size` is the glyph's
 // device-independent point size; the font comes from the shared cache.
 void DrawGlyph(HDC dc, HWND owner, const RECT& rect, wchar_t glyph, COLORREF color,
