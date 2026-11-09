@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+using namespace kelpie;
 using namespace kelpie::linuxapp;
 using Clock = std::chrono::steady_clock;
 

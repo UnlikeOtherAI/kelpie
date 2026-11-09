@@ -19,6 +19,7 @@
 #include <string>
 #include <thread>
 
+using namespace kelpie;
 using namespace kelpie::linuxapp;
 using namespace std::chrono_literals;
 

@@ -1,7 +1,7 @@
 // Discovery rules that do not need the OS: TXT encoding, instance names, the
 // per-instance merge, the Windows browse record cache and serial delivery.
 #include "dnssd_browse_cache.h"
-#include "sync_peer_events.h"
+#include "kelpie/sync_peer_events.h"
 
 #include <atomic>
 #include <cassert>
@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+using namespace kelpie;
 using namespace kelpie::windows;
 using Clock = std::chrono::steady_clock;
 

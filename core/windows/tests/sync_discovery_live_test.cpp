@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 
+using namespace kelpie;
 using namespace kelpie::windows;
 using namespace std::chrono_literals;
 
