@@ -59,7 +59,14 @@ std::optional<SyncStore::PlannedOp> SyncStore::PlanRecord(const nlohmann::json& 
   *invalid = false;
 
   const auto it = entries_.find(op.key);
-  if (it != entries_.end() && !it->second.local_only && !(op.hlc > it->second.hlc)) return std::nullopt;
+  if (it != entries_.end() && !it->second.local_only && !(op.hlc > it->second.hlc)) {
+    // The same version restores a cookie this engine lost (a restart dropped a
+    // session cookie, or a read failed); anything else equal or older is stale.
+    const Entry& entry = it->second;
+    const bool restores = op.hlc == entry.hlc && !op.remove && !entry.deleted && entry.unapplied &&
+                          entry.observed == kObservedAbsent;
+    if (!restores) return std::nullopt;
+  }
   return op;
 }
 

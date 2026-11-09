@@ -124,6 +124,15 @@ int SyncStore::ScanPresent(const std::string& key, const EngineCookie& engine_co
     entry.observed = engine_cookie.fingerprint;
     return kPersistOnly;
   }
+  if (entry.unapplied && !entry.deleted && ValueHash(cookie.value) == entry.value_hash) {
+    // The engine now holds the accepted value — a recovered read, a restored
+    // session cookie or a renderer switch, not a local edit. Adopt it without a
+    // new version, so a glitch can never re-publish old values over newer ones.
+    entry.observed = engine_cookie.fingerprint;
+    entry.unapplied = false;
+    Touch(&entry);
+    return kFeedChange;
+  }
   entry.hlc = Stamp(now);
   entry.deleted = false;
   entry.unapplied = false;
@@ -138,6 +147,7 @@ int SyncStore::ScanAbsent(const EngineMap& engine, const Coverage& coverage, std
   std::size_t covered_live = 0;
   std::vector<std::string> candidates;
   std::vector<std::string> drops;
+  std::vector<std::string> unknown;  // absent for a reason other than a deletion
   const std::int64_t now_seconds = now / 1000;
 
   for (auto& [key, entry] : entries_) {
@@ -153,7 +163,7 @@ int SyncStore::ScanAbsent(const EngineMap& engine, const Coverage& coverage, std
     } else if (entry.expires && *entry.expires <= now_seconds) {
       drops.push_back(key);  // expired everywhere; no deletion to announce
     } else if (first_scan_after_launch_) {
-      drops.push_back(key);  // the store may not be fully loaded yet
+      unknown.push_back(key);  // the store may not be fully loaded yet
     } else {
       candidates.push_back(key);
     }
@@ -162,11 +172,20 @@ int SyncStore::ScanAbsent(const EngineMap& engine, const Coverage& coverage, std
   const bool is_purge = candidates.size() > kPurgeMinimum &&
                         static_cast<double>(candidates.size()) > kPurgeFraction * static_cast<double>(covered_live);
   if (is_purge) {
-    // An eviction, purge or clear-all, not a logout: forget, announce nothing.
+    // An eviction, purge, clear-all or a failed engine read, not a logout:
+    // announce nothing.
     *purge = true;
     last_purge_at_ = now;
-    drops.insert(drops.end(), candidates.begin(), candidates.end());
+    unknown.insert(unknown.end(), candidates.begin(), candidates.end());
     candidates.clear();
+  }
+  for (const auto& key : unknown) {
+    // Keep the version so the same value reappearing is not a new edit, and a
+    // peer's equal version can put the cookie back (see PlanRecord).
+    Entry& entry = entries_.at(key);
+    entry.observed = kObservedAbsent;
+    entry.unapplied = true;
+    effect = std::max<int>(effect, kPersistOnly);
   }
   for (const auto& key : candidates) {
     Entry& entry = entries_.at(key);

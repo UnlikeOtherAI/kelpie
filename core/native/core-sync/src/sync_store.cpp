@@ -113,14 +113,13 @@ void SyncStore::Load(const Options& options) {
   last_hlc_.replica = replica_;
 
   if (options.launch) {
-    // The restart lost every session cookie; forgetting them lets peers that
-    // still hold them send them back in the first full snapshot.
-    for (auto it = entries_.begin(); it != entries_.end();) {
-      if (!it->second.deleted && !it->second.expires) {
-        it = entries_.erase(it);
-      } else {
-        ++it;
-      }
+    // The restart lost every session cookie. Their versions stay, marked
+    // unapplied, so a peer that still holds one can send it back with the same
+    // version (see PlanRecord) and it reappearing is not a new local edit.
+    for (auto& [key, entry] : entries_) {
+      if (entry.deleted || entry.expires || entry.local_only) continue;
+      entry.observed = kObservedAbsent;
+      entry.unapplied = true;
     }
   }
   warming_ = options.launch;

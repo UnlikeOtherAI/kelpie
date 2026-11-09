@@ -82,7 +82,7 @@ void TestPurgeGuard() {
   const json result = a.Scan(kNow + 2000);
   assert(result["purge"] == true);
   assert(result["changed"] == 0);
-  assert(EntriesOnDisk(a).empty());
+  for (const auto& entry : EntriesOnDisk(a)) assert(entry["ua"] == true && !entry.contains("del"));
 
   // A normal logout (a handful of cookies) still produces tombstones.
   for (int i = 0; i < 40; ++i) a.engine.Put(MakeCookie(".site" + std::to_string(i) + ".com", "c", "v"));
@@ -124,7 +124,8 @@ void TestLaunchWarmupAndSessionCookies() {
   // Restart: the engine lost the session cookie.
   a.engine.Remove(".example.com", "session");
   a.Open(true, kNow + 60000);
-  assert(FindStored(a, "session").is_null());  // forgotten at open, so a peer can restore it
+  // Kept with its version but unapplied, so a peer's equal version can restore it.
+  assert(FindStored(a, "session")["ua"] == true && FindStored(a, "session")["o"] == "absent");
   assert(a.Scan(kNow + 61000)["deferred"] == true);
 
   // A cookie the site set during warm-up must not beat a peer's version.
@@ -133,7 +134,8 @@ void TestLaunchWarmupAndSessionCookies() {
   a.store->FinishWarmup();
   const json first = a.Scan(kNow + 62000);
   assert(FindStored(a, "anon")["v"][0] == 0);
-  assert(FindStored(a, "persistent").is_null());  // dropped, not tombstoned
+  assert(!FindStored(a, "persistent").contains("del"));  // not tombstoned
+  assert(FindStored(a, "persistent")["ua"] == true);       // version kept, engine state unknown
   assert(first["changed"] == 1);
 }
 
@@ -240,6 +242,32 @@ void TestDuplicateKeysAreUnobservable() {
   assert(response["records"].empty() && response["incomplete"] == false);  // skipped, never stalls the feed
 }
 
+void TestFailedReadNeverRestampsOldValues() {
+  Device a("failed-read");
+  a.Open(false, kNow);
+  a.Scan(kNow);
+  for (int i = 0; i < 30; ++i) a.engine.Put(MakeCookie(".s" + std::to_string(i) + ".com", "c", "v"));
+  a.Scan(kNow + 1000);
+  const auto version = FindStored(a, "c")["v"];
+  // The engine's read fails and reports an empty store (a dead network service).
+  const auto saved = a.engine.cookies;
+  a.engine.cookies.clear();
+  assert(a.Scan(kNow + 2000)["purge"] == true);
+  // The cookies come back with the same values: adopted, no new versions.
+  a.engine.cookies = saved;
+  a.Scan(kNow + 3000);
+  for (const auto& entry : EntriesOnDisk(a)) {
+    assert(!entry.contains("ua") && entry["v"][0] == kNow + 1000);
+  }
+  assert(FindStored(a, "c")["v"] == version);
+  // A genuinely different value is still a local edit.
+  a.engine.Put(MakeCookie(".s0.com", "c", "changed"));
+  a.Scan(kNow + 4000);
+  bool stamped = false;
+  for (const auto& entry : EntriesOnDisk(a)) stamped = stamped || entry["v"][0] == kNow + 4000;
+  assert(stamped);
+}
+
 }  // namespace
 
 int main() {
@@ -256,5 +284,6 @@ int main() {
     TestTombstonesSurviveRestart();
     TestRendererSwitchRebaseStampsNothing();
     TestDuplicateKeysAreUnobservable();
+    TestFailedReadNeverRestampsOldValues();
   });
 }
