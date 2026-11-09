@@ -34,8 +34,9 @@ class WebViewCookieSource(
     override fun snapshot(
         entries: List<EntryLocation>,
         hosts: Set<String>?,
+        discover: Boolean,
     ): CookieSnapshot {
-        val urls = CoverageUrls.build(entries, hosts, if (hosts == null) historyHosts() else emptyList(), recent.urls())
+        val urls = CoverageUrls.build(entries, hosts, if (hosts == null && discover) historyHosts() else emptyList(), recent.urls())
         val cookies = linkedMapOf<Triple<String, String, String>, SetCookieLine.Parsed>()
         for (url in urls) {
             val lines =

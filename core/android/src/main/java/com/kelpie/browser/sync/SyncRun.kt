@@ -94,7 +94,7 @@ class SyncRun(
         while (true) {
             requireCurrent()
             val version = feedVersion.value
-            val response = store.use { answerPull(pull, cookies.snapshot(entries()), clock()) }
+            val response = store.use { answerPull(pull, cookies.snapshot(entries(), discover = false), clock()) }
             noteHead(response.long("head"))
             val idle = response.array("records").isNullOrEmpty() && response.bool("more") != true
             val remaining = deadline - clock()
@@ -121,7 +121,7 @@ class SyncRun(
     suspend fun buildPush(watermark: JsonObject): JsonObject? {
         requireCurrent()
         // build_push scans first; read the head in the same turn so other peers hear of local changes.
-        val (built, head) = store.use { buildPush(watermark, cookies.snapshot(entries()), clock()) to status().long("head") }
+        val (built, head) = store.use { buildPush(watermark, cookies.snapshot(entries(), discover = false), clock()) to status().long("head") }
         noteHead(head)
         return built.obj("push")
     }

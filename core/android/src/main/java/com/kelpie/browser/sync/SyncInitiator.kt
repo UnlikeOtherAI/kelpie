@@ -132,7 +132,7 @@ class SyncInitiator(
                 }
             val response = exchange(session, pull)
             if (response.string("replica") != session.peerReplica) throw SyncFailure("PROTOCOL", "pull from another replica")
-            response.obj("yourWatermark")?.let { theirWatermark.set(it) }
+            response.obj("yourWatermark")?.let { advance(theirWatermark, it) }
             if (response.bool("warming") == true) {
                 firstPage.complete(Unit)
                 caughtUp = false
@@ -174,8 +174,18 @@ class SyncInitiator(
             val next = reply.obj("yourWatermark") ?: throw SyncFailure("PROTOCOL", "push reply has no watermark")
             // A responder whose watermark does not move would make this loop spin.
             if (next.string("replica") == known.string("replica") && (next.long("seq") ?: 0) <= (known.long("seq") ?: 0)) return
-            theirWatermark.set(next)
+            advance(theirWatermark, next)
             if (push.bool("more") != true) return
+        }
+    }
+
+    /** Pull answers and push replies both report it; never let a late answer move it back. */
+    private fun advance(
+        theirWatermark: AtomicReference<JsonObject?>,
+        next: JsonObject,
+    ) {
+        theirWatermark.getAndUpdate { known ->
+            if (known != null && known.string("replica") == next.string("replica") && (next.long("seq") ?: 0) < (known.long("seq") ?: 0)) known else next
         }
     }
 

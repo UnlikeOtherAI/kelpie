@@ -130,6 +130,7 @@ class MemoryCookies : CookieSource {
     @Synchronized override fun snapshot(
         entries: List<EntryLocation>,
         hosts: Set<String>?,
+        discover: Boolean,
     ): CookieSnapshot =
         CookieSnapshot(
             JsonArray(cookies.values.map(::wire)),

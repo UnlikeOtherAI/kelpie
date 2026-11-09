@@ -25,10 +25,13 @@ interface CookieSource {
     /**
      * Reads the store. [entries] are the metadata entries' locations; [hosts]
      * limits the read to those hosts (null reads every known location).
+     * [discover] adds locations that only find new cookies (Android: history
+     * hosts); pull and push answers skip them to stay cheap.
      */
     fun snapshot(
         entries: List<EntryLocation>,
         hosts: Set<String>? = null,
+        discover: Boolean = true,
     ): CookieSnapshot
 
     /**
