@@ -44,6 +44,7 @@ struct PairingDialog: View {
 
             Text("Computer key: \(prompt.publicKey)")
                 .font(.system(.caption, design: .monospaced))
+                .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
 
             Text(

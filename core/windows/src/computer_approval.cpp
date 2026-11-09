@@ -1,5 +1,6 @@
 #include "computer_approval.h"
 #include "windows_utf.h"
+#include <algorithm>
 #include <vector>
 
 namespace kelpie::windows {
@@ -29,12 +30,18 @@ struct ComputerList {
   bool done = false;
   void Refresh() {
     SendMessageW(list, LB_RESETCONTENT, 0, 0);
+    SendMessageW(list, LB_SETHORIZONTALEXTENT, 0, 0);
     addresses.clear();
     for (const auto& computer : store.List()) {
       const std::string address = computer.at("publicKey");
       addresses.push_back(address);
-      const auto label = utf::Utf8ToWideDisplay(address + "  " + computer.at("name").get<std::string>() + "  " + computer.at("address").get<std::string>());
+      const auto label = utf::Utf8ToWideDisplay(computer.at("name").get<std::string>() + "  " + computer.at("address").get<std::string>() + "  " + address);
       SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+      const auto context = GetDC(list);
+      SIZE size{};
+      GetTextExtentPoint32W(context, label.c_str(), static_cast<int>(label.size()), &size);
+      ReleaseDC(list, context);
+      SendMessageW(list, LB_SETHORIZONTALEXTENT, std::max<LRESULT>(SendMessageW(list, LB_GETHORIZONTALEXTENT, 0, 0), size.cx + 16), 0);
     }
   }
 };
@@ -48,7 +55,7 @@ LRESULT CALLBACK ComputersProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lp
   if (message == WM_CREATE) {
     CreateWindowW(L"STATIC", L"Localhost is always allowed. Select a computer to revoke.", WS_CHILD | WS_VISIBLE,
         16, 16, 480, 24, hwnd, nullptr, nullptr, nullptr);
-    state->list = CreateWindowExW(WS_EX_CLIENTEDGE, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
+    state->list = CreateWindowExW(WS_EX_CLIENTEDGE, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | LBS_NOTIFY,
         16, 48, 480, 240, hwnd, nullptr, nullptr, nullptr);
     CreateWindowW(L"BUTTON", L"Revoke", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         304, 304, 88, 30, hwnd, reinterpret_cast<HMENU>(1001), nullptr, nullptr);
