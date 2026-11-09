@@ -15,14 +15,14 @@ final class DesktopAddressUITests: XCTestCase {
         capture("macos-newtab", app)
         app.typeText("address-focus-check")
         let typedAfterNewTab = address.value as? String
-        address.click()
+        address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         app.typeKey("a", modifierFlags: .command)
         app.typeText("example.org")
         app.typeKey(.return, modifierFlags: [])
         let page = app.webViews.firstMatch
         XCTAssertTrue(page.waitForExistence(timeout: 15))
         page.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.1)).click()
-        address.click()
+        address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         capture("macos-address-selected", app)
         app.typeText("replacement")
         XCTAssertEqual(address.value as? String, "replacement")

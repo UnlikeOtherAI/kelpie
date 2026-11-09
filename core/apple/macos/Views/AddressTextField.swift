@@ -4,8 +4,13 @@ import SwiftUI
 /// A native field keeps initial selection independent of WebView focus and
 /// leaves subsequent clicks, drag selection and IME editing to AppKit.
 final class AddressTextField: NSTextField {
+    var isEditingAddress: Bool {
+        guard let editor = currentEditor() else { return false }
+        return window?.firstResponder === editor
+    }
+
     override func mouseDown(with event: NSEvent) {
-        guard currentEditor() != nil else {
+        guard isEditingAddress else {
             selectText(nil)
             return
         }
@@ -40,9 +45,12 @@ struct AddressField: NSViewRepresentable {
 
     func updateNSView(_ field: AddressTextField, context: Context) {
         context.coordinator.parent = self
-        if field.stringValue != text { field.stringValue = text }
+        let focusChanged = context.coordinator.focusRequest != focusRequest
+        // AppKit owns the live editor and its selection. A SwiftUI focus update
+        // must not rewrite that editor while the person is entering text.
+        if (!field.isEditingAddress || focusChanged) && field.stringValue != text { field.stringValue = text }
         field.textColor = color
-        if context.coordinator.focusRequest != focusRequest {
+        if focusChanged {
             context.coordinator.focusRequest = focusRequest
             DispatchQueue.main.async { [weak field] in
                 guard let field, field.window != nil else { return }
