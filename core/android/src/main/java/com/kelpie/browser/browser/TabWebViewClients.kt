@@ -106,6 +106,11 @@ private fun tabWebViewClient(
             tab.recordHistoryIfNeeded(url)
             tab.isLoading = false
             tabStore.persistSession()
+            // Only the default store syncs; partitioned tabs never feed cookie sync.
+            if (tab.partition == null) {
+                com.kelpie.browser.sync.CookieSync
+                    .pageLoaded(url)
+            }
             if (isActive()) {
                 browserState.updateUrl(url)
                 browserState.updateLoading(false)

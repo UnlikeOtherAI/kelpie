@@ -34,6 +34,7 @@ add_library(kelpie_jni SHARED
   local_inference_jni.cpp
   connect_jni.cpp
   browser_gateway_jni.cpp
+  cookie_sync_jni.cpp
 )
 
 target_link_libraries(kelpie_jni
@@ -43,4 +44,5 @@ target_link_libraries(kelpie_jni
     kelpie_core_protocol
     kelpie_core_ai
     kelpie_core_mcp
+    kelpie_core_sync
 )
