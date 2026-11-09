@@ -109,8 +109,12 @@ std::string ValidateMessage(const std::string& kind, const nlohmann::json& messa
 }
 
 std::string TranscriptChallenge(const nlohmann::json& hello_pair) {
-  const auto initiator = hello_pair.at("initiator");
-  const auto responder = hello_pair.at("responder");
+  if (!hello_pair.is_object() || !hello_pair.contains("initiator") || !hello_pair.contains("responder") ||
+      !hello_pair["initiator"].is_object() || !hello_pair["responder"].is_object()) {
+    throw std::invalid_argument("initiator and responder");
+  }
+  const auto& initiator = hello_pair["initiator"];
+  const auto& responder = hello_pair["responder"];
   Sha256 hasher;
   const char zero = '\0';
   hasher.Update("kelpie-sync-v1");

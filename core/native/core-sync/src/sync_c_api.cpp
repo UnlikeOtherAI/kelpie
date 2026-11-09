@@ -152,9 +152,7 @@ char* kelpie_sync_transcript(const char* hello_pair_json) {
     try {
       return json{{"challenge", kelpie::sync::TranscriptChallenge(Parse(hello_pair_json, "hello pair"))}};
     } catch (const std::invalid_argument&) {
-      throw SyncError{"INVALID_MESSAGE", "transcript needs replica, key and nonce on both sides"};
-    } catch (const std::out_of_range&) {
-      throw SyncError{"INVALID_MESSAGE", "transcript needs initiator and responder"};
+      throw SyncError{"INVALID_MESSAGE", "transcript needs replica, key and nonce for initiator and responder"};
     }
   });
 }
