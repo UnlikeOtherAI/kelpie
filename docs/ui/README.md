@@ -59,11 +59,11 @@
   one: the UOA avatar when signed in, otherwise a person cut from a filled
   disc, with the busy or error dot on its edge.
 - The native EDIT preserves IME, text selection, accessibility and inline
-    history completion. Escape rejects completion; Enter accepts. Ctrl+L focuses
-    and selects the address. Ctrl+T and the plus focus and select the address after
-    opening a tab, as does New isolated tab. The first click into an unfocused
-    address selects all text; later clicks position the caret normally.
-    Ctrl+W/Tab/Shift+Tab retain their tab behavior after page focus.
+  history completion. Escape rejects completion; Enter accepts. Ctrl+L focuses
+  and selects the address. Ctrl+T and the plus focus and select the address after
+  opening a tab, as does New isolated tab. The first click into an unfocused
+  address selects all text; later clicks position the caret normally.
+  Ctrl+W/Tab/Shift+Tab retain their tab behavior after page focus.
 - Favorites use the active local or UOA bookmark list. The 44-DIP row exists only when it
   has entries, opens entries with one click and moves excess entries to a menu.
   Changes through HTTP/MCP refresh it without requiring navigation. Showing or
