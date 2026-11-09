@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -138,19 +138,27 @@ async function launchAndRead(config, fixtureUrl, profile, readinessFile, port) {
   }
 }
 
-async function verifyProfileLock(config, fixtureUrl, profile, primaryReadiness, port) {
-  const secondaryReadiness = join(profile, "conflict-readiness.json");
-  const contender = startBrowser(config.exe, browserArguments({ profile, readiness: secondaryReadiness, port: await reservePort(), fixtureUrl }));
+async function verifySingleApp(config, fixtureUrl, profile, primaryReadiness) {
+  const otherProfile = await mkdtemp(join(tmpdir(), "kelpie-windows-other-profile-"));
+  const original = await readFile(primaryReadiness, "utf8");
   try {
-    const outcome = await Promise.race([
-      contender.exited,
-      delay(8_000).then(() => null),
-    ]);
-    assert.notEqual(outcome, null, "second launch against an owned profile must fail promptly");
-    assert.equal(await fileExists(secondaryReadiness), false, "profile-conflicted process must not publish readiness");
-    assert.equal(await fileExists(primaryReadiness), true, "profile-conflicted process must not remove the owner readiness file");
+    for (const candidateProfile of [profile, otherProfile]) {
+      const secondaryReadiness = join(candidateProfile, "conflict-readiness.json");
+      const contender = startBrowser(config.exe, browserArguments({ profile: candidateProfile,
+        readiness: secondaryReadiness, port: await reservePort(), fixtureUrl }));
+      try {
+        const outcome = await Promise.race([contender.exited, delay(8_000).then(() => null)]);
+        assert.notEqual(outcome, null, "a second app must fail promptly, even with another profile and port");
+        assert.equal(outcome.code, 183, "duplicate app must report ERROR_ALREADY_EXISTS");
+        assert.equal(await fileExists(secondaryReadiness), false, "rejected app must not publish readiness");
+        // Compare as a boolean so assertion output can never disclose the token.
+        assert((await readFile(primaryReadiness, "utf8")) === original, "rejected app must preserve owner readiness");
+      } finally {
+        await stopBrowser(contender);
+      }
+    }
   } finally {
-    await stopBrowser(contender);
+    await rm(otherProfile, PROFILE_REMOVAL);
   }
 }
 
@@ -278,7 +286,7 @@ async function main() {
   try {
     const port = config.port === undefined ? await reservePort() : Number(config.port);
     current = await launchAndRead(config, fixture.baseUrl, profile.path, readiness, port);
-    await verifyProfileLock(config, fixture.baseUrl, profile.path, readiness, current.readiness.port);
+    await verifySingleApp(config, fixture.baseUrl, profile.path, readiness);
     await verifyOccupiedPort(config, fixture.baseUrl);
     const session = await runLiveAcceptance(current.readiness, fixture.baseUrl, config.nessieRoot);
     await assertSandboxedRenderer(current.browser, config.timeoutMs);

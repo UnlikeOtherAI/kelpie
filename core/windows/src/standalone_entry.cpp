@@ -1,6 +1,7 @@
 #include "windows_app.h"
 #include "kelpie/bootstrap.h"
 #include "windows_utf.h"
+#include "standalone_instance.h"
 
 #if defined(HAS_CEF)
 #include "include/cef_sandbox_win.h"
@@ -129,6 +130,11 @@ int RunKelpieWindowsApp(HINSTANCE resource_instance,
 
   config.sandbox_info = sandbox_info;
   config.cef_process_instance = cef_process_instance;
+  StandaloneInstance instance;
+  if (instance.error() != ERROR_SUCCESS) {
+    if (instance.error() == ERROR_ALREADY_EXISTS) StandaloneInstance::ActivateExisting();
+    return static_cast<int>(instance.error());
+  }
   WindowsApp app(resource_instance, std::move(config));
   return app.Run(show_command);
 }
