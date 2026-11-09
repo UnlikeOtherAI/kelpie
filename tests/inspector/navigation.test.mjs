@@ -239,7 +239,7 @@ test('desktop and phone screenshot pairs use matching base and final scenes', {s
     const base = process.env.KELPIE_BASE_REVISION || 'ae744915';
     const baseline = ['enter-setup', 'enter-collect', 'enter-apply', 'enter-input'].map(name =>
         execFileSync('git', ['show', `${base}:${resources}/${name}.js`], {cwd: root, encoding: 'utf8'})).join('\n');
-    for (const [name, viewport] of [['desktop', {width: 1280, height: 900}], ['phone', {width: 390, height: 844}]]) {
+    for (const [name, viewport] of [['desktop', {width: 1280, height: 900}], ['phone', {width: 390, height: 844}], ['landscape', {width: 844, height: 390}], ['compact', {width: 390, height: 360}]]) {
         for (const [revision, script] of [['before', baseline], ['after', enter]]) {
             const page = await scene(viewport, script);
             try {
