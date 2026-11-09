@@ -9,7 +9,12 @@ final class DesktopAddressUITests: XCTestCase {
     @MainActor
     func testNewTabAndInitialAddressSelection() throws {
         continueAfterFailure = false
-        let app = XCUIApplication(bundleIdentifier: "com.kelpie.browser.address-focus-verification")
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let app = XCUIApplication(url: repository.appendingPathComponent(
+            ".cache/address-ui/KelpieAddressVerification.app"
+        ))
         app.activate()
         let address = app.textFields["browser.address"]
         XCTAssertTrue(address.waitForExistence(timeout: 15))
