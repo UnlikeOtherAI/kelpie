@@ -20,11 +20,10 @@ final class AddressTextField: NSTextField {
             guard let self, event.window === self.window,
                   self.bounds.contains(self.convert(event.locationInWindow, from: nil)),
                   !self.isEditingAddress else { return event }
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.isEditingAddress else { return }
-                self.currentEditor()?.selectAll(nil)
-            }
-            return event
+            // NSWindow moves focus before calling mouseDown. Consume only the
+            // initial click here so native tracking cannot collapse selection.
+            self.selectText(nil)
+            return nil
         }
     }
 
