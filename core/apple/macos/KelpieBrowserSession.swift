@@ -75,7 +75,6 @@ public final class KelpieBrowserSession: ObservableObject {
         KelpieBrowserProfile.release(runtimeID)
         NessieConnection.shared.detach(context: serverState.handlerContext)
         serverState.stop()
-        serverState.handlerContext.stopSharedCookieSync()
         _ = serverState.scriptPlaybackState.requestAbort()
         serverState.router.retire()
         NetworkTrafficStore.shared.flush()

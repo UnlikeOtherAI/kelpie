@@ -28,6 +28,10 @@ void CEFBridgeStringClear(cef_string_t *value);
 NSString *CEFBridgeStringFromUserFree(cef_string_userfree_t _Nullable value);
 NSString *CEFBridgeJSONStringForValue(id _Nullable value);
 cef_basetime_t CEFBridgeBaseTimeFromDate(NSDate * _Nullable value);
+/// YES once cef_initialize succeeded; CEF globals are unusable before that.
+BOOL CEFBridgeIsCEFInitialized(void);
+/// Tests only: the cookie bridge uses `manager` instead of CEF's global manager; NULL restores it.
+void CEFBridgeUseCookieManagerForTesting(cef_cookie_manager_t *_Nullable manager);
 
 BridgeClient *CEFBridgeCreateClient(CEFBridge *owner);
 cef_client_t *CEFBridgeClientHandle(BridgeClient *client);
@@ -36,20 +40,6 @@ void CEFBridgeReleaseClient(BridgeClient *client);
 cef_jsdialog_handler_t *CEFBridgeCreateJSDialogHandler(CEFBridge *owner);
 void CEFBridgeNullifyJSDialogHandler(cef_jsdialog_handler_t *handler);
 
-cef_cookie_manager_t *CEFBridgeCookieManagerFromBrowser(cef_browser_t *browser);
-void CEFBridgeVisitAllCookies(cef_cookie_manager_t *manager, void (^ _Nullable completion)(NSArray<NSDictionary *> *cookies));
-void CEFBridgeSetCookie(cef_cookie_manager_t *manager,
-                        NSString *name,
-                        NSString *value,
-                        NSString *url,
-                        NSString *domain,
-                        NSString *path,
-                        BOOL httpOnly,
-                        BOOL secure,
-                        NSDate * _Nullable expires,
-                        void (^ _Nullable completion)(BOOL success));
-void CEFBridgeDeleteAllCookies(cef_cookie_manager_t *manager, void (^ _Nullable completion)(NSInteger deleted));
-void CEFBridgeFlushCookieStore(cef_cookie_manager_t *manager, void (^ _Nullable completion)(void));
 /// Shared bounded CDP command transport; each result callback completes once.
 void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
                                 NSString *method,
@@ -64,25 +54,6 @@ void CEFBridgeSendBrowserControlCommand(cef_browser_host_t *host,
 /// Called only from CEF's on_before_close; bridge deallocation is not renderer retirement.
 void CEFBridgeRetireBrowserControlCommands(cef_browser_t *browser);
 
-void CEFBridgeSetCookieViaCDP(cef_browser_host_t *host,
-                              NSString *name,
-                              NSString *value,
-                              NSString *domain,
-                              NSString *path,
-                              BOOL httpOnly,
-                              BOOL secure,
-                              NSString * _Nullable sameSite,
-                              NSDate * _Nullable expires,
-                              void (^ _Nullable completion)(BOOL success));
-void CEFBridgeGetCookiesViaCDP(cef_browser_host_t *host,
-                               void (^ _Nullable completion)(BOOL success, NSArray<NSDictionary *> *cookies));
-void CEFBridgeDeleteCookieViaCDP(cef_browser_host_t *host,
-                                 NSString *name,
-                                 NSString *domain,
-                                 NSString *path,
-                                 void (^ _Nullable completion)(BOOL success));
-void CEFBridgeDeleteAllCookiesViaCDP(cef_browser_host_t *host,
-                                     void (^ _Nullable completion)(BOOL success, NSInteger deleted));
 void CEFBridgeCaptureScreenshot(cef_browser_host_t *host,
                                 CGSize logicalSize,
                                 void (^ _Nullable completion)(NSData * _Nullable pngData));

@@ -58,6 +58,17 @@ enum CookieScope {
         }
     }
 
+    /// `scoped(_:toURL:)` for engine-neutral cookies.
+    static func scoped(_ cookies: [BrowserCookie], toURL urlString: String) -> [BrowserCookie] {
+        guard let url = URL(string: urlString), let host = url.host else { return [] }
+        let path = url.path.isEmpty ? "/" : url.path
+        let isSecureScheme = url.scheme?.lowercased() == "https"
+        return cookies.filter { cookie in
+            hostMatches(host, cookieDomain: cookie.domain) && pathMatches(path, cookiePath: cookie.path) &&
+                (!cookie.secure || isSecureScheme)
+        }
+    }
+
     /// Exact domain filter for `delete-cookies`, tolerant of a leading dot on
     /// either side (WebKit may store `.example.com`; callers pass `example.com`).
     static func domainMatches(_ cookieDomain: String, filter: String) -> Bool {
