@@ -14,11 +14,6 @@ struct CloseInternet { void operator()(void* value) const { if (value) WinHttpCl
 using Internet = std::unique_ptr<void, CloseInternet>;
 void Require(bool ok) { if (!ok) throw std::runtime_error("Update check failed"); }
 std::string Fetch() {
-#ifndef NDEBUG
-  if (const auto* fixture = std::getenv("KELPIE_UPDATE_TEST_FEED")) {
-    std::ifstream input(fixture); return {std::istreambuf_iterator<char>(input), {}};
-  }
-#endif
   Internet session(WinHttpOpen(L"Kelpie update check", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
       WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
   Require(bool(session));

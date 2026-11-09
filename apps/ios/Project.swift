@@ -72,6 +72,17 @@ let kelpieLibraryTestHost = Target.target(
     settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
 
+let kelpieUpdateVerification = Target.target(
+    name: "KelpieUpdateVerificationIOS",
+    destinations: [.iPhone, .iPad],
+    product: .app,
+    bundleId: "com.unlikeotherai.kelpie.update-verification.ios",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .extendingDefault(with: ["CFBundleDisplayName": "Kelpie Update Verification"]),
+    sources: [.glob("../updates/apple/**/*.swift"), .glob("../updates/verification-host/**/*.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieUpdateTests = Target.target(
     name: "KelpieUpdateTestsIOS",
     destinations: [.iPhone, .iPad],
@@ -147,9 +158,12 @@ let project = Project(
         kelpieEmbeddingUITests,
         kelpieTests,
         kelpieUpdateTests,
+        kelpieUpdateVerification,
         kelpieUITests,
     ],
     schemes: [
+        .scheme(name: "KelpieUpdateVerificationIOS", shared: true,
+                buildAction: .buildAction(targets: ["KelpieUpdateVerificationIOS"])),
         .scheme(name: "KelpieUpdatesIOS", shared: true,
                 buildAction: .buildAction(targets: ["Kelpie"]),
                 testAction: .targets(["KelpieUpdateTestsIOS", "KelpieUITests"])),

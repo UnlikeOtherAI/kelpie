@@ -10,11 +10,6 @@
 namespace kelpie::linuxapp {
 namespace {
 std::string Fetch() {
-#ifndef NDEBUG
-  if (const auto* fixture = std::getenv("KELPIE_UPDATE_TEST_FEED")) {
-    std::ifstream input(fixture); return {std::istreambuf_iterator<char>(input), {}};
-  }
-#endif
   static const auto initialized = curl_global_init(CURL_GLOBAL_DEFAULT);
   if (initialized != CURLE_OK) throw std::runtime_error("No TLS transport");
   std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup);

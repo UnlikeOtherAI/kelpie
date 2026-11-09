@@ -21,6 +21,7 @@ final class AppUpdates: ObservableObject {
     private let target: String
     private let session: URLSession
     private let feedURL: URL
+    private let performUpdate: ((AppRelease) -> Void)?
     private let logger = Logger(subsystem: "com.unlikeotherai.kelpie.updates", category: "releases")
     #if os(macOS)
     private var installer: Process?
@@ -31,7 +32,8 @@ final class AppUpdates: ObservableObject {
         session: URLSession = .shared,
         installed: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
         target: String? = nil,
-        feedURL: URL? = nil
+        feedURL: URL? = nil,
+        performUpdate: ((AppRelease) -> Void)? = nil
     ) {
         guard let endpoint = feedURL ?? URL(string: "https://api.github.com/repos/UnlikeOtherAI/kelpie/releases?per_page=100") else {
             preconditionFailure("The built-in Kelpie release URL must be valid.")
@@ -41,6 +43,7 @@ final class AppUpdates: ObservableObject {
         self.installed = installed
         self.target = target ?? Self.platformTarget
         self.feedURL = endpoint
+        self.performUpdate = performUpdate
     }
 
     static var platformTarget: String {
@@ -73,21 +76,6 @@ final class AppUpdates: ObservableObject {
         checking = true
         defer { checking = false }
         do {
-            #if DEBUG
-            if let fixture = ProcessInfo.processInfo.environment["KELPIE_UPDATE_TEST_FEED_JSON"], fixture.utf8.count <= 1_048_576 {
-                candidate = AppRelease.newest(in: Data(fixture.utf8), target: target, installed: installed)
-                logger.debug("Fixture update version: \(self.candidate?.version ?? "none", privacy: .public)")
-                presentCandidate()
-                return true
-            }
-            if let fixture = ProcessInfo.processInfo.environment["KELPIE_UPDATE_TEST_FEED"] {
-                let data = try Data(contentsOf: URL(fileURLWithPath: fixture))
-                candidate = AppRelease.newest(in: data, target: target, installed: installed)
-                logger.debug("Fixture update version: \(self.candidate?.version ?? "none", privacy: .public)")
-                presentCandidate()
-                return true
-            }
-            #endif
             var request = URLRequest(url: feedURL, timeoutInterval: 15)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
             request.setValue("Kelpie-update-check", forHTTPHeaderField: "User-Agent")
@@ -122,6 +110,7 @@ final class AppUpdates: ObservableObject {
 
     func update(_ item: AppRelease) {
         offered = nil
+        if let performUpdate { performUpdate(item); return }
         #if os(macOS)
         installMac(item)
         #else
