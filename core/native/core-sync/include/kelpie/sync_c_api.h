@@ -33,6 +33,12 @@ void kelpie_sync_store_finish_warmup(KelpieSyncStoreRef store);
 // cookies: engine cookies in wire shape. coverage: {"all":true} | {"urls":[…]}.
 char* kelpie_sync_store_scan(KelpieSyncStoreRef store, const char* cookies_json,
                              const char* coverage_json, int64_t now_millis);
+// After the default store moves to another engine (macOS renderer switch):
+// adopt the new engine's cookies as observed state without stamping or
+// tombstoning anything. Scan the outgoing engine first so no local edit is lost.
+// Returns {"adopted","head"}.
+char* kelpie_sync_store_rebase(KelpieSyncStoreRef store, const char* cookies_json,
+                               const char* coverage_json, int64_t now_millis);
 char* kelpie_sync_store_answer_pull(KelpieSyncStoreRef store, const char* pull_json,
                                     const char* cookies_json, const char* coverage_json,
                                     int64_t now_millis);
