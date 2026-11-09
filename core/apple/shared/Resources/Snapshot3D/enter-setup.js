@@ -33,6 +33,7 @@
         var staleBody = document.body;
         staleBody.style.transformStyle = staleState.origBodyStyles.transformStyle;
         staleBody.style.transform = staleState.origBodyStyles.transform;
+        staleBody.style.transformOrigin = staleState.origBodyStyles.transformOrigin || '';
         staleBody.style.overflow = staleState.origBodyStyles.overflow;
 
         window.scrollTo(staleState.scrollX, staleState.scrollY);
@@ -105,4 +106,3 @@
         '}'
     ].join('\n');
     document.head.appendChild(suppressStyle);
-

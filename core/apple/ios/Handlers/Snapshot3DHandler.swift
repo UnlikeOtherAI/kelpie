@@ -25,7 +25,7 @@ struct Snapshot3DHandler {
         }
 
         do {
-            _ = try await context.evaluateJS(Snapshot3DBridge.enterScript)
+            try await context.enter3DInspector()
             let active = try await context.evaluateJSReturningString("window.__m3d ? 'true' : 'false'")
             if active == "true" {
                 context.isIn3DInspector = true

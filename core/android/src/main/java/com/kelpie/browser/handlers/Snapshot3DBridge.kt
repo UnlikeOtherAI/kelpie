@@ -7,7 +7,7 @@ import com.kelpie.browser.KelpieEnvironment
  *
  * The enter and exit scripts live as standalone JS sources under
  * `assets/snapshot3d/`. The enter script is assembled at first access
- * from four phase files (setup, collect, apply, input) so each individual
+ * from scene and tool phase files so each individual
  * source file stays within the project's 500-line limit. The phases share
  * closure state inside one IIFE, so the concatenation is what runs.
  *
@@ -20,6 +20,9 @@ object Snapshot3DBridge {
             "enter-setup",
             "enter-collect",
             "enter-apply",
+            "enter-scene",
+            "enter-tree",
+            "enter-tools",
             "enter-input",
         ).joinToString(separator = "") { loadAsset(it) }
     }
@@ -33,6 +36,8 @@ object Snapshot3DBridge {
             return window.__m3d.setMode('$mode');
         })();
         """.trimIndent()
+
+    fun previewScript(image: String): String = "window.__m3d?.setPreview('data:image/png;base64,$image');"
 
     val RESET_VIEW_SCRIPT: String =
         """

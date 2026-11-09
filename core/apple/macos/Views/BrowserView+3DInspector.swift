@@ -6,7 +6,7 @@ extension BrowserView {
             return
         }
 
-        _ = try? await serverState.handlerContext.evaluate3DInspectorJS(Snapshot3DBridge.enterScript, windowId: windowId)
+        try? await serverState.handlerContext.enter3DInspector(windowId: windowId)
         // Use a JS string expression so WebKit returns a String rather than NSNumber,
         // avoiding the "1" vs "true" mismatch from evaluateJSReturningString.
         let active = try? await serverState.handlerContext.evaluate3DInspectorJS("window.__m3d ? 'true' : 'false'", windowId: windowId)

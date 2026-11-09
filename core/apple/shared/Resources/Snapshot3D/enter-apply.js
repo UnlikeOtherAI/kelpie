@@ -7,6 +7,7 @@
 
     // Apply preserve-3d + rotation base to body
     bodyEl.style.transformStyle = 'preserve-3d';
+    bodyEl.style.transformOrigin = (window.scrollX + window.innerWidth / 2) + 'px ' + (window.scrollY + window.innerHeight / 2) + 'px';
     bodyEl.style.overflow = 'visible';
 
     // Process each collected element
@@ -108,4 +109,3 @@
         'overflow: hidden', 'text-overflow: ellipsis'
     ].join(';');
     overlay.appendChild(infoPanel);
-
