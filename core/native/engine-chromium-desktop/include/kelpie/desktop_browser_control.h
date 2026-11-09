@@ -128,6 +128,14 @@ struct BrowserControlResult {
   }
 };
 
+// A whole cookie store: a tab's store, a named partition's store, or the
+// default (unpartitioned) store when neither is set.
+struct CookieStoreTarget {
+  std::optional<std::string> tab_id;
+  std::optional<std::uint64_t> generation;
+  std::optional<std::string> partition;
+};
+
 struct BrowserScreenshot {
   // Requested viewport encoding: "png", or "jpeg" with an optional 1-100 quality.
   std::string format = "png";
@@ -214,6 +222,23 @@ class DesktopBrowserControl {
                                              const Json& query,
                                              Json* result,
                                              Timeout timeout) = 0;
+  // Store-level cookies, independent of any page. Every cookie in the target
+  // store in the automation shape {name, value, domain, path, expires
+  // (ISO-8601 or null), httpOnly, secure, sameSite}; never partial.
+  virtual BrowserControlResult ReadCookieStore(const CookieStoreTarget&, Json*, Timeout) {
+    return CookieStoresUnsupported();
+  }
+  // Writes already-validated cookies in the core-sync wire shape; `result` is
+  // {set, failed: [{index, name, domain, error}]} for the ones the engine refused.
+  virtual BrowserControlResult WriteCookieStore(const CookieStoreTarget&, const Json&, Json*, Timeout) {
+    return CookieStoresUnsupported();
+  }
+  // Copies from one store into another without the values leaving the
+  // browser; `result` is {copied, failed}. The same store twice is refused.
+  virtual BrowserControlResult CopyCookieStore(const CookieStoreTarget&, const CookieStoreTarget&,
+                                               const std::optional<std::string>&, Json*, Timeout) {
+    return CookieStoresUnsupported();
+  }
   virtual BrowserControlResult DispatchTrustedInput(TabLease lease,
                                                     const Json& input,
                                                     Json* result,
@@ -245,6 +270,10 @@ class DesktopBrowserControl {
   }
 
  protected:
+  static BrowserControlResult CookieStoresUnsupported() {
+    return BrowserControlResult::Failure("PLATFORM_NOT_SUPPORTED",
+                                         "This build has no browser engine with store-level cookie access");
+  }
   static BrowserControlResult PartitionsUnsupported() {
     // `activeEngine` is omitted rather than nulled when there is no engine to
     // name, matching the macOS envelope.

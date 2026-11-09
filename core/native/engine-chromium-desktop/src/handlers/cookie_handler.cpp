@@ -31,6 +31,9 @@ CookieHandler::CookieHandler(DesktopHandlerRuntime runtime) : runtime_(std::move
 
 void CookieHandler::Register(DesktopRouter& router) const {
   router.Register("get-cookies", [this](const nlohmann::json& p) { return GetCookies(p); });
+  router.Register("set-cookies", [this](const nlohmann::json& p) { return SetCookies(p); });
+  router.Register("copy-cookies", [this](const nlohmann::json& p) { return CopyCookies(p); });
+  router.Register("get-cookie-sync-status", [this](const nlohmann::json& p) { return GetCookieSyncStatus(p); });
   router.Register("set-cookie", [this](const nlohmann::json& p) { return SetCookie(p); });
   router.Register("delete-cookies", [this](const nlohmann::json& p) { return DeleteCookies(p); });
   router.Register("clear-cookies", [this](const nlohmann::json& p) {
@@ -43,12 +46,20 @@ void CookieHandler::Register(DesktopRouter& router) const {
 
 nlohmann::json CookieHandler::GetCookies(const nlohmann::json& params) const {
   try {
+    // all:true or a partition reads a whole store instead of the current page's context.
+    const auto all = params.find("all");
+    if (all != params.end() && !all->is_boolean()) return InvalidParams("all must be a boolean");
+    const auto partition = params.find("partition");
+    if ((all != params.end() && all->get<bool>()) || (partition != params.end() && !partition->is_null())) {
+      return GetStoreCookies(params);
+    }
     TabLease lease; BrowserControlResult result = Resolve(runtime_, params, &lease);
     if (!result.ok) return ControlError(result);
     nlohmann::json cookies;
     result = RequireBrowserControl(runtime_).GetCookies(lease, params, &cookies, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
-    return WithTab(result, {{"cookies", cookies}});
+    const std::size_t count = cookies.size();
+    return WithTab(result, {{"cookies", cookies}, {"count", count}});
   } catch (const std::invalid_argument& e) { return InvalidParams(e.what()); }
 }
 
