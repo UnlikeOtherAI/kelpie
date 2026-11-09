@@ -92,6 +92,7 @@ private struct UpdateVerificationApp: App {
                 Text(session.result).accessibilityIdentifier("verification-result")
             }
             .padding(32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .modifier(AppUpdatePresentation(updates: session.updates))
             .task { await session.captureViews() }
             .onChange(of: session.result) { _ in Task { await session.captureViews() } }
