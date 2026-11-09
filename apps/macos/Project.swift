@@ -117,9 +117,10 @@ let kelpieApp = Target.target(
     bundleId: "com.kelpie.browser.macos",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [.glob("Kelpie/**/*.swift")],
+    sources: [.glob("Kelpie/**/*.swift"), .glob("../updates/apple/**/*.swift")],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
+        .glob(pattern: "../updates/install-macos.sh"),
     ],
     entitlements: .file(path: KelpieBrowserBuild.webKitOnly ? "Kelpie/Store.entitlements" : "Kelpie/Kelpie.entitlements"),
     scripts: [KelpieBrowserBuild.embedMacResources] + (KelpieBrowserBuild.webKitOnly ? [] : [
@@ -188,6 +189,17 @@ let kelpieLibraryTestHost = Target.target(
     settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
 
+let kelpieUpdateTests = Target.target(
+    name: "KelpieUpdateTests",
+    destinations: .macOS,
+    product: .unitTests,
+    bundleId: "com.unlikeotherai.kelpie.updates.tests.macos",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [.glob("../updates/apple/**/*.swift"), .glob("../updates/tests/ReleaseFeedTests.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieTests = Target.target(
     name: "KelpieTests",
     destinations: .macOS,
@@ -236,8 +248,12 @@ let project = Project(
         kelpieEmbeddingHost,
         kelpieEmbeddingUITests,
         kelpieTests,
+        kelpieUpdateTests,
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [KelpieBrowserBuild.cefHelper(core: "../../core")]),
     schemes: [
+        .scheme(name: "KelpieUpdateTests", shared: true,
+                buildAction: .buildAction(targets: ["KelpieUpdateTests"]),
+                testAction: .targets(["KelpieUpdateTests"])),
         kelpieScheme,
         .scheme(name: "KelpieEmbeddingHost", shared: true,
                 buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),

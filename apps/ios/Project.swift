@@ -11,7 +11,7 @@ let kelpieApp = Target.target(
     bundleId: "com.unlikeotherai.kelpie",
     deploymentTargets: .iOS("16.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [.glob("Kelpie/**/*.swift")],
+    sources: [.glob("Kelpie/**/*.swift"), .glob("../updates/apple/**/*.swift")],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
     ],
@@ -21,8 +21,8 @@ let kelpieApp = Target.target(
     ],
     settings: .settings(
         base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core", additional: [
-            "MARKETING_VERSION": "0.2.0",
-            "CURRENT_PROJECT_VERSION": "22",
+            "MARKETING_VERSION": "0.2.1",
+            "CURRENT_PROJECT_VERSION": "23",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D"
         ])
@@ -69,6 +69,17 @@ let kelpieLibraryTestHost = Target.target(
     deploymentTargets: .iOS("16.0"),
     infoPlist: .default,
     sources: [.glob("../apple-test-host/**/*.swift")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
+let kelpieUpdateTests = Target.target(
+    name: "KelpieUpdateTests",
+    destinations: [.iPhone, .iPad],
+    product: .unitTests,
+    bundleId: "com.unlikeotherai.kelpie.updates.tests.ios",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [.glob("../updates/apple/**/*.swift"), .glob("../updates/tests/ReleaseFeedTests.swift")],
     settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
 
@@ -119,7 +130,7 @@ let kelpieScheme = Scheme.scheme(
     name: "Kelpie",
     shared: true,
     buildAction: .buildAction(targets: ["Kelpie"]),
-    testAction: .targets(["KelpieTests", "KelpieUITests"])
+    testAction: .targets(["KelpieTests", "KelpieUpdateTests", "KelpieUITests"])
 )
 
 // MARK: - Project
@@ -135,9 +146,13 @@ let project = Project(
         kelpieEmbeddingHost,
         kelpieEmbeddingUITests,
         kelpieTests,
+        kelpieUpdateTests,
         kelpieUITests,
     ],
     schemes: [
+        .scheme(name: "KelpieUpdateTests", shared: true,
+                buildAction: .buildAction(targets: ["KelpieUpdateTests"]),
+                testAction: .targets(["KelpieUpdateTests"])),
         kelpieScheme,
         .scheme(name: "KelpieEmbeddingHost", shared: true,
                 buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),

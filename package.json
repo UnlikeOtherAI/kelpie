@@ -6,7 +6,8 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "check:embedding": "node scripts/check-embedding.mjs",
-    "check:macos-signing": "node --test tests/packaging/macos-signing.test.mjs"
+    "check:macos-signing": "node --test tests/packaging/macos-signing.test.mjs",
+    "check:updates": "node --test tests/packaging/app-updates.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
