@@ -1,121 +1,126 @@
 <p align="center">
-
-The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](core/README.md).
-
-  <img src="assets/kelpie-icon-1024.png" width="128" height="128" alt="Kelpie icon">
+  <img src="assets/kelpie-icon-1024.png" width="112" height="112" alt="Kelpie icon">
 </p>
 
 <h1 align="center">Kelpie</h1>
 
 <p align="center">
-  LLM-first browser for iOS, Android, macOS, and desktop work in progress.<br>
-  Control real browsers via mDNS discovery, HTTP API, and MCP. AirPlay to Apple TV supported.
+  A native browser for people and AI agents.<br>
+  Browse on desktop and mobile. Inspect pages in 3D. Connect through MCP, HTTP or the CLI.
 </p>
 
 <p align="center">
-  <a href="https://unlikeotherai.github.io/kelpie">Website</a> &middot;
-  <a href="docs/brief.md">Product Brief</a> &middot;
-  <a href="docs/architecture.md">Architecture</a> &middot;
-  <a href="docs/api/">API Reference</a> &middot;
-  <a href="docs/cli.md">CLI Reference</a>
+  <a href="https://github.com/UnlikeOtherAI/kelpie/releases">Download</a> &middot;
+  <a href="#quick-start">Quick start</a> &middot;
+  <a href="docs/ui/3d-inspector.md">3D inspector</a> &middot;
+  <a href="docs/api/">API reference</a> &middot;
+  <a href="https://unlikeotherai.github.io/kelpie">Website</a>
 </p>
 
----
+Kelpie is an open-source browser for macOS, Windows, Linux, iOS and Android. Use its native interface yourself, or give an AI agent access to real browser tabs: navigate, read pages, click, fill forms, take screenshots and inspect network traffic.
 
-## What it is
+![Kelpie on macOS, with native tabs, an address bar, bookmarks and screenshot cards for favourite sites](assets/screenshots/macos-start-page.png)
 
-Native iOS, Android, and macOS browser apps paired with a Node.js CLI. Language models discover devices on the local network, then control them: navigate, screenshot, read DOM, click, fill forms, scroll, capture network traffic, evaluate JS. Works on real devices, simulators, and emulators. AirPlay an iPhone to an Apple TV and it appears as a second controllable device.
+*The macOS start page brings favourites and recently visited sites into a grid of screenshot cards.*
 
-No emulators pretending to be phones. No persistent content scripts. No browser extensions. Real browsers on real hardware, fully controllable by LLMs.
+## What you can do
 
-## Status
+- **Browse with native controls.** Tabs, bookmarks, history and desktop start pages keep your sites close at hand.
+- **Explore a page in 3D.** Rotate its layers, inspect individual elements and move between the header and footer without losing your zoom level.
+- **Inspect what happened.** Read network requests, console output and JavaScript errors, or capture annotated screenshots for visual automation.
+- **Connect your AI tools.** Use the built-in HTTP/MCP interfaces or the Node.js CLI to control a browser and send group commands across devices.
+- **Work on real mobile browsers.** Discover phones and tablets on the local network. AirPlay from an iPhone or iPad to expose an Apple TV as another controllable screen.
 
-| Target | Status | Notes |
-|---|---|---|
-| iOS | Done | Main mobile platform, actively usable |
-| Android | Done | Main mobile platform, actively usable |
-| macOS | Done | Desktop app is usable |
-| Linux | In progress | Desktop shell exists, still evolving |
-| Windows | In progress | Runs and is controllable: native chrome, tabs, navigation, DOM, eval, screenshots over loopback HTTP/MCP. Not yet released |
-| CLI | Done | Main control surface for devices |
+Feature coverage varies by platform; see the [API reference](docs/api/) and [feature catalogue](docs/functionality.md).
 
-## Install
+## Explore the page in 3D
 
-```
-npm install -g @unlikeotherai/kelpie
-```
+See how a page's elements fit together. The left toolbar switches between Rotate, Pan, Scroll and Inspect. The right side holds a screenshot-based orientation card, zoom controls and a vertical layer-separation slider.
 
-Published releases also attach Android artifacts plus Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` downloads. GitHub Pages publishes Linux package repositories for `apt` and `dnf` from the same release flow.
+![Kelpie's 3D inspector at a desktop viewport, showing a rotated example page, navigation tools, RGB orientation rings, 85% zoom and the layer-separation slider](assets/screenshots/desktop-3d-inspector.png)
+
+*The 3D inspector at a desktop viewport, displaying an example page.*
+
+Open **Elements** to explore the page tree. Hover an element in the tree or on the page to highlight it; off-screen elements move into view while the camera keeps its zoom and angle. Pan, the up/down buttons and arrow keys let you move along a long page without zooming out.
+
+The inspector is experimental and available on **macOS, iOS and Android**. On macOS, enable it in **Settings → Experimental**, then use the browser's 3D action. [See the inspector controls and platform details](docs/ui/3d-inspector.md).
+
+## Download
+
+[Browse releases](https://github.com/UnlikeOtherAI/kelpie/releases) for downloads, checksums and verification notes. Components are versioned independently.
+
+| Platform | Available builds |
+| --- | --- |
+| macOS | [Apple Silicon ZIP](https://github.com/UnlikeOtherAI/kelpie/releases), Developer ID signed and notarized |
+| Windows | [x64 ZIP](https://github.com/UnlikeOtherAI/kelpie/releases), with signed executables and the Chromium sandbox |
+| Linux | [`.deb`, `.rpm`, `.AppImage` and `.tar.gz` packages](https://github.com/UnlikeOtherAI/kelpie/releases); `apt` and `dnf` repositories are available through the [website](https://unlikeotherai.github.io/kelpie) |
+| Android | [Signed APK and AAB preview](https://github.com/UnlikeOtherAI/kelpie/releases/tag/release/2026-11-09.1) |
+| iOS / iPadOS | [Simulator preview](https://github.com/UnlikeOtherAI/kelpie/releases/tag/release/2026-11-09.1), or [build from source](docs/tech-stack.md#build--run) for a physical device |
 
 ## Quick start
 
-1. Build and run the iOS or Android app on a device or simulator
-2. `kelpie discover` — lists all Kelpie instances on your network
-3. `kelpie navigate --url https://example.com` — or connect your LLM via MCP
+Download and open the app for your platform. To control it from a terminal or an AI client, install the CLI with **Node.js 20 or later**:
 
-## Key features
-
-- **Real browsers** — WKWebView (iOS/macOS), CEF (macOS), Android WebView, with native user agents
-- **Apple TV support** — AirPlay from iPhone/iPad to Apple TV, TV appears as a separate controllable device
-- **mDNS discovery** — devices advertise `_kelpie._tcp`, CLI auto-discovers them
-- **HTTP + MCP API** — navigate, screenshot, DOM, click, fill, scroll, JS eval
-- **Group commands** — send commands to all devices simultaneously
-- **Annotated screenshots** — numbered labels on interactive elements for visual-first automation
-- **Safari / Chrome auth** — one-tap login using saved passwords, cookies sync back
-- **Network inspector** — capture XHR and fetch traffic with headers, bodies, timing
-- **Console capture** — read console output and JS errors with stack traces
-
-## Architecture
-
-```
-  +-----------+    +-----------+    +-----------+    +-----------+
-  | Kelpie  |    | Kelpie  |    | Kelpie  |    | Apple TV  |
-  | (iPhone)  |    | (iPad)    |    | (Android) |    | (AirPlay) |
-  | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |
-  | mDNS      |    | mDNS      |    | mDNS      |    | mDNS      |
-  +-----+-----+    +-----+-----+    +-----+-----+    +-----+-----+
-        |               |               |               |
-        +-------+-------+-------+-------+-------+-------+
-                |               |
-         +------+---------------+------+
-         |      Kelpie CLI           |
-         |      (Node.js / MCP)        |
-         +-------------+---------------+
-                       |
-                  +----+----+
-                  |   LLM   |
-                  +---------+
+```sh
+npm install -g @unlikeotherai/kelpie
+kelpie discover
 ```
 
-## Repository structure
+For a discovered macOS, iOS or Android browser, replace `DEVICE_ID` with the identifier returned by discovery. Approve the pairing request in the browser when prompted:
 
+```sh
+kelpie pair "DEVICE_ID"
+kelpie --device "DEVICE_ID" navigate https://example.com
+kelpie --device "DEVICE_ID" screenshot
 ```
-apps/
-  ios/          iOS app (Swift, SwiftUI, WKWebView) + Apple TV via AirPlay
-  android/      Android app (Kotlin, Jetpack Compose, WebView)
-  macos/        macOS app (Swift, SwiftUI, WKWebView + CEF)
-packages/
-  cli/          Node.js CLI and MCP server
-docs/           Product brief, architecture, API reference, CLI docs
+
+Windows and Linux use local browser aliases and their protected readiness tokens. Follow the [Windows](docs/cli.md#windows-aliases-and-agent-stdio) or [Linux](docs/cli.md#linux-aliases-and-agent-stdio) setup to register the downloaded executable and connect your agent.
+
+### Connect an MCP client
+
+For a discovered Mac or mobile browser, add Kelpie to your MCP client's configuration:
+
+```json
+{
+  "mcpServers": {
+    "kelpie": {
+      "command": "kelpie",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
+
+For a local browser alias, use `kelpie --browser ALIAS mcp` instead. See the [MCP setup guide](docs/cli/advanced.md#mcp-server) for transports and client options, or run `kelpie --llm-help` for structured command help.
+
+## Build and contribute
+
+Kelpie is open source. See the [build instructions](docs/tech-stack.md#build--run) and [agent guide](AGENTS.md) for platform prerequisites, checks and contribution rules. [Open an issue](https://github.com/UnlikeOtherAI/kelpie/issues) to report a bug or suggest a feature; include the platform, app version and steps to reproduce a problem.
+
+```text
+apps/            Standalone hosts for macOS, Windows, Linux, iOS and Android
+core/            Embeddable browser UI, platform libraries and shared native code
+packages/cli/    Node.js CLI and MCP bridge
+packages/shared/ Shared browser-control contracts and TypeScript utilities
+docs/            Product, architecture, API, CLI and UI references
+```
+
+The embeddable browser keeps its UI, tabs and behaviour in `core/`; standalone apps are thin hosts. See the [embedding contract](core/README.md) to integrate it into another app.
 
 ## Documentation
 
-| Doc | Description |
-|-----|-------------|
-| [Product Brief](docs/brief.md) | What, why, how, MVP scope |
-| [Architecture](docs/architecture.md) | Components, data flow, protocols |
-| [Tech Stack](docs/tech-stack.md) | Platform choices, dependencies |
-| [Feature Catalogue](docs/functionality.md) | Every user-facing feature |
-| [API Reference](docs/api/) | All HTTP/MCP methods |
-| [CLI Reference](docs/cli.md) | Commands, flags, group operations |
+| Guide | Contents |
+| --- | --- |
+| [Feature catalogue](docs/functionality.md) | Browser features and platform behaviour |
+| [3D inspector](docs/ui/3d-inspector.md) | Camera tools, layer separation and the element toolbox |
+| [CLI reference](docs/cli.md) | Discovery, pairing, commands and browser aliases |
+| [API reference](docs/api/) | HTTP and MCP methods |
+| [Architecture](docs/architecture.md) | Components, data flow and protocols |
+| [Tech stack and builds](docs/tech-stack.md) | Dependencies and platform build instructions |
+| [Product brief](docs/brief.md) | Product scope and goals |
 
-## Sister projects
-
-### [AppReveal](https://github.com/UnlikeOtherAI/AppReveal)
-
-Kelpie uses AppReveal only for debug automation. The CLI helper and the in-app library are separate things, and the in-app SDK must never ship in release builds. See [docs.md](docs.md).
+[AppReveal](https://github.com/UnlikeOtherAI/AppReveal) supports Kelpie's debug automation. Its in-app SDK is excluded from release builds; see [developer notes](docs.md).
 
 ## License
 
-MIT
+[Apache License 2.0](LICENSE).
