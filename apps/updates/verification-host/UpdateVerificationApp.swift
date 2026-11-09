@@ -3,7 +3,7 @@ import Foundation
 
 // This app is a separate, non-shipping target. It never opens the browser,
 // touches Kelpie's profile or runs an installer. Fixtures cannot enter real apps.
-private final class VerificationFeed: URLProtocol, @unchecked Sendable {
+private class VerificationFeed: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
@@ -18,8 +18,12 @@ private final class VerificationFeed: URLProtocol, @unchecked Sendable {
                     "sha256": String(repeating: "a", count: 64)]
         do {
             let metadata = try JSONSerialization.data(withJSONObject: item)
-            let feed: [[String: Any]] = [["draft": false, "prerelease": false,
-                "body": "<!-- kelpie-update: \(String(decoding: metadata, as: UTF8.self)) -->"]]
+            guard let text = String(bytes: metadata, encoding: .utf8) else { return }
+            let feed: [[String: Any]] = [[
+                "draft": false,
+                "prerelease": false,
+                "body": "<!-- kelpie-update: \(text) -->"
+            ]]
             guard let url = request.url, let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil) else { return }
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: try JSONSerialization.data(withJSONObject: feed))
