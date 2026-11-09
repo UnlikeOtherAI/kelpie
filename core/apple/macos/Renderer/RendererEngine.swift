@@ -28,11 +28,7 @@ protocol RendererEngine: AnyObject {
     func evaluateJS(_ script: String) async throws -> Any?
     func evaluateBrowserControlJS(_ script: String) async throws -> Any?
 
-    // MARK: - Cookies
-    func allCookies() async -> [HTTPCookie]
-    func setCookies(_ cookies: [HTTPCookie]) async
-    func deleteCookie(_ cookie: HTTPCookie) async
-    func deleteAllCookies() async
+    // Cookies are not renderer state: each engine's store is a `CookieJar`.
 
     // MARK: - Screenshot
     func takeSnapshot() async throws -> NSImage

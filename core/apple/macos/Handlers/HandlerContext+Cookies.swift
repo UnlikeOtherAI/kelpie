@@ -1,19 +1,24 @@
 import AppKit
 import Foundation
+import WebKit
 
-// MARK: - Cookie management (cross-renderer sync)
+// MARK: - Cookie stores
 
 extension HandlerContext {
-    /// True when the renderer the cookie sync would act on belongs to a
-    /// partitioned tab.
-    ///
-    /// `SharedCookieJar` is not a passive snapshot: a poller pushes its
-    /// contents into the active renderer and writes that renderer's cookies
-    /// back every two seconds. Letting a partitioned tab join would hand it
-    /// every other tab's cookies and leak its own into the shared file, which
-    /// is exactly the isolation the partition was created to provide. Every
-    /// shared-jar path below therefore excludes partitioned tabs and operates
-    /// on the tab's own `websiteDataStore.httpCookieStore` instead.
+    /// A cookie store a request reads or writes: the live default store or one partition.
+    struct CookieTarget {
+        let jar: CookieJar
+        /// nil for the default store.
+        let partition: String?
+        /// Equal for two targets that name the same store.
+        let identity: String
+
+        var isDefault: Bool { identity == Self.defaultIdentity }
+        static let defaultIdentity = "default"
+    }
+
+    /// True when the active renderer belongs to a partitioned tab. Such a tab has its own
+    /// store, so the UOA login hand-over and the default-store paths never touch it.
     var activeRendererIsPartitioned: Bool {
         guard let renderer else { return false }
         return WindowRegistry.shared.allEntriesIncludingDetached().contains { entry in
@@ -21,129 +26,24 @@ extension HandlerContext {
         }
     }
 
-    func allCookies() async -> [HTTPCookie] {
-        guard profileID == KelpieStorage.profileID, let renderer else { return [] }
-        if activeRendererIsPartitioned {
-            return await renderer.allCookies()
-        }
-        if renderer.engineName == "chromium" {
-            return SharedCookieJar.load().cookies
-        }
-        return await renderer.allCookies()
+    var defaultCookieTarget: CookieTarget {
+        CookieTarget(jar: defaultCookies.jar, partition: nil, identity: CookieTarget.defaultIdentity)
     }
 
-    func setCookie(_ cookie: HTTPCookie) async {
-        guard profileID == KelpieStorage.profileID, let renderer else { return }
-        await renderer.setCookies([cookie])
-        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
-
-        if renderer.engineName == "chromium" {
-            var merged = SharedCookieJar.load().cookies
-            merged.removeAll { existing in
-                existing.domain == cookie.domain &&
-                existing.path == cookie.path &&
-                existing.name == cookie.name
-            }
-            merged.append(cookie)
-            SharedCookieJar.save(cookies: merged)
-            let snapshot = SharedCookieJar.load()
-            lastSharedCookieSignature = snapshot.signature
-            lastSharedCookieModifiedAt = snapshot.modifiedAt
-            return
-        }
-
-        await persistRendererCookiesToSharedJar()
+    /// The store a resolved renderer uses. Chromium has only the default store.
+    func cookieTarget(for renderer: any RendererEngine) -> CookieTarget {
+        guard let webKit = renderer as? WKWebViewRenderer,
+              webKit.websiteDataStore !== KelpieWebsiteData.store else { return defaultCookieTarget }
+        let partition = WindowRegistry.shared.allEntriesIncludingDetached()
+            .lazy.flatMap(\.tabStore.tabs).first { $0.renderer === webKit }?.partition
+        let identity = partition.map { "partition:\($0)" } ?? "store:\(ObjectIdentifier(webKit.websiteDataStore).hashValue)"
+        return CookieTarget(jar: .webKit(webKit.websiteDataStore.httpCookieStore), partition: partition, identity: identity)
     }
 
-    func deleteCookie(_ cookie: HTTPCookie) async {
-        guard profileID == KelpieStorage.profileID, let renderer else { return }
-        await renderer.deleteCookie(cookie)
-        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
-
-        if renderer.engineName == "chromium" {
-            var merged = SharedCookieJar.load().cookies
-            merged.removeAll { existing in
-                existing.domain == cookie.domain &&
-                existing.path == cookie.path &&
-                existing.name == cookie.name
-            }
-            SharedCookieJar.save(cookies: merged)
-            let snapshot = SharedCookieJar.load()
-            lastSharedCookieSignature = snapshot.signature
-            lastSharedCookieModifiedAt = snapshot.modifiedAt
-            return
-        }
-
-        await persistRendererCookiesToSharedJar()
-    }
-
-    func deleteAllCookies() async {
-        guard profileID == KelpieStorage.profileID, let renderer else { return }
-        await renderer.deleteAllCookies()
-        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
-
-        if renderer.engineName == "chromium" {
-            SharedCookieJar.save(cookies: [])
-            let snapshot = SharedCookieJar.load()
-            lastSharedCookieSignature = snapshot.signature
-            lastSharedCookieModifiedAt = snapshot.modifiedAt
-            return
-        }
-
-        await persistRendererCookiesToSharedJar()
-    }
-
-    func syncSharedCookiesIntoRenderer(force: Bool = false) async {
-        guard profileID == KelpieStorage.profileID, let renderer else { return }
-        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
-        let snapshot = SharedCookieJar.load()
-
-        if !force,
-           snapshot.signature == lastSharedCookieSignature,
-           snapshot.modifiedAt == lastSharedCookieModifiedAt {
-            return
-        }
-
-        if renderer.engineName == "chromium" && snapshot.cookies.isEmpty {
-            // CEF cookie deletion is unstable during renderer switches. The
-            // shared jar remains the source of truth, and Chromium no longer
-            // tries to wipe its store during activation.
-        } else if snapshot.modifiedAt != nil && snapshot.cookies.isEmpty {
-            await renderer.deleteAllCookies()
-        } else if !snapshot.cookies.isEmpty {
-            await renderer.setCookies(snapshot.cookies)
-        }
-        lastSharedCookieSignature = snapshot.signature
-        lastSharedCookieModifiedAt = snapshot.modifiedAt
-    }
-
-    func persistRendererCookiesToSharedJar() async {
-        guard profileID == KelpieStorage.profileID, let renderer else { return }
-        guard renderer.engineName != "chromium" else { return }
-        guard profileID == KelpieStorage.profileID, !activeRendererIsPartitioned else { return }
-        let cookies = await renderer.allCookies()
-        guard profileID == KelpieStorage.profileID else { return }
-        let signature = SharedCookieJar.signature(for: cookies)
-        if signature == lastSharedCookieSignature { return }
-
-        SharedCookieJar.save(cookies: cookies)
-        let snapshot = SharedCookieJar.load()
-        lastSharedCookieSignature = snapshot.signature
-        lastSharedCookieModifiedAt = snapshot.modifiedAt
-    }
-
-    func startSharedCookieSync() {
-        sharedCookiePoller?.invalidate()
-        sharedCookiePoller = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.syncSharedCookiesIntoRenderer()
-                await self?.persistRendererCookiesToSharedJar()
-            }
-        }
-    }
-
-    func stopSharedCookieSync() {
-        sharedCookiePoller?.invalidate()
-        sharedCookiePoller = nil
+    /// Runs `body` on the target store; default-store work waits its turn with sync.
+    func withCookies<T>(_ target: CookieTarget, _ body: (CookieJar) async throws -> T) async throws -> T {
+        guard profileID == KelpieStorage.profileID else { throw CancellationError() }
+        if target.isDefault { return try await defaultCookies.exclusive(body) }
+        return try await body(target.jar)
     }
 }

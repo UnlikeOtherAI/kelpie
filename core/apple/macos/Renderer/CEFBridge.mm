@@ -82,8 +82,6 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
         _createdBrowser = createdBrowser;
     }
 
-    _cookieManager = CEFBridgeCookieManagerFromBrowser(createdBrowser);
-
     NSLog(
         @"[CEFBridge] create_browser_sync returned=%@ parentSubviews=%lu",
         CEFBridgeDescribeBrowser(createdBrowser),
@@ -141,10 +139,6 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
         if (_createdBrowser != nullptr) {
             CEFBridgeInvalidateScreenshotCapture(_createdBrowser);
             CEFBridgeInvalidateCookieObserver(_createdBrowser);
-        }
-        if (_cookieManager != nullptr) {
-            _cookieManager->base.release(&_cookieManager->base);
-            _cookieManager = nullptr;
         }
         if (_callbackBrowser != nullptr) {
             _callbackBrowser->base.release(&_callbackBrowser->base);
