@@ -15,6 +15,15 @@ export function componentVersion(source, target) {
   return version;
 }
 
+export function taggedComponentVersion(api, tag, target) {
+  const sourcePath = target.startsWith('windows-') ? 'apps/windows/CMakeLists.txt' :
+    target.startsWith('linux-') ? 'apps/linux/CMakeLists.txt' :
+      target.startsWith('macos-') ? 'apps/macos/Kelpie/Info.plist' :
+        target === 'ios' ? 'apps/ios/Project.swift' : 'apps/android/app/build.gradle.kts';
+  const file = JSON.parse(api(`repos/UnlikeOtherAI/kelpie/contents/${sourcePath}?ref=${encodeURIComponent(tag)}`));
+  return componentVersion(Buffer.from(file.content, 'base64').toString('utf8'), target);
+}
+
 export function updateNotes(release, { target, version, asset, storeURL }) {
   if (!targets.includes(target) || !/^\d{1,6}\.\d{1,6}\.\d{1,6}$/.test(version ?? '')) {
     throw new Error('A supported target and numeric component version are required.');
@@ -77,12 +86,7 @@ function main() {
   }
   const api = (...args) => execFileSync('gh', ['api', ...args], { encoding: 'utf8' });
   const release = JSON.parse(api(`repos/UnlikeOtherAI/kelpie/releases/tags/${encodeURIComponent(options.tag)}`));
-  const sourcePath = options.target.startsWith('windows-') ? 'apps/windows/CMakeLists.txt' :
-    options.target.startsWith('linux-') ? 'apps/linux/CMakeLists.txt' :
-      options.target.startsWith('macos-') ? 'apps/macos/Kelpie/Info.plist' :
-        options.target === 'ios' ? 'apps/ios/Project.swift' : 'apps/android/app/build.gradle.kts';
-  const file = JSON.parse(api(`repos/UnlikeOtherAI/kelpie/contents/${sourcePath}?ref=${encodeURIComponent(options.tag)}`));
-  const canonical = componentVersion(Buffer.from(file.content, 'base64').toString('utf8'), options.target);
+  const canonical = taggedComponentVersion(api, options.tag, options.target);
   if (options.version !== canonical) throw new Error(`Update version must match the release's ${options.target} component version ${canonical}.`);
   const body = updateNotes(release, { ...options, storeURL: options['store-url'] });
   execFileSync('gh', ['api', `repos/UnlikeOtherAI/kelpie/releases/${release.id}`, '--method', 'PATCH', '--input', '-'], {

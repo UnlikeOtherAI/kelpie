@@ -1,14 +1,15 @@
-import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { taggedComponentVersion } from './publish-app-update.mjs';
 
 // Run after attaching and verifying the release artifacts, never at release creation.
 const tag = process.argv[2];
 if (!tag) throw new Error('Usage: publish-built-app-updates.mjs TAG');
 const release = JSON.parse(execFileSync('gh', ['api',
   `repos/UnlikeOtherAI/kelpie/releases/tags/${encodeURIComponent(tag)}`], { encoding: 'utf8' }));
-const linux = readFileSync('apps/linux/CMakeLists.txt', 'utf8').match(/KELPIE_LINUX_VERSION="([0-9.]+)"/)[1];
-const android = readFileSync('apps/android/app/build.gradle.kts', 'utf8').match(/versionName = "([0-9.]+)"/)[1];
+const api = path => execFileSync('gh', ['api', path], { encoding: 'utf8' });
+const linux = taggedComponentVersion(api, tag, 'linux-x64-tar');
+const android = taggedComponentVersion(api, tag, 'android');
 const jobs = [
   ['linux-x64-appimage', linux, name => name.endsWith('.AppImage')],
   ['linux-x64-deb', linux, name => name.endsWith('.deb')],
