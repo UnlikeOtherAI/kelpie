@@ -29,7 +29,7 @@ struct URLBarView: View {
     let onAddBookmark: () -> Void
     let onNetworkInspector: () -> Void
     let onSettings: () -> Void
-    let addressFocusRequest: Int
+    @Binding var addressFocusRequested: Bool
 
     @ObservedObject var bookmarkStore = BookmarkStore.shared
     @State var showTools = false
@@ -116,7 +116,7 @@ struct URLBarView: View {
         .onAppear { syncAddress() }
         .onChange(of: browserState.currentURL) { _, _ in if !isAddressFieldFocused || urlText.isEmpty { syncAddress() } }
         .onChange(of: isStartPage) { _, _ in syncAddress() }
-        .onChange(of: addressFocusRequest) { _, _ in syncAddress() }
+        .onChange(of: addressFocusRequested) { _, requested in if requested { syncAddress() } }
     }
 
     private func syncAddress() { urlText = isStartPage ? "" : browserState.currentURL }
@@ -187,7 +187,7 @@ struct URLBarView: View {
                 AddressField(
                     text: $urlText,
                     isFocused: $isAddressFieldFocused,
-                    focusRequest: addressFocusRequest,
+                    focusRequested: $addressFocusRequested,
                     color: appearance.palette.foreground.color,
                     onSubmit: navigate
                 )
