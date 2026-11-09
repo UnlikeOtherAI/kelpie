@@ -1,6 +1,6 @@
 # Kelpie API — Browser Management Methods
 
-Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen.
+Dialogs/alerts, tabs, iframes, cookies (see [cookies.md](cookies.md)), storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen.
 
 For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
@@ -437,93 +437,17 @@ Response:
 
 ---
 
-## Cookies & Storage
+## Cookies
 
-### `getCookies`
-Read cookies for the current page.
+`get-cookies`, `set-cookie`, `set-cookies`, `copy-cookies`, `delete-cookies` and
+`get-cookie-sync-status` are documented in [cookies.md](cookies.md): cookie
+stores (default, tab or partition), exporting a whole store with `all:true`,
+copying synced sessions into an isolated tab, and peer-to-peer cookie sync
+status. The sync protocol between devices is in [cookie-sync.md](cookie-sync.md).
 
-```json
-POST /v1/get-cookies
-{
-  "url": null,                 // optional, scope to cookies that would be sent to this URL
-  "name": null                 // optional, filter by cookie name
-}
+---
 
-Response:
-{
-  "success": true,
-  "cookies": [
-    {
-      "name": "session_id",
-      "value": "abc123...",
-      "domain": "example.com",
-      "path": "/",
-      "expires": "2026-04-30T00:00:00.000Z",
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "Lax"
-    },
-    {
-      "name": "theme",
-      "value": "light",
-      "domain": "example.com",
-      "path": "/",
-      "expires": null,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "None"
-    }
-  ],
-  "count": 2
-}
-```
-
-The `url` and `name` filters are honored on all platforms (iOS, Android, macOS). `url` scoping matches a cookie's host, path, and `Secure` flag against the URL, mirroring which cookies the browser would actually send to that URL — equivalent to Android's `CookieManager.getCookie(url)`.
-
-### `setCookie`
-Set a cookie.
-
-```json
-POST /v1/set-cookie
-{
-  "name": "session_id",
-  "value": "new_value",
-  "domain": "example.com",
-  "path": "/",
-  "httpOnly": true,
-  "secure": true,
-  "sameSite": "Lax",
-  "expires": "2026-12-31T00:00:00.000Z"
-}
-
-Response:
-{
-  "success": true
-}
-```
-
-The cookie is written to the platform's native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), so `httpOnly`, `secure`, `sameSite`, and `expires` are all honored on every platform. This is the supported way to inject an httpOnly session cookie for auth — JavaScript (`eval` / `document.cookie`) cannot create httpOnly cookies. On macOS, pass `tabId` to target a specific tab's cookie store.
-
-### `deleteCookies`
-Delete cookies by name, domain, or all.
-
-```json
-POST /v1/delete-cookies
-{
-  "url": null,                // optional, scope deletion to cookies sent to this URL
-  "name": "session_id",       // optional, delete specific cookie
-  "domain": "example.com",    // optional, scope deletion to this exact domain
-  "deleteAll": false           // optional, delete all cookies in scope
-}
-
-Response:
-{
-  "success": true,
-  "deleted": 1
-}
-```
-
-The `url`, `name`, and `domain` selectors are honored on all platforms (iOS, Android, macOS). When none of `name`, `domain`, or `deleteAll` is supplied, the call is a no-op (`deleted: 0`) rather than wiping the store. `deleteAll` only clears the full store when no `url`/`name`/`domain` narrows the scope; otherwise it deletes just the matching cookies. `domain` matching is exact and tolerant of a leading dot.
+## Storage
 
 ### `getStorage`
 Read localStorage or sessionStorage.

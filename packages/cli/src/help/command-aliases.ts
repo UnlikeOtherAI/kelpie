@@ -49,6 +49,9 @@ export const endpointToCliCommandAliases: Record<string, string> = {
   "get-cookies": "cookies",
   "set-cookie": "cookies set",
   "delete-cookies": "cookies delete",
+  "set-cookies": "cookies import",
+  "copy-cookies": "cookies copy",
+  "get-cookie-sync-status": "cookies sync-status",
   "get-storage": "storage",
   "set-storage": "storage set",
   "clear-storage": "storage clear",
@@ -92,6 +95,7 @@ export const cliToEndpointCommandAliases: Record<string, string> = {
   ...Object.fromEntries(
     Object.entries(endpointToCliCommandAliases).map(([endpoint, cli]) => [cli, endpoint]),
   ),
+  "cookies list": "get-cookies",
   "dialog dismiss": "handle-dialog",
   "ai endpoint edit": "ai-endpoint-save",
   "ai endpoint use": "ai-load",
