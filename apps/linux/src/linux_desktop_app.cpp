@@ -49,6 +49,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   runtime.start_stdio_mcp=impl_->config.mcp_stdio; runtime.device_info_provider=impl_.get();
   runtime.bookmark_action=[this](const std::string& action,const json& params) { return impl_->account.BookmarkAction(action,params); };
   runtime.bookmarks_supplier=[this] { return impl_->account.Bookmarks(); };
+  runtime.cookie_sync_status=[this] { return impl_->CookieSyncStatus(); };
   runtime.site_previews_path=std::filesystem::path(impl_->config.profile_dir)/"site-previews";
   runtime.request_shutdown=[this] { RequestShutdown(); return BrowserControlResult::Success(); };
   runtime.set_home=[this](std::string url) { SetHomeUrl(url); return BrowserControlResult::Success(); };
@@ -84,6 +85,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   if(engine.initial_url.empty()) impl_->LoadSession(engine);
   if(!impl_->desktop.Start(runtime)) { ShowToast(impl_->desktop.last_error()); return false; }
   impl_->started=true;
+  impl_->StartCookieSync();
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
   impl_->account.RestoreSession();
   impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine(),connect::Executor::Infer{},
@@ -101,6 +103,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
 void LinuxApp::RequestShutdown() { impl_->closing=true; }
 bool LinuxApp::FinishShutdown() {
   if(!impl_->closing) return false;
+  impl_->StopCookieSync();
   if(impl_->connection) { impl_->connection->Shutdown(); if(!impl_->connection->Drain())return false; impl_->connection.reset(); impl_->connect_executor.reset(); }
   impl_->account.Shutdown(); impl_->desktop.BeginShutdown();
   if(!CloseAccountLoginWindow()) return false;
@@ -113,6 +116,7 @@ bool LinuxApp::IsRunning() const { return impl_->running && !impl_->closing; }
 void LinuxApp::PumpBrowser() {
   impl_->desktop.Tick(); impl_->account.Poll();
   if(impl_->connection)impl_->connection->Update(false);
+  if(impl_->cookie_sync && !impl_->closing) impl_->cookie_sync->Tick();
   if(!impl_->account.State().signing_in) CloseAccountLoginWindow();
   if(impl_->started && !impl_->closing && std::chrono::steady_clock::now()-impl_->last_save>std::chrono::seconds(1)) {
     impl_->Save(); impl_->last_save=std::chrono::steady_clock::now();

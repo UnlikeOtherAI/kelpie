@@ -266,7 +266,7 @@ if(BUILD_TESTING)
 endif()
 
 if(KELPIE_LINUX_HAS_CEF)
-  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp)
+  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp src/linux_cookie_sync.cpp)
   target_link_libraries(kelpie-linux PRIVATE kelpie_linux_sync_discovery)
 else()
   target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_browser_gateway.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/stub_renderer.cpp)

@@ -8,6 +8,9 @@
 #include "kelpie/desktop_app.h"
 #include "kelpie/desktop_http_server.h"
 #include "kelpie/desktop_router.h"
+#include "kelpie/desktop_sync.h"
+#include "kelpie/sync_cookie_store.h"
+#include "avahi_sync_discovery.h"
 #include <atomic>
 #include <mutex>
 
@@ -21,6 +24,12 @@ struct LinuxApp::Impl final : DeviceInfoProvider {
   account::AccountService account;
   std::unique_ptr<connect::Executor> connect_executor;
   std::unique_ptr<connect::Client> connection;
+  // Peer-to-peer cookie sync (linux_cookie_sync.cpp); destroyed service
+  // first. The mutex covers the pointers for status reads from HTTP workers.
+  mutable std::mutex cookie_sync_mutex;
+  std::unique_ptr<AvahiSyncDiscovery> sync_discovery;
+  std::unique_ptr<SyncCookieStore> sync_cookies;
+  std::unique_ptr<DesktopCookieSync> cookie_sync;
   std::atomic<bool> running{true}, closing{false}, fullscreen{false}, desired_fullscreen{false};
   std::atomic<int> requested_width{0},requested_height{0};
   std::atomic<bool> started{false};
@@ -34,6 +43,9 @@ struct LinuxApp::Impl final : DeviceInfoProvider {
   StringMap GetMdnsMetadata() const override { return {}; }
   void LoadSession(DesktopEngine::Config& engine);
   void Save();
+  void StartCookieSync();
+  void StopCookieSync();
+  nlohmann::json CookieSyncStatus() const;
 };
 std::string ReadProfile(const std::filesystem::path& path);
 }  // namespace kelpie::linuxapp
