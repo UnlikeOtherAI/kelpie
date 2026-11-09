@@ -115,7 +115,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.2.0"
+    KELPIE_LINUX_VERSION="0.2.1"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -213,6 +213,10 @@ add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-connect" "${CMAKE_BINARY_DIR}/de
 target_link_libraries(kelpie-linux PRIVATE kelpie_desktop_account kelpie_desktop_connect)
 target_sources(kelpie-linux PRIVATE src/profile_session.cpp)
 if(BUILD_TESTING)
+  add_executable(linux_standalone_instance_test tests/standalone_instance_test.cpp)
+  target_include_directories(linux_standalone_instance_test PRIVATE src)
+  target_compile_options(linux_standalone_instance_test PRIVATE -UNDEBUG)
+  add_test(NAME linux_standalone_instance_test COMMAND linux_standalone_instance_test)
   add_executable(linux_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
   target_include_directories(linux_profile_session_test PRIVATE src)
   target_compile_options(linux_profile_session_test PRIVATE -UNDEBUG)

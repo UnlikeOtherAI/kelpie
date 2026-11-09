@@ -123,8 +123,10 @@ set(WINDOWS_APP_SOURCES
   src/letter_avatar.cpp
   src/settings_view.cpp
   ${WINDOWS_INFERENCE_SOURCES}
-  src/bookmarks_view.cpp
-  src/history_view.cpp
+  src/panel_window.cpp
+  src/link_list_panel.cpp
+  src/display_format.cpp
+  src/network_rows.cpp
   src/network_inspector.cpp
   src/profile_session.cpp
   src/session_snapshot.cpp
@@ -149,8 +151,10 @@ set(WINDOWS_APP_HEADERS
   src/favicon_cache.h
   src/letter_avatar.h
   src/settings_view.h
-  src/bookmarks_view.h
-  src/history_view.h
+  src/panel_window.h
+  src/link_list_panel.h
+  src/display_format.h
+  src/network_rows.h
   src/network_inspector.h
   src/profile_session.h
   src/session_snapshot.h
@@ -254,6 +258,11 @@ include(runtime.cmake)
 
 if(BUILD_TESTING)
   add_windows_inference_tests()
+  add_executable(kelpie_windows_standalone_instance_test tests/standalone_instance_test.cpp)
+  target_include_directories(kelpie_windows_standalone_instance_test PRIVATE src)
+  target_link_libraries(kelpie_windows_standalone_instance_test PRIVATE user32)
+  target_compile_options(kelpie_windows_standalone_instance_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_standalone_instance_test COMMAND kelpie_windows_standalone_instance_test)
   add_executable(page_color_sampler_test tests/page_color_sampler_test.cpp src/page_color_sampler.cpp ${WINDOWS_THEME_SOURCES})
   target_include_directories(page_color_sampler_test PRIVATE src "${KELPIE_NATIVE_ROOT}/engine-chromium-desktop/include")
   target_link_libraries(page_color_sampler_test PRIVATE nlohmann_json::nlohmann_json user32 gdi32 gdiplus uxtheme dwmapi crypt32 ole32)
@@ -420,8 +429,10 @@ if(BUILD_TESTING)
     src/letter_avatar.cpp
     src/tab_tooltips.cpp
     src/toast_view.cpp
-    src/bookmarks_view.cpp
-    src/history_view.cpp
+    src/panel_window.cpp
+    src/link_list_panel.cpp
+    src/display_format.cpp
+    src/network_rows.cpp
     src/network_inspector.cpp
   )
   target_compile_definitions(windows_shell_preview_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
@@ -450,6 +461,13 @@ if(BUILD_TESTING)
     target_link_options(kelpie_windows_theme_test PRIVATE "/MANIFEST:NO")
   endif()
   add_test(NAME kelpie_windows_theme_test COMMAND kelpie_windows_theme_test)
+
+  add_executable(kelpie_windows_network_rows_test
+    tests/network_rows_test.cpp src/network_rows.cpp src/display_format.cpp)
+  target_include_directories(kelpie_windows_network_rows_test PRIVATE src)
+  target_link_libraries(kelpie_windows_network_rows_test PRIVATE nlohmann_json::nlohmann_json user32 kernel32)
+  target_compile_options(kelpie_windows_network_rows_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_network_rows_test COMMAND kelpie_windows_network_rows_test)
 
   include(tests/close_tab.cmake)
   include(tests/native_window_control.cmake)

@@ -110,9 +110,11 @@ void TestFontCache(HWND window) {
 
 void TestIconGlyphsAreDistinct() {
   // A duplicated code point would silently give two controls the same icon.
-  const std::vector<wchar_t> glyphs{ui::icon::kBack,      ui::icon::kForward, ui::icon::kReload,
-                                    ui::icon::kBookmarks, ui::icon::kHistory, ui::icon::kNetwork,
-                                    ui::icon::kSettings,  ui::icon::kNewTab,  ui::icon::kLock};
+  const std::vector<wchar_t> glyphs{
+      ui::icon::kBack,     ui::icon::kForward, ui::icon::kReload,       ui::icon::kHome,
+      ui::icon::kBookmarks, ui::icon::kHistory, ui::icon::kNetwork,     ui::icon::kSettings,
+      ui::icon::kNewTab,   ui::icon::kLock,    ui::icon::kFavoriteStar, ui::icon::kPerson,
+      ui::icon::kClear,    ui::icon::kFilter,  ui::icon::kChevronDown};
   const std::set<wchar_t> unique(glyphs.begin(), glyphs.end());
   assert(unique.size() == glyphs.size());
   // Stop and close intentionally share the cancel glyph.
@@ -174,20 +176,28 @@ void TestPaintPrimitives(HWND window) {
   ReleaseDC(window, screen);
 }
 
-void TestPanelMetrics(HWND window) {
-  assert(ui::PanelHeaderHeight(window) == ui::Dip(window, 52));
-  HFONT font = nullptr;
-  ui::RefreshPanelFont(window, window, &font, 13);
-  assert(font != nullptr);
-  HFONT first = font;
-  ui::RefreshPanelFont(window, window, &font, 16);
-  assert(font != nullptr && font != first && "the replaced font must be swapped out");
-  DeleteObject(font);
-  // A null control must be tolerated rather than crashing the shell.
-  HFONT none = nullptr;
-  ui::RefreshPanelFont(window, nullptr, &none, 13);
-  assert(none == nullptr);
+void TestPanelPlacement(HWND window) {
+  const RECT work{0, 0, 1920, 1040};
+  // Centred over the browser window, wherever it is on the monitor.
+  const RECT centred = ui::CenteredWindowRect({200, 100, 1400, 900}, work, {600, 400});
+  assert(centred.left == 500 && centred.top == 300 && centred.right == 1100 && centred.bottom == 700);
+  // A browser near the edge still gets a pop-up fully on the monitor.
+  const RECT edge = ui::CenteredWindowRect({1700, 900, 2300, 1300}, work, {600, 400});
+  assert(edge.right == 1920 && edge.bottom == 1040 && edge.left == 1320 && edge.top == 640);
+  // Larger than the work area: shrunk to it, so its caption and buttons show.
+  const RECT large = ui::CenteredWindowRect({0, 0, 1920, 1040}, work, {2400, 1600});
+  assert(large.left == 0 && large.top == 0 && large.right == 1920 && large.bottom == 1040);
+  // Work areas need not start at the origin (a second monitor on the left).
+  const RECT left = ui::CenteredWindowRect({-1800, 100, -200, 900}, {-1920, 0, 0, 1080}, {400, 300});
+  assert(left.left == -1200 && left.top == 350 && left.right == -800 && left.bottom == 650);
+
+  constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
+  const SIZE outer = ui::OuterSizeForClient(window, {400, 300}, style, 0);
+  assert(outer.cx > ui::Dip(window, 400) && outer.cy > ui::Dip(window, 300));
+  const RECT owned = ui::OwnedWindowRect(window, {400, 300}, style, 0);
+  assert(owned.right - owned.left == outer.cx && owned.bottom - owned.top == outer.cy);
   ui::StyleList(nullptr, nullptr);
+  assert(!ui::AnswerEmptyMarkup(0, L"empty"));
 }
 
 }  // namespace
@@ -203,7 +213,7 @@ int main() {
   TestFontCache(window);
   TestIconGlyphsAreDistinct();
   TestPaintPrimitives(window);
-  TestPanelMetrics(window);
+  TestPanelPlacement(window);
 
   DestroyWindow(window);
   std::printf("theme_test: ok\n");

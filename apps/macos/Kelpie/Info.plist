@@ -32,5 +32,7 @@
 	<string>Kelpie uses the local network to receive browser automation commands from the CLI.</string>
 	<key>NSQuitAlwaysKeepsWindows</key>
 	<false/>
+	<key>LSMultipleInstancesProhibited</key>
+	<true/>
 </dict>
 </plist>
