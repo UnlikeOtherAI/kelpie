@@ -54,13 +54,20 @@ void TestRegistryFiltering() {
   // Exact counts: a tool that quietly appears on or disappears from a platform
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
-  assert(all_tools.size() == 124);
-  assert(ios_tools.size() == 121);
-  assert(android_tools.size() == 121);
-  assert(macos_tools.size() == 118);
-  assert(windows_tools.size() == 114);
-  assert(webkit_tools.size() == 124);
-  assert(chromium_tools.size() == 124);
+  assert(all_tools.size() == 127);
+  assert(ios_tools.size() == 124);
+  assert(android_tools.size() == 124);
+  assert(macos_tools.size() == 121);
+  assert(windows_tools.size() == 117);
+  assert(webkit_tools.size() == 127);
+  assert(chromium_tools.size() == 127);
+
+  // Store-level cookie methods and sync status exist on every platform.
+  for (const auto* name : {"kelpie_set_cookies", "kelpie_copy_cookies", "kelpie_get_cookie_sync_status"}) {
+    for (const auto* tools : {&ios_tools, &android_tools, &macos_tools, &windows_tools, &linux_tools}) {
+      assert(ContainsTool(*tools, name));
+    }
+  }
 
   for (const auto* name : {"kelpie_bookmarks_create_folder", "kelpie_bookmarks_update", "kelpie_bookmarks_move"}) {
     assert(ContainsTool(ios_tools, name));
