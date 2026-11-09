@@ -235,7 +235,8 @@ bool DesktopHttpServer::Start(const Config& config) {
     response.set_content(page, "text/html; charset=utf-8");
   });
   impl_->server.Options(R"(/.*)", [](const httplib::Request&, httplib::Response& response) {
-    Json(response, 403, {{"success", false}, {"error", {{"code", "FORBIDDEN"}, {"message", "Browser preflight is not permitted"}}}});
+    response.set_header("Allow", "POST");
+    Json(response, 405, {{"success", false}, {"error", {{"code", "METHOD_NOT_ALLOWED"}, {"message", "Browser preflight is not permitted"}}}});
   });
   impl_->server.Get("/mcp", [](const httplib::Request&, httplib::Response& response) {
     response.status = 405;
