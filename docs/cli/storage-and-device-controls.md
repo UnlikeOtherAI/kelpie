@@ -67,9 +67,10 @@ Copy cookies between stores on one device. The values never leave the device. A 
 - The same store on both sides is refused with `INVALID_ARGUMENT`.
 
 ```bash
-# sign an isolated tab in with the person's synced sessions
-kelpie tab new https://example.com/ --partition agent-1 --device "Studio Mac"
+# sign an isolated tab in with the person's synced sessions, then open the site
+kelpie tab new --partition agent-1 --device "Studio Mac"
 kelpie cookies copy --to-tab <tabId> --domain example.com --device "Studio Mac"
+kelpie --tab-id <tabId> navigate https://example.com/ --device "Studio Mac"
 
 # bring a partition's cookies back into the default store (this syncs them)
 kelpie cookies copy --from-partition agent-1 --device "Studio Mac"
