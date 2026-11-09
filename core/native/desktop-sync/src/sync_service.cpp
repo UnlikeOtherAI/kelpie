@@ -122,7 +122,6 @@ void DesktopCookieSync::Impl::Fail(const std::string& reason, std::uint64_t gene
   Log("cookie-sync: unavailable: " + reason);
   std::lock_guard lock(mu_);
   reason_ = reason;
-  supported_ = reason != "mdns-unavailable";
   retry_at_ = Clock::now() + kRetry;
   failed_generation_ = generation;
 }
@@ -133,9 +132,8 @@ void DesktopCookieSync::Impl::Reconcile(const account::AccountService::Identity&
   if (!runnable) {
     if (epoch) StopEpoch();
     std::lock_guard lock(mu_);
-    supported_ = !identity.hosted && config_.discovery != nullptr && store_ != nullptr;
     reason_ = identity.hosted ? "embedded" : !config_.discovery ? "mdns-unavailable"
-                                           : !store_ ? "cookies-unavailable" : "";
+                                           : !store_ ? "no-cef" : "";
     return;
   }
   if (epoch && epoch->subject == identity.subject && epoch->account_generation == identity.generation) return;
@@ -165,21 +163,21 @@ void DesktopCookieSync::Impl::StartEpoch(const account::AccountService::Identity
     return;
   }
   opened_once_ = true;
+  // A device that cannot listen still syncs by connecting out to its peers.
   auto listener = std::make_unique<desktop_sync::SyncListener>(this);
-  if (!listener->Start(config_.bind_address)) {
-    store_->Close();
-    Fail("listener-unavailable", identity.generation);
-    return;
+  int port = 0;
+  if (listener->Start(config_.bind_address)) {
+    port = listener->port();
+    listener_ = std::move(listener);
+  } else {
+    Log("cookie-sync: listener unavailable; connecting out only");
   }
-  const int port = listener->port();
-  listener_ = std::move(listener);
   {
     std::lock_guard lock(mu_);
     epoch->id = ++epoch_counter_;
     epoch_ = epoch;
     warm_done_ = !epoch->launch;
     reason_.clear();
-    supported_ = true;
     failed_generation_.reset();
     port_ = port;
     peers_.clear();
@@ -187,7 +185,7 @@ void DesktopCookieSync::Impl::StartEpoch(const account::AccountService::Identity
     if (!epoch->launch) scan_due_ = Clock::now();
   }
   const std::uint64_t id = epoch->id;
-  if (!config_.discovery->Advertise(port, Txt(epoch, Now())) ||
+  if ((port > 0 && !config_.discovery->Advertise(port, Txt(epoch, Now()))) ||
       !config_.discovery->Browse([this, id](const SyncPeerAdvert& advert) { OnFound(id, advert); },
                                  [this, id](const std::string& instance) { OnLost(id, instance); })) {
     StopEpoch();
@@ -224,7 +222,7 @@ void DesktopCookieSync::Impl::StopEpoch() {
   changed_.notify_all();
   uoa_.WakeAll();
   config_.discovery->StopBrowsing();
-  config_.discovery->StopAdvertising();
+  config_.discovery->StopAdvertising();  // also when nothing was advertised
   config_.cookies->SetChangeListener(nullptr);
   for (auto& abort : aborts) abort->AbortAll();
   for (auto& session : outgoing) session->aborts.AbortAll();
@@ -318,7 +316,12 @@ void DesktopCookieSync::Impl::RefreshAdvertisement(const EpochRef& epoch) {
     if (today == hint_date_) return;
     hint_date_ = today;
   }
-  config_.discovery->UpdateTxt(Txt(epoch, now));
+  if (CurrentPort() > 0) config_.discovery->UpdateTxt(Txt(epoch, now));
+}
+
+int DesktopCookieSync::Impl::CurrentPort() const {
+  std::lock_guard lock(mu_);
+  return port_;
 }
 
 void DesktopCookieSync::Impl::OnCookiesChanged() {

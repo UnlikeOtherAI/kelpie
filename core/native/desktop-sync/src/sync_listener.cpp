@@ -126,8 +126,13 @@ bool SyncListener::Impl::AddressAllowed(const httplib::Request& request) {
 bool SyncListener::Impl::Admit(const httplib::Request& request, httplib::Response& response) {
   const std::string& path = request.path;
   const bool exchange = path == kExchange;
-  if (request.method != "POST" || (path != kHello && path != kAuth && !exchange)) {
+  if (path != kHello && path != kAuth && !exchange) {
     Send(response, ErrorReply(404, "NOT_FOUND"));
+    return false;
+  }
+  if (request.method != "POST") {
+    response.set_header("Allow", "POST");
+    Send(response, ErrorReply(405, "METHOD_NOT_ALLOWED"));
     return false;
   }
   if (!AddressAllowed(request)) {

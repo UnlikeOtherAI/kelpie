@@ -94,54 +94,52 @@ void DesktopCookieSync::Impl::Backoff(Peer* peer, const std::string& error) {
   peer->last_error = error;
 }
 
+// The get-cookie-sync-status payload (docs/api/cookies.md). Counts only: it
+// never names a cookie or a domain.
 Json DesktopCookieSync::Impl::Status() const {
   std::lock_guard lock(mu_);
-  Json out = {{"platform", config_.platform}};
   const bool hosted = desired_ && desired_->hosted;
   const bool signed_in = desired_ && desired_->signed_in;
-  out["signedIn"] = signed_in;
-  if (hosted || !config_.discovery || !store_) {
-    out["supported"] = false;
-    out["reason"] = hosted ? "embedded" : !config_.discovery ? "mdns-unavailable" : "cookies-unavailable";
-    return out;
-  }
-  out["peers"] = Json::array();
-  if (!signed_in) {
-    out["supported"] = true;
-    out["state"] = "signed-out";
-    return out;
-  }
-  if (!epoch_) {
-    out["supported"] = supported_;
-    out["state"] = reason_.empty() ? "starting" : "unavailable";
-    if (!reason_.empty()) out["reason"] = reason_;
+  Json store = store_ ? store_->Status() : Json::object();
+  Json out = {{"supported", false},
+              {"signedIn", signed_in},
+              {"listening", epoch_ != nullptr && port_ > 0},
+              {"peers", Json::array()},
+              {"store", {{"entries", store.value("entries", 0)},
+                         {"tombstones", store.value("tombstones", 0)},
+                         {"localOnly", store.value("localOnly", 0)},
+                         {"unapplied", store.value("unapplied", 0)},
+                         {"skipped", store.value("skipped", 0)},
+                         {"warming", store.value("warming", false)},
+                         {"lastPurgeAt", store.value("lastPurgeAt", Json())}}}};
+  const char* reason = hosted ? "embedded"
+                       : !config_.discovery ? "mdns-unavailable"
+                       : !store_ ? "no-cef"
+                       : !signed_in ? "signed-out"
+                       : !epoch_ && !reason_.empty() ? reason_.c_str() : nullptr;
+  if (reason) {
+    out["reason"] = reason;
     return out;
   }
   out["supported"] = true;
-  out["state"] = warm_done_ ? "running" : "warming";
-  out["warming"] = !warm_done_;
+  if (!epoch_) return out;  // starting
   out["replica"] = epoch_->replica;
-  out["port"] = port_;
   const auto now = Clock::now();
-  bool skew = false;
   for (const auto& [replica, peer] : peers_) {
-    const bool outgoing = peer.outgoing && !peer.outgoing->ended;
-    const bool incoming = !peer.incoming.empty();
-    const char* state = outgoing || incoming ? "connected"
+    const bool connected = (peer.outgoing && !peer.outgoing->ended) || !peer.incoming.empty();
+    // Live peers only: one that stopped advertising and has no session is gone.
+    if (!connected && !peer.advertised && !peer.handshaking) continue;
+    const bool refused = peer.last_error == "AUTH_FAILED" || peer.last_error == "ACCOUNT_MISMATCH";
+    const char* state = connected ? "connected"
                         : peer.handshaking ? "handshaking"
-                        : !peer.advertised ? "lost"
-                        : peer.failures > 0 && now < peer.next_attempt ? "backoff" : "waiting";
-    Json item = {{"replica", replica}, {"state", state},
-                 {"lastSyncAt", peer.last_sync_at ? Json(peer.last_sync_at) : Json(nullptr)},
-                 {"lastError", peer.last_error.empty() ? Json(nullptr) : Json(peer.last_error)}};
-    if (outgoing || incoming) item["role"] = outgoing ? "initiator" : "responder";
-    if (!peer.platform.empty()) item["platform"] = peer.platform;
-    if (!peer.name.empty()) item["name"] = peer.name;
-    skew = skew || peer.last_error == "CLOCK_SKEW";
+                        : peer.last_error == "CLOCK_SKEW" ? "clock-skew"
+                        : refused ? "failed"
+                        : peer.failures > 0 && now < peer.next_attempt ? "backoff" : "handshaking";
+    Json item = {{"replica", replica}, {"platform", peer.platform}, {"name", peer.name}, {"state", state}};
+    if (peer.last_sync_at) item["lastSyncAt"] = peer.last_sync_at;
+    if (!peer.last_error.empty()) item["lastError"] = peer.last_error;
     out["peers"].push_back(std::move(item));
   }
-  out["clockSkew"] = skew;
-  out["store"] = store_->Status();
   return out;
 }
 

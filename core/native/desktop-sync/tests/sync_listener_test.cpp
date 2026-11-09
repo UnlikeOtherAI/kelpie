@@ -142,7 +142,7 @@ void Admission() {
   // Nothing else is routed: not the automation API, not GET, not MCP.
   assert(Status(Raw(port, Post("/v1/get-cookies", Json(2), "{}"))) == 404);
   assert(Status(Raw(port, Post("/mcp", Json(2), "{}"))) == 404);
-  assert(Status(Raw(port, "GET /v1/sync/hello HTTP/1.1\r\nHost: peer\r\n\r\n")) == 404);
+  assert(Status(Raw(port, "GET /v1/sync/hello HTTP/1.1\r\nHost: peer\r\n\r\n")) == 405);
   assert(Status(Raw(port, "GET /health HTTP/1.1\r\nHost: peer\r\n\r\n")) == 404);
 
   // A body that arrives after the read deadline is refused.
