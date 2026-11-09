@@ -173,6 +173,8 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
   if (auto* tab = owner_->FindTab(browser)) {
     tab->url = frame->GetURL().ToString();
     if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
+    // Partitioned tabs never contribute to cookie sync.
+    if (!tab->partition) owner_->NotifyDefaultStoreLoad();
   }
   owner_->UpdateActiveState();
 }

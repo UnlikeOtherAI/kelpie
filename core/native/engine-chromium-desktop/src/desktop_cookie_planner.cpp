@@ -1,5 +1,7 @@
 #include "desktop_cookie_planner.h"
 
+#include "desktop_cookie_store.h"
+
 #include <cmath>
 #include <cstdint>
 #include <regex>
@@ -122,11 +124,15 @@ Plan PlanGetCookies(const Json& query) {
 
 bool MatchesFilter(const Json& cookie, const Json& query) {
   if (!cookie.is_object() || !query.is_object()) return false;
-  for (const char* selector : {"name", "domain"}) {
-    const auto wanted = query.find(selector);
-    if (wanted == query.end()) continue;
-    const auto actual = cookie.find(selector);
+  if (const auto wanted = query.find("name"); wanted != query.end()) {
+    const auto actual = cookie.find("name");
     if (actual == cookie.end() || !actual->is_string() || *actual != *wanted) return false;
+  }
+  if (const auto wanted = query.find("domain"); wanted != query.end()) {
+    // The cookie's host equals the filter or is a subdomain of it, as for store-level reads.
+    const auto actual = cookie.find("domain");
+    if (actual == cookie.end() || !actual->is_string() || !wanted->is_string() ||
+        !desktop_cookie_store::DomainMatches(actual->get<std::string>(), wanted->get<std::string>())) return false;
   }
   return true;
 }

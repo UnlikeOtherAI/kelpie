@@ -1,6 +1,7 @@
 add_library(kelpie_desktop_account STATIC
   account_protocol.cpp account_login.cpp account_login_surface.cpp account_token.cpp account_session_store.cpp
-  account_service.cpp account_service_host.cpp account_service_session.cpp account_service_connect.cpp)
+  account_service.cpp account_service_host.cpp account_service_session.cpp account_service_connect.cpp
+  account_service_pair.cpp)
 target_compile_features(kelpie_desktop_account PUBLIC cxx_std_20)
 target_include_directories(kelpie_desktop_account PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(kelpie_desktop_account PUBLIC kelpie_core_state kelpie_core_protocol kelpie_core_automation
@@ -16,7 +17,8 @@ else()
   target_link_libraries(kelpie_desktop_account PRIVATE OpenSSL::Crypto CURL::libcurl)
 endif()
 if(BUILD_TESTING)
-  foreach(test host_session_test account_service_test account_session_test account_login_surface_test account_connect_test)
+  foreach(test host_session_test account_service_test account_session_test account_login_surface_test account_connect_test
+      account_pair_test)
     add_executable(${test} tests/${test}.cpp)
     target_link_libraries(${test} PRIVATE kelpie_desktop_account)
     if(MSVC)
