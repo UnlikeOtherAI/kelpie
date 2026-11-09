@@ -87,6 +87,7 @@ struct StandaloneUpdates::Impl {
         throw std::runtime_error("The updater could not start");
       progress = gtk_message_dialog_new(window, GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_INFO, GTK_BUTTONS_NONE,
           "%s", "Downloading and verifying update… Kelpie will restart when ready.");
+      g_object_add_weak_pointer(G_OBJECT(progress), reinterpret_cast<gpointer*>(&progress));
       gtk_window_set_deletable(GTK_WINDOW(progress), FALSE);
       gtk_widget_show(progress);
     } catch (...) { Error("The updater could not start. Your installation is unchanged. Try again after restarting Kelpie."); }
