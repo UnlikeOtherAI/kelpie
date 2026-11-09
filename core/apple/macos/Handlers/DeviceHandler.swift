@@ -213,7 +213,7 @@ private let macosCapabilityMethods = [
     "get-tabs", "new-tab", "switch-tab", "close-tab",
     "get-partitions", "delete-partition",
     "get-iframes", "switch-to-iframe", "switch-to-main", "get-iframe-context",
-    "get-cookies", "set-cookie", "delete-cookies",
+    "get-cookies", "set-cookie", "delete-cookies", "set-cookies", "copy-cookies",
     "get-storage", "set-storage", "clear-storage",
     "watch-mutations", "get-mutations", "stop-watching",
     "query-shadow-dom", "get-shadow-roots",

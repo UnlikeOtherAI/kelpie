@@ -4,28 +4,42 @@ import WebKit
 ///
 /// Honors the documented `get-cookies`/`delete-cookies` `url` scope and the
 /// `delete-cookies` `domain` filter, matching Android's `CookieManager`
-/// semantics (see `CookieScope`).
+/// semantics (see `CookieScope`). `get-cookies` with `all` or `partition` reads a
+/// whole store instead of the current page's cookies.
 extension BrowserManagementHandler {
     @MainActor
     func getCookies(_ body: [String: Any]) async -> [String: Any] {
-        do {
-            let renderer = try context.resolveRenderer(tabId: HandlerContext.tabId(from: body))
-            var cookies = try await context.withCookies(context.cookieTarget(for: renderer)) { try await $0.all() }
-            if let name = body["name"] as? String { cookies = cookies.filter { $0.name == name } }
-            // Default the scope to the current page when no `url` is supplied, so
-            // `get-cookies` returns current-page cookies by default (matches Android).
-            let scopeURL = body["url"] as? String ?? renderer.currentURL?.absoluteString ?? "http://localhost/"
-            let cookieList = CookieScope.scoped(cookies, toURL: scopeURL).map { cookie -> [String: Any] in
-                ["name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
-                 "expires": cookie.expires?.description ?? NSNull(), "httpOnly": cookie.httpOnly,
-                 "secure": cookie.secure, "sameSite": cookie.sameSite?.rawValue ?? NSNull()]
+        if let invalid = Self.invalidCookieField(body, strings: ["tabId", "partition", "domain", "name", "url"], flags: ["all"]) {
+            return invalid
+        }
+        let wholeStore = body["all"] as? Bool == true || body["partition"] != nil
+        let target: HandlerContext.CookieTarget
+        var scopeURL = body["url"] as? String
+        if wholeStore {
+            switch resolveCookieTarget(body) {
+            case .target(let resolved): target = resolved
+            case .failure(let response): return response
             }
-            return successResponse(["cookies": cookieList, "count": cookieList.count])
+        } else {
+            do {
+                // Without `all`, the scope defaults to the current page (matches Android).
+                let renderer = try context.resolveRenderer(tabId: HandlerContext.tabId(from: body))
+                target = context.cookieTarget(for: renderer)
+                scopeURL = scopeURL ?? renderer.currentURL?.absoluteString ?? "http://localhost/"
+            } catch {
+                return tabErrorResponse(from: error) ?? errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
+            }
+        }
+        var cookies: [BrowserCookie]
+        do {
+            cookies = try await context.withCookies(target) { try await $0.all() }
         } catch {
-            if let tabError = tabErrorResponse(from: error) { return tabError }
-            if error is HandlerError { return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription) }
             return Self.cookieStoreUnavailable()
         }
+        if let name = body["name"] as? String { cookies = cookies.filter { $0.name == name } }
+        if let domain = body["domain"] as? String { cookies = cookies.filter { CookieRequest.domain($0, matches: domain) } }
+        if let scopeURL { cookies = CookieScope.scoped(cookies, toURL: scopeURL) }
+        return successResponse(["cookies": cookies.map(CookieRequest.json), "count": cookies.count, "complete": true])
     }
 
     @MainActor
@@ -92,5 +106,16 @@ extension BrowserManagementHandler {
             code: "COOKIE_STORE_UNAVAILABLE",
             message: "The cookie store could not be read completely. Nothing was reported or changed; retry."
         )
+    }
+
+    /// `INVALID_ARGUMENT` for the first field of the wrong type, else nil.
+    static func invalidCookieField(_ body: [String: Any], strings: [String], flags: [String] = []) -> [String: Any]? {
+        if let field = strings.first(where: { body[$0] != nil && !(body[$0] is String) }) {
+            return errorResponse(code: "INVALID_ARGUMENT", message: "\(field) must be a string")
+        }
+        if let field = flags.first(where: { body[$0] != nil && !(body[$0] is Bool) }) {
+            return errorResponse(code: "INVALID_ARGUMENT", message: "\(field) must be a boolean")
+        }
+        return nil
     }
 }
