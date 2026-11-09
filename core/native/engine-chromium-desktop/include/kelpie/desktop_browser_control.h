@@ -234,7 +234,7 @@ class DesktopBrowserControl {
     return CookieStoresUnsupported();
   }
   // Copies from one store into another without the values leaving the
-  // browser; `result` is {copied, failed}. The same store twice is refused.
+  // browser; `result` is {copied, failed}. The same store twice is INVALID_PARAMS.
   virtual BrowserControlResult CopyCookieStore(const CookieStoreTarget&, const CookieStoreTarget&,
                                                const std::optional<std::string>&, Json*, Timeout) {
     return CookieStoresUnsupported();

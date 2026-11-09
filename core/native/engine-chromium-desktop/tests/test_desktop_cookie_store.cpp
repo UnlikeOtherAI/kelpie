@@ -156,7 +156,9 @@ void Conversions() {
     return !FromAutomation(bad).wire;
   };
   assert(broken("name", "") && broken("value", 3) && broken("domain", ".") && broken("domain", "a.test/x"));
-  assert(broken("path", "app") && broken("expires", 1893456000) && broken("expires", "tomorrow"));
+  assert(broken("path", "app") && broken("expires", 1893456000.5) && broken("expires", -5) && broken("expires", "tomorrow"));
+  Json seconds = Info("a.test", "n", 1893456000);
+  assert(FromAutomation(seconds).wire->at("expires") == 1893456000);  // whole Unix seconds are accepted too
   assert(broken("sameSite", "lax") && broken("sameSite", "sometimes") && broken("secure", "yes"));
   assert(broken("value", std::string(5000, 'v')));
 
@@ -311,9 +313,9 @@ void Handlers() {
          control.last_to.partition == std::optional<std::string>("work") &&
          control.last_domain == std::optional<std::string>("example.com"));
   result = router.Dispatch("copy-cookies", {{"from", {{"partition", "work"}}}, {"to", {{"partition", "work"}}}});
-  assert(result.status_code == 400 && result.body["error"]["code"] == "INVALID_ARGUMENT");
+  assert(result.status_code == 400 && result.body["error"]["code"] == "INVALID_PARAMS");
   assert(router.Dispatch("copy-cookies", {{"from", Json::object()}, {"to", Json::object()}}).body["error"]["code"] ==
-         "INVALID_ARGUMENT");
+         "INVALID_PARAMS");
   assert(router.Dispatch("copy-cookies", {{"from", Json::object()}}).status_code == 400);
   assert(router.Dispatch("copy-cookies", {{"from", "default"}, {"to", Json::object()}}).status_code == 400);
   assert(control.copies == 1);

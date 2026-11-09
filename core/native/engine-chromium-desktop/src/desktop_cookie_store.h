@@ -69,8 +69,9 @@ struct ParsedCookie {
 };
 // One set-cookies entry in the shape get-cookies returns → wire shape. Every
 // field is required: name (non-empty), value, domain (leading dot = domain
-// cookie, none = host-only), path (starting "/"), expires (ISO-8601 UTC or
-// null), httpOnly, secure and sameSite (Strict|Lax|None|Unspecified).
+// cookie, none = host-only), path (starting "/"), expires (ISO-8601 UTC,
+// whole Unix seconds or null), httpOnly, secure and sameSite
+// (Strict|Lax|None|Unspecified).
 ParsedCookie FromAutomation(const Json& input);
 
 // RFC 6265 matching for get-cookies' `url`: domain match, path match and

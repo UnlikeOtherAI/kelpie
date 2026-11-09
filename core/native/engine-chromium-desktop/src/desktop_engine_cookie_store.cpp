@@ -134,7 +134,7 @@ BrowserControlResult DesktopEngine::CopyCookieStore(const CookieStoreTarget& fro
   resolved = Resolve(*this, impl_, to, &target, timeout);
   if (!resolved.ok) return resolved;
   if (source.identity == target.identity) {
-    return BrowserControlResult::Failure("INVALID_ARGUMENT", "from and to name the same cookie store");
+    return BrowserControlResult::Failure("INVALID_PARAMS", "from and to name the same cookie store");
   }
   CefCookieBackend reader(source.manager), writer(target.manager);
   const auto copied = desktop_cookie_store::CopyCookies(reader, writer, domain, cancelled);

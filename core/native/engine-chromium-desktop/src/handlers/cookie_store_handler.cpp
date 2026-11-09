@@ -81,7 +81,7 @@ nlohmann::json CookieHandler::CopyCookies(const nlohmann::json& params) const {
     const CookieStoreTarget source = StoreTarget(*from);
     const CookieStoreTarget destination = StoreTarget(*to);
     if (SameTarget(source, destination)) {
-      return ErrorResponse("INVALID_ARGUMENT", "from and to name the same cookie store");
+      return InvalidParams("from and to name the same cookie store");
     }
     const auto domain = OptionalText(params, "domain");
     nlohmann::json output;

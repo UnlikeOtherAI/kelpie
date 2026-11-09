@@ -186,12 +186,14 @@ ParsedCookie FromAutomation(const Json& input) {
       input["path"].get<std::string>().front() != '/') {
     return {std::nullopt, "path must start with /"};
   }
+  // ISO-8601 UTC as get-cookies returns it, whole Unix seconds, or null.
   Json expires = nullptr;
-  if (!input["expires"].is_null()) {
-    const auto seconds = input["expires"].is_string() ? desktop_cookie::ParseExpirySeconds(input["expires"])
-                                                      : std::nullopt;
+  const Json& given = input["expires"];
+  if (!given.is_null()) {
+    const auto seconds = given.is_string() || given.is_number_integer() ? desktop_cookie::ParseExpirySeconds(given)
+                                                                        : std::nullopt;
     if (!seconds || *seconds < 0 || *seconds > 253402300799.0) {
-      return {std::nullopt, "expires must be ISO-8601 UTC or null"};
+      return {std::nullopt, "expires must be ISO-8601 UTC, whole Unix seconds or null"};
     }
     expires = static_cast<std::int64_t>(std::floor(*seconds));
   }
