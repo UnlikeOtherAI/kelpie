@@ -3,6 +3,7 @@
 #include <string>
 
 #include "linux_app.h"
+#include "standalone_instance.h"
 
 #if KELPIE_LINUX_HAS_CEF
 #include "kelpie/cef_app_factory.h"
@@ -96,6 +97,12 @@ int main(int argc, char* argv[]) {
   }
 
   try {
+    kelpie::linuxapp::StandaloneInstance instance;
+    if (instance.error() != 0) {
+      std::cerr << (instance.error() == EADDRINUSE ? "Kelpie is already running on this computer"
+                                                : "Cannot acquire Kelpie application ownership") << '\n';
+      return instance.error() == EADDRINUSE ? 183 : 1;
+    }
     kelpie::linuxapp::LinuxApp app(config, argc, argv);
     return app.Run();
   } catch (const std::exception& error) {
