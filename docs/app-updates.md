@@ -57,6 +57,8 @@ minutes. Download or verification failures keep the current app and show an erro
 
 Release checks belong to standalone hosts in `apps/`, not the embeddable browser
 libraries. They are absent from embedded browser sessions and Linux headless runs.
+The Mac keeps a discovered update pending until an active window can present its
+sheet, including when the check finishes before the first window opens.
 
 ## Desktop installation
 

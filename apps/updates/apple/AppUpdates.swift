@@ -204,6 +204,9 @@ struct AppUpdatePresentation: ViewModifier {
             .task { updates.activate(phase == .active) }
             .onChange(of: phase) { updates.activate($0 == .active) }
             #if os(macOS)
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+                updates.activate(NSApp.isActive)
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { _ in
                 updates.activate(phase == .active)
             }
