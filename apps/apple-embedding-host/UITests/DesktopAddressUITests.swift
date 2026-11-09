@@ -17,8 +17,11 @@ final class DesktopAddressUITests: XCTestCase {
         let typedAfterNewTab = address.value as? String
         address.click()
         app.typeKey("a", modifierFlags: .command)
-        app.typeText("https://example.org/a-long-address")
-        app.typeKey(.tab, modifierFlags: [])
+        app.typeText("example.org")
+        app.typeKey(.return, modifierFlags: [])
+        let page = app.webViews.firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 15))
+        page.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.1)).click()
         address.click()
         capture("macos-address-selected", app)
         app.typeText("replacement")
@@ -31,7 +34,7 @@ final class DesktopAddressUITests: XCTestCase {
 
     @MainActor
     private func capture(_ name: String, _ app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
