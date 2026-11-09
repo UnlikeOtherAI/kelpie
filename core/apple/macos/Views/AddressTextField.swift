@@ -4,14 +4,19 @@ import SwiftUI
 /// The cell owns the transition into editing; later clicks belong to the
 /// existing field editor and retain native caret, drag selection and IME behavior.
 final class AddressTextFieldCell: NSTextFieldCell {
-    override func edit(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText,
-                       delegate: Any?, event: NSEvent?) {
+    override func edit(
+        withFrame rect: NSRect,
+        in controlView: NSView,
+        editor textObj: NSText,
+        delegate: Any?,
+        event: NSEvent?
+    ) {
         super.edit(withFrame: rect, in: controlView, editor: textObj, delegate: delegate, event: nil)
         textObj.selectAll(nil)
     }
 }
 
-final class AddressTextField: NSTextField {
+class AddressTextField: NSTextField {
     override class var cellClass: AnyClass? {
         get { AddressTextFieldCell.self }
         set { super.cellClass = newValue }
