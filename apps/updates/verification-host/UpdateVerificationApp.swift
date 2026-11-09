@@ -47,6 +47,7 @@ private final class VerificationSession: ObservableObject {
         let defaults = UserDefaults(suiteName: "com.unlikeotherai.kelpie.update-verification.\(run)") ?? .standard
         return AppUpdates(defaults: defaults, session: session, installed: "0.2.1", performUpdate: { [weak self] item in
             self?.result = "Update \(item.version) selected. No software was changed."
+            self?.updates.installing = true
         })
     }()
 }

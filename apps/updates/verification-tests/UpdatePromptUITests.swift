@@ -19,6 +19,17 @@ final class UpdatePromptUITests: XCTestCase {
             action(title).tap()
             #endif
         }
+        func attachScreenshot(_ name: String) {
+            #if os(macOS)
+            let screenshot = app.windows.firstMatch.screenshot()
+            #else
+            let screenshot = app.screenshot()
+            #endif
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
         func launch(_ version: String) {
             app.launchArguments = ["--run-id", run, "--version", version]
             app.launch()
@@ -26,10 +37,7 @@ final class UpdatePromptUITests: XCTestCase {
         launch("0.2.2")
         XCTAssertTrue(action("Update").waitForExistence(timeout: 10))
         XCTAssertTrue(action("Skip version").exists)
-        let prompt = XCTAttachment(screenshot: app.screenshot())
-        prompt.name = "Update prompt — isolated verification host"
-        prompt.lifetime = .keepAlways
-        add(prompt)
+        attachScreenshot("Update prompt — isolated verification host")
         choose("Not now")
         XCTAssertFalse(action("Update").exists)
         app.terminate()
@@ -47,6 +55,8 @@ final class UpdatePromptUITests: XCTestCase {
         XCTAssertTrue(action("Update").waitForExistence(timeout: 10))
         choose("Update")
         XCTAssertTrue(app.staticTexts["Update 0.2.3 selected. No software was changed."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Downloading and verifying update… Kelpie will restart when ready."].exists)
+        attachScreenshot("Update progress — simulated verification host")
         app.terminate()
     }
 }
