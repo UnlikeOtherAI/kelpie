@@ -1,6 +1,7 @@
 add_library(kelpie_desktop_sync STATIC
   src/sync_channel.cpp
   src/sync_client.cpp
+  src/sync_connection_guard.cpp
   src/sync_crypto_hkdf.cpp
   src/sync_listener.cpp
   src/sync_net.cpp
@@ -29,7 +30,7 @@ else()
 endif()
 
 if(BUILD_TESTING)
-  foreach(test sync_crypto_test sync_net_test sync_listener_test sync_service_test)
+  foreach(test sync_crypto_test sync_net_test sync_protocol_test sync_listener_test sync_service_test)
     add_executable(${test} tests/${test}.cpp)
     target_include_directories(${test} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
       "${CMAKE_CURRENT_SOURCE_DIR}/../core-sync/src")

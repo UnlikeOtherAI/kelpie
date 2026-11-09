@@ -30,6 +30,12 @@ namespace kelpie::desktop_sync {
 using Clock = std::chrono::steady_clock;
 
 inline constexpr std::int64_t kMaxSkewMillis = 2 * 60 * 1000;
+
+// |remote - local| <= kMaxSkewMillis without signed overflow, for any two
+// int64 clocks a peer can send.
+bool WithinClockSkew(std::int64_t remote, std::int64_t local);
+// Milliseconds from `now` until `later`, clamped to [0, cap] without overflow.
+std::int64_t MillisUntil(std::int64_t later, std::int64_t now, std::int64_t cap);
 inline constexpr const char* kHelloPath = "/v1/sync/hello";
 inline constexpr const char* kAuthPath = "/v1/sync/auth";
 inline constexpr const char* kExchangePath = "/v1/sync/exchange";

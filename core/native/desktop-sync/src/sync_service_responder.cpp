@@ -49,20 +49,16 @@ SyncReply DesktopCookieSync::Impl::Hello(const std::string& body, const std::str
     if (std::find(accepted.begin(), accepted.end(), hello->hint) == accepted.end()) {
       return ErrorReply(409, "ACCOUNT_MISMATCH");  // before any UOA call
     }
-    Peer& peer = peers_[hello->side.replica];
-    if (peer.replica.empty()) {
-      peer.replica = hello->side.replica;
-      peer.first_seen = Clock::now();
-      peer.in_warmup_window = !warm_done_ && Clock::now() - epoch->opened < config_.timings.warmup_window;
-    }
-    peer.platform = hello->platform;
-    peer.name = hello->name;
-    if (std::llabs(hello->now - now) > desktop_sync::kMaxSkewMillis) {
-      peer.last_error = "CLOCK_SKEW";
+    // An unproven hello never creates a peer: only one already discovered
+    // through mDNS is annotated.
+    const auto known = peers_.find(hello->side.replica);
+    if (!desktop_sync::WithinClockSkew(hello->now, now)) {
+      if (known != peers_.end()) known->second.last_error = "CLOCK_SKEW";
       return ErrorReply(409, "CLOCK_SKEW");
     }
     // One session per pair: the designated initiator (smaller replica) keeps its own.
-    if (peer.outgoing && !peer.outgoing->ended && epoch->replica < hello->side.replica) {
+    if (known != peers_.end() && known->second.outgoing && !known->second.outgoing->ended &&
+        epoch->replica < hello->side.replica) {
       return ErrorReply(409, "SESSION_EXISTS");
     }
   }
@@ -73,6 +69,9 @@ SyncReply DesktopCookieSync::Impl::Hello(const std::string& body, const std::str
   pending->responder = {epoch->replica, sync::Base64UrlEncode(public_key.data(), public_key.size()),
                         desktop_sync::RandomToken(32)};
   pending->initiator = hello->side;
+  pending->platform = hello->platform;
+  pending->name = hello->name;
+  pending->created = Clock::now();
   pending->id = desktop_sync::RandomToken(32);
   pending->challenge = desktop_sync::Challenge(pending->initiator, pending->responder);
   pending->epoch = epoch;
@@ -161,11 +160,15 @@ SyncReply DesktopCookieSync::Impl::Auth(const std::string& body) {
   {
     std::lock_guard lock(mu_);
     if (epoch_ != epoch || !Live(epoch)) return ErrorReply(401, "SYNC_SESSION");
+    // The account is proven: only now does the initiator become a peer.
     Peer& peer = peers_[session->peer_replica];
     if (peer.replica.empty()) {
       peer.replica = session->peer_replica;
-      peer.first_seen = Clock::now();
+      peer.first_seen = pending->created;
+      peer.in_warmup_window = !warm_done_ && pending->created - epoch->opened < config_.timings.warmup_window;
     }
+    peer.platform = pending->platform;
+    peer.name = pending->name;
     if (peer.outgoing && !peer.outgoing->ended) {
       // One session per pair: the designated initiator keeps its own.
       if (epoch->replica < session->peer_replica) return ErrorReply(409, "SESSION_EXISTS");

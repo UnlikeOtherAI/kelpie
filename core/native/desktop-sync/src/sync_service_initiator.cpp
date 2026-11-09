@@ -73,9 +73,10 @@ void DesktopCookieSync::Impl::Handshake(EpochRef epoch, std::string replica) {
 void DesktopCookieSync::Impl::InstallOutgoing(const EpochRef& epoch, const std::string& replica,
                                               desktop_sync::EstablishedSession channel) {
   auto session = std::make_shared<Outgoing>();
-  // The responder's expiry, bounded by our own lifetime; the skew gate keeps clocks close.
-  const auto remaining = std::chrono::milliseconds(std::max<std::int64_t>(channel.expires_at - Now(), 1000));
-  session->expires = Clock::now() + std::min<std::chrono::milliseconds>(remaining, config_.timings.session_lifetime);
+  // The responder's expiry, bounded by our own lifetime; any int64 it sends is safe here.
+  const std::int64_t lifetime = config_.timings.session_lifetime.count();
+  const std::int64_t remaining = std::max<std::int64_t>(desktop_sync::MillisUntil(channel.expires_at, Now(), lifetime), 1000);
+  session->expires = Clock::now() + std::chrono::milliseconds(remaining);
   session->channel = std::move(channel);
   session->epoch = epoch;
   std::lock_guard lock(mu_);

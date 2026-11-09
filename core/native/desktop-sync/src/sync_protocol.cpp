@@ -59,6 +59,20 @@ std::string ReplyError(const ClientReply& reply) {
 
 }  // namespace
 
+bool WithinClockSkew(std::int64_t remote, std::int64_t local) {
+  // Unsigned subtraction is defined modulo 2^64 and yields the exact distance.
+  const std::uint64_t distance = remote >= local
+      ? static_cast<std::uint64_t>(remote) - static_cast<std::uint64_t>(local)
+      : static_cast<std::uint64_t>(local) - static_cast<std::uint64_t>(remote);
+  return distance <= static_cast<std::uint64_t>(kMaxSkewMillis);
+}
+
+std::int64_t MillisUntil(std::int64_t later, std::int64_t now, std::int64_t cap) {
+  if (later <= now) return 0;
+  const std::uint64_t distance = static_cast<std::uint64_t>(later) - static_cast<std::uint64_t>(now);
+  return distance > static_cast<std::uint64_t>(cap) ? cap : static_cast<std::int64_t>(distance);
+}
+
 std::string RandomToken(std::size_t bytes) {
   const Bytes random = RandomBytes(bytes);
   return sync::Base64UrlEncode(random.data(), random.size());
@@ -195,7 +209,7 @@ InitiatorResult RunInitiatorHandshake(const InitiatorRequest& request) {
   if (!peer || peer->side.replica != request.expected_replica) return {std::nullopt, "INVALID_REPLY"};
   result.peer_platform = peer->platform;
   result.peer_name = peer->name;
-  if (std::llabs(peer->now - request.now_millis()) > kMaxSkewMillis) {
+  if (!WithinClockSkew(peer->now, request.now_millis())) {
     result.error = "CLOCK_SKEW";
     return result;
   }

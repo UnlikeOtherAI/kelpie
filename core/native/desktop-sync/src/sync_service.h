@@ -93,9 +93,13 @@ class DesktopCookieSync::Impl : public desktop_sync::SyncResponder {
     desktop_sync::ReplayWindow window;
   };
 
+  // An unauthenticated hello. Its identity lives only here (bounded to 8)
+  // until /auth proves the account; peers_ never holds unproven replicas.
   struct Pending {
     std::string id;
     desktop_sync::HelloSide initiator, responder;
+    std::string platform, name;
+    Clock::time_point created;
     std::unique_ptr<desktop_sync::EcdhKey> key;
     std::string challenge;
     EpochRef epoch;

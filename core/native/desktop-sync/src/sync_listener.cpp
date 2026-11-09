@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "sync_connection_guard.h"
 #include "sync_net.h"
 
 namespace kelpie::desktop_sync {
@@ -79,7 +80,9 @@ class SyncListener::Impl {
  public:
   Impl(SyncResponder* responder, Limits limits)
       : responder_(responder), limits_(limits),
-        hello_limit_(limits.hello_per_source_per_minute, limits.hello_per_minute) {}
+        hello_limit_(limits.hello_per_source_per_minute, limits.hello_per_minute),
+        server_({limits.connections_per_source, limits.header_read,
+                 [this](const std::string& peer, const std::string& local) { return AddressAllowed(peer, local); }}) {}
 
   bool Start(const std::string& bind_address);
   void Stop();
@@ -89,7 +92,7 @@ class SyncListener::Impl {
   // Header-only admission. Returns false after writing the refusal; the
   // unread body is discarded when the one-request connection closes.
   bool Admit(const httplib::Request& request, httplib::Response& response);
-  bool AddressAllowed(const httplib::Request& request);
+  bool AddressAllowed(const std::string& peer, const std::string& local);
   std::optional<std::string> ReadBody(const httplib::ContentReader& reader, std::size_t limit,
                                       std::chrono::seconds deadline, SyncReply* refusal) const;
   void Route(const char* path, const httplib::Request& request, httplib::Response& response,
@@ -98,7 +101,7 @@ class SyncListener::Impl {
   SyncResponder* responder_;
   Limits limits_;
   HelloRateLimit hello_limit_;
-  httplib::Server server_;
+  GuardedServer server_;
   std::thread thread_;
   bool running_ = false;
   std::mutex interfaces_mutex_;
@@ -106,8 +109,8 @@ class SyncListener::Impl {
   Clock::time_point interfaces_read_{};
 };
 
-bool SyncListener::Impl::AddressAllowed(const httplib::Request& request) {
-  const auto peer = ParseIp(request.remote_addr);
+bool SyncListener::Impl::AddressAllowed(const std::string& peer_text, const std::string& local_text) {
+  const auto peer = ParseIp(peer_text);
   if (!peer) return false;
   if (IsLoopback(*peer)) return true;
   std::vector<InterfaceAddress> interfaces;
@@ -120,12 +123,14 @@ bool SyncListener::Impl::AddressAllowed(const httplib::Request& request) {
     }
     interfaces = interfaces_;
   }
-  return PeerAllowed(*peer, ParseIp(request.local_addr), interfaces);
+  return PeerAllowed(*peer, ParseIp(local_text), interfaces);
 }
 
 bool SyncListener::Impl::Admit(const httplib::Request& request, httplib::Response& response) {
   const std::string& path = request.path;
   const bool exchange = path == kExchange;
+  // Headers are complete: the body (or a refusal's write) gets its own absolute deadline.
+  GuardedServer::SetDeadline(Clock::now() + (exchange ? limits_.exchange_read : limits_.handshake_read));
   if (path != kHello && path != kAuth && !exchange) {
     Send(response, ErrorReply(404, "NOT_FOUND"));
     return false;
@@ -133,10 +138,6 @@ bool SyncListener::Impl::Admit(const httplib::Request& request, httplib::Respons
   if (request.method != "POST") {
     response.set_header("Allow", "POST");
     Send(response, ErrorReply(405, "METHOD_NOT_ALLOWED"));
-    return false;
-  }
-  if (!AddressAllowed(request)) {
-    Send(response, ErrorReply(403, "FORBIDDEN"));
     return false;
   }
   if (request.has_header("Origin") || request.has_header("Transfer-Encoding")) {
@@ -201,13 +202,19 @@ void SyncListener::Impl::Route(const char* path, const httplib::Request& request
     Send(response, refusal);
     return;
   }
+  // The responder bounds its own work (a long-poll waits up to 25 s), so the
+  // handler is not watched; the response write gets a deadline again.
+  GuardedServer::SetDeadline(std::nullopt);
+  SyncReply reply;
   if (std::string(path) == kHello) {
-    Send(response, responder_->Hello(*body, request.remote_addr));
+    reply = responder_->Hello(*body, request.remote_addr);
   } else if (std::string(path) == kAuth) {
-    Send(response, responder_->Auth(*body));
+    reply = responder_->Auth(*body);
   } else {
-    Send(response, responder_->Exchange(request.get_header_value(kSessionHeader), *body));
+    reply = responder_->Exchange(request.get_header_value(kSessionHeader), *body);
   }
+  GuardedServer::SetDeadline(Clock::now() + limits_.response_write);
+  Send(response, reply);
 }
 
 bool SyncListener::Impl::Start(const std::string& bind_address) {
@@ -256,6 +263,7 @@ bool SyncListener::Impl::Start(const std::string& bind_address) {
 void SyncListener::Impl::Stop() {
   if (!running_) return;
   server_.stop();
+  server_.ShutdownConnections();  // workers blocked on slow peers return at once
   if (thread_.joinable()) thread_.join();
   running_ = false;
   port = 0;
