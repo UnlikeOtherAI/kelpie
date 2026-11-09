@@ -78,7 +78,10 @@ let kelpieUpdateVerification = Target.target(
     product: .app,
     bundleId: "com.unlikeotherai.kelpie.update-verification.ios",
     deploymentTargets: .iOS("16.0"),
-    infoPlist: .extendingDefault(with: ["CFBundleDisplayName": "Kelpie Update Verification"]),
+    infoPlist: .extendingDefault(with: [
+        "CFBundleDisplayName": "Kelpie Update Verification",
+        "UILaunchScreen": .dictionary([:])
+    ]),
     sources: [.glob("../updates/apple/**/*.swift"), .glob("../updates/verification-host/**/*.swift")],
     settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
