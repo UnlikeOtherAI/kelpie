@@ -6,8 +6,8 @@ import type { CommandHelp, HelpField } from "./command-metadata.js";
  * protocol is in docs/api/cookie-sync.md.
  */
 
-const DEFAULT_STORE =
-  "With no tabId and no partition the target is the default store. While the person is signed in to Kelpie, that store also holds the cookies synced from their other Kelpie devices signed in to the same account on the same network.";
+const SYNCED =
+  "While the person is signed in to Kelpie, the default store also holds the cookies synced from their other Kelpie devices signed in to the same account on the same network.";
 
 const cookieFields: HelpField[] = [
   { name: "name", type: "string" },
@@ -92,7 +92,7 @@ export const cookieMetadata: Record<string, CommandHelp> = {
   "get-cookies": {
     purpose: "Get cookies",
     when: "Inspecting auth tokens, session cookies, or preferences, or exporting every cookie in a store",
-    explanation: `Returns cookies from the native cookie store, including httpOnly cookies that JS \`document.cookie\` cannot see. Without all, returns the cookies the current page would send; url and name filter them. all:true returns every cookie in the target store instead. domain keeps cookies whose host is that domain or a subdomain. ${DEFAULT_STORE} tabId reads that tab's store; partition reads that partition's store; pass at most one.`,
+    explanation: `Returns cookies from the native cookie store, including httpOnly cookies that JS \`document.cookie\` cannot see. Without all, returns the cookies the current page would send; url and name filter them. all:true returns every cookie in the target store instead. domain keeps cookies whose host is that domain or a subdomain. With no tabId and no partition the target is the default store. ${SYNCED} tabId reads that tab's store; partition reads that partition's store; pass at most one.`,
     errors: ["INVALID_PARTITION", "TAB_NOT_FOUND"],
     related: ["set-cookies", "copy-cookies", "set-cookie", "delete-cookies", "get-cookie-sync-status"],
     response: getCookiesResponse,
@@ -106,7 +106,7 @@ export const cookieMetadata: Record<string, CommandHelp> = {
   "set-cookies": {
     purpose: "Write a list of cookies into one store",
     when: "Restoring cookies saved with get-cookies all:true, or planting a known session in a tab, partition, or the default store",
-    explanation: `Writes up to 500 cookies in the shape get-cookies returns. ${DEFAULT_STORE} Cookies written there sync to those devices like any other change. Refused cookies come back in failed with their index; the rest are still written. The CLI command \`kelpie cookies import <file|->\` reads a JSON array or a saved \`kelpie cookies list\` output and sends it in batches of 500. To move cookies between stores on one device, use copy-cookies.`,
+    explanation: `Writes up to 500 cookies in the shape get-cookies returns. With no tabId and no partition the target is the default store. ${SYNCED} Cookies written there sync to those devices like any other change. Refused cookies come back in failed with their index; the rest are still written. The CLI command \`kelpie cookies import <file|->\` reads a JSON array or a saved \`kelpie cookies list\` output and sends it in batches of 500. To move cookies between stores on one device, use copy-cookies.`,
     errors: ["INVALID_PARAMS", "INVALID_PARTITION", "TAB_NOT_FOUND"],
     related: ["get-cookies", "copy-cookies", "set-cookie"],
     response: setCookiesResponse,
@@ -114,7 +114,7 @@ export const cookieMetadata: Record<string, CommandHelp> = {
   "copy-cookies": {
     purpose: "Copy cookies between stores on one device",
     when: "Giving an isolated tab the person's signed-in sessions, or bringing a partition's cookies back into the default store",
-    explanation: `Copies from one store to another without the values passing through the caller. {} is the default store. ${DEFAULT_STORE} To sign an isolated tab in: open it with new-tab and a partition, then copy-cookies with from:{} and to:{tabId}, optionally with domain. Copying into the default store syncs the cookies to the person's other devices. Some sites bind a session to one device, address or user agent and reject a copied cookie. The same store as source and target is INVALID_ARGUMENT.`,
+    explanation: `Copies from one store to another without the values passing through the caller. {} is the default store. ${SYNCED} To sign an isolated tab in: open it with new-tab and a partition, then copy-cookies with from:{} and to:{tabId}, optionally with domain. Copying into the default store syncs the cookies to the person's other devices. Some sites bind a session to one device, address or user agent and reject a copied cookie. The same store as source and target is INVALID_ARGUMENT.`,
     errors: ["INVALID_ARGUMENT", "INVALID_PARTITION", "TAB_NOT_FOUND"],
     related: ["get-cookies", "set-cookies", "new-tab", "get-partitions"],
     response: copyCookiesResponse,
