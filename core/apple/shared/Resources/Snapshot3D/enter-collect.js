@@ -63,7 +63,7 @@
             if (el.tagName === 'IFRAME') {
                 try { var _d = el.contentDocument; } catch(e) { isCrossOriginIframe = true; }
             }
-            collected.push({ el: el, depth: depth, isLeaf: isLeafPlane(el), position: pos, isCrossOriginIframe: isCrossOriginIframe, hasProcessedChild: false });
+            collected.push({ el: el, depth: depth, isLeaf: isLeafPlane(el), position: pos, metadata: 'pos:' + pos + ' z:' + cs.zIndex, isCrossOriginIframe: isCrossOriginIframe, hasProcessedChild: false });
 
             // Recurse into open shadow roots
             if (el.shadowRoot && collected.length < MAX_ELEMENTS) {
@@ -75,6 +75,8 @@
                 try {
                     var idoc = el.contentDocument;
                     if (idoc && idoc.body && collected.length < MAX_ELEMENTS) {
+                        var scrolling = idoc.scrollingElement || idoc.documentElement;
+                        state.scrollPositions.push({el: scrolling, top: scrolling.scrollTop, left: scrolling.scrollLeft});
                         collectElements(idoc.body, depth);
                     }
                 } catch(e) { /* cross-origin — skip */ }
@@ -136,6 +138,6 @@
     state.origBodyStyles = {
         transformStyle: bodyEl.style.transformStyle || '',
         transform: bodyEl.style.transform || '',
+        transformOrigin: bodyEl.style.transformOrigin || '',
         overflow: bodyEl.style.overflow || ''
     };
-

@@ -46,6 +46,7 @@ import com.kelpie.browser.device.DeviceInfo
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.ScriptPlaybackState
 import com.kelpie.browser.handlers.Snapshot3DBridge
+import com.kelpie.browser.handlers.enter3DInspector
 import com.kelpie.browser.network.PairApprovalCoordinator
 import com.kelpie.browser.network.Router
 import kotlinx.coroutines.launch
@@ -153,7 +154,7 @@ fun BrowserScreen(
             return
         }
 
-        runCatching { handlerContext.evaluateJS(Snapshot3DBridge.ENTER_SCRIPT) }
+        runCatching { handlerContext.enter3DInspector() }
         val active = runCatching { handlerContext.evaluateJS("!!window.__m3d") }.getOrNull()
         if (active?.contains("true") == true) {
             handlerContext.isIn3DInspector = true
