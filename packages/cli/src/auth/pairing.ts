@@ -1,4 +1,5 @@
 import { API_VERSION_PREFIX } from "@unlikeotherai/kelpie-shared";
+import { computerIdentity, type ComputerIdentity } from "./computer-identity.js";
 import { pairAccount } from "./account-pairing.js";
 import type {
   PairRequest,
@@ -55,6 +56,8 @@ export interface PairContext {
   accountPairingTicket?: (challenge: string, clientId: string) => Promise<string>;
   /** Called only when the device actually needs a manual approval. */
   onApprovalRequired?: () => void;
+  /** Test/integration seam; defaults to this computer user's shared signing key. */
+  computerIdentity?: () => Promise<ComputerIdentity>;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
@@ -120,8 +123,9 @@ export async function requestPair(ctx: PairContext): Promise<
   | { ok: true; pending: PairResponse }
   | { ok: false; code: string; message: string }
 > {
-  const body: PairRequest = { clientId: ctx.clientId, clientName: ctx.clientName };
-  const result = await fetchJson(
+  const identity = await (ctx.computerIdentity ?? computerIdentity)();
+  const body: PairRequest = { clientId: ctx.clientId, clientName: ctx.clientName, computerPublicKey: identity.publicKey };
+  let result = await fetchJson(
     buildUrl(ctx.host, ctx.port, `${API_VERSION_PREFIX}pair`),
     {
       method: "POST",
@@ -131,7 +135,16 @@ export async function requestPair(ctx: PairContext): Promise<
     ctx.perRequestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
   );
 
-  if (result.ok && isPairResponse(result.data)) {
+  if (result.ok && isPairResponse(result.data) && result.data.status === "computer_challenge") {
+    const challenge = result.data.requestId;
+    result = await fetchJson(
+      buildUrl(ctx.host, ctx.port, `${API_VERSION_PREFIX}pair`),
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, requestId: challenge, computerSignature: identity.signChallenge(challenge) }) },
+      ctx.perRequestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+    );
+  }
+  if (result.ok && isPairResponse(result.data) && result.data.status === "pending") {
     return { ok: true, pending: result.data };
   }
 
@@ -202,6 +215,9 @@ export async function pollPairStatus(
           requestId,
         };
       }
+      if (state === "error") {
+        return { status: "error", code: "STORAGE_ERROR", message: "Kelpie could not save the computer token. Retry when storage is available." };
+      }
       if (state === "denied" || state === "expired" || state === "not_found") {
         return { status: state, requestId };
       }
@@ -231,7 +247,7 @@ export async function pair(ctx: PairContext): Promise<PairResult> {
   if (!initial.ok) {
     return { status: "error", code: initial.code, message: initial.message };
   }
-  ctx.onApprovalRequired?.();
+  if (initial.pending.approvalRequired !== false) ctx.onApprovalRequired?.();
   return pollPairStatus(ctx, initial.pending.requestId);
 }
 

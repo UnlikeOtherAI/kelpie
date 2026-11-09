@@ -14,7 +14,6 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.origin
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveText
 import io.ktor.server.request.uri
@@ -203,7 +202,7 @@ class HTTPServer(
                                         AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required"),
                                     )
                                 is AuthDecision.Authenticated -> {
-                                    val result = pairEndpoints.handlePairDelete(decision.clientId)
+                                    val result = pairEndpoints.handlePairDelete(decision.clientId, decision.computerKey)
                                     respondPairing(call, result.status, result.json, noStore = true)
                                 }
                             }
@@ -257,6 +256,7 @@ class HTTPServer(
                         deviceInfo.name,
                         "android",
                         deviceInfo.version,
+                        parsed.sourceAddress,
                     )
                 respondPairing(call, result.status, result.json, noStore = false)
             }
@@ -348,7 +348,7 @@ class HTTPServer(
         }
         // Literal peer IP. `remoteHost` reverse-resolves, so the pair POST and
         // its status poll could see different strings and lose the token.
-        val sourceAddress = call.request.origin.remoteAddress
+        val sourceAddress = pairingStore.trustedComputers.canonicalAddress(call.request.local.remoteAddress) ?: "unknown"
         return ParsedRequest(
             method = call.request.httpMethod.value,
             path = decodedPath,

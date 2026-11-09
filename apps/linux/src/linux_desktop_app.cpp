@@ -44,7 +44,8 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   if(impl_->started) { ResizeBrowserHost(width,height); return true; }
   DesktopApp::Config runtime;
   runtime.platform=Platform::kLinux; runtime.app_name="kelpie"; runtime.app_version=KELPIE_LINUX_VERSION;
-  runtime.port=impl_->config.port; runtime.bind_host="127.0.0.1";
+  runtime.port=impl_->config.port; runtime.bind_host="::";
+  runtime.approval_available=!impl_->config.headless;
   runtime.control_token=impl_->profile.token(); runtime.device_id=impl_->device.Collect().id;
   runtime.start_stdio_mcp=impl_->config.mcp_stdio; runtime.device_info_provider=impl_.get();
   runtime.bookmark_action=[this](const std::string& action,const json& params) { return impl_->account.BookmarkAction(action,params); };
@@ -113,6 +114,7 @@ bool LinuxApp::FinishShutdown() {
   impl_->profile.Clear(); impl_->started=false; impl_->running=false; return true;
 }
 bool LinuxApp::IsRunning() const { return impl_->running && !impl_->closing; }
+PeerApprovalQueue& LinuxApp::ComputerApprovals() { return impl_->desktop.http_server().approvals(); }
 void LinuxApp::PumpBrowser() {
   impl_->desktop.Tick(); impl_->account.Poll();
   if(impl_->connection)impl_->connection->Update(false);

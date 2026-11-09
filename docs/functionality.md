@@ -67,25 +67,63 @@ same UOA account, without pairing or team setup. Their account menu shows connec
 status and Pause/Stop controls; see [desktop Nessie connection](desktop-nessie-connect.md).
 This connection uses a dedicated, scoped UOA ticket and does not expose local listeners.
 
-Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires an authorized bearer token.
+**Trust a computer once.** Localhost programs can control Kelpie without a prompt.
+For another computer, Kelpie asks **No** or **Allow computer** once. Allow computer
+permits every browser API and MCP operation until revoked in Settings. The dialog
+shows its self-reported name, current IP and public signing key. Settings lists
+trusted computers and lets you revoke a key immediately.
 
-**Same-account access.** A client already authorized to the same UOA account as the signed-in Apple or Android browser connects without the Allow dialog, including through the standalone LAN CLI/MCP interface. UOA compares the current account subjects using a short-lived proof bound to the device's random challenge and the client id. General UOA credentials go only to UOA over TLS. The resulting LAN token stays in memory, expires within two minutes, and requires a fresh UOA decision on every API/MCP request. Sign-out, account change, expiry and revocation invalidate access. Local revocation also suppresses new requests from that source for ten minutes. Windows/Linux's local readiness-token path already avoids pairing prompts and remains scoped to the local user. See the [account pairing contract](api/account-pairing.md), including the required UOA endpoints and client session provider.
+Permission belongs to the computer's Ed25519 signing key, never its IP, mDNS name,
+HTTP port, client UUID or browser profile. Moving between Wi-Fi networks, changing
+an address or port, restarting Kelpie, and launching another CLI/MCP process do
+not require another approval. Another computer that obtains the old IP does not
+inherit access. Local tools running as the same OS user share the key automatically.
 
-**Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, it first uses its existing account authorization when available. A caller without account authorization posts a manual pairing request. The device shows a modal with the requester's self-reported client name and offers three responses:
+The CLI creates `~/.kelpie/computer-key.pem` automatically, with a private directory
+and owner-only file permissions on POSIX systems; Windows uses the current user's
+protected profile directory. It never prints or sends the private key. Losing or
+replacing this file creates a new computer identity that needs approval again.
+Copying the private key to another machine also copies its authority.
 
-- **No** — the device denies the request. The CLI surfaces `PAIR_DENIED` and stores nothing.
-- **Yes, once** — the device issues a session-scope token. The CLI keeps it in process memory and drops it at exit. The user must re-approve on the next CLI invocation.
-- **Always** — the device issues a persistent-scope token. The CLI writes it to `~/.kelpie/tokens.json` (mode `0600`, directory `0700`) keyed by `deviceId:host:port`. Subsequent invocations and already-running MCP processes reuse it transparently. When a multi-homed device is discovered at a different interface address, the CLI first retries the approvals that device id already holds, each only at its own pinned socket, instead of prompting again. Direct-address and discovered-ID queries share the approval at the identical host and port; ambiguous tokens and different socket addresses require their own approval. Distinct discovered device IDs do not share tokens with each other.
+**Pairing protocol.** `POST /v1/pair` first obtains a random, expiring challenge.
+The CLI signs it together with its public key, then submits the proof. Kelpie
+verifies possession before showing a prompt. One decision resolves concurrent
+requests from that key. A trusted key completes automatically, including from a
+new IP. A different key still needs approval even when it uses the same IP or
+self-reported name. Challenges are single use and polling is bound to the source
+of that short handshake. A verified computer already displayed in the native
+gate stays answerable until the person decides, even if an OS dialog covers it
+or the original CLI times out. The issued bearer is stored by the CLI for reuse at its
+pinned browser socket; only its hash is stored by Kelpie. Revoking the key
+invalidates all its tokens immediately. Token pinning prevents forwarding a
+credential to a changed discovery endpoint; signing a fresh challenge recovers
+without another prompt. Ordinary commands, `browser-control` and CLI MCP use
+this same automatic flow; users do not need a separate pairing command for each
+tool or discovery endpoint. See [computer pairing](api/computer-pairing.md).
 
-The device returns the plaintext token exactly once; only a SHA-256 hash is persisted on the device. Status polling is keyed by a 32-byte CSPRNG `requestId` and bound to the source address that started the request, so a different host cannot collect the resulting token. Pinning the stored token to `deviceId:host:port` defends against mDNS TXT-record spoofing — if a device id reappears at a different socket address, the CLI refuses to send the stored token and forces re-pairing.
+Discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`)
+are public. Remote API/MCP requests require a bearer issued to an approved signing
+key or an existing authorized account/client grant. Browser Origin, cross-site
+requests, unsafe Host headers and ambiguous framing cannot use implicit localhost
+permission. IP-only approvals from an unreleased build never become key trust.
+Headless desktop apps reuse trusted keys; a new key needs the native approval UI.
 
-**Paired clients list.** Every platform's settings panel shows the list of currently paired clients (name, scope, last seen) and lets the user revoke any of them, which immediately invalidates that token on the device.
+**Same-account access.** Apple and Android retain their existing live UOA
+challenge protocol. Those grants expire, are revalidated, and never create
+permanent computer trust. Existing legacy client tokens remain individually
+revocable; new manual pairing requires an updated CLI that proves its computer
+key. See [account pairing](api/account-pairing.md).
 
-**MCP transport.** The CLI's `kelpie mcp --http` mode binds `127.0.0.1` by default. Binding to a non-loopback address requires the explicit `--unsafe-host` flag, which prints a warning before listening. Stdio transport is unchanged.
+**MCP transport.** `kelpie mcp --http` still binds `127.0.0.1` by default.
+A non-loopback listener requires `--unsafe-host`. Stdio transport is unchanged.
 
-**Cookie access.** A paired client can read and write the device's default cookie store, HttpOnly cookies included. While the person is signed in, cookie sync shares that store with their other signed-in devices, so a client paired with one device reaches the sessions of all of them. See [Cookie sync](#cookie-sync).
+**Cookie access.** An approved computer can read and write the device's default
+cookie store, HttpOnly cookies included. While the person is signed in, cookie
+sync shares that store with their other signed-in devices, so approval on one
+device reaches those sessions too. See [Cookie sync](#cookie-sync).
 
-API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`; MCP: `kelpie_pair`.
+API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`;
+MCP: `kelpie_pair`.
 
 ## Browser Control
 
@@ -95,9 +133,9 @@ Full navigation control: go to any URL, go back/forward, reload, get the current
 
 On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell matches the Windows title-strip tabs, outlined navigation controls, rounded address field, conditional favorites row and UOA account menu.
 
-On Linux, the desktop shell runs in either GUI or headless mode. Both Chromium modes expose the shared authenticated loopback HTTP/MCP surface, persist profile-backed bookmarks, history, full tab sessions and a home page URL. They do not advertise the loopback listener over mDNS. The no-CEF fallback build keeps its limited legacy runtime but follows the same control contract: it binds `127.0.0.1` only, requires the per-launch bearer token from the profile's `readiness.json` on every `/v1/*` call, sends no CORS grant and does not advertise over mDNS. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
+On Linux, the desktop shell runs in either GUI or headless mode. Both Chromium modes expose the shared HTTP/MCP surface with implicit localhost trust and persistent signing-key approval, persist profile-backed bookmarks, history, full tab sessions and a home page URL. They do not advertise the listener over mDNS. The no-CEF fallback build keeps its limited legacy runtime but follows the same control contract: it accepts localhost without a token and remote clients with a bearer from an approved computer key, sends no CORS grant and does not advertise over mDNS. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
 
-On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with Windows-style minimize/maximize/close controls, a native tab strip, URL bar, native settings dialog, resizable bookmarks/history windows and a DevTools-style network panel (all opening centred over the browser window), native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
+On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with Windows-style minimize/maximize/close controls, a native tab strip, URL bar, native settings dialog, resizable bookmarks/history windows and a DevTools-style network panel (all opening centred over the browser window), native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server supports local programs automatically and remote clients through signed computer pairing. The protected readiness file remains available for local integrations. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
 
 The Windows shell places curved tabs in the title bar, a new-tab plus at the top left, and window controls at the top right. The navigation row has unboxed controls and an IME-capable rounded address field. Home opens the saved home URL; the address-field star adds the current page to favorites. The favorites row disappears when empty and offers an overflow menu when crowded. Rendered page-edge colors animate into the chrome, with a one-pixel separator at 10% contrasting opacity. Native accessibility, high contrast, DPI scaling, tab shortcuts and inline history completion remain available. See [Windows shell notes](ui/README.md#windows-shell-notes) for sampling limits and viewport behavior.
 

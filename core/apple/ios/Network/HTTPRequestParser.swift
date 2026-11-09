@@ -37,7 +37,7 @@ enum HTTPRequestParser {
             query: query,
             headers: headers,
             body: body,
-            sourceAddress: sourceAddress,
+            sourceAddress: TrustedComputers.canonicalAddress(sourceAddress) ?? "unknown",
             hasTransferEncoding: hasTransferEncoding
         )
     }
@@ -82,10 +82,7 @@ enum HTTPRequestParser {
             switch host {
             case .ipv4(let addr): return "\(addr)"
             case .ipv6(let addr):
-                // Strip zone identifier and bracket the address.
-                let raw = "\(addr)"
-                let trimmed = raw.split(separator: "%").first.map(String.init) ?? raw
-                return "[\(trimmed)]"
+                return TrustedComputers.canonicalAddress("\(addr)") ?? "unknown"
             case .name(let name, _): return name
             @unknown default: return "unknown"
             }

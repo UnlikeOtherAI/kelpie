@@ -3,8 +3,7 @@ import SwiftUI
 /// Modal sheet shown when an unauthenticated client requests pairing.
 /// Hosted by `BrowserView` and bound to the shared `PairApprovalCoordinator`.
 ///
-/// Per the design (Codex finding #24): the default button is `No`. `Always`
-/// is visually distinct and never the default — return-key triggers cancel.
+/// Deny is the default; allowing a computer grants persistent signing-key permission.
 struct PairingDialog: View {
     @ObservedObject var coordinator: PairApprovalCoordinator
 
@@ -15,9 +14,9 @@ struct PairingDialog: View {
     }
 
     @ViewBuilder
-    private func content(for prompt: PairingStore.PendingRequest) -> some View {
+    private func content(for prompt: TrustedComputers.Request) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Allow this client to control this browser?")
+            Text("Allow this computer to control Kelpie?")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -38,11 +37,20 @@ struct PairingDialog: View {
                     .textSelection(.enabled)
             }
 
+            Text("Computer key: \(prompt.publicKey)")
+                .font(.system(.caption, design: .monospaced))
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+
             Text(
-                "This client will be able to navigate, type, screenshot, run JavaScript, and read cookies."
+                "Allow this computer to control Kelpie, even when its IP changes. This stays allowed until you revoke it in Settings."
             )
             .font(.callout)
             .foregroundColor(.secondary)
+
+            if let error = coordinator.approvalError {
+                Text(error).font(.callout).foregroundColor(.red)
+            }
 
             VStack(spacing: 8) {
                 // No is the default — first in stacking order, prominent
@@ -57,17 +65,9 @@ struct PairingDialog: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button {
-                    coordinator.approve(requestId: prompt.requestId, persist: false)
+                    coordinator.approve(requestId: prompt.requestId)
                 } label: {
-                    Text("Yes, once")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    coordinator.approve(requestId: prompt.requestId, persist: true)
-                } label: {
-                    Text("Always allow")
+                    Text("Allow computer")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -75,7 +75,7 @@ struct PairingDialog: View {
             }
         }
         .padding(24)
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
         .interactiveDismissDisabled()
     }
 }

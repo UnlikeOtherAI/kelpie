@@ -1,4 +1,5 @@
 #include "settings_view.h"
+#include "computer_approval.h"
 
 #include <commctrl.h>
 #include <uxtheme.h>
@@ -15,6 +16,7 @@ namespace kelpie::windows {
 namespace {
 
 constexpr int kLocalAiId = 3250;
+constexpr int kTrustedComputersId = 3251;
 // Static text, distinguished so WM_CTLCOLORSTATIC can give hints muted ink.
 constexpr int kLabelId = 3260;
 constexpr int kHintId = 3261;
@@ -24,7 +26,7 @@ constexpr DWORD kStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN;
 constexpr DWORD kExStyle = WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT;
 constexpr SIZE kClientDip{520, 392};
 constexpr int kFooterDip = 64;
-constexpr std::size_t kControlCount = 14;
+constexpr std::size_t kControlCount = 15;
 // The start page EDIT sits inside this painted, rounded field.
 constexpr RECT kUrlFieldDip{172, 54, -24, 86};
 
@@ -81,7 +83,8 @@ std::array<Control, kControlCount> Controls(const SettingsValues& values, const 
       {IDC_SETTINGS_PROFILE, L"EDIT", values.profile_dir.c_str(), kReadOnly, {183, 256, -24, 278}},
       {kHintId, L"STATIC", L"Set when Kelpie starts, with --port and --profile-dir.", SS_LEFT,
        {183, 284, -24, 304}},
-      {kLocalAiId, L"BUTTON", L"Local AI…", BS_OWNERDRAW | WS_TABSTOP, {24, -48, 140, -16}},
+      {kTrustedComputersId, L"BUTTON", L"Trusted computers", BS_OWNERDRAW | WS_TABSTOP, {140, -48, 280, -16}},
+      {kLocalAiId, L"BUTTON", L"Local AI…", BS_OWNERDRAW | WS_TABSTOP, {24, -48, 132, -16}},
       {IDCANCEL, L"BUTTON", L"Cancel", BS_OWNERDRAW | WS_TABSTOP, {-232, -48, -128, -16}},
       {IDOK, L"BUTTON", L"Save", BS_OWNERDRAW | WS_TABSTOP, {-120, -48, -24, -16}},
   }};
@@ -300,6 +303,9 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
     }
     case WM_COMMAND:
       switch (LOWORD(wparam)) {
+        case kTrustedComputersId:
+          ShowTrustedComputers(hwnd);
+          return 0;
         case kLocalAiId:
           if (state->show_ai) state->show_ai(hwnd);
           return 0;

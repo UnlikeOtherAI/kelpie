@@ -24,6 +24,7 @@ import java.util.UUID
  */
 class PairingStore(
     private val file: File,
+    val trustedComputers: ComputerTrust = TrustedComputers(File(file.parentFile, "trusted-computers.json")),
 ) {
     @Serializable
     data class PairingRecord(

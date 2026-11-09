@@ -21,6 +21,7 @@ sealed interface AuthDecision {
 
     data class Authenticated(
         val clientId: String,
+        val computerKey: String? = null,
     ) : AuthDecision
 
     data class Reject(
@@ -65,12 +66,15 @@ class AuthMiddleware(
             return AuthDecision.Unauthenticated
         }
 
-        val bearer =
-            extractBearer(req.headers)
-                ?: return AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required")
+        val trustedClient = store.trustedComputers.clientId(req.sourceAddress, extractBearer(req.headers) ?: "")
+        val computerRejection = if (trustedClient != null) trustedRequestReject(req) else null
+        val computerClient = trustedClient.takeIf { computerRejection == null }
         val clientId =
-            (store.validateBearer(bearer) ?: verifiedAccountClientId)
-                ?: return AuthDecision.Reject(401, "UNAUTHORIZED", "Invalid bearer token")
+            computerClient ?: run {
+                val bearer = extractBearer(req.headers) ?: return computerRejection ?: AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required")
+                store.validateBearer(bearer) ?: verifiedAccountClientId
+                    ?: return AuthDecision.Reject(401, "UNAUTHORIZED", "Invalid bearer token")
+            }
         if (req.path == "/mcp" || req.path == "/v1/mcp") {
             if (req.headers.containsKey("origin")) return AuthDecision.Reject(403, "FORBIDDEN", "Browser Origin is not permitted on MCP")
             val versions = req.headers["mcp-protocol-version"]
@@ -78,7 +82,7 @@ class AuthMiddleware(
                 return AuthDecision.Reject(400, "BAD_REQUEST", "Unsupported MCP protocol version")
             }
         }
-        return AuthDecision.Authenticated(clientId)
+        return AuthDecision.Authenticated(clientId, computerClient?.takeUnless { it == "localhost" })
     }
 
     private fun rejectAmbiguousHeaders(req: ParsedRequest): AuthDecision.Reject? {
@@ -95,8 +99,17 @@ class AuthMiddleware(
     }
 
     private fun csrfReject(req: ParsedRequest): AuthDecision.Reject? {
-        val contentType = req.headers["content-type"]?.firstOrNull()?.lowercase() ?: ""
-        if (!contentType.startsWith("application/json")) {
+        val site = req.headers["sec-fetch-site"]
+        if (site != null && site != listOf("none") && site != listOf("same-origin")) {
+            return AuthDecision.Reject(403, "FORBIDDEN", "Cross-site pairing is not permitted")
+        }
+        val contentType =
+            req.headers["content-type"]
+                ?.firstOrNull()
+                ?.substringBefore(';')
+                ?.trim()
+                ?.lowercase() ?: ""
+        if (contentType != "application/json") {
             return AuthDecision.Reject(415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json")
         }
         val origin = req.headers["origin"]?.firstOrNull()
@@ -104,6 +117,27 @@ class AuthMiddleware(
             // Any browser-supplied Origin (including `null` from sandboxed iframes)
             // is rejected. CLI fetch in Node does not set Origin.
             return AuthDecision.Reject(403, "FORBIDDEN", "Origin '$origin' not permitted on pair endpoint")
+        }
+        return null
+    }
+
+    private fun trustedRequestReject(req: ParsedRequest): AuthDecision.Reject? {
+        val site = req.headers["sec-fetch-site"]
+        if (req.headers.containsKey("origin") || (site != null && site != listOf("none") && site != listOf("same-origin"))) {
+            return AuthDecision.Reject(403, "FORBIDDEN", "Browser requests cannot use computer approval")
+        }
+        val hosts = req.headers["host"]
+        if (hosts == null || hosts.size != 1 || !store.trustedComputers.safeHost(hosts.single())) {
+            return AuthDecision.Reject(403, "FORBIDDEN", "A local Host header is required")
+        }
+        if (req.method == "POST" &&
+            req.headers["content-type"]
+                ?.firstOrNull()
+                ?.substringBefore(';')
+                ?.trim()
+                ?.lowercase() != "application/json"
+        ) {
+            return AuthDecision.Reject(415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json")
         }
         return null
     }

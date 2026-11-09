@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { nativeBrowserTransport } from "../../src/client/browser-control.js";
+import * as identities from "../../src/auth/computer-identity.js";
 import { TokenStore, setTokenStoreForTesting, resetSessionCacheForTesting } from "../../src/auth/token-store.js";
 import type { DiscoveredDevice } from "../../src/types.js";
 
@@ -12,6 +13,7 @@ const challenge = "c".repeat(43), token = "t".repeat(43);
 let directory: string;
 let store: TokenStore;
 let calls: { url: string; init: RequestInit }[];
+const computerIdentity = identities.computerIdentity;
 
 function mockResponses(values: { status: number; body: object }[]) {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
@@ -31,6 +33,7 @@ describe("account authorization through the compact MCP browser transport", () =
     setTokenStoreForTesting(store);
     resetSessionCacheForTesting();
     calls = [];
+    vi.spyOn(identities, "computerIdentity").mockImplementation(() => computerIdentity(directory));
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });
   afterEach(async () => {
@@ -61,13 +64,39 @@ describe("account authorization through the compact MCP browser transport", () =
     expect(process.stderr.write).not.toHaveBeenCalled();
   });
 
-  it("does not open a manual pairing request when no account is available", async () => {
+  it("silently reconnects the same computer key when the browser port changes without an account", async () => {
     vi.stubEnv("KELPIE_UOA_ACCESS_TOKEN", "");
-    mockResponses([unauthorized]);
+    const answer = { version: 1, ok: true, value: [] };
+    const exchange = (requestId: string) => [unauthorized,
+      { status: 202, body: { status: "computer_challenge", requestId } },
+      { status: 202, body: { status: "pending", requestId, approvalRequired: false } },
+      { status: 200, body: { status: "approved", scope: "persistent", token } },
+      { status: 200, body: answer }];
+    mockResponses([...exchange("first"), ...exchange("changed-port")]);
+    expect(await nativeBrowserTransport(device).call({ version: 1, method: "tabs.list", params: {} })).toEqual(answer);
+    expect(await nativeBrowserTransport({ ...device, port: 8520 }).call({ version: 1, method: "tabs.list", params: {} })).toEqual(answer);
+    expect(calls).toHaveLength(10);
+    const first = JSON.parse(calls[2].init.body as string);
+    const moved = JSON.parse(calls[7].init.body as string);
+    expect(first.computerPublicKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(moved.computerPublicKey).toBe(first.computerPublicKey);
+    expect(moved.computerSignature).toMatch(/^[a-f0-9]{128}$/);
+    expect(moved.computerSignature).not.toBe(first.computerSignature);
+    expect(new Headers(calls[5].init.headers).has("Authorization")).toBe(false);
+    expect(await store.get(device.id, device.ip, 8520)).toBe(token);
+    expect(process.stderr.write).not.toHaveBeenCalled();
+  });
+
+  it("uses the ordinary single computer approval when no account is available", async () => {
+    vi.stubEnv("KELPIE_UOA_ACCESS_TOKEN", "");
+    mockResponses([unauthorized,
+      { status: 202, body: { status: "computer_challenge", requestId: "first-computer" } },
+      { status: 202, body: { status: "pending", requestId: "first-computer", approvalRequired: true } },
+      { status: 200, body: { status: "denied" } }]);
     const answer = await nativeBrowserTransport(device).call({ version: 1, method: "tabs.list", params: {} });
     expect(answer).toMatchObject({ ok: false, error: { code: "ACCESS_DENIED", mayHaveCompleted: false } });
-    expect(calls).toHaveLength(1);
-    expect(process.stderr.write).not.toHaveBeenCalled();
+    expect(calls.filter(call => call.url.endsWith("/v1/pair"))).toHaveLength(2);
+    expect(process.stderr.write).toHaveBeenCalledWith(expect.stringContaining("Approve on device"));
   });
 
   it("refuses invalid account proof without downgrading to a manual prompt", async () => {

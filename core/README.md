@@ -13,6 +13,13 @@ rendering, profiles, automation, MCP and Nessie connectivity. Standalone apps in
 The Linux app keeps its own shell and consumes `core/native`; it has no dependency
 on the Apple, Android or Windows browser components.
 
+Computer permissions use one native Ed25519 challenge verifier, approval queue and
+locked key store on every platform. The [pairing contract](../docs/api/computer-pairing.md)
+separates the computer's key from its current address and from UOA account grants.
+Verification uses Orson Peters' [Ed25519 implementation](https://github.com/orlp/ed25519),
+pinned by revision and archive hash in `native/core-state/CMakeLists.txt`. Its zlib
+license remains in the fetched source distribution; those sources are unmodified.
+
 ## Host boundary
 
 A containing app shares its UOA session through an authenticated-request provider.

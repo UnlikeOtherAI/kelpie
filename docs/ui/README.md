@@ -155,3 +155,11 @@ Shutdown drains account and browser work before removing readiness and GTK views
 
 For VNC verification on a host running both Wayland and X11, launch with
 `GDK_BACKEND=x11 DISPLAY=:2` to select the VNC desktop explicitly.
+
+## Computer approval
+
+All platforms allow localhost programs automatically. A new proven computer key
+shows one **No / Allow computer** dialog with its self-reported name, current IP
+and public signing key. Allow saves that key across address/port changes and
+restarts. The Trusted computers settings list shows the key and last paired IP;
+Revoke removes its authority immediately. Failed storage keeps approval open.

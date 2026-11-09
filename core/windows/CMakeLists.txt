@@ -124,6 +124,7 @@ set(WINDOWS_APP_SOURCES
   src/account_avatar.cpp
   src/favicon_cache.cpp
   src/letter_avatar.cpp
+  src/computer_approval.cpp
   src/settings_view.cpp
   ${WINDOWS_INFERENCE_SOURCES}
   src/panel_window.cpp

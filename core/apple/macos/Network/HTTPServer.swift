@@ -319,8 +319,8 @@ final class HTTPServer: @unchecked Sendable {
             )
         case .unauthenticated:
             await routeUnauthenticated(parsed: parsed, connection: connection)
-        case let .authenticated(clientId):
-            await routeAuthenticated(parsed: parsed, clientId: clientId, connection: connection)
+        case let .authenticated(clientId, computerKey):
+            await routeAuthenticated(parsed: parsed, clientId: clientId, computerKey: computerKey, connection: connection)
         }
     }
 
@@ -345,7 +345,8 @@ final class HTTPServer: @unchecked Sendable {
             let result = pairEndpoints.handleGetDeviceInfo(
                 name: deviceInfo.name,
                 platform: deviceInfo.platform,
-                version: deviceInfo.version
+                version: deviceInfo.version,
+                sourceAddress: parsed.sourceAddress
             )
             await send(
                 connection: connection,
@@ -361,11 +362,11 @@ final class HTTPServer: @unchecked Sendable {
         }
     }
 
-    private func routeAuthenticated(parsed: ParsedHTTPRequest, clientId: String, connection: NWConnection) async {
+    private func routeAuthenticated(parsed: ParsedHTTPRequest, clientId: String, computerKey: String?, connection: NWConnection) async {
         let pairEndpoints = PairEndpoints(store: pairingStore, onPendingChanged: nil)
         switch (parsed.method, parsed.path) {
         case ("DELETE", "/v1/pair"):
-            let result = pairEndpoints.handlePairDelete(authenticatedClientId: clientId)
+            let result = pairEndpoints.handlePairDelete(authenticatedClientId: clientId, computerKey: computerKey)
             await send(
                 connection: connection,
                 response: PairingHTTPResponse.json(status: result.status, json: result.json, noStore: true)

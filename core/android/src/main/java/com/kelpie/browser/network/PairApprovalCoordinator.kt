@@ -12,23 +12,28 @@ import kotlinx.coroutines.flow.StateFlow
 class PairApprovalCoordinator(
     val store: PairingStore,
 ) {
-    private val _currentPrompt = MutableStateFlow<PairingStore.PendingRequest?>(null)
-    val currentPrompt: StateFlow<PairingStore.PendingRequest?> = _currentPrompt
+    private val _currentPrompt = MutableStateFlow<ComputerRequest?>(null)
+    val currentPrompt: StateFlow<ComputerRequest?> = _currentPrompt
+
+    private val _approvalError = MutableStateFlow<String?>(null)
+    val approvalError: StateFlow<String?> = _approvalError
 
     fun refresh() {
-        _currentPrompt.value = store.visiblePending().firstOrNull()
+        _currentPrompt.value = store.trustedComputers.pending()
     }
 
-    fun approve(
-        requestId: String,
-        persist: Boolean,
-    ) {
-        store.approve(requestId, persist)
+    fun approve(requestId: String) {
+        if (!store.trustedComputers.approve(requestId)) {
+            _approvalError.value = "Could not save approval. Check available storage and try again."
+            return
+        }
+        _approvalError.value = null
         refresh()
     }
 
     fun deny(requestId: String) {
-        store.deny(requestId)
+        store.trustedComputers.deny(requestId)
+        _approvalError.value = null
         refresh()
     }
 }

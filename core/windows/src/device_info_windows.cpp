@@ -97,7 +97,7 @@ nlohmann::json ToJson(const DeviceInfo& device_info) {
       {"platform", device_info.platform},
       {"engine", device_info.engine},
       {"ip", device_info.ip_address},
-      {"controlMode", "loopback"},
+      {"controlMode", "computer"},
       {"mcp", {{"http", true}, {"stdio", false}, {"endpoint", "/mcp"}}},
       {"os", device_info.os_version},
       {"version", device_info.app_version},

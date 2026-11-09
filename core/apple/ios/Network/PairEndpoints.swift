@@ -17,22 +17,10 @@ struct PairEndpoints {
         guard let clientId = parsed["clientId"] as? String, !clientId.isEmpty else {
             return (400, errorBody(code: "MISSING_PARAM", message: "clientId is required"))
         }
-        let clientName = (parsed["clientName"] as? String) ?? ""
 
-        switch store.startPairing(clientId: clientId, clientName: clientName, sourceAddress: sourceAddress) {
-        case .denied:
-            return (403, errorBody(code: "DENIED", message: "Pair requests from this source are currently suppressed"))
-        case .created(let req):
-            if let hook = onPendingChanged {
-                Task { @MainActor in hook() }
-            }
-            return (202, [
-                "status": "pending",
-                "requestId": req.requestId,
-                "expiresAt": Int(req.expiresAt),
-                "sourceAddress": req.sourceAddress
-            ])
-        }
+        let response = store.trustedComputers.start(body: parsed, source: sourceAddress)
+        if let hook = onPendingChanged { Task { @MainActor in hook() } }
+        return response
     }
 
     /// GET /v1/pair/status?requestId=…
@@ -62,23 +50,26 @@ struct PairEndpoints {
         if store.wasRecentlyDenied(sourceAddress: sourceAddress) {
             return (200, ["status": "denied"])
         }
-        return (200, ["status": "not_found"])
+        if let hook = onPendingChanged { Task { @MainActor in hook() } }
+        return (200, store.trustedComputers.status(requestId: requestId, source: sourceAddress))
     }
 
     /// DELETE /v1/pair (authenticated). Revokes the pairing identified by the
     /// validated bearer token. Any `clientId` query parameter is ignored.
-    func handlePairDelete(authenticatedClientId: String) -> (status: Int, json: [String: Any]) {
-        let removed = store.revoke(clientId: authenticatedClientId)
+    func handlePairDelete(authenticatedClientId: String, computerKey: String? = nil) -> (status: Int, json: [String: Any]) {
+        let removed = computerKey.map { store.trustedComputers.revoke(publicKey: $0) } ?? store.revoke(clientId: authenticatedClientId)
         return (200, ["success": removed])
     }
 
     /// GET or POST /v1/get-device-info (unauthenticated, public capability advert).
-    func handleGetDeviceInfo(name: String, platform: String, version: String) -> (status: Int, json: [String: Any]) {
+    func handleGetDeviceInfo(name: String, platform: String, version: String, sourceAddress: String? = nil) -> (status: Int, json: [String: Any]) {
         (200, [
             "name": name,
             "platform": platform,
             "version": version,
-            "requiresPairing": true
+            "requiresPairing": sourceAddress.flatMap { store.trustedComputers.clientId(for: $0) } == nil,
+            "approvalMode": "computer-key",
+            "localhostTrusted": true
         ])
     }
 
