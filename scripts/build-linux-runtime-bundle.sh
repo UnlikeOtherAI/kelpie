@@ -73,7 +73,11 @@ Run:
 Notes:
 - This bundle includes the Chromium Embedded Framework runtime.
 - It still depends on common system libraries such as GTK3, NSS, NSPR, Pango,
-  Fontconfig, Avahi, and ALSA.
+  Fontconfig and ALSA.
+- Avahi (avahi-daemon and libavahi-client) is optional and is not bundled:
+  Kelpie loads the system's libavahi-client at runtime to find other
+  signed-in Kelpie devices for cookie sync. Without it Kelpie runs and
+  reports sync as unavailable.
 - Native distro packages and package repositories are generated from this same
   runtime bundle during release automation.
 EOF

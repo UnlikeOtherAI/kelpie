@@ -1,0 +1,46 @@
+{
+  "description": "Kelpie cookie sync v1 handshake and channel vectors. Every platform crypto implementation must reproduce these values exactly. See docs/api/cookie-sync.md.",
+  "initiator": {
+    "privateKey": "dZwSwFKBNrQkdIsq5Je2mwXDk4Z28HqL3-aMM0_6KE4",
+    "key": "BH7rhnYHC0GOzLfMDSMIErwxbW9oLIe3Y9av1MZ7fEG8QFTbde8sZ8debK2l5LUwy1TsgPXxlmRkavjmahcmexg",
+    "replica": "DrlGeFx11w1azJdmwzXszw",
+    "nonce": "YBU8uF327rhRU3daq2Eq_EdTqWZeI4vUmhrt8YU4YOg"
+  },
+  "responder": {
+    "privateKey": "_6jARDOH7FpW7tpcqW41Zeet3RxTB7tH-UknnI2vHE0",
+    "key": "BONPgy4Eo3vhzKce4L6yTTrm11VZfYlUSxA-bxvX3dtqRib7xRYcgutfHbOo2n8IKblXqas_gk8JG69oPGOoceA",
+    "replica": "OjJiVoGP30gQg8yzYiW6bQ",
+    "nonce": "wfOx4aa35cGaj5fUivVTxO0uuidcX5DD__Mu1lmcmbo"
+  },
+  "challenge": "HVv05sgnfL0_AlQwpg8PeYpxssCdeMNRrUJYACVtCZs",
+  "sharedSecret": "sQPP8yObb6d7li2Yg65e-AjH4XqIs6ox3zA-Xmx1fEQ",
+  "i2r": "SDKGmU3N9xtY15aAgUT5SGys6-gNwZFwjPa4H9ptHow",
+  "r2i": "wZ7YSsxsmTaeeS6_gN54iOAcDZKccSdJJEGnkfyt_Ys",
+  "sessionId": "tuT2iQnsjiOTA-Wt6r5SETTLuVS5zGLjc9x2nOWNx_I",
+  "messages": [
+    {
+      "direction": "req",
+      "seq": 1,
+      "plaintext": "{\"op\":\"pull\",\"replica\":\"DrlGeFx11w1azJdmwzXszw\",\"since\":{\"replica\":\"OjJiVoGP30gQg8yzYiW6bQ\",\"seq\":0},\"wait\":25000}",
+      "nonce": "AAAAAAAAAAAAAAAB",
+      "aad": "a2VscGllLXN5bmMtdjEAdHVUMmlRbnNqaU9UQS1XdDZyNVNFVFRMdVZTNXpHTGpjOXgybk9XTnhfSQByZXEAMQ",
+      "box": "XekWTfCMzaFL3t8tgI1JskU-u3XXuMGRaKLinSRZ-K-8xjvW8XgEUjOkyhgWEaNsRhcB5KrPHxWZbXWlMNUZ8WeU_5NT5aNOK-J11-rsbI9knZNb5ahRXzi_Q9W8gCFSkngfIub-x6zcptv3fmqcJveKLAYAOOH_Yzl_nbSirVX0eA"
+    },
+    {
+      "direction": "res",
+      "seq": 1,
+      "plaintext": "{\"replica\":\"OjJiVoGP30gQg8yzYiW6bQ\",\"head\":0,\"seq\":0,\"more\":false,\"incomplete\":false,\"warming\":false,\"records\":[]}",
+      "nonce": "AAAAAAAAAAAAAAAB",
+      "aad": "a2VscGllLXN5bmMtdjEAdHVUMmlRbnNqaU9UQS1XdDZyNVNFVFRMdVZTNXpHTGpjOXgybk9XTnhfSQByZXMAMQ",
+      "box": "7fJNBCPgJxvZdPUkiWTC2LA45akGi_NJX9M9NIrzw8rtGXTmkMq1zIb-legcnytTTKVLdN2VVu7OZRzfSrQzgpjPHsU6VpnehUUoQPnS8WvhUA5T3iz_mxMCwFLJgljowW6qjOLu-L6jRj-NVeVb3nuNUQhLaVPoFVaz23-VTtYxIA"
+    },
+    {
+      "direction": "req",
+      "seq": 2,
+      "plaintext": "",
+      "nonce": "AAAAAAAAAAAAAAAC",
+      "aad": "a2VscGllLXN5bmMtdjEAdHVUMmlRbnNqaU9UQS1XdDZyNVNFVFRMdVZTNXpHTGpjOXgybk9XTnhfSQByZXEAMg",
+      "box": "kwHwRPWv3g-eEVC8YMkSLQ"
+    }
+  ]
+}

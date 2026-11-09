@@ -27,7 +27,8 @@ int main() {
       "get-network-log", "clear-network-log", "clear-console", "get-accessibility-tree",
       "get-visible-elements", "get-page-text", "get-form-state", "get-dialog", "handle-dialog",
       "get-tabs", "new-tab", "switch-tab", "close-tab", "get-cookies", "set-cookie",
-      "delete-cookies", "clear-cookies", "get-storage", "set-storage", "clear-storage",
+      "delete-cookies", "clear-cookies", "set-cookies", "copy-cookies", "get-cookie-sync-status",
+      "get-storage", "set-storage", "clear-storage",
       "resize-viewport", "reset-viewport", "set-fullscreen", "get-fullscreen",
   };
   std::string live_document = "document-1";
@@ -93,6 +94,9 @@ int main() {
   const auto names = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 3}, {"method", "tools/call"},
     {"params", {{"name", "kelpie_extensions"}}}}, config);
   assert(names["result"]["content"].dump().find("kelpie_bookmarks_list") != std::string::npos);
+  for (const char* cookie_tool : {"kelpie_set_cookies", "kelpie_copy_cookies", "kelpie_get_cookie_sync_status"}) {
+    assert(names["result"]["content"].dump().find(cookie_tool) != std::string::npos);
+  }
   const auto discovered = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 4}, {"method", "tools/call"},
     {"params", {{"name", "kelpie_extension_tools"}, {"arguments", {{"names", {"kelpie_fill", "kelpie_screenshot", "kelpie_resize_viewport", "kelpie_bookmarks_remove"}}}}}}}, config);
   const auto schemas = nlohmann::json::parse(discovered["result"]["content"][0]["text"].get<std::string>())["value"];

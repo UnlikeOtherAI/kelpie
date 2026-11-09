@@ -21,8 +21,8 @@ let kelpieApp = Target.target(
     ],
     settings: .settings(
         base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core", additional: [
-            "MARKETING_VERSION": "0.2.2",
-            "CURRENT_PROJECT_VERSION": "23",
+            "MARKETING_VERSION": "0.2.3",
+            "CURRENT_PROJECT_VERSION": "24",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D"
         ])

@@ -21,10 +21,8 @@ class BrowserManagementHandler(
     private val cookieHandlers = CookieHandlers(ctx)
 
     fun register(router: Router) {
-        // Cookies (use CookieManager so HttpOnly/Secure cookies are visible)
-        router.register("get-cookies") { cookieHandlers.getCookies(it) }
-        router.register("set-cookie") { cookieHandlers.setCookie(it) }
-        router.register("delete-cookies") { cookieHandlers.deleteCookies(it) }
+        // Cookies (CookieManager, so HttpOnly/Secure cookies are visible) and cookie sync status
+        cookieHandlers.register(router)
         // Storage
         router.register("get-storage") { getStorage(it) }
         router.register("set-storage") { setStorage(it) }

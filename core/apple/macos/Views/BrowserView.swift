@@ -192,9 +192,6 @@ struct BrowserView: View {
         .onChange(of: browserState.currentURL) { _, _ in
             isChromeCollapsed = false
             hoveredLinkURL = ""
-            Task { @MainActor in
-                await serverState.handlerContext.persistRendererCookiesToSharedJar()
-            }
         }
         .onChange(of: browserState.isLoading) { _, isLoading in
             guard isLoading else { return }

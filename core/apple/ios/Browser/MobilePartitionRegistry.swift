@@ -71,6 +71,17 @@ final class MobilePartitionRegistry {
         return store
     }
 
+    /// A partition that already has a website store; never creates one.
+    func existing(_ id: String) throws -> WKWebsiteDataStore {
+        if let failure = PartitionValidator.validate(id) {
+            throw Failure(code: "INVALID_PARTITION", message: failure.message)
+        }
+        guard map.identifier(for: id) != nil else {
+            throw Failure(code: "PARTITION_NOT_FOUND", message: "No partition named \(id)")
+        }
+        return try resolve(id, restoring: true)
+    }
+
     func listing(tabs: [BrowserTab]) async -> [[String: Any]] {
         let known: [[String: Any]] = map.identifiers.keys.sorted().map { id in
             ["id": id, "persistent": true, "tabCount": tabs.filter { $0.partition == id }.count]

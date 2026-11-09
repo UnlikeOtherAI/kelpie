@@ -22,6 +22,32 @@ class AccountService {
   std::string ConnectionOwner() const;
   // Blocking on the connection worker. Reuses the rotating refresh lifecycle.
   nlohmann::json ConnectionTicket();
+  // Cookie sync identity, read under one lock. `generation` changes on every
+  // sign-in, sign-out, expiry and account switch, so work captured under one
+  // value can tell that the account it started for is gone. Host (embedded)
+  // sessions report `hosted`: they never run cookie sync.
+  struct Identity {
+    bool signed_in = false;
+    bool hosted = false;
+    std::string subject;
+    std::uint64_t generation = 0;
+  };
+  Identity CurrentIdentity() const;
+  // The signed-in UOA subject, or empty. Never a token or copied profile field.
+  std::string Subject() const;
+  std::uint64_t Generation() const;
+  // UOA proofs that this device and a peer share one account, bound to a
+  // transcript `challenge` and a role-specific `client_id`. Blocking. With
+  // `generation`, the call is refused (status 409, session kept) unless the
+  // identity still has that generation before and after the request. A 401
+  // ends the native session as ConnectionTicket does; embedded sessions are
+  // refused with 403. The access token never leaves the account service.
+  std::string IssuePairTicket(const std::string& challenge, const std::string& client_id,
+      std::optional<std::uint64_t> generation = std::nullopt);
+  // True only for UOA's {active:true}. An invalid proof ({active:false} or a
+  // non-401 4xx refusal) is false; transient failures throw AccountFailure.
+  bool ValidatePairTicket(const std::string& ticket, const std::string& challenge,
+      const std::string& client_id, std::optional<std::uint64_t> generation = std::nullopt);
   std::string Bookmarks() const; // Memory only; safe on CEF's IO thread.
   nlohmann::json BookmarkAction(const std::string& action,const nlohmann::json& params, std::optional<std::uint64_t> expected={});
   // Launch restore: signs in from the stored session in the background. False when none is stored.
@@ -48,6 +74,9 @@ class AccountService {
   void Fail(std::uint64_t generation,const std::string& message,int status=0);
   void ExpireSession(std::uint64_t generation,const std::string& message);
   void CheckGeneration(std::uint64_t generation) const;
+  // Pairing proofs (account_service_pair.cpp).
+  std::uint64_t PairGeneration(std::optional<std::uint64_t> expected) const;
+  void CheckPairIdentity(std::optional<std::uint64_t> expected) const;
   AccountRequest RequestLocked() const;
   AccountRequest Request() const;
   // Session lifecycle (account_service_session.cpp).
@@ -75,6 +104,8 @@ class AccountService {
   std::mutex store_mutex_;  // Serializes storage with the generation check that guards it.
   AccountState state_;
   std::uint64_t generation_=0;
+  // Public identity generation: bumped by sign-in completion and by Reset/expiry.
+  std::uint64_t identity_generation_=0;
   std::string token_, refresh_token_, client_id_;
   std::string subject_;
   nlohmann::json bookmarks_=nlohmann::json::array();

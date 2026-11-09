@@ -795,7 +795,7 @@ kelpie iframe context --device "My iPhone"
 
 | Area | Commands |
 | --- | --- |
-| Cookies | `kelpie cookies list`, `kelpie cookies set <name> <value>`, `kelpie cookies delete` |
+| Cookies | `kelpie cookies list`, `kelpie cookies set <name> <value>`, `kelpie cookies import <file\|->`, `kelpie cookies copy`, `kelpie cookies sync-status`, `kelpie cookies delete` |
 | Web storage | `kelpie storage get`, `kelpie storage set <key> <value>`, `kelpie storage clear` |
 | Clipboard | `kelpie clipboard get`, `kelpie clipboard set <text>` |
 | Location | `kelpie geo set <lat> <lng>`, `kelpie geo clear` |

@@ -80,7 +80,8 @@ final class ServerState: ObservableObject {
         let activeRenderer = renderer(for: startEngine)
         handlerContext.renderer = activeRenderer
         handlerContext.activeEngineIsChromium = (startEngine == .chromium)
-        handlerContext.startSharedCookieSync()
+        handlerContext.defaultCookies.adoptInitialEngine(startEngine == .chromium ? .chromium : .webkit)
+        DefaultCookieStore.removeRetiredJar()
 
         registerHandlers(rendererState: rendererState)
         guard listen else { return }
@@ -227,7 +228,7 @@ final class ServerState: ObservableObject {
         }
     }
 
-    /// Switches active renderer with cookie migration.
+    /// Switches the active renderer, carrying the default cookie store across.
     func switchRenderer(to engine: RendererState.Engine) async {
         guard RendererState.Engine.allCases.contains(engine) else { return }
         guard let rendererState else { return }
@@ -243,13 +244,13 @@ final class ServerState: ObservableObject {
         // so its tasks don't interleave with CEF's main-thread RunLoop source.
         source.willDeactivate()
 
-        // Persist the source state into the shared jar, then migrate directly
-        // where safe so renderer switching preserves auth state.
-        await handlerContext.persistRendererCookiesToSharedJar()
-        await CookieMigrator.migrate(from: source, to: target)
+        // The incoming engine's store takes over the outgoing one's cookies, then
+        // becomes the live default store; sync rebases onto it without stamping.
+        await handlerContext.cookieSync?.rendererWillSwitch()
+        await handlerContext.defaultCookies.switchEngine(to: engine == .chromium ? .chromium : .webkit)
         handlerContext.renderer = target
         handlerContext.activeEngineIsChromium = (engine == .chromium)
-        await handlerContext.syncSharedCookiesIntoRenderer(force: true)
+        await handlerContext.cookieSync?.rendererDidSwitch()
 
         // Load the same URL in the target renderer
         if let url = source.currentURL, url.absoluteString != "about:blank" {
@@ -437,12 +438,5 @@ final class ServerState: ObservableObject {
         ports.insert(8421) // Reserved for AppReveal on debug builds.
         #endif
         return ports
-    }
-
-    private func awaitSharedCookieImportThenLoad(url: URL) {
-        Task { @MainActor [weak self] in
-            await self?.handlerContext.syncSharedCookiesIntoRenderer(force: true)
-            self?.handlerContext.load(url: url)
-        }
     }
 }

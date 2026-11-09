@@ -8,10 +8,6 @@ import AppKit
 /// Wraps CEFBridge (Obj-C++) and bridges callbacks to async/await.
 @MainActor
 final class CEFRenderer: RendererEngine {
-    final class CookieContinuationState: @unchecked Sendable {
-        var didResume = false
-    }
-
     final class CEFHostView: NSView {
         var onWindowReady: (() -> Void)?
         var onBoundsReady: (() -> Void)?
@@ -62,8 +58,6 @@ final class CEFRenderer: RendererEngine {
     private var pendingNavigation: URL?
     private var documentNavigationStart = Date()
     private var capturedDocumentResponseURL: String?
-    var pendingCookies: [HTTPCookie] = []
-    var pendingDeleteAllCookies = false
     private var surfaceRefreshTask: Task<Void, Never>?
     private(set) var currentURL: URL?
     private(set) var currentTitle: String = ""
@@ -148,18 +142,9 @@ final class CEFRenderer: RendererEngine {
         self.bridge = bridge
         bridge.resize(to: containerView.bounds.size)
 
-        let hasCookieWork = !pendingCookies.isEmpty || pendingDeleteAllCookies
         let urlToLoad = pendingURL
         pendingURL = nil
-
-        if hasCookieWork {
-            if let urlToLoad {
-                pendingNavigation = urlToLoad
-            }
-            Task { @MainActor [weak self] in
-                await self?.flushDeferredStateIfPossible()
-            }
-        } else if let urlToLoad {
+        if let urlToLoad {
             bridge.loadURL(urlToLoad.absoluteString)
         }
     }
@@ -222,6 +207,7 @@ final class CEFRenderer: RendererEngine {
             capturedDocumentResponseURL = nil
         } else if !isLoading, previousLoading {
             recordCompletedDocumentNavigation()
+            NotificationCenter.default.post(name: .kelpieChromiumDocumentLoaded, object: nil)
         }
         onStateChange?()
     }
@@ -349,40 +335,9 @@ final class CEFRenderer: RendererEngine {
     private func flushDeferredStateIfPossible() async {
         guard let bridge else { return }
         guard !containerView.isHidden else { return }
-
-        if pendingDeleteAllCookies {
-            pendingDeleteAllCookies = false
-            let deleted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                bridge.deleteAllCookiesViaCDP { success, _ in
-                    continuation.resume(returning: success)
-                }
-            }
-            if !deleted {
-                await expireCookiesViaJS(await allCookies())
-            }
-        }
-
-        let deferredNavigation = pendingNavigation
+        guard let deferredNavigation = pendingNavigation else { return }
         pendingNavigation = nil
-
-        guard !pendingCookies.isEmpty else {
-            if let deferredNavigation {
-                bridge.loadURL(deferredNavigation.absoluteString)
-            }
-            return
-        }
-
-        let cookiesToApply = pendingCookies
-        pendingCookies.removeAll()
-        await applyCookiesViaCDP(
-            cookiesToApply,
-            primeURLForJSFallback: deferredNavigation ?? currentURL,
-            reloadAfterJSErrorFallback: true
-        )
-
-        if let deferredNavigation {
-            bridge.loadURL(deferredNavigation.absoluteString)
-        }
+        bridge.loadURL(deferredNavigation.absoluteString)
     }
 
     private func recordCompletedDocumentNavigation() {

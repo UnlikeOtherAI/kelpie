@@ -149,6 +149,7 @@ class DesktopApp::Impl {
     runtime.browser_control = &engine;
     runtime.bookmark_store = &bookmark_store;
     runtime.bookmark_action = config.bookmark_action;
+    runtime.cookie_sync_status = config.cookie_sync_status;
     runtime.history_store = &history_store;
     runtime.console_store = &console_store;
     runtime.network_store = &network_store;

@@ -2,55 +2,38 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// Cookie operations implemented in CEFBridge+Cookies.mm.
+/// Cookie access to CEF's global cookie manager, implemented in CEFBridge+Cookies.mm.
 ///
-/// These methods are part of the bridge's public surface and were factored
-/// into a category so the primary `CEFBridge.mm` translation unit stays
-/// within the project's 500-line file limit.
+/// Every Kelpie browser is created on CEF's global request context and CEF has no
+/// partitions on macOS, so the global manager is the one Chromium cookie store. It needs
+/// no browser view or DevTools session and reports real HttpOnly, Secure, SameSite and
+/// expiry. Completions run on the main queue exactly once.
+///
+/// Cookie dictionaries use: `name`, `value`, `domain` (a leading dot marks a domain
+/// cookie; no dot is host-only), `path`, `secure`, `httpOnly`, `sameSite`
+/// (`Strict`, `Lax`, `None` or `Unspecified`; absent when CEF reports an unknown value)
+/// and `expires` (Unix seconds as a double; absent for a session cookie).
 @interface CEFBridge (Cookies)
 
-/// Get all cookies as an array of dictionaries.
-- (void)getAllCookiesWithCompletion:(void (^ _Nonnull)(NSArray<NSDictionary *> *cookies))completion;
+/// YES once CEF has initialized. Before that the global store cannot be reached.
++ (BOOL)isGlobalCookieStoreAvailable;
 
-/// Set a cookie.
-- (void)setCookieName:(NSString *)name
-                value:(NSString *)value
-                  url:(NSString *)url
-               domain:(NSString *)domain
-                 path:(NSString *)path
-             httpOnly:(BOOL)httpOnly
-               secure:(BOOL)secure
-              expires:(NSDate * _Nullable)expires
-           completion:(void (^ _Nonnull)(BOOL success))completion;
+/// Visits every cookie. `complete` is YES only when CEF finished the visit; a refused
+/// visit or a timeout reports NO with whatever was seen, never an invented empty store.
++ (void)visitGlobalCookiesWithCompletion:(void (^)(BOOL complete, NSArray<NSDictionary<NSString *, id> *> *cookies))completion;
 
-/// Set a cookie via Chrome DevTools Protocol.
-- (void)setCookieViaCDP:(NSString *)name
-                  value:(NSString *)value
-                 domain:(NSString *)domain
-                   path:(NSString *)path
-               httpOnly:(BOOL)httpOnly
-                 secure:(BOOL)secure
-               sameSite:(NSString * _Nullable)sameSite
-                expires:(NSDate * _Nullable)expires
-             completion:(void (^ _Nonnull)(BOOL success))completion;
+/// Sets one cookie through `SetCookie` with its exact attributes.
++ (void)setGlobalCookie:(NSDictionary<NSString *, id> *)cookie
+             completion:(void (^)(BOOL success))completion;
 
-/// Get cookies via Chrome DevTools Protocol.
-- (void)getAllCookiesViaCDPWithCompletion:(void (^ _Nonnull)(BOOL success, NSArray<NSDictionary *> *cookies))completion;
+/// Deletes every cookie whose domain (ignoring case), path and name equal one of `keys`
+/// (dictionaries with `domain`, `path` and `name`) in one visit. `complete` is YES only
+/// when CEF finished that visit.
++ (void)deleteGlobalCookiesMatching:(NSArray<NSDictionary<NSString *, NSString *> *> *)keys
+                         completion:(void (^)(BOOL complete, NSInteger deleted))completion;
 
-/// Delete a cookie via Chrome DevTools Protocol.
-- (void)deleteCookieViaCDP:(NSString *)name
-                    domain:(NSString *)domain
-                      path:(NSString *)path
-                completion:(void (^ _Nonnull)(BOOL success))completion;
-
-/// Delete all current-context cookies via Chrome DevTools Protocol.
-- (void)deleteAllCookiesViaCDPWithCompletion:(void (^ _Nonnull)(BOOL success, NSInteger deleted))completion;
-
-/// Delete all cookies.
-- (void)deleteAllCookiesWithCompletion:(void (^ _Nonnull)(NSInteger deleted))completion;
-
-/// Flush the cookie store to ensure all pending set/delete operations are committed.
-- (void)flushCookieStoreWithCompletion:(void (^ _Nonnull)(void))completion;
+/// Deletes every cookie in the store.
++ (void)deleteAllGlobalCookiesWithCompletion:(void (^)(BOOL success, NSInteger deleted))completion;
 
 @end
 

@@ -57,6 +57,8 @@ struct DesktopHandlerRuntime {
   std::function<BrowserControlResult(std::string)> show_native_toast;
   // Optional account-aware favorites; callbacks must be thread-safe.
   std::function<nlohmann::json(const std::string&, const nlohmann::json&)> bookmark_action;
+  // DesktopCookieSync::Status when the shell runs cookie sync; thread-safe.
+  JsonSupplier cookie_sync_status;
   Platform platform = Platform::kLinux;
   std::string engine_name = "chromium";
 };
