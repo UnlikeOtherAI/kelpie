@@ -24,9 +24,13 @@ final class AppUpdates: ObservableObject {
     private var installer: Process?
     #endif
 
-    init(defaults: UserDefaults = .standard, session: URLSession = .shared,
-         installed: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-         target: String? = nil, feedURL: URL? = nil) {
+    init(
+        defaults: UserDefaults = .standard,
+        session: URLSession = .shared,
+        installed: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+        target: String? = nil,
+        feedURL: URL? = nil
+    ) {
         guard let endpoint = feedURL ?? URL(string: "https://api.github.com/repos/UnlikeOtherAI/kelpie/releases?per_page=100") else {
             preconditionFailure("The built-in Kelpie release URL must be valid.")
         }
@@ -55,8 +59,7 @@ final class AppUpdates: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 let success = await self.check()
-                do { try await Task.sleep(nanoseconds: UInt64(success ? 21_600 : 900) * 1_000_000_000) }
-                catch { return }
+                do { try await Task.sleep(nanoseconds: UInt64(success ? 21_600 : 900) * 1_000_000_000) } catch { return }
             }
         }
     }
@@ -141,9 +144,9 @@ final class AppUpdates: ObservableObject {
         alert.buttons[2].keyEquivalent = "\r"
         alert.beginSheetModal(for: window) { [weak self] choice in
             guard let self else { return }
-            if choice == .alertFirstButtonReturn { self.update(item) }
-            else if choice == .alertSecondButtonReturn { self.skip(item) }
-            else { self.notNow() }
+            if choice == .alertFirstButtonReturn { self.update(item) } else if choice == .alertSecondButtonReturn {
+                self.skip(item)
+            } else { self.notNow() }
         }
     }
 
@@ -156,8 +159,7 @@ final class AppUpdates: ObservableObject {
         Task {
             do {
                 let operation = FileManager.default.temporaryDirectory.appendingPathComponent("kelpie-update-\(UUID().uuidString)")
-                try FileManager.default.createDirectory(at: operation, withIntermediateDirectories: true,
-                                                       attributes: [.posixPermissions: 0o700])
+                try FileManager.default.createDirectory(at: operation, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
                 let helper = operation.appendingPathComponent("install.sh")
                 try FileManager.default.copyItem(at: script, to: helper)
                 let process = Process()
@@ -195,6 +197,14 @@ struct AppUpdatePresentation: ViewModifier {
     @ObservedObject var updates: AppUpdates
     @Environment(\.scenePhase) private var phase
 
+    private var hasError: Binding<Bool> {
+        Binding(get: { updates.errorMessage != nil }, set: { if !$0 { updates.errorMessage = nil } })
+    }
+
+    private var hasOffer: Binding<Bool> {
+        Binding(get: { updates.offered != nil }, set: { if !$0 { updates.notNow() } })
+    }
+
     func body(content: Content) -> some View {
         content
             .task { updates.activate(phase == .active) }
@@ -204,16 +214,16 @@ struct AppUpdatePresentation: ViewModifier {
                 updates.activate(phase == .active)
             }
             #endif
-            .alert("Kelpie could not update", isPresented: Binding(
-                get: { updates.errorMessage != nil }, set: { if !$0 { updates.errorMessage = nil } }
-            )) { Button("OK") { updates.errorMessage = nil } } message: { Text(updates.errorMessage ?? "") }
+            .background {
+                Color.clear.alert("Kelpie could not update", isPresented: hasError) {
+                    Button("OK") { updates.errorMessage = nil }
+                } message: { Text(updates.errorMessage ?? "") }
+            }
             .overlay(alignment: .bottom) {
                 if updates.installing { Text("Downloading and verifying update… Kelpie will restart when ready.").padding().background(.regularMaterial).padding() }
             }
             #if os(iOS)
-            .alert("A new Kelpie version is available", isPresented: Binding(
-                get: { updates.offered != nil }, set: { if !$0 { updates.notNow() } }
-            ), presenting: updates.offered) { item in
+            .alert("A new Kelpie version is available", isPresented: hasOffer, presenting: updates.offered) { item in
                 Button("Update") { updates.update(item) }
                 Button("Skip version") { updates.skip(item) }
                 Button("Not now", role: .cancel) { updates.notNow() }

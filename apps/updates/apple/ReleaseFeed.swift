@@ -24,10 +24,10 @@ struct AppRelease: Decodable, Equatable {
             options: .regularExpression) != nil
     }
 
-    static func newest(in data: Data, target: String, installed: String) -> AppRelease? {
+    static func newest(in data: Data, target: String, installed: String) -> Self? {
         guard let current = version(installed),
               let entries = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
-        var newest: AppRelease?
+        var newest: Self?
         let marker = "<!-- kelpie-update: "
         for entry in entries {
             guard let draft = entry["draft"] as? Bool, !draft,
@@ -35,7 +35,7 @@ struct AppRelease: Decodable, Equatable {
                   let notes = entry["body"] as? String else { continue }
             for part in notes.components(separatedBy: marker).dropFirst() {
                 guard let end = part.range(of: " -->"),
-                      let item = try? JSONDecoder().decode(AppRelease.self, from: Data(part[..<end.lowerBound].utf8)),
+                      let item = try? JSONDecoder().decode(Self.self, from: Data(part[..<end.lowerBound].utf8)),
                       item.target == target, let candidate = version(item.version),
                       current.lexicographicallyPrecedes(candidate), allowedURL(item.url, target: target) else { continue }
                 if target != "ios" {
