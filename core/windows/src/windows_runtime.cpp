@@ -148,7 +148,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.2.2";
+  runtime.app_version = "0.2.3";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.site_previews_path = config_.profile_dir / "site-previews";
