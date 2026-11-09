@@ -17,11 +17,13 @@ final class DesktopAddressUITests: XCTestCase {
         let typedAfterNewTab = address.value as? String
         address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         app.typeKey("a", modifierFlags: .command)
-        app.typeText("example.org")
+        let html = "<title>Address editing test</title><input aria-label='Page focus'>"
+        let url = "data:text/html;base64," + Data(html.utf8).base64EncodedString()
+        app.typeText(url)
         app.typeKey(.return, modifierFlags: [])
-        let page = app.webViews.firstMatch
-        XCTAssertTrue(page.waitForExistence(timeout: 15))
-        page.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.1)).click()
+        let pageInput = app.webViews.textFields["Page focus"]
+        XCTAssertTrue(pageInput.waitForExistence(timeout: 15))
+        pageInput.click()
         address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         capture("macos-address-selected", app)
         app.typeText("replacement")
