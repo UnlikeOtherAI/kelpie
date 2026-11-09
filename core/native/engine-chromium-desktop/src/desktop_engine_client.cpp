@@ -208,10 +208,12 @@ void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
     const std::string next = url.ToString();
     // A new document has no icon until OnFaviconURLChange fires. Keeping the old
     // one would leave the previous site's favicon on the pill; the registry
-    // still holds it, keyed by that site's host.
-    if (FaviconRegistry::HostForUrl(next) != FaviconRegistry::HostForUrl(tab->url)) {
+    // still holds it, keyed by that site's host. The comparison is with the
+    // icon's own site: Navigate has already set `url` to the destination.
+    if (FaviconRegistry::HostForUrl(next) != tab->favicon_host) {
       tab->favicon_url.clear();
       tab->favicon_png_base64.reset();
+      tab->favicon_host.clear();
     }
     tab->url = next;
     if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);

@@ -206,17 +206,26 @@ final class TabStore: ObservableObject {
         persistSession()
     }
 
+    /// Everything a tab derives from its renderer's navigation state: title,
+    /// URL, loading, history and the start page screenshot. The renderer has a
+    /// single state callback, so whoever installs it (this store, or a window
+    /// adopting the tab) must route through here.
+    func rendererStateChanged(_ tab: Tab) {
+        let renderer = tab.renderer
+        let rawTitle = renderer.currentTitle
+        let nextURL = renderer.currentURL?.absoluteString ?? ""
+        tab.title = rawTitle.isEmpty ? "Start Page" : rawTitle
+        tab.currentURL = nextURL
+        tab.isLoading = renderer.isLoading
+        tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
+        tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
+        capturePreviewIfSettled(tab)
+    }
+
     private func bind(_ tab: Tab) {
-        tab.renderer.onStateChange = { [weak tab, weak renderer = tab.renderer] in
-            guard let tab, let renderer else { return }
-            let nextTitle = renderer.currentTitle.isEmpty ? "Start Page" : renderer.currentTitle
-            let nextURL = renderer.currentURL?.absoluteString ?? ""
-            let rawTitle = renderer.currentTitle
-            tab.title = nextTitle
-            tab.currentURL = nextURL
-            tab.isLoading = renderer.isLoading
-            tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
-            tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
+        tab.renderer.onStateChange = { [weak self, weak tab] in
+            guard let self, let tab else { return }
+            self.rendererStateChanged(tab)
         }
         tabSinks[tab.id] = tab.objectWillChange
             .sink { [weak self] _ in
@@ -225,7 +234,18 @@ final class TabStore: ObservableObject {
             }
     }
 
+    /// Start page screenshots come from the person's own session only, never
+    /// from an isolated renderer harness.
+    private func capturePreviewIfSettled(_ tab: Tab) {
+        guard sessionPersistence else { return }
+        SitePreviewCapturer.shared.tabChanged(tab) { [weak self, weak tab] in
+            guard let self, let tab else { return false }
+            return self.activeTabID == tab.id
+        }
+    }
+
     private func unbind(_ tab: Tab) {
+        SitePreviewCapturer.shared.tabClosed(tab.id)
         tab.chatSession.close()
         tab.renderer.onStateChange = nil
         tabSinks.removeValue(forKey: tab.id)

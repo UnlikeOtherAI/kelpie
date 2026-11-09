@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -53,28 +56,48 @@ const Resource* FindStaticResource(std::string_view url);
 // True when the URL addresses the dynamic bookmark/history payload.
 bool IsDataRequest(std::string_view url);
 
-// Resolves a host to a base64-encoded PNG favicon, or an empty string when none
-// is known. `FaviconRegistry::Lookup` is the production implementation.
-using FaviconLookup = std::function<std::string(const std::string& host)>;
+// Resolves a `kelpie://start/preview/<key>.jpg` URL to the host whose
+// screenshot it names, or nullopt for anything else. The key is the host's hex
+// encoding (`SitePreviewStore::KeyForHost`), so a request path can never name a
+// file outside the preview store.
+std::optional<std::string> PreviewHostForUrl(std::string_view url);
+
+// The relative URL the page uses for a host's screenshot. `version` changes on
+// every new capture, so the page never shows a stale image.
+std::string PreviewPath(const std::string& host, std::uint64_t version);
+
+// What the start page can show for one site, beyond its URL and title.
+struct SiteImages {
+  // Base64 PNG, or empty when no favicon is known.
+  std::string favicon_png_base64;
+  // Set when a screenshot is stored; see PreviewPath.
+  std::optional<std::uint64_t> preview_version;
+};
+
+// Resolves a host's images. The production implementation reads the session's
+// FaviconRegistry first and the persistent SitePreviewStore second.
+using SiteLookup = std::function<SiteImages(const std::string& host)>;
+
+// The number of sites the "Recent" grid shows, mirroring `StartPageView`.
+inline constexpr std::size_t kRecentSiteLimit = 8;
 
 // Builds the `data.json` body from the shared stores' own JSON.
 //
 // `bookmarks_json` is `BookmarkStore::ToJson()` and `history_json` is
 // `HistoryStore::ToJson()`; both are taken as strings so this stays free of a
-// dependency on the store objects and is trivially testable. History is newest
-// first and capped at `recent_limit`, mirroring
-// `Array(historyStore.entries.prefix(20))` on macOS.
+// dependency on the store objects and is trivially testable.
 //
-// Entries carry only `url`, `title`, and — when `favicon_lookup` resolves one —
-// a `favicon` `data:` URI. Nothing else from the stores reaches the page, so a
-// store field added later cannot leak into rendered content by accident.
+// `bookmarks` lists every favourite page. `recent` lists the most recently
+// visited sites, newest first: one entry per host (its latest visit), skipping
+// hosts that are already favourites, capped at `recent_limit`.
+//
+// Entries carry only `url`, `title`, and — when `site_lookup` resolves them — a
+// `favicon` `data:` URI and a `thumbnail` preview path. Nothing else from the
+// stores reaches the page, so a store field added later cannot leak into
+// rendered content by accident.
 std::string BuildDataJson(const std::string& bookmarks_json,
                           const std::string& history_json,
-                          std::size_t recent_limit = 20);
-
-std::string BuildDataJson(const std::string& bookmarks_json,
-                          const std::string& history_json,
-                          std::size_t recent_limit,
-                          const FaviconLookup& favicon_lookup);
+                          std::size_t recent_limit = kRecentSiteLimit,
+                          const SiteLookup& site_lookup = nullptr);
 
 }  // namespace kelpie::start_page

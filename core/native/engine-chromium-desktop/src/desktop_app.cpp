@@ -12,7 +12,7 @@
 #include "kelpie/desktop_router.h"
 #include "kelpie/desktop_core_browser.h"
 #include "kelpie/history_store.h"
-#include "kelpie/start_page.h"
+#include "desktop_start_page.h"
 #include "kelpie/handler_context.h"
 #include "kelpie/mcp_registry.h"
 #include "kelpie/network_traffic_store.h"
@@ -111,6 +111,10 @@ class DesktopApp::Impl {
   NetworkTrafficStore network_store;
 
   DesktopEngine engine;
+  // `kelpie://start`: payload, site screenshots and their capture worker.
+  DesktopStartPage start_page{engine, history_store, [this] {
+    return config.bookmarks_supplier ? config.bookmarks_supplier() : bookmark_store.ToJson();
+  }};
   DesktopRouter router;
   DesktopHttpServer http_server;
   DesktopMcpServer mcp_server;
@@ -323,21 +327,14 @@ bool DesktopApp::Start(const Config& config) {
     impl_->mcp_server.NotifyDocumentChanged();
     impl_->history_store.Record(url, title);
     impl_->history_store.UpdateLatestTitle(url, title);
+    impl_->start_page.NotifyNavigation();
   });
 
-  // `kelpie://start` renders the user's own bookmarks and history. The engine
-  // owns no stores, so the payload is built here from the same instances the
-  // HTTP and MCP handlers use. Called on the CEF IO thread; every store and the
-  // favicon registry is mutex-guarded.
+  // `kelpie://start` renders the user's own bookmarks, history and site
+  // screenshots. The engine owns no stores, so the payload is built from the
+  // same instances the HTTP and MCP handlers use.
   DesktopEngine::Config engine_config = config.engine;
-  engine_config.start_page_data_supplier = [this]() {
-    return start_page::BuildDataJson(
-        impl_->config.bookmarks_supplier ? impl_->config.bookmarks_supplier() : impl_->bookmark_store.ToJson(),
-        impl_->history_store.ToJson(), 20,
-        [this](const std::string& host) {
-          return impl_->engine.favicons().Peek(host).value_or(std::string());
-        });
-  };
+  impl_->start_page.Configure(config.site_previews_path, engine_config);
 
   if (!impl_->engine.Initialize(engine_config)) {
     impl_->last_error = impl_->engine.last_error();
@@ -386,6 +383,7 @@ bool DesktopApp::Start(const Config& config) {
     config.mdns->Start(impl_->http_server.bound_port(), impl_->BuildTxtRecord());
   }
 
+  impl_->start_page.StartCapture();
   impl_->running = true;
   return true;
 }
@@ -398,16 +396,21 @@ void DesktopApp::BeginShutdown() {
   // This closes listener admission but does not join HTTP workers. The native
   // owner loop keeps pumping CEF while already-admitted work retires.
   impl_->http_server.BeginDrain();
+  // An in-flight preview capture waits on the CEF UI thread, so it too retires
+  // while the owner loop keeps pumping.
+  impl_->start_page.BeginStop();
 }
 
 bool DesktopApp::IsShutdownReady() const {
-  return !impl_->running || impl_->http_server.IsDrained();
+  return !impl_->running ||
+         (impl_->http_server.IsDrained() && impl_->start_page.IsStopped());
 }
 
 bool DesktopApp::Stop() {
   if (!impl_->running) return true;
   BeginShutdown();
   if (!IsShutdownReady()) return false;
+  impl_->start_page.Stop();
   if (!impl_->engine.Shutdown()) return false;
   impl_->http_server.Stop();
   impl_->running = false;

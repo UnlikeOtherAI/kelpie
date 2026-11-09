@@ -66,14 +66,15 @@ extension BrowserView {
             serverState.setActiveWebKitRenderer(tab.renderer)
             sync(browserState: browserState, from: tab.renderer)
         }
-        tab.renderer.onStateChange = { [weak tab, weak browserState, weak serverState] in
-            guard let tab, let browserState, let serverState else { return }
+        // This replaces the store's callback, so it hands the tab's own state,
+        // history and screenshot work back to the store before syncing the
+        // window.
+        tab.renderer.onStateChange = { [weak tab, weak tabStore, weak browserState, weak serverState] in
+            guard let tab, let tabStore, let browserState, let serverState else { return }
             Task { @MainActor in
                 // Update tab's own stored state (always, for all tabs — tab bar needs these)
                 let wasLoading = tab.isLoading
-                tab.title = tab.renderer.currentTitle.isEmpty ? "Start Page" : tab.renderer.currentTitle
-                tab.currentURL = tab.renderer.currentURL?.absoluteString ?? ""
-                tab.isLoading = tab.renderer.isLoading
+                tabStore.rendererStateChanged(tab)
 
                 // Only sync shared browserState for the active tab
                 guard serverState.wkRenderer === tab.renderer else { return }

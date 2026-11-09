@@ -13,14 +13,10 @@
   "use strict";
 
   /*
-   * Badge colours mirror `BookmarkTileView.tileColor` and
-   * `HistoryRowView.letterColor` in `core/apple/macos/Views/StartPageView.swift`:
-   * six colours indexed by the sum of the host's Unicode scalars. The colours
-   * themselves live in `start.css` as `.badge-0` … `.badge-5`.
-   *
-   * This is deliberately the macOS start page's palette and hash, which differ
-   * from the tab strip's `LetterAvatarView` (an HSB palette indexed by a
-   * multiply-by-31 hash). Both are mirrored exactly as macOS has them.
+   * Tile tones mirror `SiteTone` in
+   * `core/apple/macos/Views/StartPageView.swift`: six tones indexed by the sum
+   * of the host's Unicode scalars. The colours themselves live in `start.css`
+   * as `.tone-0` … `.tone-5`.
    */
   var PALETTE_SIZE = 6;
 
@@ -33,14 +29,19 @@
     }
   }
 
-  function paletteClass(host) {
+  // The card caption: the host without a leading `www.`.
+  function displayDomain(host) {
+    return host.replace(/^www\./i, "");
+  }
+
+  function toneClass(host) {
     // Swift folds over `unicodeScalars`, so iterate code points rather than
     // UTF-16 units to keep non-ASCII hosts on the same colour as macOS.
     var sum = 0;
     Array.from(host).forEach(function (character) {
       sum += character.codePointAt(0);
     });
-    return "badge-" + (Math.abs(sum) % PALETTE_SIZE);
+    return "tone-" + (Math.abs(sum) % PALETTE_SIZE);
   }
 
   // The engine already drops anything that is not an http(s) URL. This repeats
@@ -50,92 +51,120 @@
     return /^https?:\/\//i.test(String(url));
   }
 
-  function domainLetter(host) {
-    var characters = Array.from(host);
+  // Images may only come from this origin's own preview route or an inline PNG
+  // favicon; anything else in the payload is ignored.
+  function isFavicon(value) {
+    return typeof value === "string" && value.indexOf("data:image/png;base64,") === 0;
+  }
+
+  function isPreview(value) {
+    return typeof value === "string" && /^preview\/[0-9a-f]{1,512}\.jpg(\?v=[0-9]{1,20})?$/.test(value);
+  }
+
+  function initialOf(host) {
+    var characters = Array.from(displayDomain(host));
     return characters.length > 0 ? characters[0].toUpperCase() : "?";
   }
 
-  function makeBadge(className, host, faviconDataUri) {
-    var badge = document.createElement("div");
-    badge.className = className + " " + paletteClass(host);
-    if (faviconDataUri) {
-      var image = document.createElement("img");
-      image.setAttribute("src", faviconDataUri);
-      image.setAttribute("alt", "");
-      badge.appendChild(image);
-    } else {
-      badge.textContent = domainLetter(host);
+  function makeImage(className, source) {
+    var image = document.createElement("img");
+    if (className) {
+      image.className = className;
     }
-    return badge;
+    image.setAttribute("src", source);
+    image.setAttribute("alt", "");
+    image.setAttribute("decoding", "async");
+    image.setAttribute("draggable", "false");
+    return image;
   }
 
-  function makeTile(bookmark) {
-    var host = hostOf(bookmark.url);
-    var tile = document.createElement("a");
-    tile.className = "tile";
-    tile.setAttribute("href", bookmark.url);
-    tile.setAttribute("rel", "noreferrer");
-    tile.appendChild(makeBadge("tile-badge", host, bookmark.favicon));
-
-    var label = document.createElement("span");
-    label.className = "tile-label";
-    label.textContent = bookmark.title ? bookmark.title : host;
-    tile.appendChild(label);
-    return tile;
+  // The favicon, or the site's initial when there is none.
+  function fillIcon(element, host, favicon) {
+    if (isFavicon(favicon)) {
+      element.appendChild(makeImage("", favicon));
+    } else {
+      element.classList.add("is-letter");
+      element.textContent = initialOf(host);
+    }
   }
 
-  function makeRow(entry) {
+  // The tile shown until Kelpie has a screenshot of the site.
+  function showPlaceholder(shot, host, favicon) {
+    while (shot.firstChild) {
+      shot.removeChild(shot.firstChild);
+    }
+    shot.classList.add("is-placeholder");
+    var glyph = document.createElement("span");
+    glyph.className = "site-glyph";
+    fillIcon(glyph, host, favicon);
+    shot.appendChild(glyph);
+  }
+
+  function makeShot(host, entry) {
+    var shot = document.createElement("span");
+    shot.className = "site-shot " + toneClass(host);
+    if (!isPreview(entry.thumbnail)) {
+      showPlaceholder(shot, host, entry.favicon);
+      return shot;
+    }
+    var thumbnail = makeImage("site-thumb", entry.thumbnail);
+    thumbnail.setAttribute("loading", "lazy");
+    // A preview that disappeared between the payload and the request falls
+    // back to the tile rather than a broken image.
+    thumbnail.addEventListener("error", function () {
+      showPlaceholder(shot, host, entry.favicon);
+    });
+    shot.appendChild(thumbnail);
+
+    var badge = document.createElement("span");
+    badge.className = "site-icon";
+    fillIcon(badge, host, entry.favicon);
+    shot.appendChild(badge);
+    return shot;
+  }
+
+  function makeCard(entry, order) {
     var host = hostOf(entry.url);
-    var row = document.createElement("a");
-    row.className = "row";
-    row.setAttribute("href", entry.url);
-    row.setAttribute("rel", "noreferrer");
-    row.appendChild(makeBadge("row-badge", host, entry.favicon));
+    var card = document.createElement("a");
+    card.className = "site";
+    card.setAttribute("href", entry.url);
+    card.setAttribute("rel", "noreferrer");
+    card.setAttribute("title", entry.title ? entry.title : entry.url);
+    card.setAttribute("draggable", "false");
+    // Staggers the entrance animation. CSSOM writes are not inline styles, so
+    // the page's Content-Security-Policy allows them.
+    card.style.setProperty("--order", String(Math.min(order, 24)));
+    card.appendChild(makeShot(host, entry));
 
-    var text = document.createElement("span");
-    text.className = "row-text";
+    var domain = document.createElement("span");
+    domain.className = "site-domain";
+    domain.textContent = displayDomain(host);
+    card.appendChild(domain);
+    return card;
+  }
 
-    var title = document.createElement("span");
-    title.className = "row-title";
-    title.textContent = entry.title ? entry.title : entry.url;
-    text.appendChild(title);
+  function webEntries(list) {
+    return (Array.isArray(list) ? list : []).filter(function (entry) {
+      return entry && isWebUrl(entry.url);
+    });
+  }
 
-    var url = document.createElement("span");
-    url.className = "row-url";
-    url.textContent = entry.url;
-    text.appendChild(url);
-
-    row.appendChild(text);
-    return row;
+  function fill(sectionId, gridId, entries, firstOrder) {
+    if (entries.length === 0) {
+      return;
+    }
+    var grid = document.getElementById(gridId);
+    entries.forEach(function (entry, index) {
+      grid.appendChild(makeCard(entry, firstOrder + index));
+    });
+    document.getElementById(sectionId).hidden = false;
   }
 
   function render(data) {
-    var bookmarks = Array.isArray(data.bookmarks) ? data.bookmarks : [];
-    var recent = Array.isArray(data.recent) ? data.recent : [];
-
-    bookmarks = bookmarks.filter(function (bookmark) {
-      return bookmark && isWebUrl(bookmark.url);
-    });
-    recent = recent.filter(function (entry) {
-      return entry && isWebUrl(entry.url);
-    });
-
-    if (bookmarks.length > 0) {
-      var grid = document.getElementById("favourites-grid");
-      bookmarks.forEach(function (bookmark) {
-        grid.appendChild(makeTile(bookmark));
-      });
-      document.getElementById("favourites-section").hidden = false;
-    }
-
-    if (recent.length > 0) {
-      var list = document.getElementById("recent-list");
-      recent.forEach(function (entry) {
-        list.appendChild(makeRow(entry));
-      });
-      document.getElementById("recent-section").hidden = false;
-    }
-
+    var bookmarks = webEntries(data.bookmarks);
+    var recent = webEntries(data.recent);
+    fill("favourites-section", "favourites-grid", bookmarks, 0);
+    fill("recent-section", "recent-grid", recent, bookmarks.length);
     document.getElementById("empty-state").hidden = bookmarks.length > 0 || recent.length > 0;
   }
 

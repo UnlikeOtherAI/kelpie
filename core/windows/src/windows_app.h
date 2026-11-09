@@ -87,6 +87,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void OnHomeRequested() override;
   void OnAccountRequested() override;
   void OnAddFavoriteRequested() override;
+  void OnRemoveFavoriteRequested(const std::string& id) override;
   void OnOpenSettingsRequested() override;
   std::string GetBookmarksJson() const override;
   std::string GetHistoryJson() const override;

@@ -209,19 +209,39 @@ API: `history-list` (with limit), `history-clear`.
 
 ## Start Page (macOS, Windows, Linux)
 
-New tabs open Kelpie's own start page instead of a blank document. It shows the
-app icon, a "Favourites" grid of bookmark tiles, a "Recent" list of the last 20
-history entries, and the "Open a website to get started" empty state when both
-are empty. It follows the system light and dark appearance. Clicking a tile or a
-row navigates that tab.
+New tabs open Kelpie's own start page instead of a blank document. Under a small
+app icon it shows two grids of site cards: "Favourites", with every saved page,
+and "Recent", with the eight most recently visited sites that are not already
+favourites (one card per site, linking to its latest visit). Each card is a
+16:10 screenshot of the site with its favicon in the bottom-left corner and the
+domain, without `www.`, underneath; the page title appears on hover. A site
+Kelpie has not captured yet shows a two-tone tile in one of six colours chosen
+from its host, with its favicon or initial. Cards lift on hover and rise in on
+load unless reduced motion is on. Soft mint and blue glows from the app icon sit
+behind the content. The page follows the system light and dark appearance, and
+shows "Open a website to get started" when there is nothing to list. Clicking a
+card navigates that tab.
 
-On macOS the page is the SwiftUI `StartPageView`. On Windows and Linux it is the same
-layout served to the tab as first-party content from Kelpie's own `kelpie://`
-scheme, which the browser registers as standard, secure, CORS- and
-fetch-enabled. The page reads its bookmarks and history from `data.json` on that
-same origin — it is not a script injected into a third-party page, and no bridge
-script is involved. Favicons already downloaded this session appear on the tiles
-and rows; a site without one shows a coloured letter tile.
+Screenshots are taken automatically. About 1.5 seconds after a page in the
+active tab finishes loading and stops changing, Kelpie captures the visible
+viewport, keeps its top-left corner at the card's 16:10 shape, scales it to 640 by 400
+pixels and stores it as a JPEG, keyed by host, with the site's favicon. A site is
+recaptured at most every two minutes while browsing around it. Start pages,
+error pages, pages still loading, non-web URLs and in-memory (non-persistent)
+partitions are never captured, and a capture showing a single flat colour is
+discarded. The store keeps the 96 most recently captured sites in the profile
+(`site-previews` on Windows and Linux, `SitePreviews` in the macOS caches
+directory). Clearing history deletes every screenshot except the favourites'.
+
+On macOS the page is the SwiftUI `StartPageView`, and screenshots come from the
+tab's WebKit snapshot. On Windows and Linux it is the same layout served to the
+tab as first-party content from Kelpie's own `kelpie://` scheme, which the
+browser registers as standard, secure, CORS- and fetch-enabled. The page reads
+its bookmarks and history from `data.json` on that same origin and each
+screenshot from `kelpie://start/preview/<hex host>.jpg`. It is not a script
+injected into a third-party page, and no bridge script is involved. Screenshots
+are captured through a fixed internal DevTools observation that is fenced to one
+document, on a background worker, so the page and agent control are not held up.
 
 A tab on the start page reports its URL as `kelpie://start` from `get-tabs`, and
 its tab pill shows a star instead of a favicon. `new-tab` without a `url` opens
@@ -237,8 +257,12 @@ Each tab shows the page's favicon in its pill. macOS fetches it per host and
 caches it on disk; Windows takes it from Chromium itself — the browser reports
 the page's icon URLs and downloads them without sending cookies, keeping the 32
 px representation where the site offers one and the 16 px one otherwise. Icons
-are cached by host, so every tab on a site and every start page row for it share
-one image.
+are cached by host, so every tab on a site and every start page card for it share
+one image. An icon belongs to the site whose page requested it: a download that
+finishes after the tab has moved to another site never labels the new site, and
+a site that declares no icon shows no icon rather than the previous site's. On
+Windows and Linux the session's icons are in memory; the copy stored with each
+start page screenshot lets cards show icons after a restart.
 
 A tab whose site has no favicon yet shows a letter avatar: the first letter of
 the host, white on one of six colours chosen deterministically from the host
@@ -634,7 +658,9 @@ The shared browser gateway preserves rich native extension argument schemas thro
 
 ### Favourites folders and live updates
 
-On macOS, the favourites bar shows the ordered top-level pages and folders, including empty folders. Click or hover over a folder to open its menu; nested folders open cascading submenus. Drag items along the bar to reorder them, onto a folder to move them inside, or more than 32 points outside the bar to remove them with a brief puff. Escape cancels the drag. Removal supports Undo; Reduce Motion disables the expanding puff.
+On macOS, the favourites bar shows the ordered top-level pages and folders, including empty folders. Click or hover over a folder to open its menu; nested folders open cascading submenus. Dragging an item lifts a copy of it onto a floating chip with a shadow that follows the pointer, while its slot in the bar stays faintly visible. Drop it along the bar to reorder, onto a folder to move it inside, or more than 32 points outside the bar to remove it: once the pointer is that far out, the chip dims and shows a red remove badge, and the drop bursts it into a cloud puff. Escape, or a drop in the margin around the bar, glides the chip back to its slot. Removal supports Undo; Reduce Motion replaces the glide and the expanding puff with a brief fade.
+
+On Windows, dragging a favourite off the favourites bar works the same way: the item lifts out of the bar and follows the pointer, leaving an outlined empty slot, shows the red remove badge more than 32 DIPs from the bar, and dropping it there removes the favourite with the same cloud puff. A drop anywhere else, Escape, or losing the pointer to another window glides it back. The favourite disappears from the bar immediately while a signed-in account saves the change. Windows has no favourites reordering or Undo; the "Show animations" setting turns the glide and the puff off. Linux has no favourites drag.
 
 Edit Favourites opens a tree with expandable folders, drag-and-drop reordering and nesting, name/URL editing, folder creation, removal and Undo Remove. A folder cannot be moved into itself or one of its descendants. Removing a folder removes its contents; a concurrent change to that subtree rejects the removal so the user can review it again.
 

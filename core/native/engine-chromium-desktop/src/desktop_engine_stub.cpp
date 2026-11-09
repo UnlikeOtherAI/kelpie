@@ -221,4 +221,8 @@ BrowserControlResult DesktopEngine::ReadAppearance(TabLease, Json*, Timeout) {
   return UnsupportedControl();
 }
 
+BrowserControlResult DesktopEngine::CaptureSitePreview(TabLease, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
 }  // namespace kelpie

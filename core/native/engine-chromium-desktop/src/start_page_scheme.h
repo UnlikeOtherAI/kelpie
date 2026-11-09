@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "include/cef_scheme.h"
@@ -14,6 +15,9 @@ namespace kelpie {
 // Produces the `data.json` body. Called on the CEF IO thread, so the
 // implementation must be thread-safe; the shared stores already are.
 using StartPageDataSupplier = std::function<std::string()>;
+// Returns a host's stored screenshot as raw JPEG bytes, or nullopt. Also called
+// on the CEF IO thread.
+using StartPagePreviewSupplier = std::function<std::optional<std::string>(const std::string& host)>;
 
 // Declares `kelpie://` to Chromium. Must run from
 // `CefApp::OnRegisterCustomSchemes` in every process, otherwise the renderer
@@ -22,6 +26,7 @@ void RegisterKelpieCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar);
 
 // Installs the handler factory for `kelpie://start`. Must run after
 // `CefInitialize`. Returns false when CEF rejects the registration.
-bool RegisterStartPageSchemeHandler(StartPageDataSupplier supplier);
+bool RegisterStartPageSchemeHandler(StartPageDataSupplier data_supplier,
+                                    StartPagePreviewSupplier preview_supplier);
 
 }  // namespace kelpie

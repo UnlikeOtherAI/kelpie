@@ -73,11 +73,16 @@ list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_input_planner.cpp
   src/desktop_cookie_planner.cpp)
 
-# The favicon registry and the start page payload builder are pure data handling
-# with no CEF dependency, so both configurations compile and test them.
+# The favicon registry, the start page payload builder and the site preview
+# store, scaler and capture worker are pure data handling with no CEF
+# dependency, so both configurations compile and test them.
 list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/favicon_registry.cpp
   src/start_page.cpp
+  src/desktop_start_page.cpp
+  src/site_preview_capture.cpp
+  src/site_preview_image.cpp
+  src/site_preview_store.cpp
   "${KELPIE_START_PAGE_RESOURCES_CPP}")
 
 option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
@@ -126,9 +131,11 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_partition_registry.cpp
     src/desktop_devtools.cpp
     src/desktop_engine_favicon.cpp
+    src/site_preview_codec_cef.cpp
     src/start_page_scheme.cpp)
 else()
-  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp src/account_login_window_stub.cpp)
+  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp src/account_login_window_stub.cpp
+    src/site_preview_codec_stub.cpp)
 endif()
 
 add_library(kelpie_engine_chromium_desktop STATIC
