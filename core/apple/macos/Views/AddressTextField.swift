@@ -59,9 +59,10 @@ struct AddressField: NSViewRepresentable {
 
     func updateNSView(_ field: AddressTextField, context: Context) {
         context.coordinator.parent = self
-        // AppKit owns the live editor and its selection. A SwiftUI focus update
-        // must not rewrite that editor while the person is entering text.
-        if (!field.isEditingAddress || focusRequested) && field.stringValue != text { field.stringValue = text }
+        // Native edit notifications already update the binding. Equal values
+        // leave caret/IME state alone; a different value is a model replacement,
+        // such as selecting another tab, and must reach the focused editor too.
+        if field.stringValue != text { field.stringValue = text }
         field.textColor = color
         if focusRequested && !context.coordinator.focusPending {
             context.coordinator.focusPending = true

@@ -44,6 +44,15 @@ final class DesktopAddressUITests: XCTestCase {
         app.typeText("z")
         XCTAssertEqual((address.value as? String)?.replacingOccurrences(of: "z", with: ""), "replacemenxt")
         XCTAssertEqual(typedAfterNewTab, "address-focus-check")
+        app.typeKey("t", modifierFlags: .command)
+        app.typeText("unsubmitted-draft")
+        let populatedTab = app.staticTexts["Address editing test"].firstMatch
+        XCTAssertTrue(populatedTab.waitForExistence(timeout: 5))
+        populatedTab.click()
+        capture("macos-tab-switch", app)
+        XCTAssertEqual(address.value as? String, url, "Switching tabs must replace the focused draft")
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(pageInput.waitForExistence(timeout: 5))
     }
 
     @MainActor
