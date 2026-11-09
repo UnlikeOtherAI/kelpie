@@ -83,6 +83,8 @@ The device returns the plaintext token exactly once; only a SHA-256 hash is pers
 
 **MCP transport.** The CLI's `kelpie mcp --http` mode binds `127.0.0.1` by default. Binding to a non-loopback address requires the explicit `--unsafe-host` flag, which prints a warning before listening. Stdio transport is unchanged.
 
+**Cookie access.** A paired client can read and write the device's default cookie store, HttpOnly cookies included. While the person is signed in, cookie sync shares that store with their other signed-in devices, so a client paired with one device reaches the sessions of all of them. See [Cookie sync](#cookie-sync).
+
 API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`; MCP: `kelpie_pair`.
 
 ## Browser Control
@@ -415,6 +417,29 @@ Full read/write access to cookies (with domain, path, expiry, httpOnly, secure, 
 
 Cookies are read from and written to the platform's native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), not through JavaScript. This means **httpOnly cookies are fully settable and readable** — the common case for session auth — which `eval` / `document.cookie` can never do. To start automation from an authenticated session, set the session cookie with `set-cookie` (CLI `cookies set --http-only`, MCP `kelpie_set_cookie`) before navigating; no external proxy is required. See the CLI reference's "Authentication / session state" section.
 
+Each cookie call works on one store: the default store, a tab's store, or a partition's store. `get-cookies` with `all:true` exports every cookie in a store, not just the current page's, and `domain` narrows it to one site. `set-cookies` writes up to 500 cookies at once, and `copy-cookies` copies cookies between stores on one device without the values leaving it — for example from the default store into an isolated tab. CLI: `kelpie cookies list --all`, `kelpie cookies import`, `kelpie cookies copy`. See [cookies.md](api/cookies.md).
+
+## Cookie sync
+
+Kelpie devices signed in to the same UOA account share their website cookies. Sign in to a site on one device and the others are signed in within seconds while they are running. Sign out of the site on one and the others are signed out too.
+
+- **Same network, no server.** Devices find each other with mDNS on the local network and talk directly over an encrypted channel. No server stores or sees a cookie; UOA only confirms that both devices belong to the same account. A device that was away catches up the next time it is on the same network as another signed-in Kelpie.
+- **Automatic.** Sync starts when you sign in and stops when you sign out or switch accounts. There is no setting.
+- **Default store only.** Isolated (partitioned) tabs never sync, never receive synced cookies and never send theirs. An agent can copy cookies into one when asked.
+- **Standalone apps only.** A Kelpie browser embedded in another app does not sync.
+- **iOS** syncs only while Kelpie is in the foreground. It sends pending changes as it goes to the background and reconnects when it comes back.
+- **Android** syncs in the background while its foreground service runs. Its WebView cannot list every cookie, so it checks the sites it knows about: history, recent pages and cookies it already synced. A WebView too old to report cookie attributes cannot sync.
+- **Windows and Linux** open a separate sync listener on the local network; automation stays on loopback. Windows may ask to let it through the firewall. If inbound connections are blocked, the device still syncs by connecting to its peers. Linux needs Avahi for discovery.
+- **Restarts.** A browser loses its session cookies when it restarts. A restart does not log the other devices out, and they send the session cookies back.
+- **Shared computer.** When a different account signs in, the cookies already on that device stay local and never reach the new account's devices.
+- **Clearing is local.** Signing out of one site reaches every device. Removing more than 20 cookies that are also more than a quarter of the store at once — clearing all cookies, or the system purging them — is treated as a purge and clears that device only.
+- **Some sites refuse copies.** A site that ties its session to one device, address or user agent may reject a synced cookie. Kelpie delivers it; the site decides whether to accept it.
+- **Limits.** Up to 150 cookies per site and 3 000 in total sync. Devices whose clocks differ by more than 2 minutes do not sync; status shows `clock-skew`.
+
+**Who can read synced cookies.** Every signed-in device holds the shared set, so **any client paired with any one device can read and plant cookies for all of them**. Pair a client only if you would trust it with the sessions on all your devices.
+
+API: `get-cookies` with `all:true`, `set-cookies`, `copy-cookies` and `get-cookie-sync-status` ([cookies.md](api/cookies.md)); device-to-device protocol in [cookie-sync.md](api/cookie-sync.md). CLI: `kelpie cookies sync-status`. MCP: `kelpie_get_cookie_sync_status`, `kelpie_copy_cookies`.
+
 ## Clipboard
 
 Read and write the device clipboard. On iOS, a system permission banner appears briefly.
@@ -616,7 +641,8 @@ are unsupported on mobile; they never silently become shared or disk-backed tabs
 between the engine and the login screen around the sign-in. Signing out of UOA does
 not sign the tabs out of Google; use the provider's own sign-out or clear cookies.
 These cookies sit in the same store that paired automation can read with the cookie
-API, as if the user had signed in to Google in a tab.
+API, as if the user had signed in to Google in a tab. [Cookie sync](#cookie-sync)
+also shares them with the person's other signed-in Kelpie devices on the same network.
 
 ### Registered app sign-in
 

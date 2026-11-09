@@ -12,6 +12,7 @@ To drive an app that sits behind a login, put the browser into an authenticated 
 - **Do not use `eval` / `document.cookie` to set a session cookie.** JavaScript cannot create an httpOnly cookie, and reading `document.cookie` returns an empty string for httpOnly cookies — so it looks like the cookie is missing even when it is set. Use `kelpie cookies list` (which reads the native store, including httpOnly cookies) to verify instead.
 - **Non-httpOnly token schemes** that live in web storage can be primed with `kelpie storage set <key> <value>`.
 - **Interactive login** is also available: sign in once in a browser tab, and the resulting session cookies persist in the same store.
+- **Synced sessions.** While the person is signed in to Kelpie, the default store also holds the cookies from their other Kelpie devices on the same network ([cookie sync](../functionality.md#cookie-sync)). To use those sessions in an isolated tab, copy them in with `kelpie cookies copy --to-tab <id>`.
 
 ```bash
 # inject an httpOnly session cookie, then navigate authenticated
@@ -22,9 +23,18 @@ kelpie navigate "https://app.example.com/dashboard" --device admin
 ### `kelpie cookies list`
 Get cookies for the current page. Reads the native cookie store, so httpOnly cookies are included (unlike `document.cookie`).
 
+- `--all` lists every cookie in the store instead of the current page's. Without `--tab-id` or `--partition` that is the default store, which includes the cookies synced from the person's other devices.
+- `--domain <domain>` keeps cookies for that domain and its subdomains.
+- `--partition <id>` reads that partition's store. The global `--tab-id` reads that tab. Use one or the other.
+- With `--all`, the reply's `complete` is `false` on Android: its WebView can only read cookies for the URLs Kelpie knows about.
+
+Values are printed in full, as with every `cookies list`. Treat the output as a credential.
+
 ```bash
 kelpie cookies list --device "My iPhone"
 kelpie cookies list --device "My iPhone" --name "session_id"
+kelpie cookies list --all --domain example.com --device "Studio Mac"
+kelpie cookies list --all --partition agent-1 --device "Studio Mac" > agent-1-cookies.json
 ```
 
 ### `kelpie cookies set <name> <value>`
@@ -36,6 +46,46 @@ kelpie cookies set "theme" "dark" --device "My iPhone" --domain "example.com" --
 kelpie cookies set "hw_session" "abc123" --device "My iPhone" --domain "example.com" --path "/" --http-only --secure
 ```
 
+### `kelpie cookies import <file|->`
+Write cookies into one store. The file, or stdin with `-`, holds a JSON array of cookies or the output of `kelpie cookies list` unchanged. Each cookie needs `name`, `value`, `domain`, `path`, `expires` (ISO 8601 or `null`), `httpOnly`, `secure` and `sameSite` (`Strict`, `Lax`, `None` or `Unspecified`).
+
+- No flag writes into the default store, which syncs to the person's other signed-in devices.
+- `--tab <id>` writes into that tab's store; `--partition <id>` into that partition's store. Use one.
+- The CLI checks the file before contacting the device and sends it in batches of 500. Refused cookies are listed in `failed` by their position in the file; the rest are still written.
+
+```bash
+kelpie cookies import agent-1-cookies.json --partition agent-2 --device "Studio Mac"
+kelpie cookies list --all --domain example.com --device "Studio Mac" | kelpie cookies import - --device "Office PC"
+```
+
+### `kelpie cookies copy`
+Copy cookies between stores on one device. The values never leave the device. A side with no flag is the default store.
+
+- `--from-tab <id>` or `--from-partition <id>` picks the source.
+- `--to-tab <id>` or `--to-partition <id>` picks the target.
+- `--domain <domain>` copies only that domain and its subdomains.
+- The same store on both sides is refused with `INVALID_ARGUMENT`.
+
+```bash
+# sign an isolated tab in with the person's synced sessions
+kelpie tab new https://example.com/ --partition agent-1 --device "Studio Mac"
+kelpie cookies copy --to-tab <tabId> --domain example.com --device "Studio Mac"
+
+# bring a partition's cookies back into the default store (this syncs them)
+kelpie cookies copy --from-partition agent-1 --device "Studio Mac"
+```
+
+Some sites tie a session to one device, address or user agent and reject a copied cookie.
+
+### `kelpie cookies sync-status`
+Show peer-to-peer cookie sync on the device: whether it runs and why not, sign-in state, whether the sync listener is up, each peer's platform, name, state, last sync and last error, and the store's counts. It never prints a cookie.
+
+```bash
+kelpie cookies sync-status --device "Studio Mac"
+```
+
+`supported: false` comes with a `reason`: `signed-out`, `embedded`, `webview-unsupported`, `mdns-unavailable` or `no-cef`. A peer in `clock-skew` has a clock more than 2 minutes off. See [cookies.md](../api/cookies.md#getcookiesyncstatus) for every field.
+
 ### `kelpie cookies delete`
 Delete cookies.
 
@@ -44,6 +94,8 @@ kelpie cookies delete --name "session_id" --device "My iPhone"
 kelpie cookies delete --domain "example.com" --device "My iPhone"
 kelpie cookies delete --all --device "My iPhone"
 ```
+
+While cookie sync runs, a small deletion from the default store, such as a site logout, reaches the person's other devices. Deleting more than 20 synced cookies that are also more than a quarter of the store in one go, such as `--all` on a full store, is treated as a purge and clears this device only.
 
 ### `kelpie storage get`
 Read localStorage or sessionStorage.
