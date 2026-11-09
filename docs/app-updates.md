@@ -128,6 +128,10 @@ Capture the new prompt and download state on each changed native screen. The
 absence of a previous prompt should be identified in each screenshot's Before
 cell; no unchanged browser screens need screenshot evidence.
 
+The Linux update compatibility workflow compiles the production GTK integration
+against Ubuntu 22.04 headers, then checks update policy and installer recovery.
+Keep the integration compatible with that distribution's GLib version.
+
 On Windows, `tests/windows/app-update-install.ps1 -SignedPackage <absolute ZIP>`
 exercises the shipping helper against an isolated signed installation. Transport
 is replaced only in the test process; signatures, hash, shutdown, directory swap,

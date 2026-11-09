@@ -1,0 +1,45 @@
+name: Linux update compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'apps/linux/**'
+      - 'apps/updates/**'
+      - 'core/native/**'
+      - '.github/workflows/linux-updates.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/linux/**'
+      - 'apps/updates/**'
+      - 'core/native/**'
+      - '.github/workflows/linux-updates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu-compatibility:
+    name: Ubuntu 22.04 update compatibility
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - name: Install native headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-12 libgtk-3-dev libcurl4-openssl-dev nlohmann-json3-dev
+      - name: Compile production update integration against supported GLib
+        run: |
+          g++-12 -std=c++20 -fsyntax-only \
+            -DKELPIE_LINUX_HAS_GTK=1 -DKELPIE_LINUX_VERSION='"0.2.4"' \
+            -Icore/native/engine-chromium-desktop/include \
+            -Icore/native/core-automation/include -Icore/native/core-state/include \
+            -Icore/native/core-protocol/include -Icore/native/desktop-account \
+            $(pkg-config --cflags gtk+-3.0 libcurl) apps/linux/src/release_updates.cpp
+      - name: Check update policy and installer recovery
+        run: |
+          cmake -S apps/updates -B .cache/update-tests
+          cmake --build .cache/update-tests
+          ctest --test-dir .cache/update-tests --output-on-failure
+          bash tests/linux/app-update-install.sh

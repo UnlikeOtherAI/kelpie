@@ -110,7 +110,7 @@ struct StandaloneUpdates::Impl {
       if (response == 101 && !value.self->monitor.Skip(value.release))
         value.self->Error("Kelpie could not save Skip version. Please try again after restarting the app.");
       gtk_widget_destroy(GTK_WIDGET(dialog));
-    }), choice, +[](gpointer raw, GClosure*) { delete static_cast<Choice*>(raw); }, G_CONNECT_DEFAULT);
+    }), choice, +[](gpointer raw, GClosure*) { delete static_cast<Choice*>(raw); }, static_cast<GConnectFlags>(0));
     gtk_widget_show(dialog);
   }
 };
