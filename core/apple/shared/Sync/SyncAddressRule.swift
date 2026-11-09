@@ -39,8 +39,10 @@ struct SyncAddressRule: Sendable {
 
     static func isEligible(name: String) -> Bool { name.hasPrefix("en") }
 
+    /// `IPv4Address.isLoopback` covers only 127.0.0.1; the whole of 127/8 is loopback.
     private func allows(ipv4 address: IPv4Address) -> Bool {
-        address.isLoopback || address.isLinkLocal || inConnectedSubnet([UInt8](address.rawValue))
+        let bytes = [UInt8](address.rawValue)
+        return bytes.first == 127 || address.isLinkLocal || inConnectedSubnet(bytes)
     }
 
     private func inConnectedSubnet(_ bytes: [UInt8]) -> Bool {

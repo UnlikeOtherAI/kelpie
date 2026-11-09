@@ -4,17 +4,17 @@ import Foundation
 /// `{domain, path, name, value, expires, secure, httpOnly, sameSite}` with `expires` in
 /// whole Unix seconds or null and `sameSite` one of `Strict|Lax|None|Unspecified`.
 ///
-/// WebKit stores `SameSite=None` and an absent attribute the same way on some builds
-/// (a nil policy). A nil policy is reported as `Unspecified`, the attribute-absent
-/// value; any policy string other than lax, strict or none cannot be described and the
-/// cookie is skipped. Apple's public cookie API does not expose partitioned (CHIPS)
-/// cookies; a cookie whose properties carry a partition is skipped as well.
+/// A nil policy (no attribute) is `Unspecified`; Foundation and WebKit keep `none`
+/// distinct. Any other policy string cannot be described and the cookie is skipped.
+/// Apple's public cookie API does not expose partitioned (CHIPS) cookies; a cookie whose
+/// properties carry a partition is skipped as well.
 public enum SyncCookieWire {
     private static let httpOnlyKey = HTTPCookiePropertyKey("HttpOnly")
 
     /// The wire cookie, or nil when the cookie cannot be described or is partitioned.
     public static func json(from cookie: HTTPCookie) -> [String: Any]? {
-        guard cookie.portList == nil, !isPartitioned(cookie), let sameSite = wireSameSite(cookie.sameSitePolicy) else {
+        // Foundation reports "no port list" as an empty array; a real port list cannot be described.
+        guard cookie.portList?.isEmpty ?? true, !isPartitioned(cookie), let sameSite = wireSameSite(cookie.sameSitePolicy) else {
             return nil
         }
         let domain = cookie.domain.lowercased()
