@@ -105,7 +105,7 @@ dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.webkit:webkit:1.10.0")
+    implementation("androidx.webkit:webkit:1.18.0")
 
     // Encrypted credential storage (HF token etc.)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
