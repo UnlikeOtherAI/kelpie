@@ -17,6 +17,7 @@ namespace {
 
 std::mutex supplier_mutex;
 StartPageDataSupplier data_supplier;
+StartPagePreviewSupplier preview_supplier;
 
 std::string CurrentDataJson() {
   StartPageDataSupplier supplier;
@@ -28,6 +29,15 @@ std::string CurrentDataJson() {
     return "{\"bookmarks\":[],\"recent\":[]}";
   }
   return supplier();
+}
+
+std::optional<std::string> CurrentPreview(const std::string& host) {
+  StartPagePreviewSupplier supplier;
+  {
+    std::lock_guard<std::mutex> lock(supplier_mutex);
+    supplier = preview_supplier;
+  }
+  return supplier ? supplier(host) : std::nullopt;
 }
 
 // Serves one in-memory body. The bytes are copied into the handler because the
@@ -97,6 +107,11 @@ class StartPageSchemeHandlerFactory final : public CefSchemeHandlerFactory {
     if (start_page::IsDataRequest(url)) {
       return new StartPageResourceHandler("application/json; charset=utf-8", CurrentDataJson());
     }
+    if (const auto host = start_page::PreviewHostForUrl(url)) {
+      if (auto preview = CurrentPreview(*host)) {
+        return new StartPageResourceHandler("image/jpeg", std::move(*preview));
+      }
+    }
     if (const start_page::Resource* resource = start_page::FindStaticResource(url)) {
       return new StartPageResourceHandler(std::string(resource->mime_type),
                                           std::string(resource->body));
@@ -127,10 +142,11 @@ void RegisterKelpieCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) {
                                  CEF_SCHEME_OPTION_FETCH_ENABLED);
 }
 
-bool RegisterStartPageSchemeHandler(StartPageDataSupplier supplier) {
+bool RegisterStartPageSchemeHandler(StartPageDataSupplier data, StartPagePreviewSupplier preview) {
   {
     std::lock_guard<std::mutex> lock(supplier_mutex);
-    data_supplier = std::move(supplier);
+    data_supplier = std::move(data);
+    preview_supplier = std::move(preview);
   }
   return CefRegisterSchemeHandlerFactory(std::string(kInternalScheme), "start",
                                          new StartPageSchemeHandlerFactory());

@@ -1,36 +1,38 @@
 /*
  * Kelpie start page styling.
  *
- * Every measurement mirrors `core/apple/macos/Views/StartPageView.swift`, where
- * one SwiftUI point equals one CSS pixel at 100 % scaling. Light and dark follow
- * the OS through `prefers-color-scheme`, matching the macOS page's use of the
- * dynamic system colours.
+ * The layout and colours mirror `core/apple/macos/Views/StartPageView.swift`,
+ * where one SwiftUI point equals one CSS pixel at 100 % scaling. Light and dark
+ * follow the OS through `prefers-color-scheme`.
  */
 
 :root {
-  /* Light mode mirrors `NSColor.windowBackgroundColor` and the `.primary` /
-   * `.secondary` label colours, and matches the Windows shell palette in
-   * `core/windows/src/ui_theme.h` so the page and the chrome agree. */
-  --canvas: #f6f6f8;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-hover: rgba(0, 0, 0, 0.04);
-  --divider: rgba(0, 0, 0, 0.15);
-  --text: #27282d;
-  --muted-text: #686a72;
-  --icon-shadow: rgba(0, 0, 0, 0.15);
-  --focus-ring: #3f7ce0;
+  --canvas: #f5f6f9;
+  --text: #1c1d22;
+  --muted-text: #6c6f7a;
+  --card: #ffffff;
+  --card-edge: rgba(16, 20, 34, 0.08);
+  --badge: rgba(255, 255, 255, 0.94);
+  --shadow-rest: 0 1px 2px rgba(16, 20, 34, 0.06), 0 8px 20px -12px rgba(16, 20, 34, 0.28);
+  --shadow-lift: 0 2px 4px rgba(16, 20, 34, 0.08), 0 22px 40px -18px rgba(16, 20, 34, 0.4);
+  --icon-shadow: 0 6px 18px -6px rgba(16, 20, 34, 0.35);
+  --focus-ring: #1a9cff;
+  --aurora-opacity: 0.5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #202124;
-    --surface: rgba(255, 255, 255, 0.06);
-    --surface-hover: rgba(255, 255, 255, 0.08);
-    --divider: rgba(255, 255, 255, 0.15);
-    --text: #f2f2f4;
-    --muted-text: #9a9ca4;
-    --icon-shadow: rgba(0, 0, 0, 0.5);
-    --focus-ring: #6ea0ff;
+    --canvas: #101219;
+    --text: #eef0f6;
+    --muted-text: #8e92a2;
+    --card: #1b1e29;
+    --card-edge: rgba(255, 255, 255, 0.08);
+    --badge: rgba(30, 33, 45, 0.94);
+    --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 24px -14px rgba(0, 0, 0, 0.8);
+    --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.5), 0 26px 44px -18px rgba(0, 0, 0, 0.9);
+    --icon-shadow: 0 8px 22px -6px rgba(0, 0, 0, 0.7);
+    --focus-ring: #4fb4ff;
+    --aurora-opacity: 0.32;
   }
 }
 
@@ -42,7 +44,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
@@ -50,34 +52,71 @@ body {
   color: var(--text);
   font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow-y: scroll;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-edge) transparent;
 }
 
-/* `.frame(maxWidth: 720)` with 40 pt horizontal and 48 pt vertical padding. */
+/*
+ * Two soft glows in the app icon's mint and blue sit behind the content. The
+ * mask keeps the top edge plain canvas, because the Windows chrome samples the
+ * page's top rows for its own colour.
+ */
+.aurora {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--aurora-opacity);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 140px, #000 55%, transparent 90%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 140px, #000 55%, transparent 90%);
+}
+
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 640px;
+  height: 640px;
+  border-radius: 50%;
+  filter: blur(80px);
+}
+
+.aurora::before {
+  top: -160px;
+  left: calc(50% - 600px);
+  background: radial-gradient(circle, rgba(46, 230, 176, 0.75), rgba(46, 230, 176, 0) 68%);
+}
+
+.aurora::after {
+  top: -200px;
+  left: calc(50% - 40px);
+  background: radial-gradient(circle, rgba(26, 156, 255, 0.6), rgba(26, 156, 255, 0) 68%);
+}
+
+/* `.frame(maxWidth: 1040)` with 32 pt horizontal and 64 pt vertical padding. */
 .page {
-  max-width: 720px;
+  position: relative;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 48px 40px;
+  padding: 64px 32px;
   display: flex;
   flex-direction: column;
-  gap: 36px;
-  align-items: stretch;
+  gap: 44px;
 }
 
-/* `.padding(.top, 40)` on the icon row. */
-.icon-header {
+.brand {
   display: flex;
   justify-content: center;
-  padding-top: 40px;
 }
 
-/* 120 pt square, 26 pt continuous corner, black 15 % shadow with radius 8 at
- * y 4. SwiftUI's shadow radius is roughly half a CSS blur radius. */
+/* 64 pt square with a 15 pt continuous corner. */
 .app-icon {
-  width: 120px;
-  height: 120px;
-  border-radius: 26px;
-  box-shadow: 0 4px 16px var(--icon-shadow);
+  width: 64px;
+  height: 64px;
+  border-radius: 15px;
+  box-shadow: var(--icon-shadow);
   -webkit-user-drag: none;
   user-select: none;
 }
@@ -85,7 +124,7 @@ body {
 .section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .section[hidden] {
@@ -93,185 +132,255 @@ body {
 }
 
 .section-title {
-  margin: 0;
-  font-size: 18px;
+  margin: 0 0 0 2px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-text);
 }
 
-/* `LazyVGrid(columns: [GridItem(.adaptive(minimum: 72, maximum: 96))], spacing: 16)`. */
-.tile-grid {
+/* `GridItem(.adaptive(minimum: 184))` and `.adaptive(minimum: 148)` for Recent. */
+.site-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 96px));
-  gap: 16px;
-  justify-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 26px 22px;
 }
 
-.tile {
+.site-grid-compact {
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 22px 18px;
+}
+
+.site {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  background: none;
+  gap: 10px;
+  min-width: 0;
   color: inherit;
-  font: inherit;
-  cursor: pointer;
   text-decoration: none;
-  max-width: 72px;
+  outline: none;
+  animation: rise 0.48s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--order, 0) * 28ms);
 }
 
-.tile:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-  border-radius: 8px;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 
-.tile-badge {
-  width: 56px;
-  height: 56px;
+/* The 16:10 screenshot card. */
+.site-shot {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
   border-radius: 14px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: var(--shadow-rest);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease;
+}
+
+/* A hairline edge drawn over the screenshot so white pages keep their shape. */
+.site-shot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  pointer-events: none;
+}
+
+.site:hover .site-shot {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lift);
+}
+
+.site:active .site-shot {
+  transform: translateY(-1px) scale(0.985);
+}
+
+.site:focus-visible .site-shot {
+  box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-lift);
+}
+
+.site-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.site:hover .site-thumb {
+  transform: scale(1.04);
+}
+
+/* The favicon badge in the screenshot's bottom-left corner. */
+.site-icon {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--badge);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
   color: #ffffff;
-  font-size: 22px;
+  font-size: 14px;
   font-weight: 700;
   overflow: hidden;
 }
 
-/*
- * Tile and row colours mirror `BookmarkTileView.tileColor` and
- * `HistoryRowView.letterColor` in StartPageView.swift. They are classes rather
- * than inline styles so the page's own Content-Security-Policy needs no
- * `unsafe-inline` exception.
- *
- * This is deliberately the macOS start page's RGB palette, which differs from
- * the tab strip's `LetterAvatarView` HSB palette. Both are mirrored as macOS
- * has them.
- */
-.badge-0 {
-  background-color: rgb(102, 143, 217); /* 0.40, 0.56, 0.85 */
-}
-
-.badge-1 {
-  background-color: rgb(140, 191, 140); /* 0.55, 0.75, 0.55 */
-}
-
-.badge-2 {
-  background-color: rgb(217, 140, 102); /* 0.85, 0.55, 0.40 */
-}
-
-.badge-3 {
-  background-color: rgb(179, 128, 217); /* 0.70, 0.50, 0.85 */
-}
-
-.badge-4 {
-  background-color: rgb(217, 191, 89); /* 0.85, 0.75, 0.35 */
-}
-
-.badge-5 {
-  background-color: rgb(128, 191, 204); /* 0.50, 0.75, 0.80 */
-}
-
-.tile-badge img {
-  width: 28px;
-  height: 28px;
+.site-icon img {
+  width: 18px;
+  height: 18px;
   object-fit: contain;
 }
 
-.tile-label {
-  font-size: 11px;
-  max-width: 72px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text);
+.site-grid-compact .site-icon {
+  left: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
-/* `.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))`. */
-.card {
-  background: var(--surface);
-  border-radius: 12px;
-  overflow: hidden;
-  backdrop-filter: blur(20px);
+.site-grid-compact .site-icon img {
+  width: 16px;
+  height: 16px;
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  width: 100%;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.row + .row {
-  border-top: 1px solid var(--divider);
-}
-
-.row:hover {
-  background: var(--surface-hover);
-}
-
-.row:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
-}
-
-.row-badge {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+/* A site with no screenshot yet: a two-tone tile with its favicon or initial. */
+.site-shot.is-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 600;
-  overflow: hidden;
+  background: linear-gradient(135deg, var(--tone-light), var(--tone-dark));
 }
 
-.row-badge img {
-  width: 20px;
-  height: 20px;
+.site-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.site-glyph img {
+  width: 30px;
+  height: 30px;
   object-fit: contain;
 }
 
-.row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+/* No favicon either: the initial alone, large and white. */
+.site-glyph.is-letter {
+  width: auto;
+  height: auto;
+  background: none;
+  box-shadow: none;
+  color: #ffffff;
+  font-size: 40px;
+  font-weight: 700;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
 }
 
-.row-title {
+.site-grid-compact .site-glyph {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+}
+
+.site-grid-compact .site-glyph img {
+  width: 24px;
+  height: 24px;
+}
+
+.site-grid-compact .site-glyph.is-letter {
+  font-size: 32px;
+}
+
+.site:hover .site-glyph {
+  transform: scale(1.08);
+}
+
+/*
+ * Tile tones derive from the macOS start page's palette, indexed by the same
+ * host hash: `.tone-N` is `BookmarkTileView.tileColor` N, lightened and darkened.
+ * They are classes rather than inline styles so the page's own
+ * Content-Security-Policy needs no `unsafe-inline` exception.
+ */
+.tone-0 {
+  --tone-light: rgb(133, 170, 235);
+  --tone-dark: rgb(77, 113, 189);
+}
+
+.tone-1 {
+  --tone-light: rgb(164, 212, 164);
+  --tone-dark: rgb(105, 163, 113);
+}
+
+.tone-2 {
+  --tone-light: rgb(240, 168, 132);
+  --tone-dark: rgb(196, 111, 78);
+}
+
+.tone-3 {
+  --tone-light: rgb(199, 158, 235);
+  --tone-dark: rgb(146, 98, 191);
+}
+
+.tone-4 {
+  --tone-light: rgb(240, 214, 118);
+  --tone-dark: rgb(196, 160, 60);
+}
+
+.tone-5 {
+  --tone-light: rgb(155, 211, 222);
+  --tone-dark: rgb(92, 160, 176);
+}
+
+/* A letter badge on a screenshot takes the darker tone. */
+.site-icon.is-letter {
+  background: var(--tone-dark);
+}
+
+.site-domain {
+  padding: 0 4px;
   font-size: 13px;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-url {
-  font-size: 11px;
+  font-weight: 500;
   color: var(--muted-text);
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 0.2s ease;
 }
 
-/* `Spacer(minLength: 100)` then a centred 15 pt secondary label. */
+.site-grid-compact .site-domain {
+  font-size: 12px;
+}
+
+.site:hover .site-domain,
+.site:focus-visible .site-domain {
+  color: var(--text);
+}
+
 .empty-state {
-  margin: 100px 0 0 0;
+  margin: 48px 0 0 0;
   text-align: center;
   font-size: 15px;
   color: var(--muted-text);
@@ -279,4 +388,31 @@ body {
 
 .empty-state[hidden] {
   display: none;
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding: 40px 16px;
+  }
+
+  .site-grid {
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 20px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site,
+  .site-shot,
+  .site-thumb,
+  .site-glyph {
+    animation: none;
+    transition: none;
+  }
+
+  .site:hover .site-shot,
+  .site:hover .site-thumb,
+  .site:hover .site-glyph {
+    transform: none;
+  }
 }

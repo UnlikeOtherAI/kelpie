@@ -61,7 +61,7 @@ void TestResourceResolution() {
 
   const auto* css = kelpie::start_page::FindStaticResource("kelpie://start/start.css");
   assert(css != nullptr && css->mime_type == "text/css; charset=utf-8");
-  assert(css->body.find("max-width: 720px") != std::string_view::npos);
+  assert(css->body.find("max-width: 1040px") != std::string_view::npos);
 
   const auto* script = kelpie::start_page::FindStaticResource("kelpie://start/start.js");
   assert(script != nullptr && script->mime_type == "text/javascript; charset=utf-8");
@@ -99,18 +99,27 @@ void TestDataPayload() {
   // Nothing beyond url/title/favicon reaches the page.
   assert(payload["bookmarks"][0].size() == 2);
 
-  // `HistoryStore::ToJson` is newest-first and the payload keeps the last 20.
-  assert(payload["recent"].size() == 20);
+  // `HistoryStore::ToJson` is newest-first and Recent keeps the latest sites.
+  assert(payload["recent"].size() == kelpie::start_page::kRecentSiteLimit);
   assert(payload["recent"][0]["url"] == "https://site24.test/");
-  assert(payload["recent"][19]["url"] == "https://site5.test/");
+  assert(payload["recent"][7]["url"] == "https://site17.test/");
 
-  // A favicon lookup produces a data URI only for hosts it knows.
-  const json with_icons = json::parse(BuildDataJson(
+  // A site lookup produces a favicon data URI and a versioned preview path only
+  // for hosts it knows.
+  const json with_images = json::parse(BuildDataJson(
       bookmarks.ToJson(), history.ToJson(), 20, [](const std::string& host) {
-        return host == "example.com" ? std::string("QUJD") : std::string();
+        kelpie::start_page::SiteImages images;
+        if (host == "example.com") {
+          images.favicon_png_base64 = "QUJD";
+          images.preview_version = 7;
+        }
+        return images;
       }));
-  assert(with_icons["bookmarks"][0]["favicon"] == "data:image/png;base64,QUJD");
-  assert(!with_icons["bookmarks"][1].contains("favicon"));
+  assert(with_images["bookmarks"][0]["favicon"] == "data:image/png;base64,QUJD");
+  assert(with_images["bookmarks"][0]["thumbnail"] == "preview/6578616d706c652e636f6d.jpg?v=7");
+  assert(!with_images["bookmarks"][1].contains("favicon"));
+  assert(!with_images["bookmarks"][1].contains("thumbnail"));
+  assert(with_images["recent"].size() == 20);
 
   // Malformed store output degrades to an empty page rather than throwing.
   const json empty = json::parse(BuildDataJson("not json", "{}"));
@@ -133,7 +142,11 @@ void TestRejectsNonWebUrls() {
   const json payload = json::parse(BuildDataJson(hostile, hostile));
   assert(payload["bookmarks"].size() == 1);
   assert(payload["bookmarks"][0]["url"] == "https://example.com/");
-  assert(payload["recent"].size() == 1);
+  // Its only web site is already a favourite, so Recent does not repeat it.
+  assert(payload["recent"].empty());
+  const json history_only = json::parse(BuildDataJson("[]", hostile));
+  assert(history_only["recent"].size() == 1);
+  assert(history_only["recent"][0]["url"] == "https://example.com/");
 
   // A non-string or missing url is dropped rather than crashing the payload.
   const json malformed = json::parse(BuildDataJson(R"JSON([{"title":"x"},{"url":42}])JSON", "[]"));
@@ -160,12 +173,41 @@ void TestStoresIgnoreInternalScheme() {
   assert(bookmarks.Count() == 1);
 
   // The start page therefore never renders itself inside its own lists.
-  const json payload = json::parse(BuildDataJson(bookmarks.ToJson(), history.ToJson()));
-  assert(payload["bookmarks"].size() == 1);
+  const json payload = json::parse(BuildDataJson("[]", history.ToJson()));
   assert(payload["recent"].size() == 1);
   for (const json& entry : payload["recent"]) {
     assert(!kelpie::IsInternalSchemeUrl(entry["url"].get<std::string>()));
   }
+  assert(json::parse(BuildDataJson(bookmarks.ToJson(), "[]"))["bookmarks"].size() == 1);
+}
+
+void TestRecentIsOnePerSite() {
+  kelpie::HistoryStore history;
+  history.Record("https://a.test/one", "A one");
+  history.Record("https://b.test/", "B");
+  history.Record("https://a.test/two", "A two");
+  history.Record("https://fav.test/page", "Favourite page");
+  const std::string bookmarks = R"JSON([{"url":"https://fav.test/","title":"Fav"}])JSON";
+  const json payload = json::parse(BuildDataJson(bookmarks, history.ToJson()));
+  // Newest visit per host, favourites excluded.
+  assert(payload["recent"].size() == 2);
+  assert(payload["recent"][0]["url"] == "https://a.test/two");
+  assert(payload["recent"][1]["url"] == "https://b.test/");
+}
+
+void TestPreviewRoute() {
+  using kelpie::start_page::PreviewHostForUrl;
+  using kelpie::start_page::PreviewPath;
+  assert(PreviewPath("example.com", 3) == "preview/6578616d706c652e636f6d.jpg?v=3");
+  assert(PreviewHostForUrl("kelpie://start/preview/6578616d706c652e636f6d.jpg?v=3") ==
+         std::optional<std::string>("example.com"));
+  assert(!PreviewHostForUrl("kelpie://start/preview/.jpg"));
+  assert(!PreviewHostForUrl("kelpie://start/preview/2e2e2f.jpg"));
+  assert(!PreviewHostForUrl("kelpie://start/preview/6578616d706c652e636f6d.png"));
+  assert(!PreviewHostForUrl("kelpie://start/data.json"));
+  assert(!PreviewHostForUrl("https://example.com/preview/6578616d706c652e636f6d.jpg"));
+  // A preview is not a static asset.
+  assert(kelpie::start_page::FindStaticResource("kelpie://start/preview/6578616d706c652e636f6d.jpg") == nullptr);
 }
 
 }  // namespace
@@ -176,6 +218,8 @@ int main() {
   TestDataPayload();
   TestRejectsNonWebUrls();
   TestStoresIgnoreInternalScheme();
+  TestRecentIsOnePerSite();
+  TestPreviewRoute();
   std::cout << "start page tests passed" << std::endl;
   return 0;
 }

@@ -49,6 +49,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   runtime.start_stdio_mcp=impl_->config.mcp_stdio; runtime.device_info_provider=impl_.get();
   runtime.bookmark_action=[this](const std::string& action,const json& params) { return impl_->account.BookmarkAction(action,params); };
   runtime.bookmarks_supplier=[this] { return impl_->account.Bookmarks(); };
+  runtime.site_previews_path=std::filesystem::path(impl_->config.profile_dir)/"site-previews";
   runtime.request_shutdown=[this] { RequestShutdown(); return BrowserControlResult::Success(); };
   runtime.set_home=[this](std::string url) { SetHomeUrl(url); return BrowserControlResult::Success(); };
   runtime.get_home=[this](std::string* url) { *url=HomeUrl(); return BrowserControlResult::Success(); };
