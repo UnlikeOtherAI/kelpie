@@ -64,7 +64,7 @@ Copy cookies between stores on one device. The values never leave the device. A 
 - `--from-tab <id>` or `--from-partition <id>` picks the source.
 - `--to-tab <id>` or `--to-partition <id>` picks the target.
 - `--domain <domain>` copies only that domain and its subdomains.
-- The same store on both sides is refused with `INVALID_ARGUMENT`.
+- The same store on both sides is refused with `INVALID_PARAMS`.
 
 ```bash
 # sign an isolated tab in with the person's synced sessions, then open the site

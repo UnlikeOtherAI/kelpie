@@ -25,10 +25,17 @@ final class MacCookieSync {
         source.detach()
     }
 
-    /// The default store moved to the other engine. The spec makes this a rebase: refresh
-    /// what sync has observed from the new engine, stamping and tombstoning nothing. The
-    /// shared service has no rebase call yet, so nothing happens here until it does.
-    func rendererDidSwitch() {}
+    /// Before the default store moves to the other engine: record any local edit the
+    /// outgoing engine still holds.
+    func rendererWillSwitch() async {
+        await service.storeWillSwitch()
+    }
+
+    /// After the move: a rebase adopts what the new engine holds, stamping and
+    /// tombstoning nothing.
+    func rendererDidSwitch() async {
+        await service.storeDidSwitch()
+    }
 
     func status() async -> [String: Any] {
         await service.status()

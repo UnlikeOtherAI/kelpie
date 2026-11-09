@@ -108,13 +108,13 @@ extension BrowserManagementHandler {
         )
     }
 
-    /// `INVALID_ARGUMENT` for the first field of the wrong type, else nil.
+    /// `INVALID_PARAMS` for the first field of the wrong type, else nil.
     static func invalidCookieField(_ body: [String: Any], strings: [String], flags: [String] = []) -> [String: Any]? {
         if let field = strings.first(where: { body[$0] != nil && !(body[$0] is String) }) {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "\(field) must be a string")
+            return errorResponse(code: "INVALID_PARAMS", message: "\(field) must be a string")
         }
         if let field = flags.first(where: { body[$0] != nil && !(body[$0] is Bool) }) {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "\(field) must be a boolean")
+            return errorResponse(code: "INVALID_PARAMS", message: "\(field) must be a boolean")
         }
         return nil
     }

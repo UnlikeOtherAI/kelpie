@@ -149,6 +149,8 @@ final class SyncRun {
     /// Responder pulls that hold records and have not answered yet.
     var answering = 0
     var scanTask: Task<Void, Never>?
+    /// The default store is moving to another engine; change signals wait for the rebase.
+    var switchingStore = false
     private(set) var cancelled = false
     private var tasks: [UUID: Task<Void, Never>] = [:]
 

@@ -4,12 +4,12 @@ import Foundation
 enum CookieRequest {
     static let maxImportCount = 500
 
-    /// The `get-cookies` shape. `expires` keeps its existing text form; `sameSite` uses
-    /// the four wire names.
+    /// The `get-cookies` shape. `expires` is ISO 8601 UTC or null, as documented;
+    /// `sameSite` uses the four wire names.
     static func json(_ cookie: BrowserCookie) -> [String: Any] {
         [
             "name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
-            "expires": cookie.expires?.description ?? NSNull(), "httpOnly": cookie.httpOnly,
+            "expires": CookieAPIFormat.expires(cookie.expires), "httpOnly": cookie.httpOnly,
             "secure": cookie.secure, "sameSite": cookie.sameSite?.rawValue ?? NSNull()
         ]
     }

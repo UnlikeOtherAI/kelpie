@@ -186,9 +186,9 @@ describe("cookie commands over the wire", () => {
   it("cookies copy refuses the same store, conflicting flags and the global tab lease", async () => {
     mockFetch(() => ({ success: true }));
     await run("cookies", "copy");
-    expect(lastPrinted().error.code).toBe("INVALID_ARGUMENT");
+    expect(lastPrinted().error.code).toBe("INVALID_PARAMS");
     await run("cookies", "copy", "--from-partition", "work", "--to-partition", "work");
-    expect(lastPrinted().error.code).toBe("INVALID_ARGUMENT");
+    expect(lastPrinted().error.code).toBe("INVALID_PARAMS");
     await run("cookies", "copy", "--from-tab", "a", "--from-partition", "work");
     expect(lastPrinted().error.message).toContain("--from-tab or --from-partition");
     await run("--tab-id", "t1", "cookies", "copy", "--to-tab", "t2");

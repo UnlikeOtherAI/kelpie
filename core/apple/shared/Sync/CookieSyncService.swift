@@ -126,7 +126,7 @@ final class CookieSyncService {
     // MARK: - Scanning
 
     func cookiesChanged() {
-        guard let run, isCurrent(run) else { return }
+        guard let run, isCurrent(run), !run.switchingStore else { return }
         scheduleScan(run, after: timing.scanQuiet)
     }
 

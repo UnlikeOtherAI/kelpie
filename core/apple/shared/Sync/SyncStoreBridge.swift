@@ -67,6 +67,15 @@ actor SyncStoreBridge {
         }
     }
 
+    /// The default store moved to another engine: adopt its cookies as observed state,
+    /// stamping and tombstoning nothing. `{"adopted","head"}`.
+    func rebase(_ snapshot: Snapshot) async throws -> [String: Any] {
+        try await exclusive {
+            let engine = try await snapshot()
+            return try Self.take(kelpie_sync_store_rebase(try store(), engine.cookiesJSON, engine.coverageJSON, clock()))
+        }
+    }
+
     func answerPull(_ pull: [String: Any], snapshot: Snapshot) async throws -> [String: Any] {
         try await exclusive {
             let engine = try await snapshot()

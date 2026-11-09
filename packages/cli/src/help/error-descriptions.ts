@@ -7,7 +7,6 @@ export const errorDescriptions: Record<string, string> = {
   INVALID_SELECTOR: "The provided CSS selector is syntactically invalid.",
   INVALID_PARAM: "A provided parameter value is invalid.",
   INVALID_PARAMS: "One or more required parameters are missing or invalid.",
-  INVALID_ARGUMENT: "The request is well formed but cannot be carried out as asked, for example copy-cookies with the same store as source and target.",
   NO_WEBVIEW: "No active browser renderer is attached yet.",
   NO_URL: "There is no current URL available for this action.",
   TAB_NOT_FOUND: "No open tab matched the requested tab ID.",

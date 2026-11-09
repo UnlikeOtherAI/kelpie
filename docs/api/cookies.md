@@ -195,7 +195,7 @@ Response:
 ```
 
 `from` and `to` each take at most one of `tabId` and `partition`. The same store as
-source and target returns `INVALID_ARGUMENT`. Cookies already in the target with
+source and target returns `INVALID_PARAMS`. Cookies already in the target with
 the same domain, path and name are replaced.
 
 **Sign an isolated tab in with the person's sessions:**

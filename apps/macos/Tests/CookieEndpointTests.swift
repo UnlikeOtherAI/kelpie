@@ -24,25 +24,25 @@ final class CookieEndpointTests: XCTestCase {
     }
 
     func testSetCookiesRequiresABoundedArray() async {
-        expect("INVALID_ARGUMENT", await handler.setCookies([:]))
-        expect("INVALID_ARGUMENT", await handler.setCookies(["cookies": "sid=1"]))
+        expect("INVALID_PARAMS", await handler.setCookies([:]))
+        expect("INVALID_PARAMS", await handler.setCookies(["cookies": "sid=1"]))
         let tooMany = Array(repeating: ["name": "n", "value": "v", "domain": domain] as [String: Any], count: 501)
-        expect("INVALID_ARGUMENT", await handler.setCookies(["cookies": tooMany]))
+        expect("INVALID_PARAMS", await handler.setCookies(["cookies": tooMany]))
     }
 
     func testTargetsNameOneStore() async {
         let both: [String: Any] = ["cookies": [Any](), "tabId": UUID().uuidString, "partition": "work"]
-        expect("INVALID_ARGUMENT", await handler.setCookies(both))
-        expect("INVALID_ARGUMENT", await handler.getCookies(["all": "yes"]))
+        expect("INVALID_PARAMS", await handler.setCookies(both))
+        expect("INVALID_PARAMS", await handler.getCookies(["all": "yes"]))
         expect("INVALID_PARTITION", await handler.getCookies(["partition": "bad id!"]))
         expect("PARTITION_NOT_FOUND", await handler.getCookies(["partition": "never-created-\(UUID().uuidString)"]))
         expect("TAB_NOT_FOUND", await handler.getCookies(["all": true, "tabId": UUID().uuidString]))
     }
 
     func testCopyCookiesRefusesTheSameStoreAndMalformedEnds() async {
-        expect("INVALID_ARGUMENT", await handler.copyCookies([:]))
-        expect("INVALID_ARGUMENT", await handler.copyCookies(["from": [String: Any](), "to": [String: Any]()]))
-        expect("INVALID_ARGUMENT", await handler.copyCookies(["from": "default", "to": [String: Any]()]))
+        expect("INVALID_PARAMS", await handler.copyCookies([:]))
+        expect("INVALID_PARAMS", await handler.copyCookies(["from": [String: Any](), "to": [String: Any]()]))
+        expect("INVALID_PARAMS", await handler.copyCookies(["from": "default", "to": [String: Any]()]))
         expect("INVALID_PARTITION", await handler.copyCookies(["to": ["partition": "bad id!"]]))
     }
 

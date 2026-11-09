@@ -14,10 +14,10 @@ extension BrowserManagementHandler {
     @MainActor
     func setCookies(_ body: [String: Any]) async -> [String: Any] {
         guard let items = body["cookies"] as? [Any] else {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "cookies must be an array")
+            return errorResponse(code: "INVALID_PARAMS", message: "cookies must be an array")
         }
         guard items.count <= CookieRequest.maxImportCount else {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "cookies holds at most \(CookieRequest.maxImportCount) entries")
+            return errorResponse(code: "INVALID_PARAMS", message: "cookies holds at most \(CookieRequest.maxImportCount) entries")
         }
         let target: HandlerContext.CookieTarget
         switch resolveCookieTarget(body) {
@@ -52,7 +52,7 @@ extension BrowserManagementHandler {
     @MainActor
     func copyCookies(_ body: [String: Any]) async -> [String: Any] {
         guard body["from"] == nil || body["from"] is [String: Any], body["to"] == nil || body["to"] is [String: Any] else {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "from and to must be objects")
+            return errorResponse(code: "INVALID_PARAMS", message: "from and to must be objects")
         }
         if let invalid = Self.invalidCookieField(body, strings: ["domain"]) { return invalid }
         let source: HandlerContext.CookieTarget
@@ -66,7 +66,7 @@ extension BrowserManagementHandler {
             destination = to
         }
         guard source.identity != destination.identity else {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "from and to name the same cookie store")
+            return errorResponse(code: "INVALID_PARAMS", message: "from and to name the same cookie store")
         }
         do {
             var cookies = try await context.withCookies(source) { try await $0.all() }
@@ -99,7 +99,7 @@ extension BrowserManagementHandler {
         let tabId = selector["tabId"] as? String
         let partition = selector["partition"] as? String
         if tabId != nil && partition != nil {
-            return .failure(errorResponse(code: "INVALID_ARGUMENT", message: "Name a tabId or a partition, not both"))
+            return .failure(errorResponse(code: "INVALID_PARAMS", message: "Name a tabId or a partition, not both"))
         }
         if let partition { return resolvePartitionCookieTarget(partition) }
         guard let tabId else { return .target(context.defaultCookieTarget) }

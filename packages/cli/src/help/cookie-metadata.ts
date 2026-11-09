@@ -114,8 +114,8 @@ export const cookieMetadata: Record<string, CommandHelp> = {
   "copy-cookies": {
     purpose: "Copy cookies between stores on one device",
     when: "Giving an isolated tab the person's signed-in sessions, or bringing a partition's cookies back into the default store",
-    explanation: `Copies from one store to another without the values passing through the caller. {} is the default store. ${SYNCED} To sign an isolated tab in: open it with new-tab and a partition, then copy-cookies with from:{} and to:{tabId}, optionally with domain. Copying into the default store syncs the cookies to the person's other devices. Some sites bind a session to one device, address or user agent and reject a copied cookie. The same store as source and target is INVALID_ARGUMENT.`,
-    errors: ["INVALID_ARGUMENT", "INVALID_PARTITION", "TAB_NOT_FOUND"],
+    explanation: `Copies from one store to another without the values passing through the caller. {} is the default store. ${SYNCED} To sign an isolated tab in: open it with new-tab and a partition, then copy-cookies with from:{} and to:{tabId}, optionally with domain. Copying into the default store syncs the cookies to the person's other devices. Some sites bind a session to one device, address or user agent and reject a copied cookie. The same store as source and target is INVALID_PARAMS.`,
+    errors: ["INVALID_PARAMS", "INVALID_PARTITION", "TAB_NOT_FOUND"],
     related: ["get-cookies", "set-cookies", "new-tab", "get-partitions"],
     response: copyCookiesResponse,
   },

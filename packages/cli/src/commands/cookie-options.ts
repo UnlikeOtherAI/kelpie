@@ -14,7 +14,7 @@ import { print } from "../output/formatter.js";
 /** A cookie command the CLI refuses before it contacts a device. */
 export class CookieInputError extends Error {
   constructor(
-    readonly code: "INVALID_PARAMS" | "INVALID_PARTITION" | "INVALID_ARGUMENT",
+    readonly code: "INVALID_PARAMS" | "INVALID_PARTITION",
     message: string,
   ) {
     super(message);

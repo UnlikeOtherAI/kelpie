@@ -1,8 +1,8 @@
 import WebKit
 
 /// Cookie endpoints. A target is a tab (`tabId`), a named partition (`partition`) or,
-/// with neither, the default website store. Cookies use the sync wire shape: `expires`
-/// in whole Unix seconds or null, `sameSite` one of `Strict|Lax|None|Unspecified`.
+/// with neither, the default website store. `expires` is ISO 8601 UTC or null (set-cookies
+/// also accepts whole Unix seconds); `sameSite` is one of `Strict|Lax|None|Unspecified`.
 /// `copy-cookies` moves cookies between stores without returning their values.
 struct MobileCookieHandler {
     static let maxCookiesPerWrite = 500
@@ -37,11 +37,11 @@ struct MobileCookieHandler {
     /// always has. Otherwise no target means the default store.
     @MainActor
     private func target(_ body: [String: Any], createPartition: Bool, currentPage: Bool = false) throws -> Target {
-        if let raw = body["tabId"], !(raw is String) { throw Refusal("INVALID_ARGUMENT", "tabId must be a string") }
+        if let raw = body["tabId"], !(raw is String) { throw Refusal("INVALID_PARAMS", "tabId must be a string") }
         if let raw = body["partition"], !(raw is String) { throw Refusal("INVALID_PARTITION", "partition must be a string") }
         let tabId = body["tabId"] as? String
         let partition = body["partition"] as? String
-        if tabId != nil, partition != nil { throw Refusal("INVALID_ARGUMENT", "Use tabId or partition, not both") }
+        if tabId != nil, partition != nil { throw Refusal("INVALID_PARAMS", "Use tabId or partition, not both") }
         if let tabId {
             guard let tab = context.tabStore?.tabs.first(where: { $0.id.uuidString == tabId }) else {
                 throw Refusal("TAB_NOT_FOUND", "No tab with id \(tabId)")
@@ -91,15 +91,15 @@ struct MobileCookieHandler {
     /// `all:true` returns every cookie in the target instead of the current page's.
     @MainActor
     private func getCookies(_ body: [String: Any]) async -> [String: Any] {
-        guard let all = SyncJSON.flag(body["all"]) else { return errorResponse(code: "INVALID_ARGUMENT", message: "all must be a boolean") }
-        if let raw = body["domain"], !(raw is String) { return errorResponse(code: "INVALID_ARGUMENT", message: "domain must be a string") }
+        guard let all = SyncJSON.flag(body["all"]) else { return errorResponse(code: "INVALID_PARAMS", message: "all must be a boolean") }
+        if let raw = body["domain"], !(raw is String) { return errorResponse(code: "INVALID_PARAMS", message: "domain must be a string") }
         do {
             let target = try target(body, createPartition: false, currentPage: !all)
             var cookies = await target.store.httpCookieStore.allCookies()
             if let name = body["name"] as? String { cookies = cookies.filter { $0.name == name } }
             if let domain = body["domain"] as? String { cookies = cookies.filter { Self.inDomain($0.domain, domain) } }
             if let scope = body["url"] as? String ?? (all ? nil : target.page) { cookies = CookieScope.scoped(cookies, toURL: scope) }
-            let described = cookies.compactMap(SyncCookieWire.json(from:))
+            let described = cookies.compactMap(SyncCookieWire.json(from:)).map(CookieAPIFormat.apiJSON(fromWire:))
             var result: [String: Any] = ["cookies": described, "count": described.count, "complete": described.count == cookies.count]
             if described.count != cookies.count { result["skipped"] = cookies.count - described.count }
             return successResponse(result)
@@ -116,7 +116,7 @@ struct MobileCookieHandler {
     @MainActor
     private func setCookies(_ body: [String: Any]) async -> [String: Any] {
         guard let items = body["cookies"] as? [Any], items.count <= Self.maxCookiesPerWrite else {
-            return errorResponse(code: "INVALID_ARGUMENT", message: "cookies must be an array of at most \(Self.maxCookiesPerWrite)")
+            return errorResponse(code: "INVALID_PARAMS", message: "cookies must be an array of at most \(Self.maxCookiesPerWrite)")
         }
         do {
             let store = try target(body, createPartition: true).store.httpCookieStore
@@ -124,7 +124,8 @@ struct MobileCookieHandler {
             var failed: [[String: Any]] = []
             for (index, item) in items.enumerated() {
                 let json = item as? [String: Any] ?? [:]
-                guard let cookie = SyncCookieWire.httpCookie(from: json) else {
+                guard let wire = CookieAPIFormat.wireJSON(fromAPI: json),
+                      let cookie = SyncCookieWire.httpCookie(from: wire) else {
                     failed.append(Self.failure(index, name: json["name"], domain: json["domain"], "INVALID_COOKIE"))
                     continue
                 }
@@ -146,14 +147,14 @@ struct MobileCookieHandler {
     /// Copies every cookie (optionally under `domain`) from one store to another.
     @MainActor
     private func copyCookies(_ body: [String: Any]) async -> [String: Any] {
-        if let raw = body["from"], !(raw is [String: Any]) { return errorResponse(code: "INVALID_ARGUMENT", message: "from must be an object") }
-        if let raw = body["to"], !(raw is [String: Any]) { return errorResponse(code: "INVALID_ARGUMENT", message: "to must be an object") }
-        if let raw = body["domain"], !(raw is String) { return errorResponse(code: "INVALID_ARGUMENT", message: "domain must be a string") }
+        if let raw = body["from"], !(raw is [String: Any]) { return errorResponse(code: "INVALID_PARAMS", message: "from must be an object") }
+        if let raw = body["to"], !(raw is [String: Any]) { return errorResponse(code: "INVALID_PARAMS", message: "to must be an object") }
+        if let raw = body["domain"], !(raw is String) { return errorResponse(code: "INVALID_PARAMS", message: "domain must be a string") }
         do {
             let source = try target(body["from"] as? [String: Any] ?? [:], createPartition: false)
             let destination = try target(body["to"] as? [String: Any] ?? [:], createPartition: true)
             guard !Self.sameStore(source.store, destination.store) else {
-                return errorResponse(code: "INVALID_ARGUMENT", message: "from and to are the same cookie store")
+                return errorResponse(code: "INVALID_PARAMS", message: "from and to are the same cookie store")
             }
             var cookies = await source.store.httpCookieStore.allCookies()
             if let domain = body["domain"] as? String { cookies = cookies.filter { Self.inDomain($0.domain, domain) } }

@@ -98,7 +98,7 @@ async function copyCookies(program: Command, opts: CopyOptions): Promise<void> {
   const to = cookieStoreTarget(opts.toTab, opts.toPartition, { tab: "--to-tab", partition: "--to-partition" });
   if (sameCookieStore(from, to)) {
     throw new CookieInputError(
-      "INVALID_ARGUMENT",
+      "INVALID_PARAMS",
       "The source and target are the same store. With no flags both are the default store; pass --from-* or --to-*.",
     );
   }
