@@ -137,6 +137,8 @@ set(WINDOWS_APP_SOURCES
   src/device_info_windows.cpp
   src/sync_peer_events.cpp
   src/dnssd_browse_cache.cpp
+  src/dnssd_windows.cpp
+  src/sync_advertise_windows.cpp
   src/sync_discovery_windows.cpp
 )
 
@@ -169,7 +171,9 @@ set(WINDOWS_APP_HEADERS
   src/device_info_windows.h
   src/sync_peer_events.h
   src/dnssd_browse_cache.h
+  src/dnssd_windows.h
   src/sync_discovery_windows.h
+  src/sync_discovery_windows_state.h
 )
 
 add_library(kelpie_windows_browser STATIC ${WINDOWS_APP_SOURCES} ${WINDOWS_APP_HEADERS})
@@ -486,8 +490,8 @@ if(BUILD_TESTING)
   target_compile_options(kelpie_windows_sync_discovery_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_sync_discovery_test COMMAND kelpie_windows_sync_discovery_test)
   add_executable(kelpie_windows_sync_discovery_live_test
-    tests/sync_discovery_live_test.cpp src/sync_discovery_windows.cpp src/sync_peer_events.cpp
-    src/dnssd_browse_cache.cpp)
+    tests/sync_discovery_live_test.cpp src/sync_discovery_windows.cpp src/sync_advertise_windows.cpp
+    src/dnssd_windows.cpp src/sync_peer_events.cpp src/dnssd_browse_cache.cpp)
   target_compile_definitions(kelpie_windows_sync_discovery_live_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
   target_include_directories(kelpie_windows_sync_discovery_live_test PRIVATE src)
   target_link_libraries(kelpie_windows_sync_discovery_live_test PRIVATE kelpie_desktop_sync ws2_32)
