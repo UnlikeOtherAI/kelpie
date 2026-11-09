@@ -1,20 +1,25 @@
 import AppKit
 import SwiftUI
 
-/// A native field keeps initial selection independent of WebView focus and
-/// leaves subsequent clicks, drag selection and IME editing to AppKit.
+/// The cell owns the transition into editing; later clicks belong to the
+/// existing field editor and retain native caret, drag selection and IME behavior.
+final class AddressTextFieldCell: NSTextFieldCell {
+    override func edit(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText,
+                       delegate: Any?, event: NSEvent?) {
+        super.edit(withFrame: rect, in: controlView, editor: textObj, delegate: delegate, event: nil)
+        textObj.selectAll(nil)
+    }
+}
+
 final class AddressTextField: NSTextField {
+    override class var cellClass: AnyClass? {
+        get { AddressTextFieldCell.self }
+        set { super.cellClass = newValue }
+    }
+
     var isEditingAddress: Bool {
         guard let editor = currentEditor() else { return false }
         return window?.firstResponder === editor
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        guard isEditingAddress else {
-            selectText(nil)
-            return
-        }
-        super.mouseDown(with: event)
     }
 }
 
