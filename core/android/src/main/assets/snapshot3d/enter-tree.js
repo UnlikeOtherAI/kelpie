@@ -108,14 +108,56 @@
         else if (rowRect.bottom > box.bottom) treeRoot.scrollTop += rowRect.bottom - box.bottom;
     }
 
+    function revealFrameContents(el) {
+        var current = el;
+        while (current.ownerDocument !== document) {
+            var view = current.ownerDocument.defaultView;
+            var frame = view.frameElement;
+            if (!frame) break;
+            var rect = current.getBoundingClientRect();
+            var dx = rect.right <= 0 || rect.left >= view.innerWidth ? (rect.left + rect.right - view.innerWidth) / 2 : 0;
+            var dy = rect.bottom <= 0 || rect.top >= view.innerHeight ? (rect.top + rect.bottom - view.innerHeight) / 2 : 0;
+            if (dx || dy) view.scrollBy({left: dx, top: dy, behavior: 'instant'});
+            current = frame;
+        }
+    }
+
+    function sceneRect(el) {
+        var bounds = el.getBoundingClientRect();
+        var rect = {left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom};
+        var view = el.ownerDocument.defaultView;
+        while (view !== window) {
+            var frame = view.frameElement;
+            if (!frame) return null;
+            // Convert the intersection with each containing frame's viewport.
+            rect.left = Math.max(0, rect.left);
+            rect.right = Math.min(view.innerWidth, rect.right);
+            rect.top = Math.max(0, rect.top);
+            rect.bottom = Math.min(view.innerHeight, rect.bottom);
+            if (rect.right <= rect.left || rect.bottom <= rect.top) return null;
+            var outer = frame.getBoundingClientRect();
+            var sx = outer.width / frame.offsetWidth, sy = outer.height / frame.offsetHeight;
+            rect = {
+                left: outer.left + (frame.clientLeft + rect.left) * sx,
+                right: outer.left + (frame.clientLeft + rect.right) * sx,
+                top: outer.top + (frame.clientTop + rect.top) * sy,
+                bottom: outer.top + (frame.clientTop + rect.bottom) * sy
+            };
+            view = frame.ownerDocument.defaultView;
+        }
+        return rect;
+    }
+
     function revealSceneElement(el) {
         if (!sceneEntries.has(el)) return;
+        revealFrameContents(el);
         var left = treePanel && !treePanel.hidden ? treePanel.getBoundingClientRect().right + 16 : leftTools.getBoundingClientRect().right + 16;
         var right = rightTools.getBoundingClientRect().left - 16;
         var top = 24, bottom = window.innerHeight - 80;
         // Translation, rather than fit-to-selection, preserves zoom and rotation.
         for (var i = 0; i < 3; i++) {
-            var rect = el.getBoundingClientRect();
+            var rect = sceneRect(el);
+            if (!rect) return;
             var dx = rect.right < left || rect.left > right ? (left + right - rect.left - rect.right) / 2 : 0;
             var dy = rect.bottom < top || rect.top > bottom ? (top + bottom - rect.top - rect.bottom) / 2 : 0;
             if (!dx && !dy) break;
@@ -147,10 +189,20 @@
         var target;
         try {
             target = document.elementFromPoint(x, y);
-            while (target) {
+            for (var depth = 0; target && depth < 32; depth++) {
                 var inner = target.shadowRoot && target.shadowRoot.elementFromPoint(x, y);
-                if (!inner || inner === target) break;
-                target = inner;
+                if (inner && inner !== target) { target = inner; continue; }
+                if (target.tagName !== 'IFRAME') break;
+                try {
+                    var frameDocument = target.contentDocument;
+                    if (!frameDocument) break;
+                    var rect = target.getBoundingClientRect();
+                    var localX = (x - rect.left) * target.offsetWidth / rect.width - target.clientLeft;
+                    var localY = (y - rect.top) * target.offsetHeight / rect.height - target.clientTop;
+                    inner = frameDocument.elementFromPoint(localX, localY);
+                    if (!inner) break;
+                    x = localX; y = localY; target = inner;
+                } catch(e) { break; }
             }
         } finally { overlay.style.display = ''; }
         if (target === hoveredEl) return;

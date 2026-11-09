@@ -185,6 +185,54 @@ test('exit and re-entry restore source styles and remove scene listeners', async
     } finally { await page.close(); }
 });
 
+test('short narrow viewports keep the toolbox and close action reachable', async () => {
+    const page = await scene({width: 390, height: 360});
+    try {
+        await page.getByRole('button', {name: 'Open element toolbox', exact: true}).click();
+        const close = page.getByRole('button', {name: 'Close element toolbox', exact: true});
+        const box = await close.boundingBox();
+        assert.ok(box.y >= 0 && box.y + box.height <= 360, JSON.stringify(box));
+        assert.ok(box.x >= 0 && box.x + box.width <= 390, JSON.stringify(box));
+        await close.click();
+        assert.equal(await page.getByRole('tree', {name: 'Page elements'}).isVisible(), false);
+    } finally { await page.close(); }
+});
+
+test('nested iframe reveal converts coordinates, scrolls clipped content and restores it', async () => {
+    const page = await browser.newPage({viewport: {width: 1280, height: 900}});
+    try {
+        await page.setContent('<body><div style="height:1400px">Top</div><iframe id="outer" style="width:460px;height:260px"></iframe></body>');
+        await page.locator('#outer').evaluate(el => {
+            el.srcdoc = '<body><div style="height:800px">Outer</div><iframe id="inner" style="width:360px;height:200px"></iframe></body>';
+        });
+        const outer = page.frameLocator('#outer');
+        await outer.locator('#inner').evaluate(el => {
+            el.srcdoc = '<body><div style="height:900px">Inner</div><footer id="frame-footer" style="height:80px;background:orange">Frame footer</footer></body>';
+        });
+        const footer = outer.frameLocator('#inner').locator('#frame-footer');
+        await footer.waitFor({state: 'attached'});
+        await page.evaluate(enter);
+        await page.getByRole('button', {name: 'Front view (Z axis)', exact: true}).click();
+        await page.getByRole('button', {name: 'Open element toolbox', exact: true}).click();
+        for (const [name, level] of [['<iframe#outer>', 3], ['<html>', 4], ['<body>', 5], ['<iframe#inner>', 6], ['<html>', 7], ['<body>', 8]]) {
+            await page.locator(`[role=treeitem][aria-label="${name}"][aria-level="${level}"] .disclosure`).click();
+        }
+        await page.getByRole('treeitem', {name: '<footer#frame-footer>', exact: true}).hover();
+        assert.match(await transform(page), /scale\(0.85\) rotateX\(0deg\) rotateY\(0deg\)/);
+        const box = await footer.boundingBox();
+        assert.ok(box.y >= 0 && box.y < 820 && box.y + box.height > 24, JSON.stringify(box));
+        assert.ok(await footer.evaluate(el => el.ownerDocument.defaultView.scrollY > 0));
+        assert.ok(await outer.locator('#inner').evaluate(el => el.ownerDocument.defaultView.scrollY > 0));
+        await page.getByRole('button', {name: 'Close element toolbox', exact: true}).click();
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.getByRole('button', {name: 'Open element toolbox', exact: true}).click();
+        assert.equal(await page.getByRole('treeitem', {name: '<footer#frame-footer>', exact: true}).getAttribute('aria-selected'), 'true');
+        await page.evaluate(exit);
+        assert.equal(await footer.evaluate(el => el.ownerDocument.defaultView.scrollY), 0);
+        assert.equal(await outer.locator('#inner').evaluate(el => el.ownerDocument.defaultView.scrollY), 0);
+    } finally { await page.close(); }
+});
+
 test('desktop and phone screenshot pairs use matching base and final scenes', {skip: !process.env.KELPIE_SCREENSHOTS}, async () => {
     const dir = path.resolve(process.env.KELPIE_SCREENSHOTS);
     await mkdir(dir, {recursive: true});

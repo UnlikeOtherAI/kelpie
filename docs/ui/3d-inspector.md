@@ -22,7 +22,9 @@ includes hidden nodes, open shadow roots and same-origin iframe documents. Expan
 branches with their disclosure arrows or Left/Right keys; move between visible
 rows with Up/Down. Hovering, focusing or selecting a row highlights its plane. If
 the plane is outside the visible scene, the camera translates to it while retaining
-its zoom and angle. Hovering the page reveals the matching row and expands its
+its zoom and angle. For same-origin frames, it reveals clipped content inside each
+containing frame before moving the outer camera; exit restores those frame scroll
+positions. Hovering the page reveals the matching row and expands its
 ancestors. Only the toolbox scrolls when a matching row needs to be shown.
 
 Unrendered nodes and nodes beyond the existing 5,000-plane render limit remain
@@ -38,3 +40,5 @@ state automatically. The preview is kept only in memory for the current session.
 
 On phone widths the right card narrows and the toolbox opens below the left tools.
 Landscape layouts shorten the preview and slider to keep controls reachable.
+Short, narrow windows open the tree beside the tools so its close action remains
+inside the viewport.

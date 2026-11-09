@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.unlikeotherai.kelpie"
-version = "0.2.1"
+version = "0.2.2"
 
 ktlint {
     version.set("1.5.0")

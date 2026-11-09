@@ -76,7 +76,8 @@
             .vertical-pan { flex-direction: row; } .vertical-pan button { min-height: 32px !important; }
             .right { top: 8px; width: 250px; gap: 8px; grid-template-columns: 1fr 56px; }
             .orientation { grid-column: 1; } .zoom { grid-column: 1; }
-            .spacing { grid-column: 2; grid-row: 1 / span 2; } }
+            .spacing { grid-column: 2; grid-row: 1 / span 2; }
+            .tree { top: 8px; bottom: 8px; left: 80px; width: calc(100% - 92px); z-index: 1; } }
     `;
     tools.appendChild(toolStyle);
 
