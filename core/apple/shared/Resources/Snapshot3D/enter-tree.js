@@ -110,8 +110,8 @@
 
     function revealSceneElement(el) {
         if (!sceneEntries.has(el)) return;
-        var left = treePanel && !treePanel.hidden ? treePanel.getBoundingClientRect().right + 16 : 84;
-        var right = window.innerWidth - (window.innerWidth < 600 ? 136 : 232);
+        var left = treePanel && !treePanel.hidden ? treePanel.getBoundingClientRect().right + 16 : leftTools.getBoundingClientRect().right + 16;
+        var right = rightTools.getBoundingClientRect().left - 16;
         var top = 24, bottom = window.innerHeight - 80;
         // Translation, rather than fit-to-selection, preserves zoom and rotation.
         for (var i = 0; i < 3; i++) {

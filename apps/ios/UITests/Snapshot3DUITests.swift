@@ -21,7 +21,7 @@ final class Snapshot3DUITests: XCTestCase {
             let exit = app.buttons["browser.snapshot3d.exit"]
             XCTAssertTrue(exit.waitForExistence(timeout: 10))
             let page = app.webViews.firstMatch
-            let pan = page.buttons["Pan 3D view"]
+            let pan = page.descendants(matching: .any).matching(identifier: "Pan 3D view").firstMatch
             XCTAssertTrue(pan.waitForExistence(timeout: 5))
             pan.tap()
             page.buttons["Move page up without zooming"].tap()

@@ -2,13 +2,24 @@
     var toolsHost = document.createElement('div');
     toolsHost.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
     overlay.appendChild(toolsHost);
+    var uiScale = 1;
+    function layoutTools() {
+        uiScale = 1 / ((window.visualViewport && window.visualViewport.scale) || 1);
+        toolsHost.style.width = (window.innerWidth / uiScale) + 'px';
+        toolsHost.style.height = (window.innerHeight / uiScale) + 'px';
+        toolsHost.style.transformOrigin = 'top left';
+        toolsHost.style.transform = 'scale(' + uiScale + ')';
+    }
+    layoutTools();
+    addListener(window, 'resize', layoutTools, false);
+    if (window.visualViewport) addListener(window.visualViewport, 'resize', layoutTools, false);
     var tools = toolsHost.attachShadow({mode: 'open'});
     ['click', 'dblclick', 'mousedown', 'mousemove', 'touchstart', 'touchmove', 'wheel', 'keydown'].forEach(function(type) {
         toolsHost.addEventListener(type, function(e) { e.stopPropagation(); });
     });
     var toolStyle = document.createElement('style');
     toolStyle.textContent = `
-        :host { all: initial; color-scheme: dark; }
+        :host { all: initial; color-scheme: dark; container-type: size; }
         * { box-sizing: border-box; }
         .panel { pointer-events: auto; color: #eef1f7; background: rgba(25,29,39,.96);
             border: 1px solid #434b5e; border-radius: 14px; box-shadow: 0 8px 30px #0004;
@@ -42,8 +53,8 @@
         select { min-width: 0; width: 82px; text-align: center; }
         .spacing { justify-self: end; padding: 12px 8px; display: grid; justify-items: center; gap: 8px; }
         .spacing input { writing-mode: vertical-lr; direction: rtl; appearance: auto;
-            width: 28px; height: min(26vh,200px); accent-color: #8bb7ff; touch-action: none; }
-        .tree { position: absolute; left: 84px; top: 20px; bottom: 72px; width: min(340px, calc(100vw - 340px)); overflow: hidden; }
+            width: 28px; height: min(26cqh,200px); accent-color: #8bb7ff; touch-action: none; }
+        .tree { position: absolute; left: 84px; top: 20px; bottom: 72px; width: min(340px, calc(100% - 340px)); overflow: hidden; }
         .tree header { height: 48px; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between; }
         .tree header button { min-height: 32px; min-width: 32px; }
         .tree-root { height: calc(100% - 48px); overflow: auto; overscroll-behavior: contain; padding: 5px 0; }
@@ -52,15 +63,20 @@
         .tree-row:hover, .tree-row[aria-selected=true] { background: #35496b; color: #ffcf83; }
         .disclosure { flex: 0 0 22px; text-align: center; }
         [hidden] { display: none !important; }
-        @media (max-width: 600px) {
+        @container (max-width: 600px) {
             .left { left: 6px; top: 10px; } .right { right: 6px; top: 10px; width: 120px; }
             .orientation { padding: 7px; } .orbit { height: 112px; transform: scale(.73); margin: -8px -20px; }
             .axes { gap: 2px; } .axes button { font-size: 10px; }
             .zoom { gap: 2px; padding: 5px; flex-wrap: wrap; } select { flex: 1; width: 44px; }
-            .zoom button { min-width: 28px; } .tree { left: 6px; top: 370px; bottom: 16px; width: calc(100vw - 138px); }
+            .zoom button { min-width: 28px; } .vertical-pan { flex-direction: column; }
+            .vertical-pan button { min-height: 44px !important; } .tree { left: 6px; top: 430px; bottom: 16px; width: calc(100% - 138px); }
         }
-        @media (max-height: 520px) { .orbit { height: 95px; transform: scale(.65); margin: -12px 0; }
-            .spacing input { height: 70px; } .left { top: 8px; gap: 2px; } .right { top: 8px; gap: 5px; } }
+        @container (max-height: 520px) { .orbit { height: 95px; transform: scale(.65); margin: -12px 0; }
+            .spacing input { height: 70px; } .left { top: 8px; gap: 2px; } .left button { padding: 3px; min-height: 32px; }
+            .vertical-pan { flex-direction: row; } .vertical-pan button { min-height: 32px !important; }
+            .right { top: 8px; width: 250px; gap: 8px; grid-template-columns: 1fr 56px; }
+            .orientation { grid-column: 1; } .zoom { grid-column: 1; }
+            .spacing { grid-column: 2; grid-row: 1 / span 2; } }
     `;
     tools.appendChild(toolStyle);
 
@@ -129,8 +145,8 @@
     });
     orbit.addEventListener('pointermove', function(e) {
         if (!orbitDrag) return;
-        rotY += (e.clientX - orbitDrag.x) * 0.8;
-        rotX = Math.max(-90, Math.min(90, rotX - (e.clientY - orbitDrag.y) * 0.8));
+        rotY += (e.clientX - orbitDrag.x) * 0.8 / uiScale;
+        rotX = Math.max(-90, Math.min(90, rotX - (e.clientY - orbitDrag.y) * 0.8 / uiScale));
         orbitDrag = {x: e.clientX, y: e.clientY}; applyTransform();
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(type) {

@@ -143,6 +143,33 @@ test('phone tools remain reachable and touch drags preserve pan semantics', asyn
     } finally { await context.close(); }
 });
 
+test('mobile sites without viewport metadata keep readable inspector controls', async () => {
+    const context = await browser.newContext({viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+    const page = await context.newPage();
+    try {
+        await page.setContent(fixture.replace(/<meta name="viewport"[^>]*>/, ''));
+        await page.evaluate(enter);
+        const button = await page.getByRole('button', {name: 'Pan 3D view', exact: true}).boundingBox();
+        const viewportScale = await page.evaluate(() => window.visualViewport.scale);
+        assert.ok(button.width * viewportScale >= 40, 'Controls must remain readable in device pixels');
+        await page.getByRole('button', {name: 'Pan 3D view', exact: true}).tap();
+        await page.getByRole('button', {name: 'Open element toolbox', exact: true}).tap();
+        await page.getByRole('button', {name: 'Close element toolbox', exact: true}).tap();
+    } finally { await context.close(); }
+});
+
+test('landscape keeps vertical movement and separation controls inside the viewport', async () => {
+    const page = await scene({width: 844, height: 390});
+    try {
+        for (const control of [page.getByRole('slider', {name: 'Layer separation'}),
+            page.getByRole('button', {name: 'Move page up without zooming', exact: true}),
+            page.getByRole('button', {name: 'Reset 3D view', exact: true})]) {
+            const box = await control.boundingBox();
+            assert.ok(box.y >= 0 && box.y + box.height <= 390, JSON.stringify(box));
+        }
+    } finally { await page.close(); }
+});
+
 test('exit and re-entry restore source styles and remove scene listeners', async () => {
     const page = await scene();
     try {
