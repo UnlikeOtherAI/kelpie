@@ -63,6 +63,8 @@ ln -s /opt/kelpie/kelpie-linux "${BUILDROOT}/usr/bin/kelpie-linux"
 chmod 755 "${BUILDROOT}/opt/kelpie/kelpie-linux"
 chmod 755 "${BUILDROOT}/opt/kelpie/chrome-sandbox"
 
+# Avahi is a weak dependency: cookie-sync discovery dlopens
+# libavahi-client.so.3 and reports mdns-unavailable without it.
 cat > "${TOPDIR}/SPECS/kelpie.spec" <<EOF
 Name:           kelpie
 Version:        ${VERSION}
@@ -76,7 +78,6 @@ Requires:       openssl-libs
 Requires:       alsa-lib
 Requires:       at-spi2-atk
 Requires:       atk
-Requires:       avahi-libs
 Requires:       cups-libs
 Requires:       dbus-libs
 Requires:       fontconfig
@@ -93,10 +94,16 @@ Requires:       nspr
 Requires:       nss
 Requires:       pango
 Requires:       zlib
+Recommends:     avahi
+Recommends:     avahi-libs
 
 %description
 Linux desktop browser shell for Kelpie with embedded Chromium runtime,
 local HTTP/MCP control surface, and mDNS discovery.
+
+Avahi is optional. Kelpie loads libavahi-client at runtime to find other
+signed-in Kelpie devices for cookie sync; without the avahi daemon it runs
+and reports sync as unavailable.
 
 %install
 rm -rf %{buildroot}

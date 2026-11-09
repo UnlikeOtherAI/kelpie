@@ -36,6 +36,9 @@
 #include "connect_client.h"
 #include "connect_executor.h"
 #include "inference_service.h"
+#include "kelpie/desktop_sync.h"
+#include "kelpie/sync_cookie_store.h"
+#include "sync_discovery_windows.h"
 
 namespace kelpie::windows {
 
@@ -126,6 +129,12 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void ArmCloseRetry();
   bool CreateShell(int show_command);
   std::wstring AppTitle() const;
+  // Peer-to-peer cookie sync (windows_cookie_sync.cpp); standalone only.
+  bool IsStandalone() const;
+  void StartCookieSync(const std::string& device_name);
+  void TickCookieSync();
+  void StopCookieSync();
+  nlohmann::json CookieSyncStatus() const;
 
   HINSTANCE instance_;
   AppConfig config_;
@@ -154,6 +163,12 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::unique_ptr<InferenceService> inference_;
   ProfileSession profile_session_;
   StartupDiagnostics startup_diagnostics_;
+  // Destroyed in reverse: the service first, then what it uses. The mutex
+  // covers the pointers for status reads from HTTP workers.
+  mutable std::mutex cookie_sync_mutex_;
+  std::unique_ptr<SyncDiscoveryWindows> sync_discovery_;
+  std::unique_ptr<SyncCookieStore> sync_cookies_;
+  std::unique_ptr<DesktopCookieSync> cookie_sync_;
 
 };
 
