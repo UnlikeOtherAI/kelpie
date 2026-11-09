@@ -1,19 +1,23 @@
 cmake_minimum_required(VERSION 3.16)
-project(kelpie_windows VERSION 0.2.3 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.2.4 LANGUAGES CXX RC)
 include(CTest)
 
 add_subdirectory(../../core/windows kelpie-browser)
 
 if(HAS_CEF OR CEF_ROOT)
-  add_library(kelpie SHARED src/main.cpp resources/kelpie.rc)
+  add_library(kelpie SHARED src/main.cpp src/standalone_entry.cpp src/release_updates.cpp resources/kelpie.rc)
 else()
-  add_executable(kelpie WIN32 src/main.cpp resources/kelpie.rc)
+  add_executable(kelpie WIN32 src/main.cpp src/standalone_entry.cpp src/release_updates.cpp resources/kelpie.rc)
   if(MSVC)
     target_link_options(kelpie PRIVATE "/MANIFEST:NO")
   endif()
 endif()
 
 target_link_libraries(kelpie PRIVATE Kelpie::Browser)
+target_link_libraries(kelpie PRIVATE winhttp comctl32)
+target_compile_definitions(kelpie PRIVATE KELPIE_APP_VERSION="${PROJECT_VERSION}")
+
+configure_file("../updates/install-windows.ps1" "${CMAKE_BINARY_DIR}/install-update.ps1" COPYONLY)
 target_compile_features(kelpie PRIVATE cxx_std_20)
 target_include_directories(kelpie PRIVATE ../../core/windows/resources)
 set_target_properties(kelpie PROPERTIES
@@ -24,7 +28,9 @@ set_target_properties(kelpie PROPERTIES
   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 
-kelpie_stage_browser_runtime(kelpie)
+if(HAS_CEF OR CEF_ROOT)
+  kelpie_stage_browser_runtime(kelpie)
+endif()
 
 # Opt-in native embedding fixture; it is excluded from standalone releases.
 option(KELPIE_BUILD_EMBEDDING_HOST "Build the native parent-window SDK fixture" OFF)
@@ -41,3 +47,13 @@ if(KELPIE_BUILD_EMBEDDING_HOST AND CEF_ROOT)
   )
   kelpie_stage_browser_runtime(kelpie_embed_host)
 endif()
+
+# Keep multi-config generators beside the shared runtime staging directory,
+# matching the single-config release build and package manifest.
+foreach(host IN ITEMS kelpie kelpie_embed_host)
+  if(TARGET ${host})
+    foreach(configuration IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+      set_property(TARGET ${host} PROPERTY RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}")
+    endforeach()
+  endif()
+endforeach()

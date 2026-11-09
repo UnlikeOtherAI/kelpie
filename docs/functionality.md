@@ -5,6 +5,30 @@ The embeddable browser extraction keeps the complete native UI, tabs and behavio
 
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.
 
+## App updates
+
+Standalone Kelpie apps on macOS, Windows, Linux and Android check GitHub for compatible stable releases at launch and
+every six hours while running. A new component version offers **Update**, **Skip
+version**, and **Not now**. Skip version remembers that component version across
+restarts; a later version can still prompt. Not now dismisses the prompt for this
+launch and asks again on the next launch. Closing the prompt has the same effect.
+
+On desktop, Update downloads and verifies the complete package before closing
+Kelpie, installs it, and restarts with the same launch arguments. Mac packages
+must be signed by the installed app's team and pass Gatekeeper; Windows packages
+must have valid, matching UnlikeOtherAI signatures on the CEF bootstrap, client
+DLL and `chrome_elf.dll`. All desktop downloads must match the SHA-256 published
+by GitHub. Portable installs retain the previous installation for recovery;
+Linux `.deb` and `.rpm` installs use the system package manager and its normal
+authorization prompt. Mobile Update opens the published APK or store update page.
+iOS update notifications are deferred. Simulator archives are never advertised as physical iOS updates.
+
+Unrelated component releases, prereleases, drafts, missing packages and installed
+or older versions do not prompt. Offline checks retry after fifteen minutes without
+interrupting browsing. Embedded Kelpie browsers and headless Linux runs do not
+check for standalone updates. See [App update delivery](app-updates.md) for the
+release metadata and packaging contract.
+
 For information about browser engine availability by platform and Apple's regulatory requirements for alternative engines, see [browser-engines.md](browser-engines.md).
 
 ---

@@ -410,6 +410,8 @@ jobs:
       - build-android
       - publish-cli
     steps:
+      - uses: actions/checkout@v6.0.3
+
       - uses: actions/download-artifact@v8.0.1
         if: needs.build-linux.result == 'success'
         with:
@@ -448,6 +450,11 @@ jobs:
             dist/release/**/*.aab
             dist/release/**/*.tgz
             dist/release/**/checksums-*.txt
+
+      - name: Advertise completed app updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-built-app-updates.mjs "${{ github.event.release.tag_name }}"
 
   publish-package-repos:
     # Skipped, unchanged components must not suppress a successful Linux release.

@@ -10,6 +10,7 @@
 #include "ui_theme.h"
 #include "url_bar.h"
 #include "window_geometry.h"
+#include "release_updates.h"
 #if KELPIE_LINUX_HAS_GTK
 #include <gdk/gdkkeysyms.h>
 #include <gtk/gtk.h>
@@ -22,6 +23,7 @@ int GUIShell::Run() {
   auto* window=GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
   gtk_window_set_title(window,"Kelpie"); gtk_window_set_default_size(window,app_.config().width,app_.config().height);
   WindowGeometry geometry(window,app_.config().profile_dir);
+  StandaloneUpdates updates(app_,window);
   auto* header=gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
   gtk_window_set_titlebar(window,header); // Client-side decoration keeps native resize handles.
   gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(window)),"kelpie-window");
@@ -50,7 +52,7 @@ int GUIShell::Run() {
     if(action==3)chrome.AccountMenu(url.widget());
     if(action==4) { settings.Refresh(); settings.Show(window); }
   };
-  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; unsigned tick=0; } context{app_,window,url,browser,chrome,toast};
+  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; StandaloneUpdates& updates; unsigned tick=0; } context{app_,window,url,browser,chrome,toast,updates};
   g_signal_connect(window,"delete-event",G_CALLBACK(+[](GtkWidget*,GdkEvent*,gpointer raw)->gboolean {
     static_cast<LinuxApp*>(raw)->RequestShutdown(); return TRUE; // Keep renderer and pump alive until drained.
   }),&app_);
@@ -72,6 +74,7 @@ int GUIShell::Run() {
   const auto timer=g_timeout_add(16,+[](gpointer raw)->gboolean {
     auto& c=*static_cast<Context*>(raw); c.app.PumpBrowser();
     if(!c.app.IsRunning()) { if(c.app.FinishShutdown())gtk_main_quit(); return G_SOURCE_CONTINUE; }
+    c.updates.Tick();
     if(c.app.WantsFullscreen()!=c.app.IsFullscreen()) { if(c.app.WantsFullscreen())gtk_window_fullscreen(c.window); else gtk_window_unfullscreen(c.window); }
     auto [width,height]=c.app.TakeResizeRequest();
     if(width>0&&height>0) {

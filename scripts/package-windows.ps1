@@ -130,6 +130,7 @@ Remove-Item -Recurse -Force -LiteralPath $stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 try {
   Copy-Item -LiteralPath $bootstrap, $dll -Destination $stage
+  Copy-Item -LiteralPath (Join-Path $build "install-update.ps1") -Destination $stage
   $originalBootstrapHash = (Get-FileHash -LiteralPath (Join-Path $stage "kelpie.exe") -Algorithm SHA256).Hash
   Copy-KelpieBranding $dll (Join-Path $stage "kelpie.exe")
   $customBootstrap = Join-Path $stage "kelpie.exe"

@@ -202,7 +202,10 @@ async function runBrowserActions(readiness, fixtureUrl) {
   const screenshot = await control(readiness, "screenshot", { format: "png" });
   const decoded = decodePng(Buffer.from(imageFrom(screenshot), "base64"));
   assertion(decoded.width > 0 && decoded.height > 0, "screenshot must decode to a non-empty PNG");
-  await expectControlError(readiness, "screenshot", { format: "jpeg" });
+  const jpeg = await control(readiness, "screenshot", { format: "jpeg" });
+  assert.equal(Buffer.from(imageFrom(jpeg), "base64").subarray(0, 3).toString("hex"), "ffd8ff",
+    "JPEG screenshot must contain JPEG image data");
+  await expectControlError(readiness, "screenshot", { format: "gif" });
 
   // A later navigation must win even when the earlier page is still loading.
   const slowNavigation = control(readiness, "navigate", { url: `${fixtureUrl}/slow` });

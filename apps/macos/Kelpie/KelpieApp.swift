@@ -3,6 +3,7 @@ import KelpieBrowser
 
 struct KelpieApp: App {
     @StateObject private var browser = KelpieBrowserSession.standalone()
+    @StateObject private var updates = AppUpdates()
 
     init() {
         #if DEBUG
@@ -11,7 +12,10 @@ struct KelpieApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { KelpieBrowserView(session: browser, ownsWindowChrome: true) }
+        WindowGroup {
+            KelpieBrowserView(session: browser, ownsWindowChrome: true)
+                .modifier(AppUpdatePresentation(updates: updates))
+        }
             .commands { KelpieBrowserCommands(session: browser) }
     }
 }

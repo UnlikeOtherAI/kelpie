@@ -4,6 +4,7 @@ import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -84,9 +85,11 @@ class OpenAIInference(
         contextProvider: suspend (String) -> String?,
     ): Map<String, Any?> {
         val progress = AgentProgress()
-        val job = scope.async { runCatchingErrors(request, dispatcher, contextProvider, progress) }
+        val job = scope.async(start = CoroutineStart.LAZY) { runCatchingErrors(request, dispatcher, contextProvider, progress) }
         running += job
         try {
+            // Register before any transport work can race with ai-cancel.
+            job.start()
             return job.await()
         } catch (e: CancellationException) {
             if (job.isCancelled && currentCoroutineContext().isActive) {

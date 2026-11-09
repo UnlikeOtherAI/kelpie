@@ -7,6 +7,8 @@ included:
   - apps/apple-test-host
   - apps/ios/Kelpie
   - apps/macos/Kelpie
+  - apps/updates/apple
+  - apps/updates/verification-host
 
 excluded:
   - core/apple/macos/Frameworks

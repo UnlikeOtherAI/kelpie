@@ -48,3 +48,10 @@ After the PR passes its required checks and merges, upload the verified signed
 ZIP, hash and provenance to the component's dated release. Download the published
 archive, compare its SHA-256, extract and launch that copy. Keep the source
 revision and signing evidence with the release record.
+
+After the published download has been verified, advertise it to installed apps
+with `scripts/publish-app-update.mjs`: use the release tag, target `windows-x64`,
+the canonical Windows component version and the signed ZIP asset name. The
+publisher checks the version against the tagged source and requires GitHub's
+uploaded-asset digest. Never advertise the unsigned CI candidate. See
+[App update delivery](app-updates.md).

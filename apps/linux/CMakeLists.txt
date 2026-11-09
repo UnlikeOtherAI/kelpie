@@ -103,6 +103,7 @@ add_executable(kelpie-linux
   src/network_inspector.cpp
   src/toast_view.cpp
   src/device_info_linux.cpp
+  src/release_updates.cpp
 )
 
 target_include_directories(kelpie-linux
@@ -115,7 +116,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.2.2"
+    KELPIE_LINUX_VERSION="0.2.3"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -123,7 +124,8 @@ if(KELPIE_LINUX_HAS_CEF)
 endif()
 
 if(KELPIE_LINUX_HAS_GTK)
-  target_link_libraries(kelpie-linux PRIVATE PkgConfig::GTK3)
+  find_package(CURL REQUIRED)
+  target_link_libraries(kelpie-linux PRIVATE PkgConfig::GTK3 CURL::libcurl)
 endif()
 
 if(KELPIE_LINUX_HAS_FONTCONFIG)
@@ -151,6 +153,9 @@ set_target_properties(kelpie-linux PROPERTIES
   INSTALL_RPATH "\$ORIGIN"
   INSTALL_RPATH_USE_LINK_PATH FALSE
 )
+
+add_custom_command(TARGET kelpie-linux POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+  "${CMAKE_CURRENT_SOURCE_DIR}/../updates/install-linux.sh" "$<TARGET_FILE_DIR:kelpie-linux>/install-update.sh")
 
 add_custom_command(TARGET kelpie-linux POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
