@@ -39,7 +39,7 @@ final class ComputerTrustUITests: XCTestCase {
         app.cells.containing(.staticText, identifier: computerName).buttons["Revoke"].tap()
         XCTAssertFalse(app.staticTexts[computerName].exists)
         app.buttons["Done"].tap()
-        app.swipeDown()
+        app.buttons["Done"].tap()
         let revoked = try await prove(key)
         XCTAssertEqual(revoked["approvalRequired"] as? Bool, true)
         XCTAssertTrue(allow.waitForExistence(timeout: 5))
