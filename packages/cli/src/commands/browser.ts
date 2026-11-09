@@ -283,7 +283,6 @@ export function registerBrowser(program: Command): void {
         await setRunningBrowser(name, { port: boundPort, lastLaunchedAt: new Date().toISOString() });
         print({ success: true, name, platform: alias.platform, appPath, port: boundPort }, globals.format);
       } catch (error) {
-        await clearRunningBrowser(name);
         print({
           success: false,
           error: {

@@ -23,7 +23,7 @@ vi.mock("../../src/mcp/transport.js", () => ({
 import { execFile, spawn } from "node:child_process";
 import { allocateBrowserPort } from "../../src/browser/launch.js";
 import { probeHealth } from "../../src/discovery/local-probe.js";
-import { getBrowserAlias, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
+import { clearRunningBrowser, getBrowserAlias, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
 import { startHttp } from "../../src/mcp/transport.js";
 import { createProgram } from "../../src/program.js";
 
@@ -133,6 +133,7 @@ describe("browser launch --port on macOS", () => {
       await launch;
       expect(execFile).toHaveBeenCalledOnce();
       expect(setRunningBrowser).not.toHaveBeenCalled();
+      expect(clearRunningBrowser).not.toHaveBeenCalled();
       expect(process.exitCode).toBe(6);
       expect(vi.mocked(console.log).mock.calls.join("\n")).toContain("may already be running");
     } finally {

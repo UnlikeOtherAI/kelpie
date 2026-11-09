@@ -198,7 +198,7 @@ kelpie browser register codex-b --app-path /Applications/Kelpie.app
 `--platform` defaults to this machine's platform. A Windows or Linux alias also needs an absolute `--profile-dir` (see [Windows aliases and agent stdio](#windows-aliases-and-agent-stdio)).
 
 ### `kelpie browser launch <name>`
-Launch the local Kelpie app for a registered alias. Only one standalone app may run on this computer, including across aliases, executable copies, profiles and ports. Use the running browser or close it before switching profiles. A duplicate launch fails with `BROWSER_LAUNCH_FAILED`; native startup enforces ownership even when concurrent CLI launches race. macOS opens the app without requesting another instance.
+Launch the local Kelpie app for a registered alias. Only one standalone app may run on this computer, including across aliases, executable copies, profiles and ports. Use the running browser or close it before switching profiles. A duplicate launch fails with `BROWSER_LAUNCH_FAILED`; native startup enforces ownership even when concurrent CLI launches race. macOS opens the app without requesting another instance. A rejected Mac launch preserves the running alias's port record so existing commands can still target it.
 
 If `--port` is omitted, the CLI picks the first free port from `8420` to `8519`, skipping `8421` (AppReveal and CLI MCP). An explicit port is used exactly as given. If an unrelated service holds the requested port, macOS can bind the next available port; the CLI records the observed port. A launch that never becomes ready fails without recording a successful launch.
 
