@@ -22,7 +22,7 @@
 #include <memory>
 #include <string>
 
-#include "sync_contract_pending.h"
+#include "kelpie/desktop_sync.h"
 
 namespace kelpie::linuxapp {
 

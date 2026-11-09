@@ -251,7 +251,7 @@ target_compile_definitions(kelpie_linux_sync_discovery PRIVATE
 if(KELPIE_LINUX_HAS_AVAHI_HEADERS)
   target_include_directories(kelpie_linux_sync_discovery PRIVATE ${AVAHI_CLIENT_INCLUDE_DIRS})
 endif()
-target_link_libraries(kelpie_linux_sync_discovery PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(kelpie_linux_sync_discovery PUBLIC kelpie_desktop_sync Threads::Threads ${CMAKE_DL_LIBS})
 if(BUILD_TESTING)
   add_executable(linux_sync_discovery_test tests/sync_discovery_test.cpp)
   target_compile_options(linux_sync_discovery_test PRIVATE -UNDEBUG)

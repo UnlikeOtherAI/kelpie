@@ -482,6 +482,7 @@ if(BUILD_TESTING)
   add_executable(kelpie_windows_sync_discovery_test
     tests/sync_discovery_test.cpp src/sync_peer_events.cpp src/dnssd_browse_cache.cpp)
   target_include_directories(kelpie_windows_sync_discovery_test PRIVATE src)
+  target_link_libraries(kelpie_windows_sync_discovery_test PRIVATE kelpie_desktop_sync)
   target_compile_options(kelpie_windows_sync_discovery_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_sync_discovery_test COMMAND kelpie_windows_sync_discovery_test)
   add_executable(kelpie_windows_sync_discovery_live_test
@@ -489,7 +490,7 @@ if(BUILD_TESTING)
     src/dnssd_browse_cache.cpp)
   target_compile_definitions(kelpie_windows_sync_discovery_live_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
   target_include_directories(kelpie_windows_sync_discovery_live_test PRIVATE src)
-  target_link_libraries(kelpie_windows_sync_discovery_live_test PRIVATE ws2_32)
+  target_link_libraries(kelpie_windows_sync_discovery_live_test PRIVATE kelpie_desktop_sync ws2_32)
   target_compile_options(kelpie_windows_sync_discovery_live_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_sync_discovery_live_test COMMAND kelpie_windows_sync_discovery_live_test)
 
