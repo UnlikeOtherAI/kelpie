@@ -4,6 +4,7 @@
 // refused, that /auth is single use and that the replay window holds.
 #include <cassert>
 #include <cstdio>
+#include <limits>
 #include <memory>
 
 #include "base64url.h"
@@ -234,10 +235,25 @@ void OtherAccountRefused(FakeUoa& uoa, FakeBus& bus) {
   const auto replay = client.Post(desktop_sync::kAuthPath, auth, std::chrono::seconds(5));
   assert(replay.status == 401 && replay.body["error"] == "SYNC_SESSION");
 
+  // Clocks at the ends of int64 are refused as skew, never overflowing.
+  for (const std::int64_t extreme : {std::numeric_limits<std::int64_t>::min(), std::numeric_limits<std::int64_t>::max()}) {
+    json skew = hello;
+    skew["replica"] = desktop_sync::RandomToken(16);
+    skew["now"] = extreme;
+    const auto refused = client.Post(desktop_sync::kHelloPath, skew, std::chrono::seconds(5));
+    assert(refused.status == 409 && refused.body["error"] == "CLOCK_SKEW");
+  }
+  // No unproven hello (forged, mismatched, skewed or failed /auth) became a peer.
+  assert(a.Status()["peers"].empty());
+
   // A genuine second Alice session is admitted; its sequence numbers are replay-checked.
   const std::string own = desktop_sync::RandomToken(16);
   const auto genuine = attempt(*spare.account, "alice", own, NowMillis);
   assert(genuine.session && genuine.error.empty() && genuine.session->peer_replica == replica);
+  // Proof succeeded: now, and only now, the initiator is a peer, with its hello identity.
+  const json peers = a.Status()["peers"];
+  assert(peers.size() == 1 && peers[0]["replica"] == own && peers[0]["platform"] == "linux" &&
+         peers[0]["name"] == "test" && peers[0]["state"] == "connected");
   desktop_sync::SyncClient channel(genuine.session->target, genuine.session->port);
   const auto exchange = [&](std::uint64_t seq, const std::string& as) {
     const json pull = {{"op", "pull"}, {"replica", as}, {"since", {{"replica", replica}, {"seq", 0}}}, {"wait", 0}};
@@ -267,6 +283,37 @@ void OtherAccountRefused(FakeUoa& uoa, FakeBus& bus) {
   assert(after == "UNREACHABLE" || after == "SYNC_SESSION");
 }
 
+// A LAN peer rotating replicas with a valid (public) hint cannot grow state:
+// unproven hellos live only in the 8-entry pending table and never in peers.
+void HelloFlood(FakeUoa& uoa, FakeBus& bus) {
+  Device a(&uoa, &bus, "flooded", "token-flooded");
+  a.SignIn();
+  a.StartSync();
+  assert(WaitFor([&] { return a.Running(); }));
+  desktop_sync::SyncClient client(*desktop_sync::ParseIp("127.0.0.1"), a.discovery.port());
+  std::vector<std::string> handshakes;
+  for (int i = 0; i < 9; ++i) {  // under the 10-a-minute hello rate limit
+    const auto key = desktop_sync::EcdhKey::Generate();
+    const json hello = {{"v", 1}, {"replica", desktop_sync::RandomToken(16)},
+                        {"hint", sync::AccountHint("alice", NowMillis())}, {"now", NowMillis()},
+                        {"platform", "linux"}, {"name", "flood"},
+                        {"key", sync::Base64UrlEncode(key->PublicKey().data(), key->PublicKey().size())},
+                        {"nonce", desktop_sync::RandomToken(32)}};
+    const auto reply = client.Post(desktop_sync::kHelloPath, hello, std::chrono::seconds(5));
+    assert(reply.status == 200);
+    handshakes.push_back(reply.body["handshakeId"]);
+  }
+  assert(a.Status()["peers"].empty());
+  // The ninth hello evicted the first pending handshake.
+  const auto evicted = client.Post(desktop_sync::kAuthPath, {{"handshakeId", handshakes.front()}, {"ticket", "t"}},
+                                   std::chrono::seconds(5));
+  assert(evicted.status == 401 && evicted.body["error"] == "SYNC_SESSION");
+  const auto newest = client.Post(desktop_sync::kAuthPath, {{"handshakeId", handshakes.back()}, {"ticket", "t"}},
+                                  std::chrono::seconds(5));
+  assert(newest.status == 403 && newest.body["error"] == "AUTH_FAILED");
+  assert(a.Status()["peers"].empty());
+}
+
 void Unsupported(FakeUoa& uoa, FakeBus&) {
   // Without discovery the service reports why and never listens.
   BookmarkStore bookmarks;
@@ -290,7 +337,7 @@ void Unsupported(FakeUoa& uoa, FakeBus&) {
 
 int main() {
   FakeUoa uoa;
-  uoa.subjects = {{"token-a", "alice"}, {"token-b", "alice"}, {"token-alice", "alice"}, {"token-spare", "alice"},
+  uoa.subjects = {{"token-a", "alice"}, {"token-b", "alice"}, {"token-alice", "alice"}, {"token-spare", "alice"}, {"token-flooded", "alice"},
                   {"token-bob", "bob"}, {"token-unsupported", "carol"}};
   FakeBus bus;
   LoginLogoutRestart(uoa, bus);
@@ -298,6 +345,9 @@ int main() {
   FakeBus other_bus;
   OtherAccountRefused(uoa, other_bus);
   std::puts("another account, a forged hint, clock skew and replays are refused");
+  FakeBus flood_bus;
+  HelloFlood(uoa, flood_bus);
+  std::puts("a replica-rotating hello flood stays bounded");
   Unsupported(uoa, bus);
   std::puts("sync_service_test passed");
   return 0;
