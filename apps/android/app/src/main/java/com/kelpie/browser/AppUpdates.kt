@@ -33,6 +33,14 @@ class AppUpdates(
 
     fun attach(owner: Activity) {
         activity = WeakReference(owner)
+        if (BuildConfig.DEBUG) {
+            val fixture = owner.intent.getStringExtra("kelpie.updateTestFeed")
+            if (fixture != null && fixture.length <= 1_048_576) {
+                candidate = runCatching { ReleaseFeed.newest(JSONArray(fixture), BuildConfig.VERSION_NAME) }.getOrNull()
+                present()
+                return
+            }
+        }
         present()
         if (started) return
         started = true

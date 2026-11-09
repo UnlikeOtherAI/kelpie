@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 #if os(macOS)
 import AppKit
 #else
@@ -20,6 +21,7 @@ final class AppUpdates: ObservableObject {
     private let target: String
     private let session: URLSession
     private let feedURL: URL
+    private let logger = Logger(subsystem: "com.unlikeotherai.kelpie.updates", category: "releases")
     #if os(macOS)
     private var installer: Process?
     #endif
@@ -52,6 +54,7 @@ final class AppUpdates: ObservableObject {
     }
 
     func activate(_ value: Bool) {
+        logger.debug("Update presentation active: \(value)")
         active = value
         if value { presentCandidate() }
         guard loop == nil else { return }
@@ -73,12 +76,14 @@ final class AppUpdates: ObservableObject {
             #if DEBUG
             if let fixture = ProcessInfo.processInfo.environment["KELPIE_UPDATE_TEST_FEED_JSON"], fixture.utf8.count <= 1_048_576 {
                 candidate = AppRelease.newest(in: Data(fixture.utf8), target: target, installed: installed)
+                logger.debug("Fixture update version: \(self.candidate?.version ?? "none", privacy: .public)")
                 presentCandidate()
                 return true
             }
             if let fixture = ProcessInfo.processInfo.environment["KELPIE_UPDATE_TEST_FEED"] {
                 let data = try Data(contentsOf: URL(fileURLWithPath: fixture))
                 candidate = AppRelease.newest(in: data, target: target, installed: installed)
+                logger.debug("Fixture update version: \(self.candidate?.version ?? "none", privacy: .public)")
                 presentCandidate()
                 return true
             }
