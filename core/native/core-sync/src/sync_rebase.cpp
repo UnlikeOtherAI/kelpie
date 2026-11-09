@@ -12,6 +12,7 @@ nlohmann::json SyncStore::Rebase(const nlohmann::json& cookies, const nlohmann::
   std::size_t adopted = 0;
 
   for (const auto& [key, engine_cookie] : engine) {
+    if (engine_cookie.ambiguous) continue;
     const auto it = entries_.find(key);
     if (it == entries_.end()) {
       // Only this engine had it: adopt with the zero version so any peer wins.

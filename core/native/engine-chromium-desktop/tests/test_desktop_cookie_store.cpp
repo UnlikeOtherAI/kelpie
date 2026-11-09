@@ -195,7 +195,7 @@ void WritesAndCopies() {
   store.refuse = {"refused"};
   const Json written = WriteCookies(store, *parsed, {});
   assert(written["set"] == 2 && written["failed"].size() == 1);
-  assert(written["failed"][0] == Json({{"index", 1}, {"name", "refused"}, {"domain", "a.test"}, {"error", "rejected by engine"}}));
+  assert(written["failed"][0] == Json({{"index", 1}, {"name", "refused"}, {"domain", "a.test"}, {"error", "NOT_STORED"}}));
   assert(store.cookies.size() == 2);
 
   FakeBackend source, target;
@@ -210,7 +210,7 @@ void WritesAndCopies() {
   target.Put(Wire(".example.com", "sid", "old"));
   const auto copied = CopyCookies(source, target, std::string("example.com"), {});
   assert(copied && (*copied)["copied"] == 2 && (*copied)["failed"].size() == 1);
-  assert((*copied)["failed"][0] == Json({{"name", "refused"}, {"domain", "example.com"}, {"error", "rejected by engine"}}));
+  assert((*copied)["failed"][0] == Json({{"name", "refused"}, {"domain", "example.com"}, {"error", "NOT_STORED"}}));
   assert(target.cookies.size() == 2 && target.cookies[FakeBackend::Key(Wire(".example.com", "sid", ""))]["value"] == "1");
   source.visit_fails = true;
   assert(!CopyCookies(source, target, std::nullopt, {}));

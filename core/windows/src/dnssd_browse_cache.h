@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "sync_peer_events.h"
+#include "kelpie/sync_peer_events.h"
 
 namespace kelpie::windows {
 

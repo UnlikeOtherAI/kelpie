@@ -55,11 +55,12 @@ final class MobileCookieSync {
 
     func status() async -> [String: Any] {
         if let service { return await service.status() }
+        let signedIn = UOAAccount.shared.profile != nil
         var result: [String: Any] = [
-            "supported": !declined, "signedIn": UOAAccount.shared.profile != nil, "listening": false,
+            "supported": false, "signedIn": signedIn, "listening": false,
             "peers": [[String: Any]](), "store": [String: Any]()
         ]
-        if declined { result["reason"] = "EMBEDDED_SESSION" }
+        result["reason"] = declined ? "embedded" : "signed-out"
         return result
     }
 

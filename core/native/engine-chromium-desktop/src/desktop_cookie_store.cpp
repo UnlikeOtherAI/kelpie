@@ -89,7 +89,7 @@ Json Failure(const Json& cookie, const std::string& error) {
   return {{"name", StringField(cookie, "name")}, {"domain", StringField(cookie, "domain")}, {"error", error}};
 }
 
-constexpr const char* kRefused = "rejected by engine";
+constexpr const char* kRefused = "NOT_STORED";  // the engine did not keep it
 
 }  // namespace
 

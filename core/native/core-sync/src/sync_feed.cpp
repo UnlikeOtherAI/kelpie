@@ -51,7 +51,9 @@ SyncStore::Page SyncStore::BuildPage(std::uint64_t after, const EngineMap& engin
       return page;
     }
     const Entry& entry = entries_.at(it->second);
-    if (entry.Forwardable()) {
+    const auto engine_cookie = engine.find(it->second);
+    const bool ambiguous = engine_cookie != engine.end() && engine_cookie->second.ambiguous;
+    if (entry.Forwardable() && !ambiguous) {
       auto record = RecordFor(entry, engine);
       if (!record) {
         page.incomplete = true;  // never move the cursor past an unsent record

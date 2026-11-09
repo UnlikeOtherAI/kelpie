@@ -4,6 +4,7 @@ add_library(kelpie_desktop_sync STATIC
   src/sync_crypto_hkdf.cpp
   src/sync_listener.cpp
   src/sync_net.cpp
+  src/sync_peer_events.cpp
   src/sync_protocol.cpp
   src/sync_service.cpp
   src/sync_service_initiator.cpp

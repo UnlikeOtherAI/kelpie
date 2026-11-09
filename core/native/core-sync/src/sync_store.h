@@ -75,6 +75,10 @@ class SyncStore {
   struct EngineCookie {
     Cookie cookie;
     std::string fingerprint;
+    // The engine reported this key more than once (Chromium lists every CHIPS
+    // partition of a cookie without marking it). Its value cannot be known, so
+    // the key is neither synced nor treated as deleted.
+    bool ambiguous = false;
   };
   using EngineMap = std::map<std::string, EngineCookie>;
 

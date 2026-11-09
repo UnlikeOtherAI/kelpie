@@ -142,7 +142,8 @@ void SyncStore::CommitOp(const PlannedOp& op, bool ok, const EngineMap& readback
   entry.name = op.name;
   entry.hlc = op.hlc;
   entry.local_only = false;
-  const auto found = readback.find(op.key);
+  auto found = readback.find(op.key);
+  if (found != readback.end() && found->second.ambiguous) found = readback.end();
 
   if (op.remove) {
     entry.deleted = true;

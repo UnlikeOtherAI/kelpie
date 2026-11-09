@@ -16,7 +16,7 @@
 #include "dnssd_browse_cache.h"
 #include "dnssd_windows.h"
 #include "sync_discovery_windows.h"
-#include "sync_peer_events.h"
+#include "kelpie/sync_peer_events.h"
 
 namespace kelpie::windows {
 

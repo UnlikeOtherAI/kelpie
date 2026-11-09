@@ -95,7 +95,8 @@ export type CookieSyncUnsupportedReason =
   | "embedded"
   | "webview-unsupported"
   | "mdns-unavailable"
-  | "no-cef";
+  | "no-cef"
+  | "store-unavailable";
 
 export type CookieSyncPeerState = "handshaking" | "connected" | "backoff" | "clock-skew" | "failed";
 

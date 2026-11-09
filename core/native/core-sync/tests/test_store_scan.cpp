@@ -222,6 +222,24 @@ void TestRendererSwitchRebaseStampsNothing() {
   assert(a.Scan(kNow + 2000)["changed"] == 0);
 }
 
+void TestDuplicateKeysAreUnobservable() {
+  Device a("ambiguous");
+  a.Open(false, kNow);
+  a.engine.Put(MakeCookie(".embed.com", "chips", "v"));
+  a.Scan(kNow);
+  a.Scan(kNow + 1);
+  // Chromium lists two CHIPS partitions of the same cookie without marking them.
+  json both = a.engine.Snapshot();
+  json other = MakeCookie(".embed.com", "chips", "other-partition");
+  both.push_back(other);
+  const json result = a.store->Scan(both, json{{"all", true}}, kNow + 1000);
+  assert(result["changed"] == 0);                    // no new version
+  assert(!FindStored(a, "chips").contains("del"));   // and not a deletion
+  const json pull = {{"op", "pull"}, {"replica", "peer"}, {"since", {{"replica", a.replica}, {"seq", 0}}}, {"wait", 0}};
+  const json response = a.store->AnswerPull(pull, both, json{{"all", true}}, kNow + 2000);
+  assert(response["records"].empty() && response["incomplete"] == false);  // skipped, never stalls the feed
+}
+
 }  // namespace
 
 int main() {
@@ -237,5 +255,6 @@ int main() {
     TestCorruptFileIsReplaced();
     TestTombstonesSurviveRestart();
     TestRendererSwitchRebaseStampsNothing();
+    TestDuplicateKeysAreUnobservable();
   });
 }

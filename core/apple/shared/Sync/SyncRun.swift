@@ -102,8 +102,10 @@ struct SyncPendingHandshake {
 /// What this run knows about one peer replica. Never holds cookie data.
 @MainActor
 final class SyncPeer {
+    /// The documented `peers[].state` values, shared with Android, Windows and Linux.
     enum State: String {
-        case waiting, connecting, connected, retrying, offline
+        case handshaking, connected, backoff, failed
+        case clockSkew = "clock-skew"
     }
 
     let replica: String

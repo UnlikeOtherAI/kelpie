@@ -17,7 +17,7 @@
 
 #include "kelpie/desktop_sync.h"
 
-namespace kelpie::windows {
+namespace kelpie {
 
 using SyncTxt = std::map<std::string, std::string>;
 
@@ -141,4 +141,4 @@ class SyncPeerDelivery {
   Lost lost_;
 };
 
-}  // namespace kelpie::windows
+}  // namespace kelpie

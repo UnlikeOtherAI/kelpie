@@ -272,9 +272,11 @@ final class CookieSyncService {
 
     /// `{supported, signedIn, replica?, listening, peers, store, lastError?}`; counts only.
     func status() async -> [String: Any] {
+        let signedIn = account.fence != nil
         var result: [String: Any] = [
-            "supported": true, "signedIn": account.fence != nil, "listening": run?.port != nil, "peers": [[String: Any]]()
+            "supported": signedIn, "signedIn": signedIn, "listening": run?.port != nil, "peers": [[String: Any]]()
         ]
+        if !signedIn { result["reason"] = "signed-out" }
         if let lastError { result["lastError"] = lastError }
         guard let run, isCurrent(run) else {
             result["store"] = [String: Any]()
@@ -289,9 +291,10 @@ final class CookieSyncService {
     }
 
     private func peerStatus(_ run: SyncRun) -> [[String: Any]] {
-        run.peers.values.sorted { $0.replica < $1.replica }.map { peer in
+        run.peers.values.sorted { $0.replica < $1.replica }.compactMap { peer in
+            guard let state = state(of: peer, in: run) else { return nil }
             var entry: [String: Any] = [
-                "replica": peer.replica, "platform": peer.platform, "name": peer.name, "state": state(of: peer, in: run).rawValue
+                "replica": peer.replica, "platform": peer.platform, "name": peer.name, "state": state.rawValue
             ]
             if let lastSyncAt = peer.lastSyncAt { entry["lastSyncAt"] = lastSyncAt }
             if let lastError = peer.lastError { entry["lastError"] = lastError }
@@ -299,11 +302,18 @@ final class CookieSyncService {
         }
     }
 
-    private func state(of peer: SyncPeer, in run: SyncRun) -> SyncPeer.State {
+    /// nil for a peer that stopped advertising and has no session: it is gone.
+    private func state(of peer: SyncPeer, in run: SyncRun) -> SyncPeer.State? {
         if run.channel(for: peer.replica) != nil { return .connected }
-        if peer.handshaking { return .connecting }
-        if let retryAt = peer.retryAt, retryAt > Date() { return .retrying }
-        return peer.advert == nil ? .offline : .waiting
+        if peer.handshaking { return .handshaking }
+        guard peer.advert != nil else { return nil }
+        switch peer.lastError {
+        case "CLOCK_SKEW": return .clockSkew
+        case "PROOF_REJECTED", "AUTH_FAILED", "ACCOUNT_MISMATCH": return .failed
+        default: break
+        }
+        if let retryAt = peer.retryAt, retryAt > Date() { return .backoff }
+        return .handshaking
     }
 
     /// Scans now and sends pending changes to every peer, for at most `timeout` seconds.

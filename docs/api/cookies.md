@@ -156,8 +156,8 @@ Response:
 {
   "success": true,
   "set": 1,
-  "failed": [             // cookies the engine refused; the rest are still written
-    { "index": 3, "name": "big", "domain": ".example.com", "error": "rejected by engine" }
+  "failed": [             // cookies not written; the rest are still written
+    { "index": 3, "name": "big", "domain": ".example.com", "error": "NOT_STORED" }
   ]
 }
 ```
@@ -166,10 +166,13 @@ Response:
   other signed-in devices.
 - Every field of each cookie is required. `sameSite` must be one of the four
   values above; `Unspecified` writes the cookie without the attribute.
-- `index` is the refused cookie's position in the request. `failed` never
-  contains a value.
-- More than 500 cookies, or a malformed cookie, fails the whole request before
-  anything is written.
+- `expires` is ISO 8601 UTC, whole Unix seconds or `null` for a session cookie.
+- `index` is the cookie's position in the request. `error` is `INVALID_COOKIE`
+  (the cookie could not be built, for example an unparseable `expires`) or
+  `NOT_STORED` (the engine did not keep it, for example `SameSite=None` without
+  `Secure`). `failed` never contains a value.
+- More than 500 cookies, or `cookies` that is not an array, fails the whole
+  request with `INVALID_PARAMS` before anything is written.
 
 The CLI's `kelpie cookies import` sends a saved listing in batches of 500.
 
@@ -195,7 +198,9 @@ Response:
 ```
 
 `from` and `to` each take at most one of `tabId` and `partition`. The same store as
-source and target returns `INVALID_PARAMS`. Cookies already in the target with
+source and target returns `INVALID_PARAMS`. A `failed` entry's `error` is
+`NOT_STORED` (the target engine did not keep it) or `PARTITIONED` (a CHIPS cookie
+the source engine marks as partitioned; it is never copied). Cookies already in the target with
 the same domain, path and name are replaced.
 
 **Sign an isolated tab in with the person's sessions:**
@@ -271,7 +276,7 @@ Response:
 | Field | Meaning |
 |---|---|
 | `supported` | `false` when sync is not running here; `reason` says why |
-| `reason` | `signed-out` (no UOA session), `embedded` (a browser inside another app), `webview-unsupported` (Android WebView without `GET_COOKIE_INFO`), `mdns-unavailable` (no mDNS, e.g. Linux without Avahi), `no-cef` (a desktop build without the Chromium engine) |
+| `reason` | `signed-out` (no UOA session), `embedded` (a browser inside another app), `webview-unsupported` (Android WebView without `GET_COOKIE_INFO`), `mdns-unavailable` (no mDNS, e.g. Linux without Avahi), `no-cef` (a desktop build without the Chromium engine), `store-unavailable` (the sync metadata file cannot be opened) |
 | `replica` | This run's replica id. It changes on every launch and sign-in; absent while sync is not running |
 | `listening` | Whether the sync-only listener accepts peers. A device that cannot listen, for example behind a firewall, still syncs by connecting out |
 | `peers[].state` | `handshaking`, `connected`, `backoff` (retrying after a failure), `clock-skew` (clocks more than 2 minutes apart) or `failed` |

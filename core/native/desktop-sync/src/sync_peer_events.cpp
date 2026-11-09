@@ -1,9 +1,9 @@
-#include "sync_peer_events.h"
+#include "kelpie/sync_peer_events.h"
 
 #include <algorithm>
 #include <cctype>
 
-namespace kelpie::windows {
+namespace kelpie {
 namespace {
 
 constexpr std::size_t kMaxReplicaIdLength = 43;
@@ -246,4 +246,4 @@ void SyncPeerDelivery::Deliver(std::uint64_t generation, std::optional<SyncPeerT
   });
 }
 
-}  // namespace kelpie::windows
+}  // namespace kelpie

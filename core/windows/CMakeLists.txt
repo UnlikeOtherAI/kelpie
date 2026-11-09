@@ -136,7 +136,6 @@ set(WINDOWS_APP_SOURCES
   src/tab_tooltips.cpp
   src/toast_view.cpp
   src/device_info_windows.cpp
-  src/sync_peer_events.cpp
   src/dnssd_browse_cache.cpp
   src/dnssd_windows.cpp
   src/sync_advertise_windows.cpp
@@ -170,7 +169,6 @@ set(WINDOWS_APP_HEADERS
   src/toast_view.h
   src/drag_effects.h
   src/device_info_windows.h
-  src/sync_peer_events.h
   src/dnssd_browse_cache.h
   src/dnssd_windows.h
   src/sync_discovery_windows.h
@@ -485,14 +483,14 @@ if(BUILD_TESTING)
   # Cookie-sync discovery: the OS-free rules, then a real DNS-SD round trip
   # that only runs with KELPIE_SYNC_MDNS_LIVE=1 (it needs working multicast).
   add_executable(kelpie_windows_sync_discovery_test
-    tests/sync_discovery_test.cpp src/sync_peer_events.cpp src/dnssd_browse_cache.cpp)
+    tests/sync_discovery_test.cpp src/dnssd_browse_cache.cpp)
   target_include_directories(kelpie_windows_sync_discovery_test PRIVATE src)
   target_link_libraries(kelpie_windows_sync_discovery_test PRIVATE kelpie_desktop_sync)
   target_compile_options(kelpie_windows_sync_discovery_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_sync_discovery_test COMMAND kelpie_windows_sync_discovery_test)
   add_executable(kelpie_windows_sync_discovery_live_test
     tests/sync_discovery_live_test.cpp src/sync_discovery_windows.cpp src/sync_advertise_windows.cpp
-    src/dnssd_windows.cpp src/sync_peer_events.cpp src/dnssd_browse_cache.cpp)
+    src/dnssd_windows.cpp src/dnssd_browse_cache.cpp)
   target_compile_definitions(kelpie_windows_sync_discovery_live_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
   target_include_directories(kelpie_windows_sync_discovery_live_test PRIVATE src)
   target_link_libraries(kelpie_windows_sync_discovery_live_test PRIVATE kelpie_desktop_sync ws2_32)

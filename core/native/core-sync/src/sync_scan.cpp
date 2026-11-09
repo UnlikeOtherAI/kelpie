@@ -57,6 +57,11 @@ SyncStore::EngineMap SyncStore::ParseEngine(const nlohmann::json& cookies) {
     if (!parsed.cookie) continue;  // not syncable: loopback, partitioned, oversized or undescribable
     const std::string key = CookieKey(*parsed.cookie);
     const std::string fingerprint = CookieFingerprint(*parsed.cookie);
+    const auto existing = engine.find(key);
+    if (existing != engine.end()) {
+      existing->second.ambiguous = true;
+      continue;
+    }
     engine[key] = EngineCookie{std::move(*parsed.cookie), fingerprint};
   }
   return engine;
@@ -89,6 +94,7 @@ nlohmann::json SyncStore::ScanParsed(const EngineMap& engine, const Coverage& co
 // from `observed` is a genuine engine change, because `observed` always holds
 // the engine's own read-back after a remote write.
 int SyncStore::ScanPresent(const std::string& key, const EngineCookie& engine_cookie, std::int64_t now) {
+  if (engine_cookie.ambiguous) return kNoEffect;
   const Cookie& cookie = engine_cookie.cookie;
   const auto it = entries_.find(key);
   if (it == entries_.end()) {

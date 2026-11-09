@@ -6,7 +6,7 @@
 #include <tuple>
 
 #include "avahi_api.h"
-#include "sync_peer_events.h"
+#include "kelpie/sync_peer_events.h"
 
 namespace kelpie::linuxapp {
 namespace {

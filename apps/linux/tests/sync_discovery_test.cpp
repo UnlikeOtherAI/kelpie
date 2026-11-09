@@ -2,7 +2,7 @@
 // per-instance merge and serial delivery, plus argument checks that must
 // fail before Avahi is touched.
 #include "avahi_sync_discovery.h"
-#include "sync_peer_events.h"
+#include "kelpie/sync_peer_events.h"
 
 #include <atomic>
 #include <cassert>

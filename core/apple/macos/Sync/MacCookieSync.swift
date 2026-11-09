@@ -44,7 +44,7 @@ final class MacCookieSync {
     /// The status of a session that never syncs, in the service's shape.
     static func unavailableStatus() -> [String: Any] {
         [
-            "supported": false, "reason": "EMBEDDED_SESSION", "signedIn": UOAAccount.shared.profile != nil,
+            "supported": false, "reason": "embedded", "signedIn": UOAAccount.shared.profile != nil,
             "listening": false, "peers": [[String: Any]](), "store": [String: Any]()
         ]
     }

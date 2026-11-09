@@ -3,6 +3,9 @@
 // (the default store, a partition or a tab's store), not the current page.
 #include "cookie_handler.h"
 
+#include <algorithm>
+#include <vector>
+
 #include "desktop_cookie_store.h"
 
 namespace kelpie {
@@ -61,14 +64,39 @@ nlohmann::json CookieHandler::SetCookies(const nlohmann::json& params) const {
       return InvalidParams("cookies must be an array of 1 to 500 cookies");
     }
     const CookieStoreTarget target = StoreTarget(params);
-    // A malformed cookie fails the whole request before anything is written.
-    std::string error;
-    const auto parsed = desktop_cookie_store::ParseCookies(*cookies, &error);
-    if (!parsed) return InvalidParams(error);
-    nlohmann::json output;
-    const auto result = RequireBrowserControl(runtime_).WriteCookieStore(
-        target, nlohmann::json(*parsed), &output, ControlTimeout(params));
-    if (!result.ok) return ControlError(result);
+    // A malformed cookie fails only itself (INVALID_COOKIE), as on every platform;
+    // the rest are still written.
+    nlohmann::json valid = nlohmann::json::array();
+    std::vector<std::size_t> original_index;
+    nlohmann::json failed = nlohmann::json::array();
+    for (std::size_t i = 0; i < cookies->size(); ++i) {
+      std::string error;
+      const auto one = desktop_cookie_store::ParseCookies(nlohmann::json::array({(*cookies)[i]}), &error);
+      if (!one) {
+        const auto& item = (*cookies)[i];
+        const auto text = [&](const char* field) {
+          return item.is_object() && item.contains(field) && item[field].is_string() ? item[field] : nlohmann::json();
+        };
+        failed.push_back({{"index", i}, {"name", text("name")}, {"domain", text("domain")}, {"error", "INVALID_COOKIE"}});
+        continue;
+      }
+      valid.push_back((*one)[0]);
+      original_index.push_back(i);
+    }
+    nlohmann::json output = {{"set", 0}, {"failed", nlohmann::json::array()}};
+    if (!valid.empty()) {
+      const auto result = RequireBrowserControl(runtime_).WriteCookieStore(target, valid, &output, ControlTimeout(params));
+      if (!result.ok) return ControlError(result);
+    }
+    for (auto refused : output.value("failed", nlohmann::json::array())) {
+      const auto at = refused.value("index", std::size_t{0});
+      refused["index"] = at < original_index.size() ? original_index[at] : at;
+      failed.push_back(std::move(refused));
+    }
+    std::sort(failed.begin(), failed.end(), [](const nlohmann::json& a, const nlohmann::json& b) {
+      return a.value("index", std::size_t{0}) < b.value("index", std::size_t{0});
+    });
+    output["failed"] = std::move(failed);
     return SuccessResponse(output);
   } catch (const std::invalid_argument& e) { return InvalidParams(e.what()); }
 }

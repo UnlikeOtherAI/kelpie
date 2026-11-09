@@ -50,7 +50,7 @@ enum CookieRequest {
 
     enum CookieError: String, Error {
         case invalid = "INVALID_COOKIE"
-        case refused = "REFUSED"
+        case refused = "NOT_STORED"
         case partitioned = "PARTITIONED"
     }
 
