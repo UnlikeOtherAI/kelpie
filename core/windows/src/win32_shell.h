@@ -13,11 +13,10 @@
 #endif
 #include <windows.h>
 
-#include "bookmarks_view.h"
-#include "history_view.h"
 #include "favorites_bar.h"
 #include "favicon_cache.h"
 #include "theme/chrome_palette.h"
+#include "link_list_panel.h"
 #include "network_inspector.h"
 #include "settings_view.h"
 #include "tab_tooltips.h"
@@ -45,6 +44,8 @@ class ShellDelegate : public UrlBarDelegate {
   virtual void OnActivateTabRequested(std::string id, std::uint64_t generation) = 0;
   virtual void OnCloseTabRequested(std::string id, std::uint64_t generation) = 0;
   virtual void OnWindowCloseRequested() = 0;
+  // Empties the request log, as the HTTP `clear-network-log` method does.
+  virtual void OnClearNetworkRequested() {}
 };
 
 class Win32Shell {
@@ -58,6 +59,9 @@ class Win32Shell {
   HWND hwnd() const { return hwnd_; }
   HACCEL accelerators() const { return accelerators_; }
   bool HandleKeyboardNavigation(const MSG& message);
+  // Keyboard for the Bookmarks, History and Network panels: Tab moves between
+  // their controls and Escape closes them. True when the message was handled.
+  bool HandlePanelMessage(const MSG& message);
   void UpdateBrowserState(const BrowserState& state);
   void FocusAddress() { url_bar_.Focus(); }
   void SetPageColor(COLORREF color);
@@ -134,8 +138,8 @@ class Win32Shell {
   UrlBar url_bar_;
   ToastView toast_;
   TabStripTooltips tab_tooltips_;
-  BookmarksView bookmarks_view_;
-  HistoryView history_view_;
+  LinkListPanel bookmarks_view_{LinkListPanel::Bookmarks()};
+  LinkListPanel history_view_{LinkListPanel::History()};
   NetworkInspector network_view_;
   std::vector<TabItem> tabs_;
   std::vector<TabCloseButton> tab_close_buttons_;

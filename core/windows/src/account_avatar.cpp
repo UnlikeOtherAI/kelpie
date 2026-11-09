@@ -55,24 +55,37 @@ void UrlBar::UpdateAccountTooltip() const {
 }
 void UrlBar::DrawAccount(const DRAWITEMSTRUCT& item) const {
   ui::FillSolid(item.hDC,item.rcItem,palette_.bar);
-  const int size=ui::Dip(parent_,34);
-  RECT circle{(item.rcItem.right-size)/2,(item.rcItem.bottom-size)/2,0,0};
+  const bool focused=(item.itemState&ODS_FOCUS)!=0;
+  if ((item.itemState&ODS_SELECTED)!=0 || item.hwndItem==hovered_button_ || focused)
+    ui::PaintRounded(item.hDC,item.rcItem,palette_.hover,focused?ui::Colors().focus:palette_.hover,
+                     ui::Dip(parent_,8),focused?2:0);
+  // The macOS account control: a 28-point circle with a hairline at 18% of
+  // the toolbar ink, holding the avatar or person.crop.circle.fill.
+  const int size=ui::Dip(parent_,30);
+  RECT circle{(item.rcItem.left+item.rcItem.right-size)/2,(item.rcItem.top+item.rcItem.bottom-size)/2,0,0};
   circle.right=circle.left+size; circle.bottom=circle.top+size;
   if (account_avatar_) {
+    ui::PaintCircularImage(item.hDC,circle,account_avatar_);
+  } else {
+    // A disc with the person cut out of it, shoulders cropped by its edge.
+    const COLORREF disc=ui::Blend(palette_.text,palette_.bar,0.72);
+    ui::PaintRounded(item.hDC,circle,disc,disc,size/2,0);
     const int saved=SaveDC(item.hDC);
-    HRGN clip=CreateEllipticRgn(circle.left,circle.top,circle.right,circle.bottom);
+    HRGN clip=CreateEllipticRgn(circle.left,circle.top,circle.right+1,circle.bottom+1);
     SelectClipRgn(item.hDC,clip);
-    HDC source=CreateCompatibleDC(item.hDC);
-    auto previous=SelectObject(source,account_avatar_);
-    SetStretchBltMode(item.hDC,HALFTONE);
-    StretchBlt(item.hDC,circle.left,circle.top,size,size,source,0,0,64,64,SRCCOPY);
-    SelectObject(source,previous); DeleteDC(source); DeleteObject(clip); RestoreDC(item.hDC,saved);
-  } else ui::DrawGlyph(item.hDC,parent_,circle,L'\uE77B',palette_.text,27);
+    RECT person=circle;
+    OffsetRect(&person,0,ui::Dip(parent_,6));
+    ui::DrawGlyph(item.hDC,parent_,person,ui::icon::kPerson,palette_.bar,27);
+    RestoreDC(item.hDC,saved);
+    DeleteObject(clip);
+    // The clip region is aliased; a ring in the disc colour smooths the cut.
+    ui::PaintFocusRing(item.hDC,circle,disc,size/2,1);
+  }
+  ui::PaintFocusRing(item.hDC,circle,ui::Blend(palette_.text,palette_.bar,0.18),size/2,1);
   if (account_error_ || account_busy_) {
     RECT dot{circle.right-ui::Dip(parent_,8),circle.bottom-ui::Dip(parent_,8),circle.right,circle.bottom};
     const auto color=account_error_?RGB(205,50,45):RGB(40,112,240);
-    ui::PaintRounded(item.hDC,dot,color,color,ui::Dip(parent_,4));
+    ui::PaintRounded(item.hDC,dot,color,palette_.bar,ui::Dip(parent_,4),1);
   }
-  if (item.itemState&ODS_FOCUS) DrawFocusRect(item.hDC,&item.rcItem);
 }
 }  // namespace kelpie::windows

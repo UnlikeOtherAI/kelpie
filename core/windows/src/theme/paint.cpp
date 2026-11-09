@@ -127,6 +127,26 @@ void PaintFocusRing(HDC dc, RECT rect, COLORREF color, int radius, int width) {
   graphics.DrawPath(&pen, &path);
 }
 
+void PaintCircularImage(HDC dc, RECT rect, HBITMAP image) {
+  if (image == nullptr || rect.right <= rect.left || rect.bottom <= rect.top) return;
+  EnsureGdiPlus();
+  Gdiplus::Bitmap bitmap(image, nullptr);
+  if (bitmap.GetLastStatus() != Gdiplus::Ok || bitmap.GetWidth() == 0 || bitmap.GetHeight() == 0) return;
+  Gdiplus::Graphics graphics(dc);
+  graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+  graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+  graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+  // A texture-filled ellipse keeps the edge antialiased, which a GDI clip
+  // region cannot.
+  const auto width = static_cast<float>(rect.right - rect.left);
+  const auto height = static_cast<float>(rect.bottom - rect.top);
+  Gdiplus::TextureBrush brush(&bitmap, Gdiplus::WrapModeClamp);
+  brush.TranslateTransform(static_cast<float>(rect.left), static_cast<float>(rect.top));
+  brush.ScaleTransform(width / static_cast<float>(bitmap.GetWidth()),
+                       height / static_cast<float>(bitmap.GetHeight()));
+  graphics.FillEllipse(&brush, static_cast<float>(rect.left), static_cast<float>(rect.top), width, height);
+}
+
 void DrawGlyph(HDC dc, HWND owner, const RECT& rect, wchar_t glyph, COLORREF color,
                int dip_size) {
   HGDIOBJ previous = SelectObject(dc, CachedIconFont(owner, dip_size));
