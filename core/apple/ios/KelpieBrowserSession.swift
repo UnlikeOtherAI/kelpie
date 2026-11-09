@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 
@@ -10,6 +11,7 @@ public final class KelpieBrowserSession: ObservableObject {
     let tabStore: TabStore
     private let localControlEnabled: Bool
     private let externalDisplaysEnabled: Bool
+    private let hostedAccount: Bool
     private var started = false
     private var closed = false
     private let runtimeID = UUID()
@@ -22,6 +24,7 @@ public final class KelpieBrowserSession: ObservableObject {
         server.tabStore = tabStore
         self.localControlEnabled = localControlEnabled
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }
+        hostedAccount = uoaSession != nil
         self.externalDisplaysEnabled = externalDisplaysEnabled
         KelpieBrowserProfile.acquire(runtimeID)
     }
@@ -44,6 +47,7 @@ public final class KelpieBrowserSession: ObservableObject {
             }
         }
         OpenAIEndpointMonitor.shared.start()
+        MobileCookieSync.shared.start(embedded: hostedAccount)
         UOAAccount.shared.restoreSession()
     }
 
@@ -53,10 +57,12 @@ public final class KelpieBrowserSession: ObservableObject {
         case .active:
             BookmarkStore.shared.refreshAccountBookmarks()
             NessieConnection.shared.setForeground(true)
+            MobileCookieSync.shared.enterForeground()
             if localControlEnabled { serverState.ensureMDNSAdvertising() }
         case .background:
             NetworkTrafficStore.shared.flush()
             NessieConnection.shared.setForeground(false)
+            MobileCookieSync.shared.enterBackground()
             serverState.stopMDNS()
             SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeBrowserTabID)
         case .inactive:
@@ -71,6 +77,7 @@ public final class KelpieBrowserSession: ObservableObject {
         closed = true
         KelpieBrowserProfile.release(runtimeID)
         NessieConnection.shared.detach(context: serverState.handlerContext)
+        MobileCookieSync.shared.stop()
         serverState.stop()
         _ = serverState.scriptPlaybackState.requestAbort()
         serverState.router.retire()
