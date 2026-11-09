@@ -98,7 +98,7 @@ final class SitePreviewCache: ObservableObject {
     }
 
     static func host(forKey key: String) -> String? {
-        guard !key.isEmpty, key.count % 2 == 0 else { return nil }
+        guard !key.isEmpty, key.count.isMultiple(of: 2) else { return nil }
         var bytes: [UInt8] = []
         var index = key.startIndex
         while index < key.endIndex {
@@ -128,8 +128,13 @@ final class SitePreviewCache: ObservableObject {
         let scale = min(1, previewSize.width / crop.width)
         let target = CGSize(width: (crop.width * scale).rounded(), height: (crop.height * scale).rounded())
         guard let context = CGContext(
-            data: nil, width: Int(target.width), height: Int(target.height), bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            data: nil,
+            width: Int(target.width),
+            height: Int(target.height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
         ) else { return nil }
         context.interpolationQuality = .high
         context.draw(cropped, in: CGRect(origin: .zero, size: target))

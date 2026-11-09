@@ -44,8 +44,8 @@ final class FavouriteDragGhost {
         chip.layer?.borderColor = NSColor.separatorColor.cgColor
         container.addSubview(chip)
 
-        let icon = NSImageView(image: NSImage(systemSymbolName: isFolder ? "folder" : "bookmark",
-                                              accessibilityDescription: nil) ?? NSImage())
+        let symbol = NSImage(systemSymbolName: isFolder ? "folder" : "bookmark", accessibilityDescription: nil)
+        let icon = NSImageView(image: symbol ?? NSImage())
         icon.contentTintColor = .labelColor
         let label = NSTextField(labelWithString: title)
         label.font = .systemFont(ofSize: 12, weight: .medium)
@@ -105,7 +105,10 @@ final class FavouriteDragGhost {
     /// cancelled.
     func flyBack(to itemScreenFrame: NSRect) {
         badge.opacity = 0
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return close() }
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            close()
+            return
+        }
         var target = panel.frame
         target.origin = NSPoint(x: itemScreenFrame.minX - Self.margin - 6,
                                 y: itemScreenFrame.midY - panel.frame.height / 2)
@@ -121,7 +124,10 @@ final class FavouriteDragGhost {
 
     /// Fades out where it is. Used when the item lands somewhere on the bar.
     func fadeOut() {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return close() }
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            close()
+            return
+        }
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.12
             panel.animator().alphaValue = 0

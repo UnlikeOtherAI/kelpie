@@ -60,7 +60,7 @@ struct SiteCard: View {
                 Image(nsImage: preview)
                     .resizable()
                     .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
                     .scaleEffect(isHovered && !reduceMotion ? 1.04 : 1, anchor: .top)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .clipped()

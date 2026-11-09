@@ -213,7 +213,10 @@ final class FavouriteButton: NSButton {
             }
             let removing = !dragRect().insetBy(dx: -Self.removalMargin, dy: -Self.removalMargin).contains(point)
             if next.type == .leftMouseUp {
-                guard let ghost else { return activate() }
+                guard let ghost else {
+                    activate()
+                    return
+                }
                 switch finishDrag(point, generation) {
                 case .removed: ghost.close()
                 case .moved: ghost.fadeOut()
@@ -234,8 +237,13 @@ final class FavouriteButton: NSButton {
     private func lift(grab: NSPoint, at point: NSPoint) -> FavouriteDragGhost {
         // Grab is measured from the bottom-left, whatever the view's flipping.
         let fromBottom = NSPoint(x: grab.x, y: isFlipped ? bounds.height - grab.y : grab.y)
-        let ghost = FavouriteDragGhost(title: title, isFolder: isFolder, itemSize: bounds.size,
-                                       grab: fromBottom, appearance: window?.effectiveAppearance)
+        let ghost = FavouriteDragGhost(
+            title: title,
+            isFolder: isFolder,
+            itemSize: bounds.size,
+            grab: fromBottom,
+            appearance: window?.effectiveAppearance
+        )
         ghost.show(at: point)
         highlight(false)
         alphaValue = 0.25

@@ -172,17 +172,19 @@ private struct StartPageBackground: View {
         .ignoresSafeArea()
     }
 
+    private func glow(_ color: Color) -> RadialGradient {
+        RadialGradient(colors: [color, .clear], center: .center, startRadius: 0, endRadius: 220)
+    }
+
     private func glows(in size: CGSize) -> some View {
         ZStack {
             Circle()
-                .fill(RadialGradient(colors: [Color(red: 46 / 255, green: 230 / 255, blue: 176 / 255).opacity(0.75), .clear],
-                                     center: .center, startRadius: 0, endRadius: 220))
+                .fill(glow(Color(red: 46 / 255, green: 230 / 255, blue: 176 / 255).opacity(0.75)))
                 .frame(width: 640, height: 640)
                 .blur(radius: 80)
                 .position(x: size.width / 2 - 280, y: 160)
             Circle()
-                .fill(RadialGradient(colors: [Color(red: 26 / 255, green: 156 / 255, blue: 1).opacity(0.6), .clear],
-                                     center: .center, startRadius: 0, endRadius: 220))
+                .fill(glow(Color(red: 26 / 255, green: 156 / 255, blue: 1).opacity(0.6)))
                 .frame(width: 640, height: 640)
                 .blur(radius: 80)
                 .position(x: size.width / 2 + 280, y: 120)
