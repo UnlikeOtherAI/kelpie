@@ -137,6 +137,7 @@ class DesktopCookieSync::Impl : public desktop_sync::SyncResponder {
   void OnCookiesChanged();
   void OnHeadChanged();
   void Wake();
+  int CurrentPort() const;
   void Fail(const std::string& reason, std::uint64_t generation);
   void Spawn(std::vector<std::shared_ptr<Worker>>* owner, std::function<void()> body);
   // Requires mu_. Used where a session must be registered and started atomically.
@@ -181,7 +182,6 @@ class DesktopCookieSync::Impl : public desktop_sync::SyncResponder {
   bool opened_once_ = false;
   bool warm_done_ = false;
   std::string reason_;  // why sync is not running while signed in
-  bool supported_ = true;
   Clock::time_point retry_at_{};
   std::optional<std::uint64_t> failed_generation_;
   int port_ = 0;

@@ -62,9 +62,10 @@ struct Device {
     sync.reset();
   }
   json Status() const { return sync->Status(); }
+  // Sync is up and past warm-up.
   bool Running() const {
     const json status = Status();
-    return status.value("state", std::string()) == "running";
+    return status.value("supported", false) && status.contains("replica") && status["store"]["warming"] == false;
   }
   bool ConnectedTo(const std::string& replica) const {
     for (const auto& peer : Status().value("peers", json::array())) {
@@ -106,7 +107,12 @@ void LoginLogoutRestart(FakeUoa& uoa, FakeBus& bus) {
   a.StartSync();
   b.StartSync();
   Connect(a, b);
-  assert(a.Status()["supported"] == true && a.Status()["signedIn"] == true);
+  const json shape = a.Status();
+  assert(shape["supported"] == true && shape["signedIn"] == true && shape["listening"] == true);
+  assert(shape["peers"].size() == 1 && shape["peers"][0]["platform"] == "linux" && shape["peers"][0]["name"] == "Device b");
+  for (const char* key : {"entries", "tombstones", "localOnly", "unapplied", "skipped", "warming", "lastPurgeAt"}) {
+    assert(shape["store"].contains(key));
+  }
   assert(uoa.pairs >= 2 && uoa.validations >= 2);
 
   // Login on A reaches B with every attribute; a host-only cookie on B reaches A.
@@ -149,13 +155,17 @@ void LoginLogoutRestart(FakeUoa& uoa, FakeBus& bus) {
   // Sign-out stops sync; a cookie set meanwhile arrives after the next sign-in,
   // which starts without warm-up because it is not the first open.
   a.SignOut();
-  assert(WaitFor([&] { return a.Status()["signedIn"] == false && a.Status()["state"] == "signed-out"; }));
+  assert(WaitFor([&] {
+    const json status = a.Status();
+    return status["signedIn"] == false && status["supported"] == false && status["reason"] == "signed-out" &&
+           !status.contains("replica") && status["listening"] == false;
+  }));
   b.cookies.Put(".example.com", "later", "while-away");
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
   assert(!a.cookies.Value(".example.com", "later"));
   a.SignIn();
-  assert(WaitFor([&] { return a.Status().value("state", std::string()) != "signed-out" && a.Replica() != ""; }));
-  assert(a.Status()["state"] == "running" && a.Status()["warming"] == false);
+  assert(WaitFor([&] { return a.Replica() != ""; }));
+  assert(a.Status()["store"]["warming"] == false);  // not the first open: no warm-up
   assert(WaitFor([&] { return a.cookies.Value(".example.com", "later") == std::optional<std::string>("while-away"); }));
 }
 
@@ -175,7 +185,7 @@ void OtherAccountRefused(FakeUoa& uoa, FakeBus& bus) {
   assert(a.Status()["peers"].empty() && bob.Status()["peers"].empty());
 
   const json status = a.Status();
-  const int port = status["port"];
+  const int port = a.discovery.port();
   const std::string replica = status["replica"];
   desktop_sync::UoaGate gate(2);
   desktop_sync::AbortSet aborts;
@@ -252,7 +262,7 @@ void OtherAccountRefused(FakeUoa& uoa, FakeBus& bus) {
   }
   // Signing out tears the session down.
   a.SignOut();
-  assert(WaitFor([&] { return a.Status()["state"] == "signed-out"; }));
+  assert(WaitFor([&] { return a.Status().value("reason", std::string()) == "signed-out"; }));
   const std::string after = exchange(81, own).error;
   assert(after == "UNREACHABLE" || after == "SYNC_SESSION");
 }
@@ -271,7 +281,7 @@ void Unsupported(FakeUoa& uoa, FakeBus&) {
   DesktopCookieSync sync(config);
   sync.Tick();
   assert(WaitFor([&] { return sync.Status().value("reason", std::string()) == "mdns-unavailable"; }));
-  assert(sync.Status()["supported"] == false && !sync.Status().contains("port"));
+  assert(sync.Status()["supported"] == false && !sync.Status().contains("replica") && sync.Status()["listening"] == false);
   sync.Stop();
   std::filesystem::remove_all(std::filesystem::path(std::u8string(config.profile_dir.begin(), config.profile_dir.end())));
 }

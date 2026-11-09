@@ -204,14 +204,14 @@ SyncReply DesktopCookieSync::Impl::Exchange(const std::string& session_id, const
   const std::uint64_t seq = *Unsigned(message.at("seq"));
   {
     std::lock_guard lock(session->window_mutex);
-    if (!session->window.Acceptable(seq)) return ErrorReply(409, "REPLAY");
+    if (!session->window.Acceptable(seq)) return ErrorReply(400, "REPLAY");
   }
   const auto plain = desktop_sync::OpenBox(session->keys, desktop_sync::Direction::kRequest, session->id, seq,
                                            message.at("box").get<std::string>());
   if (!plain) return ErrorReply(400, "INVALID_BOX");
   {
     std::lock_guard lock(session->window_mutex);
-    if (!session->window.Acceptable(seq)) return ErrorReply(409, "REPLAY");
+    if (!session->window.Acceptable(seq)) return ErrorReply(400, "REPLAY");
     session->window.Accept(seq);
   }
   const Json inner = Json::parse(*plain, nullptr, false);

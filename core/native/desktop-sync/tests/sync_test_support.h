@@ -191,6 +191,7 @@ class FakeDiscovery final : public SyncDiscovery {
     return true;
   }
   void StopBrowsing() override { bus_->StopBrowsing(this); }
+  int port() const { return port_; }
 
   std::function<void(const SyncPeerAdvert&)> found_;
   std::function<void(const std::string&)> lost_;
@@ -198,7 +199,7 @@ class FakeDiscovery final : public SyncDiscovery {
  private:
   FakeBus* bus_;
   std::string instance_;
-  int port_ = 0;
+  std::atomic<int> port_{0};
 };
 
 inline void FakeBus::Advertise(FakeDiscovery* who, const SyncPeerAdvert& advert) {
