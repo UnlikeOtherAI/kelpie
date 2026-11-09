@@ -298,16 +298,21 @@ void Handlers() {
   result = router.Dispatch("set-cookies", {{"cookies", Json::array({Info(".a.test", "a")})}, {"partition", "work"}});
   assert(result.status_code == 200 && result.body["set"] == 1 && control.last_target.partition == std::optional<std::string>("work"));
   assert(control.last_written[0]["domain"] == ".a.test" && control.last_written[0]["expires"] == 1893456000);
-  // One malformed cookie fails the request before anything is written.
+  // A malformed cookie fails only itself (INVALID_COOKIE); the rest are still written.
   Json mixed = Json::array({Info(".a.test", "a"), {{"name", "b"}, {"domain", "a.test"}}});
   result = router.Dispatch("set-cookies", {{"cookies", mixed}});
-  assert(result.status_code == 400 && control.writes == 1);
+  assert(result.status_code == 200 && control.writes == 2 && control.last_written.size() == 1);
+  assert(result.body["failed"] ==
+         Json::array({{{"index", 1}, {"name", "b"}, {"domain", "a.test"}, {"error", "INVALID_COOKIE"}}}));
+  // Nothing valid: nothing is written, every cookie is reported.
+  result = router.Dispatch("set-cookies", {{"cookies", Json::array({{{"name", "a"}}})}});
+  assert(result.status_code == 200 && result.body["set"] == 0 && result.body["failed"].size() == 1 && control.writes == 2);
   assert(router.Dispatch("set-cookies", {{"cookies", Json::array()}}).status_code == 400);
   assert(router.Dispatch("set-cookies", {{"cookies", Json::array({{{"name", "a"}}})}, {"generation", 1}}).status_code == 400);
   Json many = Json::array();
   for (int i = 0; i < 501; ++i) many.push_back(Info("a.test", "n"));
   assert(router.Dispatch("set-cookies", {{"cookies", many}}).status_code == 400);
-  assert(control.writes == 1);
+  assert(control.writes == 2);
 
   result = router.Dispatch("copy-cookies", {{"from", Json::object()}, {"to", {{"partition", "work"}}}, {"domain", "example.com"}});
   assert(result.status_code == 200 && result.body["copied"] == 1 && !control.last_target.partition &&
