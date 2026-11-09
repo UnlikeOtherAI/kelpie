@@ -23,8 +23,14 @@ final class AddressTextFieldCell: NSTextFieldCell {
         start selStart: Int,
         length selLength: Int
     ) {
-        super.select(withFrame: rect, in: controlView, editor: textObj, delegate: delegate,
-                     start: selStart, length: selLength)
+        super.select(
+            withFrame: rect,
+            in: controlView,
+            editor: textObj,
+            delegate: delegate,
+            start: selStart,
+            length: selLength
+        )
         selectAfterEditingBegins(in: controlView)
     }
 
