@@ -50,9 +50,13 @@
   are retained. Native tab selection, overflow, close buttons and tooltips remain.
 - The 72-DIP navigation row has unboxed Back, Forward, Reload/Stop and Home
   controls, a 44-DIP pill address field with a secure-transport lock and
-  Add favorite star, followed by bookmarks, network inspector, history and
-  account and settings. Home uses the persisted home URL. The star stores the
-  current page once, locally when signed out or in UOA when signed in.
+  Add favorite star, followed by bookmarks (the star-and-list Favorites glyph),
+  network inspector (up and down transfer arrows), history, account and the
+  three-dot settings control. Home uses the persisted home URL. The star stores
+  the current page once, locally when signed out or in UOA when signed in.
+- The account control is a 30-DIP circle with a hairline ring, like the macOS
+  one: the UOA avatar when signed in, otherwise a person cut from a filled
+  disc, with the busy or error dot on its edge.
 - The native EDIT preserves IME, text selection, accessibility and inline
   history completion. Escape rejects completion; Enter accepts. Ctrl+L focuses
   the address. Ctrl+T/W/Tab/Shift+Tab retain their tab behavior after page focus.
@@ -83,6 +87,23 @@
   favourite off the favourites bar removes it with a cloud puff. Settings retains **Isolate every new tab**,
   off by default. Panels, settings, native toasts, agent control and Chromium's
   sandbox continue to use the existing Windows runtime.
+- Settings (the three-dot control), Local AI, Bookmarks, History and Network
+  open centred over the browser window, on its monitor and at its DPI, and are
+  kept inside that monitor's work area. Settings has a white body with
+  Browsing (start page, isolation) and read-only launch options (control port,
+  profile folder), and a footer with Local AI, Cancel and Save.
+- Bookmarks, History and Network are resizable windows with a minimum size.
+  Closing one hides it, so its toolbar button opens it again; Escape closes it
+  and Tab moves between its controls. Opening a bookmark or history entry
+  (double-click or Enter) navigates and closes the panel. Empty lists say why.
+- Network follows Chrome DevTools: Clear, a filter by address or method, and
+  type buttons (All, Fetch/XHR, Doc, CSS, JS, Font, Img, Other) above a striped
+  table of Name, Method, Status, Type, Initiator, Size and Time. Failed and
+  4xx/5xx requests are red, a row's tooltip is its full address, and the status
+  line counts shown and total requests and bytes transferred. While open it
+  re-reads the log every second, keeps the selected request selected, and
+  follows new requests when scrolled to the end. Clear empties the log as
+  `clear-network-log` does.
 
 Windows remembers window size, position and maximized state in the profile.
 Maximization preserves access to auto-hide taskbars.
