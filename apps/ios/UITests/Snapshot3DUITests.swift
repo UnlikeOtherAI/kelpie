@@ -20,6 +20,21 @@ final class Snapshot3DUITests: XCTestCase {
             app.buttons["3D inspector"].tap()
             let exit = app.buttons["browser.snapshot3d.exit"]
             XCTAssertTrue(exit.waitForExistence(timeout: 10))
+            let page = app.webViews.firstMatch
+            let pan = page.buttons["Pan 3D view"]
+            XCTAssertTrue(pan.waitForExistence(timeout: 5))
+            pan.tap()
+            page.buttons["Move page up without zooming"].tap()
+            page.buttons["Move page down without zooming"].tap()
+            page.buttons["Front view (Z axis)"].tap()
+            XCTAssertTrue(page.images["Snapshot of the inspected website"].exists)
+            page.buttons["Open element toolbox"].tap()
+            XCTAssertTrue(page.buttons["Close element toolbox"].waitForExistence(timeout: 5))
+            let evidence = XCTAttachment(screenshot: app.screenshot())
+            evidence.name = "3D toolbox and orientation preview"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            page.buttons["Close element toolbox"].tap()
             app.buttons["browser.snapshot3d.zoom-in"].tap()
             app.buttons["browser.snapshot3d.zoom-out"].tap()
             app.buttons["browser.snapshot3d.reset"].tap()
