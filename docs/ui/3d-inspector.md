@@ -4,7 +4,9 @@ The experimental inspector is supported by macOS, iOS and Android, including
 embedded browsers. Enter through the browser's 3D action or `snapshot-3d-enter`.
 
 The left toolbar selects Rotate, Pan, Scroll or Inspect, opens Elements, and resets
-the camera. Rotate changes the viewing angle; Pan translates the camera without
+the camera. Dedicated up/down buttons move the page by 60% of the viewport height
+at its current zoom. Arrow keys also pan. In Pan mode, wheel/trackpad movement
+pans the scene; Control-wheel still zooms. Rotate changes the viewing angle; Pan translates the camera without
 changing rotation or zoom; Scroll moves through the source document. Inspect
 highlights a plane on tap without starting a camera drag. Mouse hover highlights
 planes in every mode.

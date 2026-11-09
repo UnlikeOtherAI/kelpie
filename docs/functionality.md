@@ -163,7 +163,7 @@ API: `network-list`, `network-detail`, `network-select`, `network-current`, `net
 A visual debugging tool for inspecting element stacking and layer order. Click the 3D button in the floating menu (or call the `snapshot-3d-enter` endpoint) to explode the page DOM into a 3D layered view. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
 
 **Controls on macOS, iOS, and Android:**
-- **Left toolbar** — Rotate orbits the page, Pan moves the camera horizontally and vertically, Scroll moves through the source page, and Inspect picks an element without moving the scene. Pointer and one-finger drags follow the selected tool.
+- **Left toolbar** — Rotate orbits the page, Pan moves the camera horizontally and vertically using drag or wheel/trackpad input, without changing zoom, Scroll moves through the source page, and Inspect picks an element without moving the scene. Pointer and one-finger drags follow the selected tool.
 - **Page orientation card** — a native screenshot taken before disassembly shows the actual website inside red X, green Y, and blue Z rings. Drag the preview to orbit the scene, or choose Top, Side, and Front views. If snapshot capture is unavailable, the card says so; inspection remains available.
 - **Zoom controls** — zoom out/in or select a percentage from 15% to 250%. Wheel/trackpad and pinch gestures update the displayed level.
 - **Vertical layer slider** — adjust separation from 0 (assembled) to 80 pixels per DOM depth step. The current value is displayed beside the slider; + and - keys also adjust it.

@@ -37,8 +37,7 @@ object Snapshot3DBridge {
         })();
         """.trimIndent()
 
-    fun previewScript(image: String): String =
-        "window.__m3d?.setPreview('data:image/png;base64,$image');"
+    fun previewScript(image: String): String = "window.__m3d?.setPreview('data:image/png;base64,$image');"
 
     val RESET_VIEW_SCRIPT: String =
         """

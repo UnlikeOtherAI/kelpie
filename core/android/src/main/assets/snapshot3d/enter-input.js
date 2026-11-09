@@ -129,7 +129,11 @@
 
     addListener(inputCapture, 'wheel', function(e) {
         e.preventDefault();
-        if (state.mode === 'scroll') {
+        if (state.mode === 'pan' && !e.ctrlKey) {
+            panX -= e.shiftKey ? e.deltaY : e.deltaX;
+            panY -= e.shiftKey ? 0 : e.deltaY;
+            applyTransform();
+        } else if (state.mode === 'scroll' && !e.ctrlKey) {
             scrollScene(-e.deltaY);
         } else {
             zoomBy(e.deltaY * -0.002);
@@ -148,6 +152,10 @@
         } else if (e.key === '-') {
             state.spacing = Math.max(0, state.spacing - 5);
             reapplyDepths();
+        } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) >= 0) {
+            panX += e.key === 'ArrowLeft' ? 48 : e.key === 'ArrowRight' ? -48 : 0;
+            panY += e.key === 'ArrowUp' ? 48 : e.key === 'ArrowDown' ? -48 : 0;
+            applyTransform();
         } else if (e.key === 'r' || e.key === 'R') {
             resetView();
         }

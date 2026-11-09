@@ -50,6 +50,13 @@ test('navigation, zoom, separation and orientation work through visible controls
         await drag(page, 650, 700, 75, -40);
         assert.notEqual(await transform(page), initial);
         assert.match(await transform(page), /scale\(0.85\).*rotateX\(15deg\).*rotateY\(-25deg\)/);
+        const panned = await transform(page);
+        await page.mouse.wheel(0, 420);
+        await page.waitForFunction(previous => document.body.style.transform !== previous, panned);
+        assert.match(await transform(page), /scale\(0.85\).*rotateX\(15deg\).*rotateY\(-25deg\)/);
+        await page.getByRole('button', {name: 'Move page down without zooming', exact: true}).click();
+        assert.match(await transform(page), /scale\(0.85\)/);
+
         await page.getByRole('button', {name: 'Rotate 3D view', exact: true}).click();
         await drag(page, 650, 700, 50, 30);
         assert.notEqual(await transform(page), initial);
@@ -85,6 +92,11 @@ test('tree hover reveals off-screen planes without changing zoom or rotation', a
         assert.ok(rect.y < 820 && rect.y + rect.height > 24, JSON.stringify(rect));
         assert.match(await page.locator('#far').evaluate(el => el.style.outline), /3px/);
         assert.equal(await far.getAttribute('aria-selected'), 'true');
+        // Return from the footer to the header without zooming out or resetting.
+        await page.getByRole('treeitem', {name: '<header>', exact: true}).hover();
+        const header = await page.locator('body > header').boundingBox();
+        assert.ok(header.y < 820 && header.y + header.height > 24, JSON.stringify(header));
+        assert.match(await transform(page), /scale\(0.75\) rotateX\(0deg\) rotateY\(0deg\)/);
         const hidden = page.getByRole('treeitem', {name: '<div#hidden-node>', exact: true});
         await hidden.hover();
         assert.match(await page.locator('#__m3d_info').textContent(), /no rendered plane/);

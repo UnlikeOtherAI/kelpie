@@ -57,7 +57,7 @@
             .orientation { padding: 7px; } .orbit { height: 112px; transform: scale(.73); margin: -8px -20px; }
             .axes { gap: 2px; } .axes button { font-size: 10px; }
             .zoom { gap: 2px; padding: 5px; flex-wrap: wrap; } select { flex: 1; width: 44px; }
-            .zoom button { min-width: 28px; } .tree { left: 6px; top: 330px; bottom: 16px; width: calc(100vw - 138px); }
+            .zoom button { min-width: 28px; } .tree { left: 6px; top: 370px; bottom: 16px; width: calc(100vw - 138px); }
         }
         @media (max-height: 520px) { .orbit { height: 95px; transform: scale(.65); margin: -12px 0; }
             .spacing input { height: 70px; } .left { top: 8px; gap: 2px; } .right { top: 8px; gap: 5px; } }
@@ -87,6 +87,14 @@
         button.style.whiteSpace = 'pre-line';
         modeButtons[mode[0]] = button;
     });
+    var verticalTools = toolElement('div', 'vertical-pan', leftTools);
+    verticalTools.style.cssText = 'display:flex;gap:4px;';
+    toolButton(verticalTools, 'Move page up without zooming', '↑', function() {
+        panY -= window.innerHeight * 0.6; applyTransform();
+    }).style.cssText = 'min-width:0;min-height:32px;flex:1;';
+    toolButton(verticalTools, 'Move page down without zooming', '↓', function() {
+        panY += window.innerHeight * 0.6; applyTransform();
+    }).style.cssText = 'min-width:0;min-height:32px;flex:1;';
     var treeToggle = toolButton(leftTools, 'Open element toolbox', '☷\nElements', function() {
         treePanel.hidden = !treePanel.hidden;
         treeToggle.setAttribute('aria-expanded', String(!treePanel.hidden));
