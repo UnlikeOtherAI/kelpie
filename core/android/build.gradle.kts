@@ -70,6 +70,9 @@ android {
             assets.srcDir("../../assets")
             assets.srcDir("../native/licenses")
         }
+        // Cookie sync test doubles (fake UOA, memory store, loopback discovery) serve JVM and device tests.
+        getByName("test") { java.srcDir("src/sharedTest/java") }
+        getByName("androidTest") { java.srcDir("src/sharedTest/java") }
     }
 
     composeOptions {
@@ -131,4 +134,67 @@ dependencies {
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+}
+
+// JVM unit tests run the real core-sync through a host build of the same JNI
+// bridge (src/test/cpp). Needs CMake and a host C++17 compiler; CMake comes from
+// PATH or the Android SDK.
+val hostSyncJniBuild = layout.buildDirectory.dir("host-sync-jni/build")
+val hostSyncJniOutput = layout.buildDirectory.dir("host-sync-jni/lib")
+val hostSyncJniLibrary = hostSyncJniOutput.map { it.file(System.mapLibraryName("kelpie_sync_host_jni")) }
+
+fun hostCmake(): String {
+    val sdkCmake = android.sdkDirectory.resolve("cmake/3.22.1/bin/" + if (System.getProperty("os.name").startsWith("Windows")) "cmake.exe" else "cmake")
+    val onPath =
+        System
+            .getenv("PATH")
+            .orEmpty()
+            .split(File.pathSeparator)
+            .map { File(it, if (System.getProperty("os.name").startsWith("Windows")) "cmake.exe" else "cmake") }
+    return (onPath.firstOrNull { it.canExecute() } ?: sdkCmake).absolutePath
+}
+
+val configureHostSyncJni by tasks.registering(Exec::class) {
+    description = "Configures the host build of the cookie-sync JNI bridge used by unit tests."
+    val include = File(System.getProperty("java.home")).resolve("include")
+    val os = System.getProperty("os.name").lowercase()
+    val platform =
+        include.resolve(
+            if (os.startsWith("windows")) {
+                "win32"
+            } else if (os.contains("mac")) {
+                "darwin"
+            } else {
+                "linux"
+            },
+        )
+    inputs.file("src/test/cpp/CMakeLists.txt")
+    outputs.file(hostSyncJniBuild.map { it.file("CMakeCache.txt") })
+    commandLine(
+        hostCmake(),
+        "-S",
+        file("src/test/cpp").absolutePath,
+        "-B",
+        hostSyncJniBuild.get().asFile.absolutePath,
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DKELPIE_JNI_INCLUDE=${include.absolutePath}",
+        "-DKELPIE_JNI_PLATFORM_INCLUDE=${platform.absolutePath}",
+        "-DKELPIE_JNI_OUTPUT=${hostSyncJniOutput.get().asFile.absolutePath}",
+    )
+}
+
+val buildHostSyncJni by tasks.registering(Exec::class) {
+    description = "Builds the cookie-sync JNI bridge for the host JVM used by unit tests."
+    dependsOn(configureHostSyncJni)
+    inputs.file("src/main/cpp/cookie_sync_jni.cpp")
+    inputs.dir("../native/core-sync/src")
+    inputs.dir("../native/core-sync/include")
+    outputs.file(hostSyncJniLibrary)
+    commandLine(hostCmake(), "--build", hostSyncJniBuild.get().asFile.absolutePath, "--config", "Release", "--target", "kelpie_sync_host_jni")
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(buildHostSyncJni)
+    systemProperty("kelpie.sync.jni", hostSyncJniLibrary.get().asFile.absolutePath)
+    systemProperty("kelpie.sync.vectors", file("../native/core-sync/tests/vectors/handshake-v1.json").absolutePath)
 }
