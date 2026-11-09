@@ -63,10 +63,17 @@ struct SyncHTTPResponse {
         let parts = lines.first?.split(separator: " ") ?? []
         guard parts.count >= 2, parts[0].hasPrefix("HTTP/1."), let status = Int(parts[1]) else { return nil }
         let body = data[end.upperBound...]
-        let length = lines.dropFirst().compactMap { line -> Int? in
-            guard line.lowercased().hasPrefix("content-length:") else { return nil }
-            return Int(line.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces))
-        }.first
+        let declared = lines.dropFirst().filter { $0.lowercased().hasPrefix("content-length:") }
+            .map { $0.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces) }
+        // One strictly decimal, bounded Content-Length, or none. Anything else is a broken
+        // or hostile peer: status 0 fails the request instead of slicing with it.
+        guard declared.count <= 1 else { return Self(status: 0, body: Data()) }
+        var length: Int?
+        if let text = declared.first {
+            guard !text.isEmpty, text.count <= 9, text.allSatisfy(\.isASCII), text.allSatisfy(\.isNumber),
+                  let value = Int(text), value <= SyncNetwork.maxResponseBytes else { return Self(status: 0, body: Data()) }
+            length = value
+        }
         if let length {
             guard body.count >= length else { return nil }
             return Self(status: status, body: Data(body.prefix(length)))

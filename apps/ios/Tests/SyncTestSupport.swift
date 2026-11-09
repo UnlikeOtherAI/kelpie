@@ -67,7 +67,7 @@ final class MemoryCookieSource: SyncCookieSource {
         SyncCookieSnapshot(cookiesJSON: SyncJSON.string(Array(cookies.values)), coverageJSON: #"{"all":true}"#)
     }
 
-    func apply(_ op: SyncCookieOp) async -> SyncCookieOpResult {
+    func apply(_ op: SyncCookieOp, isCurrent: @escaping @MainActor () -> Bool) async -> SyncCookieOpResult {
         guard let cookie = SyncJSON.object(op.cookieJSON), let domain = cookie["domain"] as? String,
               let name = cookie["name"] as? String else { return SyncCookieOpResult(id: op.id, ok: false, readbackJSON: "[]") }
         let key = Self.key(domain, cookie["path"] as? String ?? "/", name)

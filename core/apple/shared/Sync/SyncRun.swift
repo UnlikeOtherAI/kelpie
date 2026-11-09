@@ -27,6 +27,13 @@ enum SyncLimits {
     static let outgoingHandshakes = 10
     static let concurrentUOACalls = 2
     static let maxPullWaitMillis = 25_000
+
+    /// Whether two millisecond clocks are within the skew gate. Overflow-safe: a peer can
+    /// send any Int64 in `now`, and checked subtraction would otherwise trap.
+    static func withinSkew(_ peerNow: Int64, _ localNow: Int64) -> Bool {
+        let (difference, overflow) = peerNow.subtractingReportingOverflow(localNow)
+        return !overflow && difference.magnitude <= UInt64(maxClockSkewMillis)
+    }
 }
 
 /// One live encrypted session with a peer. Only the initiator sends requests.

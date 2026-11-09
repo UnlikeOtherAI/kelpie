@@ -11,7 +11,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.math.abs
 
 /** One HTTP POST to a peer's sync listener. */
 interface SyncTransport {
@@ -68,7 +67,7 @@ class SyncInitiator(
         if (SyncCore.invalid("hello-reply", reply) != null) throw SyncFailure("PROTOCOL", "invalid hello reply")
         if (reply.string("replica") != peerReplica) throw SyncFailure("PROTOCOL", "peer replica changed")
         run.peers.introduced(peerReplica, reply.string("platform"), reply.string("name"))
-        if (abs(reply.long("now")!! - run.clock()) > SyncProtocol.MAX_CLOCK_SKEW_MS) throw SyncFailure("CLOCK_SKEW")
+        if (!SyncProtocol.withinSkew(reply.long("now")!!, run.clock())) throw SyncFailure("CLOCK_SKEW")
         val peerKey = SyncCrypto.decodePublicKey(reply.string("key")!!) ?: throw SyncFailure("PROTOCOL", "invalid peer key")
         val challenge =
             SyncCore.challenge(
@@ -229,7 +228,7 @@ class SyncInitiator(
         run.requireCurrent()
         val parsed = SyncJson.parseObject(response.body)
         if (response.status != 200) {
-            val code = parsed?.string("error")?.takeIf { it.length <= 40 } ?: "HTTP_${response.status}"
+            val code = SyncProtocol.peerCode(parsed?.string("error"), response.status)
             throw SyncFailure(if (response.status == 401) "SYNC_SESSION" else code)
         }
         return parsed ?: throw SyncFailure("PROTOCOL", "reply is not JSON")

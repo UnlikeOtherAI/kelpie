@@ -44,6 +44,15 @@ public struct SyncCookieOpResult: Sendable {
 /// implement this. A failed or partial read must throw rather than return less.
 @MainActor public protocol SyncCookieSource: AnyObject {
     func snapshot() async throws -> SyncCookieSnapshot
-    func apply(_ op: SyncCookieOp) async -> SyncCookieOpResult
+    /// Writes one op. `isCurrent` is re-checked after every suspension and immediately
+    /// before each engine mutation, so work for an account that has signed out or
+    /// switched never touches the store; it then returns `ok:false`.
+    func apply(_ op: SyncCookieOp, isCurrent: @escaping @MainActor () -> Bool) async -> SyncCookieOpResult
     func setChangeHandler(_ handler: @escaping @MainActor () -> Void)
+}
+
+public extension SyncCookieSource {
+    func apply(_ op: SyncCookieOp) async -> SyncCookieOpResult {
+        await apply(op, isCurrent: { true })
+    }
 }

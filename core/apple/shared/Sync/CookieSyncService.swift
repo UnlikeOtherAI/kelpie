@@ -169,7 +169,7 @@ final class CookieSyncService {
             guard let self, self.isCurrent(run) else { return nil }
             var results: [SyncCookieOpResult] = []
             for op in ops {
-                results.append(await self.source.apply(op))
+                results.append(await self.source.apply(op, isCurrent: { [weak self] in self?.isCurrent(run) ?? false }))
                 guard self.isCurrent(run) else { return nil }
             }
             return results

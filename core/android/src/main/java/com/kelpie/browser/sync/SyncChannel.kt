@@ -71,24 +71,26 @@ object SyncChannel {
 
 /**
  * The responder's 64-entry replay window: accepts a seq it has not seen that is
- * less than 64 below the highest seen. Called only after the box authenticated.
+ * no more than 64 below the highest seen, the same boundary as Apple and desktop.
+ * Called only after the box authenticated.
  */
 class ReplayWindow {
     private var highest = 0L
-    private var seen = 0L // bit i set: (highest - i) was accepted
+    private var seen = 0L // bit i set: (highest - 1 - i) was accepted
 
     @Synchronized fun accept(seq: Long): Boolean {
         if (seq <= 0) return false
         if (seq > highest) {
             val shift = seq - highest
+            // Kotlin's shl uses only the low six bits, so a shift of 64 or more must clear explicitly.
             seen = if (shift >= WINDOW) 0L else seen shl shift.toInt()
-            seen = seen or 1L
+            if (highest > 0 && shift <= WINDOW) seen = seen or (1L shl (shift - 1).toInt())
             highest = seq
             return true
         }
-        val offset = highest - seq
-        if (offset >= WINDOW) return false
-        val bit = 1L shl offset.toInt()
+        val behind = highest - seq
+        if (behind < 1 || behind > WINDOW) return false
+        val bit = 1L shl (behind - 1).toInt()
         if (seen and bit != 0L) return false
         seen = seen or bit
         return true

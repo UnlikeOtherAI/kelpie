@@ -36,11 +36,13 @@ final class MacSyncCookieSource: SyncCookieSource {
         }
     }
 
-    func apply(_ op: SyncCookieOp) async -> SyncCookieOpResult {
+    func apply(_ op: SyncCookieOp, isCurrent: @escaping @MainActor () -> Bool) async -> SyncCookieOpResult {
         await store.exclusive { jar in
+            // The exclusive gate may have waited: re-check before any write.
+            guard isCurrent() else { return SyncCookieOpResult(id: op.id, ok: false, readbackJSON: "[]") }
             switch jar {
             case .webKit:
-                return await webKit.apply(op)
+                return await webKit.apply(op, isCurrent: isCurrent)
             #if !KELPIE_WEBKIT_ONLY
             case .chromium:
                 return await Self.apply(op, to: jar)

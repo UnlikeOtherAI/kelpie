@@ -39,7 +39,7 @@ extension CookieSyncService {
               let nonce = hello["nonce"] as? String, let peerNow = SyncJSON.int64(hello["now"]),
               let peerKey = try? SyncCrypto.publicKey(keyText) else { return .error(400, "INVALID_MESSAGE") }
         guard acceptedHints(run).contains(hint) else { return .error(409, "ACCOUNT_MISMATCH") }
-        guard abs(peerNow - now()) <= SyncLimits.maxClockSkewMillis else {
+        guard SyncLimits.withinSkew(peerNow, now()) else {
             run.peers[peer]?.lastError = "CLOCK_SKEW"
             return .error(409, "CLOCK_SKEW")
         }

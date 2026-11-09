@@ -4,7 +4,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 
 /** An HTTP status and JSON body. */
 data class SyncReply(
@@ -53,7 +52,7 @@ class SyncResponder(
         val platform = body.string("platform")!!
         val name = body.string("name")!!
         run.peers.introduced(peer.replica, platform, name)
-        if (abs(body.long("now")!! - now) > SyncProtocol.MAX_CLOCK_SKEW_MS) {
+        if (!SyncProtocol.withinSkew(body.long("now")!!, now)) {
             run.peers.failed(peer.replica, "CLOCK_SKEW")
             return refuse(409, "CLOCK_SKEW")
         }
@@ -137,10 +136,15 @@ class SyncResponder(
         return session
     }
 
+    /** The session is still installed under its id, unexpired, for the current account. */
+    private fun live(session: Session): Boolean = session(session.id) === session && run.isCurrent()
+
     suspend fun exchange(
         session: Session,
         body: JsonObject,
     ): SyncReply {
+        // The body may have arrived after expiry or replacement; re-check before using the keys.
+        if (!live(session)) return refuse(401, "SYNC_SESSION")
         SyncCore.invalid("exchange", body)?.let { return refuse(400, "INVALID_MESSAGE") }
         val seq = body.long("seq") ?: return refuse(400, "INVALID_MESSAGE")
         val plaintext =
@@ -159,6 +163,7 @@ class SyncResponder(
             } catch (failure: SyncFailure) {
                 return if (failure.code == "INVALID_MESSAGE") refuse(400, "INVALID_MESSAGE") else refuse(503, "UNAVAILABLE")
             }
+        if (!live(session)) return refuse(401, "SYNC_SESSION")
         run.peers.synced(session.peerReplica)
         lastServed[session.peerReplica] = run.clock()
         val box = SyncChannel.seal(session.keys.r2i, session.id, SyncChannel.RESPONSE, seq, response.toString())

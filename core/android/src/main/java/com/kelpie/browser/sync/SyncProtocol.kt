@@ -14,6 +14,32 @@ object SyncProtocol {
     const val SESSION_HEADER = "X-Kelpie-Sync-Session"
 
     const val MAX_CLOCK_SKEW_MS = 2 * 60_000L
+
+    /** Overflow-safe skew gate: a peer can send any Long in `now`. */
+    fun withinSkew(
+        peerNow: Long,
+        localNow: Long,
+    ): Boolean =
+        try {
+            kotlin.math.abs(Math.subtractExact(peerNow, localNow)) <= MAX_CLOCK_SKEW_MS
+        } catch (_: ArithmeticException) {
+            false
+        }
+
+    /** The documented codes a peer may send back; anything else becomes PEER_ERROR. */
+    private val peerCodes =
+        setOf(
+            "ACCOUNT_MISMATCH", "AUTH_FAILED", "BAD_REQUEST", "CLOCK_SKEW", "DUPLICATE_CONTENT_LENGTH", "FORBIDDEN",
+            "HEADERS_TOO_LARGE", "INVALID_BOX", "INVALID_CONTENT_LENGTH", "INVALID_MESSAGE", "LENGTH_REQUIRED",
+            "METHOD_NOT_ALLOWED", "NOT_FOUND", "ORIGIN_REJECTED", "PAYLOAD_TOO_LARGE", "PROOF_REJECTED", "RATE_LIMITED",
+            "REPLAY", "REPLAYED", "REQUEST_TIMEOUT", "SESSION_EXISTS", "SYNC_SESSION", "TIMEOUT", "TRANSFER_ENCODING",
+            "UNAVAILABLE", "UNSUPPORTED_MEDIA_TYPE", "UOA_BUSY", "UOA_UNAVAILABLE",
+        )
+
+    fun peerCode(
+        raw: String?,
+        status: Int,
+    ): String = if (raw == null) "HTTP_$status" else if (raw in peerCodes) raw else "PEER_ERROR"
     const val PENDING_TTL_MS = 60_000L
     const val MAX_PENDING = 8
     const val SESSION_MS = 10 * 60_000L

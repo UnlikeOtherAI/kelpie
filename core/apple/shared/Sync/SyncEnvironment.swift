@@ -78,6 +78,22 @@ struct SyncFailure: Error, Equatable {
 
     init(_ code: String) { self.code = code }
 
+    /// The documented codes a peer may send back. Anything else — which could be a
+    /// reflected ticket or cookie text — becomes `PEER_ERROR` before it reaches a log or
+    /// the status.
+    private static let peerCodes: Set<String> = [
+        "ACCOUNT_MISMATCH", "AUTH_FAILED", "BAD_REQUEST", "CLOCK_SKEW", "DUPLICATE_CONTENT_LENGTH", "FORBIDDEN",
+        "HEADERS_TOO_LARGE", "INVALID_BOX", "INVALID_CONTENT_LENGTH", "INVALID_MESSAGE", "LENGTH_REQUIRED",
+        "METHOD_NOT_ALLOWED", "NOT_FOUND", "ORIGIN_REJECTED", "PAYLOAD_TOO_LARGE", "PROOF_REJECTED", "RATE_LIMITED",
+        "REPLAY", "REPLAYED", "REQUEST_TIMEOUT", "SESSION_EXISTS", "SYNC_SESSION", "TRANSFER_ENCODING", "UNAVAILABLE",
+        "UNSUPPORTED_MEDIA_TYPE", "UOA_BUSY", "UOA_UNAVAILABLE"
+    ]
+
+    static func peer(_ raw: Any?, status: Int) -> Self {
+        guard let text = raw as? String else { return Self("HTTP_\(status)") }
+        return Self(peerCodes.contains(text) ? text : "PEER_ERROR")
+    }
+
     static func code(of error: Error) -> String {
         switch error {
         case let failure as Self: return failure.code

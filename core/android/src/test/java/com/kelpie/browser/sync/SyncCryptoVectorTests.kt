@@ -110,10 +110,26 @@ class SyncCryptoVectorTests {
         assertTrue(window.accept(2))
         assertTrue(window.accept(100))
         assertTrue(window.accept(37))
-        assertFalse(window.accept(36))
+        assertTrue(window.accept(36)) // exactly 64 below the highest
+        assertFalse(window.accept(35)) // 65 below
         assertFalse(window.accept(37))
+        assertFalse(window.accept(100))
         assertFalse(window.accept(0))
         assertTrue(window.accept(99))
+    }
+
+    @Test fun skewGateSurvivesExtremeClocks() {
+        assertTrue(SyncProtocol.withinSkew(1_000_000, 1_000_000 + SyncProtocol.MAX_CLOCK_SKEW_MS))
+        assertFalse(SyncProtocol.withinSkew(1_000_000, 1_000_001 + SyncProtocol.MAX_CLOCK_SKEW_MS))
+        assertFalse(SyncProtocol.withinSkew(Long.MIN_VALUE, 1_767_225_600_000))
+        assertFalse(SyncProtocol.withinSkew(Long.MAX_VALUE, -1_767_225_600_000))
+    }
+
+    @Test fun peerErrorsAreLimitedToDocumentedCodes() {
+        assertEquals("CLOCK_SKEW", SyncProtocol.peerCode("CLOCK_SKEW", 409))
+        assertEquals("PEER_ERROR", SyncProtocol.peerCode("eyJhbGci.reflected.ticket", 403))
+        assertEquals("PEER_ERROR", SyncProtocol.peerCode("sid=secret", 400))
+        assertEquals("HTTP_502", SyncProtocol.peerCode(null, 502))
     }
 
     @Test fun base64UrlRejectsPaddingAndStandardAlphabet() {

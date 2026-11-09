@@ -28,14 +28,16 @@ public final class WebKitSyncCookieSource: SyncCookieSource {
         )
     }
 
-    public func apply(_ op: SyncCookieOp) async -> SyncCookieOpResult {
-        guard let cookie = SyncJSON.object(op.cookieJSON),
+    public func apply(_ op: SyncCookieOp, isCurrent: @escaping @MainActor () -> Bool) async -> SyncCookieOpResult {
+        let abandoned = SyncCookieOpResult(id: op.id, ok: false, readbackJSON: "[]")
+        guard isCurrent(), let cookie = SyncJSON.object(op.cookieJSON),
               let domain = cookie["domain"] as? String, let name = cookie["name"] as? String else {
-            return SyncCookieOpResult(id: op.id, ok: false, readbackJSON: "[]")
+            return abandoned
         }
         if op.isDelete {
             let path = cookie["path"] as? String ?? "/"
             for existing in await store.allCookies() where Self.matches(existing, domain: domain, path: path, name: name) {
+                guard isCurrent() else { return abandoned }
                 await store.deleteCookie(existing)
             }
             return SyncCookieOpResult(id: op.id, ok: true, readbackJSON: await readback(domain: domain, name: name))
@@ -43,6 +45,7 @@ public final class WebKitSyncCookieSource: SyncCookieSource {
         guard let engineCookie = SyncCookieWire.httpCookie(from: cookie) else {
             return SyncCookieOpResult(id: op.id, ok: false, readbackJSON: await readback(domain: domain, name: name))
         }
+        guard isCurrent() else { return abandoned }
         await store.setCookie(engineCookie)
         return SyncCookieOpResult(id: op.id, ok: true, readbackJSON: await readback(domain: domain, name: name))
     }

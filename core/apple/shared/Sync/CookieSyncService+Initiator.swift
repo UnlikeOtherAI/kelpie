@@ -110,7 +110,7 @@ extension CookieSyncService {
               let handshakeId = reply["handshakeId"] as? String, let peerNow = SyncJSON.int64(reply["now"]) else {
             throw SyncFailure("PROTOCOL")
         }
-        guard abs(peerNow - now()) <= SyncLimits.maxClockSkewMillis else { throw SyncFailure("CLOCK_SKEW") }
+        guard SyncLimits.withinSkew(peerNow, now()) else { throw SyncFailure("CLOCK_SKEW") }
         guard let peerKey = try? SyncCrypto.publicKey(peerKeyText) else { throw SyncFailure("PROTOCOL") }
         peer.platform = reply["platform"] as? String ?? peer.platform
         peer.name = reply["name"] as? String ?? peer.name
@@ -169,7 +169,7 @@ extension CookieSyncService {
             endpoint, path: route.rawValue, body: try SyncJSON.data(body), timeout: 15, rule: environment.rule
         )
         let json = SyncJSON.object(response.body)
-        guard response.status == 200, let json else { throw SyncFailure(json?["error"] as? String ?? "HTTP_\(response.status)") }
+        guard response.status == 200, let json else { throw SyncFailure.peer(json?["error"], status: response.status) }
         return json
     }
 
@@ -318,7 +318,7 @@ extension CookieSyncService {
         )
         let envelope = SyncJSON.object(response.body)
         guard response.status == 200, let envelope else {
-            throw SyncFailure(envelope?["error"] as? String ?? "HTTP_\(response.status)")
+            throw SyncFailure.peer(envelope?["error"], status: response.status)
         }
         guard SyncStoreBridge.invalidReason("exchange", envelope) == nil, SyncJSON.uint64(envelope["seq"]) == seq,
               let sealed = envelope["box"] as? String else { throw SyncFailure("PROTOCOL") }
