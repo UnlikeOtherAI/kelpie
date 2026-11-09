@@ -2,6 +2,8 @@
 // it runs only with KELPIE_SYNC_MDNS_LIVE=1; otherwise it reports a skip.
 // Optional: KELPIE_SYNC_MDNS_HOLD=<seconds> keeps the advertisement up so
 // another machine can browse it (avahi-browse -rt _kelpie-sync._tcp).
+// KELPIE_SYNC_MDNS_LIVE=absent checks the other side: on a system without
+// the Avahi libraries or daemon, Advertise and Browse must report failure.
 #include "avahi_sync_discovery.h"
 
 #include <unistd.h>
@@ -43,6 +45,18 @@ bool WaitFor(Seen& seen, std::chrono::seconds timeout, Predicate predicate) {
 
 int main() {
   const char* live = std::getenv("KELPIE_SYNC_MDNS_LIVE");
+  if (live != nullptr && std::string(live) == "absent") {
+    AvahiSyncDiscovery discovery;
+    std::cout << "libraries " << (AvahiSyncDiscovery::LibraryAvailable() ? "loaded" : "missing") << "\n";
+    const bool advertised = discovery.Advertise(43210, {{"v", "1"}, {"id", "absentCheck"}});
+    const bool browsing = discovery.Browse([](const kelpie::SyncPeerAdvert&) {}, [](const std::string&) {});
+    if (advertised || browsing) {
+      std::cerr << "mDNS reported available\n";
+      return 1;
+    }
+    std::cout << "mDNS unavailable reported\n";
+    return 0;
+  }
   if (live == nullptr || std::string(live) != "1") {
     std::cout << "live mDNS round trip skipped (set KELPIE_SYNC_MDNS_LIVE=1)\n";
     return 0;
