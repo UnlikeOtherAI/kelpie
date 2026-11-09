@@ -27,7 +27,7 @@ Pod::Spec.new do |s|
     'LIBRARY_SEARCH_PATHS' => '$(inherited) "$(PODS_CONFIGURATION_BUILD_DIR)/KelpieBrowser/Native"'
   }
   root = File.expand_path('../..', __dir__)
-  inputs = Dir["#{root}/core/native/{core-state,core-connect,core-protocol,core-automation,core-mcp,core-ai}/**/*.{cpp,cc,c,cxx,m,mm,h,hpp,cmake,txt}"]
+  inputs = Dir["#{root}/core/native/{core-state,core-connect,core-protocol,core-automation,core-mcp,core-ai,core-sync}/**/*.{cpp,cc,c,cxx,m,mm,h,hpp,cmake,txt}"]
   inputs += Dir["#{root}/packages/shared/**/*.{ts,json,mjs}"]
   inputs += ["#{root}/core/native/CMakeLists.txt", "#{root}/pnpm-lock.yaml", "#{root}/scripts/native/generate-browser-contract.mjs"]
   inputs += [File.join(__dir__, 'build-native.sh'), File.join(__dir__, 'build-pod-native.sh')]

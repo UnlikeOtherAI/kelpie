@@ -41,7 +41,7 @@ public enum KelpieBrowserBuild {
     }
 
     private static let nativeModules = [
-        "state", "connect", "protocol", "automation", "mcp", "ai"
+        "state", "connect", "protocol", "automation", "mcp", "ai", "sync"
     ]
 
     public static func mac(core: String, additional: SettingsDictionary = [:]) -> SettingsDictionary {
