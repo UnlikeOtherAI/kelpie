@@ -2,6 +2,16 @@
 
 The embeddable browser extraction keeps the complete native UI, tabs and behavior in `core/`, with thin standalone hosts in `apps/`. Embedded apps supply their existing UOA session. Linux retains its own shell and consumes only the shared C++ core. See [the embedding contract](../core/README.md).
 
+Standalone startup owns the one-app-per-computer boundary before constructing a
+browser session. Profile locks alone cannot enforce it: two profiles and ports
+previously admitted two browsers, and the Mac CLI explicitly requested a new
+process. Windows now holds a fixed global named mutex after CEF subprocess
+dispatch; Linux holds a fixed abstract Unix socket after subprocess dispatch.
+macOS prohibits multiple instances through Launch Services and holds a fixed
+application-support file lock before entering SwiftUI, covering direct binary
+launches within the user account. All guards are independent of browser profiles
+and release with the owning process. Embedded hosts do not acquire them.
+
 
 ## Overview
 

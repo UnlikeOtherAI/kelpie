@@ -198,9 +198,9 @@ kelpie browser register codex-b --app-path /Applications/Kelpie.app
 `--platform` defaults to this machine's platform. A Windows or Linux alias also needs an absolute `--profile-dir` (see [Windows aliases and agent stdio](#windows-aliases-and-agent-stdio)).
 
 ### `kelpie browser launch <name>`
-Launch a new local Kelpie app instance for a registered alias. If `--port` is omitted, the CLI picks the first port from `8420` upward that it can bind on `127.0.0.1`, skipping `8421` (AppReveal and CLI MCP). An explicit `--port` is used exactly as given. The Windows app fails its startup on an occupied port rather than moving, so this is how a second Windows alias avoids the first one's port. Two launches started at the same moment can still pick the same port. If no port from `8420` to `8519` is free, the launch fails with `BROWSER_LAUNCH_FAILED` before starting the app.
+Launch the local Kelpie app for a registered alias. Only one standalone app may run on this computer, including across aliases, executable copies, profiles and ports. Use the running browser or close it before switching profiles. A duplicate launch fails with `BROWSER_LAUNCH_FAILED`; native startup enforces ownership even when concurrent CLI launches race. macOS opens the app without requesting another instance.
 
-If the requested port is already held by a stale instance, the macOS app falls back to the next free port. After launching, the CLI polls the fallback range and records the port the new instance actually bound, so the saved alias stays reachable.
+If `--port` is omitted, the CLI picks the first free port from `8420` to `8519`, skipping `8421` (AppReveal and CLI MCP). An explicit port is used exactly as given. If an unrelated service holds the requested port, macOS can bind the next available port; the CLI records the observed port. A launch that never becomes ready fails without recording a successful launch.
 
 `--port` may come before or after `launch`: both start the app on that port. A value that is not an integer from 1 to 65535 is rejected with `INVALID_PORT` rather than launching on the default.
 

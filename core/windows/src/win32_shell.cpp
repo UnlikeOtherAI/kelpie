@@ -42,6 +42,7 @@ bool Win32Shell::Create(const std::wstring& title, int width, int height, std::o
   hwnd_ = CreateWindowExW(0, window_class.lpszClassName, title.c_str(), style,
                           origin ? origin->x : CW_USEDEFAULT, origin ? origin->y : CW_USEDEFAULT, width, height, nullptr, nullptr, instance_, this);
   if (hwnd_ != nullptr) {
+    if (!hosted_) SetPropW(hwnd_, L"UnlikeOtherAI.Kelpie.Standalone", reinterpret_cast<HANDLE>(1));
     SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     window_chrome_.UpdateDwmFrame();
   }

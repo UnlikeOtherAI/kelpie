@@ -15,6 +15,21 @@ Kelpie has two parts: **native browser apps** (iOS, Android, macOS, Linux, and a
 
 No emulators, no cloud, no persistent scripts. Real browsers on real devices, fully controllable by language models.
 
+## One Desktop App per Computer
+
+Only one standalone Kelpie app may run on a computer. Another executable copy,
+CLI alias, profile directory or HTTP port cannot start a second browser. Close
+the running app before switching copies or profiles. Tabs and browser windows
+remain part of that one app; embedded Kelpie sessions belong to their containing
+apps and do not take standalone ownership.
+
+Ownership is acquired before opening profiles or starting browser services and
+is released automatically on normal exit or a crash. A rejected launch leaves
+the running app's tabs, port and readiness record intact. Windows and direct
+macOS relaunches bring the existing app forward when its window is available;
+Linux reports that Kelpie is already running. macOS also asks Launch Services to
+prohibit simultaneous app instances, and the CLI no longer requests a new one.
+
 ## Device Discovery
 
 Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension. On Android, a foreground-service notification ("Kelpie is reachable") keeps the server alive in the background; tapping it brings the running browser back without restarting it, so open tabs, pending pairing prompts and just-approved tokens survive.

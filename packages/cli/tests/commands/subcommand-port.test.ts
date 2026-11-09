@@ -5,7 +5,7 @@ import { CLI_MCP_PORT } from "@unlikeotherai/kelpie-shared";
 vi.mock("node:child_process", () => ({ spawn: vi.fn(), execFile: vi.fn() }));
 // What the machine happens to have listening must not decide these results.
 vi.mock("../../src/browser/launch.js", () => ({ allocateBrowserPort: vi.fn() }));
-vi.mock("../../src/discovery/local-probe.js", () => ({ probeHealth: vi.fn() }));
+vi.mock("../../src/discovery/local-probe.js", () => ({ probeHealth: vi.fn(), probeLocalDevices: vi.fn(async () => []) }));
 vi.mock("../../src/browser/store.js", () => ({
   getBrowserAlias: vi.fn(), loadBrowserStore: vi.fn(), readLocalReadiness: vi.fn(),
   readinessPath: vi.fn(), clearRunningBrowser: vi.fn(), removeBrowserAlias: vi.fn(),
@@ -18,8 +18,8 @@ vi.mock("../../src/mcp/transport.js", () => ({
 
 import { execFile, spawn } from "node:child_process";
 import { allocateBrowserPort } from "../../src/browser/launch.js";
-import { probeHealth } from "../../src/discovery/local-probe.js";
-import { getBrowserAlias, readLocalReadiness, readinessPath } from "../../src/browser/store.js";
+import { probeHealth, probeLocalDevices } from "../../src/discovery/local-probe.js";
+import { getBrowserAlias, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
 import { startHttp } from "../../src/mcp/transport.js";
 import { createProgram } from "../../src/program.js";
 
@@ -85,6 +85,14 @@ describe("browser launch --port on Windows", () => {
     expect(spawn).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(4);
   });
+
+  it("reports native singleton refusal without recording another alias", async () => {
+    vi.mocked(spawn).mockImplementation(() => Object.assign(launchChild(), { exitCode: 183 }) as never);
+    await run("browser", "launch", "other-profile", "--port", "8468");
+    expect(process.exitCode).toBe(6);
+    expect(setRunningBrowser).not.toHaveBeenCalled();
+    expect(vi.mocked(console.log).mock.calls.join("\n")).toContain("already running on this computer");
+  });
 });
 
 describe("browser launch --port on macOS", () => {
@@ -104,12 +112,21 @@ describe("browser launch --port on macOS", () => {
 
   it("opens the app on the port given after the subcommand", async () => {
     await run("browser", "launch", "x", "--port", "8467");
-    expect(vi.mocked(execFile).mock.calls[0]?.slice(0, 2)).toEqual(["open", ["-na", process.execPath, "--args", "--port", "8467"]]);
+    expect(vi.mocked(execFile).mock.calls[0]?.slice(0, 2)).toEqual(["open", ["-a", process.execPath, "--args", "--port", "8467"]]);
   });
 
   it("opens the app on the first free port when none is given", async () => {
     await run("browser", "launch", "x");
-    expect(vi.mocked(execFile).mock.calls[0]?.slice(0, 2)).toEqual(["open", ["-na", process.execPath, "--args", "--port", "8424"]]);
+    expect(vi.mocked(execFile).mock.calls[0]?.slice(0, 2)).toEqual(["open", ["-a", process.execPath, "--args", "--port", "8424"]]);
+  });
+
+  it("rejects a second alias even when it requests a different port", async () => {
+    vi.mocked(probeLocalDevices).mockResolvedValueOnce([{ platform: "macos", port: 8420 } as never]);
+    await run("browser", "launch", "other-alias", "--port", "8467");
+    expect(execFile).not.toHaveBeenCalled();
+    expect(setRunningBrowser).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(6);
+    expect(vi.mocked(console.log).mock.calls.join("\n")).toContain("already running on this computer");
   });
 });
 

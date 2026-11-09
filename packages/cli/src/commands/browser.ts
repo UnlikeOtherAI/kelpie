@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import type { Command } from "commander";
 import { allocateBrowserPort } from "../browser/launch.js";
 import { print } from "../output/formatter.js";
-import { probeHealth } from "../discovery/local-probe.js";
+import { probeHealth, probeLocalDevices } from "../discovery/local-probe.js";
 import { sendCommand } from "../client/http-client.js";
 import { subcommandPort } from "./helpers.js";
 import type { DiscoveredDevice } from "../types.js";
@@ -99,6 +99,7 @@ export async function waitForReadiness(
     while (Date.now() < deadline) {
       if (launchError) throw new Error(`Kelpie failed to start: ${launchError.message}`);
       if (child && child.exitCode !== null) {
+        if (child.exitCode === 183) throw new Error("Kelpie is already running on this computer; use the running browser or stop it first");
         throw new Error(`Kelpie exited before publishing readiness (exit ${child.exitCode})`);
       }
       const readiness = await readLocalReadiness(file);
@@ -228,6 +229,14 @@ export function registerBrowser(program: Command): void {
         print({ success: false, error: { code, message: error instanceof Error ? error.message : "No usable port" } }, globals.format);
         process.exitCode = requestedPort ? 4 : 6; return;
       }
+      if (alias.platform === "macos") {
+        const running = await probeLocalDevices();
+        if (running.some((device) => device.platform === "macos")) {
+          print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: "Kelpie is already running on this computer; use the running browser or stop it first" } }, globals.format);
+          process.exitCode = 6;
+          return;
+        }
+      }
       if (alias.platform === "windows" || alias.platform === "linux") {
         const appPath = alias.appPath;
         const profileDir = alias.profileDir;
@@ -276,8 +285,9 @@ export function registerBrowser(program: Command): void {
 
       try {
         const preLaunchReachable = await reachablePorts(fallbackPorts(port), PRE_LAUNCH_PROBE_TIMEOUT_MS);
-        await execFileAsync("open", ["-na", appPath, "--args", "--port", String(port)]);
-        const boundPort = (await waitForBoundPort(port, preLaunchReachable)) ?? port;
+        await execFileAsync("open", ["-a", appPath, "--args", "--port", String(port)]);
+        const boundPort = await waitForBoundPort(port, preLaunchReachable);
+        if (!boundPort) throw new Error("Kelpie did not start a browser on the requested port; it may already be running");
         await setRunningBrowser(name, { port: boundPort, lastLaunchedAt: new Date().toISOString() });
         print({ success: true, name, platform: alias.platform, appPath, port: boundPort }, globals.format);
       } catch (error) {
