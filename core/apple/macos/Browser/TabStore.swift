@@ -207,7 +207,7 @@ final class TabStore: ObservableObject {
     }
 
     private func bind(_ tab: Tab) {
-        tab.renderer.onStateChange = { [weak tab, weak renderer = tab.renderer] in
+        tab.renderer.onStateChange = { [weak self, weak tab, weak renderer = tab.renderer] in
             guard let tab, let renderer else { return }
             let nextTitle = renderer.currentTitle.isEmpty ? "Start Page" : renderer.currentTitle
             let nextURL = renderer.currentURL?.absoluteString ?? ""
@@ -217,6 +217,7 @@ final class TabStore: ObservableObject {
             tab.isLoading = renderer.isLoading
             tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
             tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
+            self?.capturePreviewIfSettled(tab)
         }
         tabSinks[tab.id] = tab.objectWillChange
             .sink { [weak self] _ in
@@ -225,7 +226,18 @@ final class TabStore: ObservableObject {
             }
     }
 
+    /// Start page screenshots come from the person's own session only, never
+    /// from an isolated renderer harness.
+    private func capturePreviewIfSettled(_ tab: Tab) {
+        guard sessionPersistence else { return }
+        SitePreviewCapturer.shared.tabChanged(tab) { [weak self, weak tab] in
+            guard let self, let tab else { return false }
+            return self.activeTabID == tab.id
+        }
+    }
+
     private func unbind(_ tab: Tab) {
+        SitePreviewCapturer.shared.tabClosed(tab.id)
         tab.chatSession.close()
         tab.renderer.onStateChange = nil
         tabSinks.removeValue(forKey: tab.id)

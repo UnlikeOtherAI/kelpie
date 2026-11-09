@@ -105,6 +105,11 @@ final class HistoryStore: ObservableObject {
         clearGeneration += 1
         refreshFromCore()
         persist()
+        // Screenshots of visited sites are history too; favourites keep theirs.
+        SitePreviewCapturer.shared.historyCleared()
+        SitePreviewCache.shared.retainOnly(Set(BookmarkStore.shared.bookmarks.compactMap {
+            URL(string: $0.url)?.host?.lowercased()
+        }))
     }
 
     func remove(id: UUID) {

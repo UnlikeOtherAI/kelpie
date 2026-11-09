@@ -1,259 +1,191 @@
 import SwiftUI
 import AppKit
 
+/// The page a new tab opens on: the favourites and the most recently visited
+/// sites as screenshot cards, each with its favicon in the corner and its
+/// domain underneath.
+///
+/// The Windows and Linux start page (`core/native/engine-chromium-desktop/
+/// resources/start_page`) mirrors this layout, its measurements and its colours.
 struct StartPageView: View {
     @ObservedObject var bookmarkStore: BookmarkStore
     @ObservedObject var historyStore: HistoryStore
-    @ObservedObject private var faviconCache = FaviconCache.shared
+    @ObservedObject private var previews = SitePreviewCache.shared
     let onNavigate: (String) -> Void
 
-    /// The page tracks the system appearance rather than the app icon, so the
-    /// `.primary` / `.secondary` text below stays legible in light and dark.
-    private var pageBackgroundColor: Color {
-        Color(nsColor: .windowBackgroundColor)
+    /// Mirrors `start_page::kRecentSiteLimit`.
+    private static let recentLimit = 8
+
+    private var favourites: [StartPageSite] {
+        bookmarkStore.bookmarks.compactMap { StartPageSite(url: $0.url, title: $0.title) }
+    }
+
+    /// The latest visit to each site, newest first, leaving out sites that are
+    /// already favourites.
+    private var recent: [StartPageSite] {
+        var shown = Set(favourites.map(\.host))
+        var sites: [StartPageSite] = []
+        for entry in historyStore.entries {
+            guard sites.count < Self.recentLimit, let site = StartPageSite(url: entry.url, title: entry.title),
+                  shown.insert(site.host).inserted else { continue }
+            sites.append(site)
+        }
+        return sites
     }
 
     var body: some View {
+        let favourites = favourites
+        let recent = recent
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 36) {
-                // App icon header
+            VStack(alignment: .leading, spacing: 44) {
                 HStack {
                     Spacer()
-                    if let img = KelpieResources.bundle.image(forResource: "WelcomeIcon") {
-                        Image(nsImage: img)
+                    if let icon = KelpieResources.bundle.image(forResource: "WelcomeIcon") {
+                        Image(nsImage: icon)
                             .resizable()
-                            .frame(width: 120, height: 120)
-                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .shadow(color: .black.opacity(0.22), radius: 9, y: 6)
                     }
                     Spacer()
                 }
-                .padding(.top, 40)
 
-                if !bookmarkStore.bookmarks.isEmpty {
+                if !favourites.isEmpty {
                     StartPageSection(title: "Favourites") {
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 72, maximum: 96))],
-                            alignment: .leading,
-                            spacing: 16
-                        ) {
-                            ForEach(bookmarkStore.bookmarks) { bm in
-                                BookmarkTileView(bookmark: bm) { onNavigate(bm.url) }
-                            }
-                        }
+                        SiteGrid(sites: favourites, compact: false, firstOrder: 0, onNavigate: onNavigate)
                     }
                 }
 
-                let recent = Array(historyStore.entries.prefix(20))
                 if !recent.isEmpty {
                     StartPageSection(title: "Recent") {
-                        VStack(spacing: 0) {
-                            ForEach(recent) { entry in
-                                HistoryRowView(
-                                    entry: entry,
-                                    onTap: { onNavigate(entry.url) },
-                                    onRemove: { historyStore.remove(id: entry.id) }
-                                )
-                                if entry.id != recent.last?.id {
-                                    Divider().opacity(0.15)
-                                }
-                            }
-                        }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        SiteGrid(sites: recent, compact: true, firstOrder: favourites.count, onNavigate: onNavigate)
                     }
                 }
 
-                if bookmarkStore.bookmarks.isEmpty && historyStore.entries.isEmpty {
-                    Spacer(minLength: 100)
+                if favourites.isEmpty && recent.isEmpty {
                     Text("Open a website to get started")
                         .font(.system(size: 15))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
+                        .padding(.top, 48)
                 }
             }
-            .frame(maxWidth: 720)
+            .frame(maxWidth: 1040)
             .frame(maxWidth: .infinity)
-            .padding(.horizontal, 40)
-            .padding(.vertical, 48)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 64)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            ZStack {
-                pageBackgroundColor
-                if let img = KelpieResources.bundle.image(forResource: "KelpieMark") {
-                    Image(nsImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .opacity(0.06)
-                }
-            }
-            .clipped()
-        }
+        .background { StartPageBackground() }
     }
 }
 
-// MARK: - Section wrapper
+/// One card's worth of data.
+struct StartPageSite: Identifiable {
+    let url: String
+    let title: String
+    let host: String
+
+    var id: String { url }
+
+    /// The caption: the host without a leading `www.`.
+    var domain: String { host.hasPrefix("www.") ? String(host.dropFirst(4)) : host }
+
+    init?(url: String, title: String) {
+        guard let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme?.lowercased() ?? ""),
+              let host = parsed.host?.lowercased(), !host.isEmpty else { return nil }
+        self.url = url
+        self.title = title
+        self.host = host
+    }
+}
+
+/// Tile tones for sites without a screenshot: the six start page colours,
+/// lightened and darkened, picked by the sum of the host's Unicode scalars.
+/// Mirrors `.tone-0` … `.tone-5` in the desktop page's `start.css`.
+enum SiteTone {
+    private static let tones: [(light: Color, dark: Color)] = [
+        (Color(red: 133 / 255, green: 170 / 255, blue: 235 / 255), Color(red: 77 / 255, green: 113 / 255, blue: 189 / 255)),
+        (Color(red: 164 / 255, green: 212 / 255, blue: 164 / 255), Color(red: 105 / 255, green: 163 / 255, blue: 113 / 255)),
+        (Color(red: 240 / 255, green: 168 / 255, blue: 132 / 255), Color(red: 196 / 255, green: 111 / 255, blue: 78 / 255)),
+        (Color(red: 199 / 255, green: 158 / 255, blue: 235 / 255), Color(red: 146 / 255, green: 98 / 255, blue: 191 / 255)),
+        (Color(red: 240 / 255, green: 214 / 255, blue: 118 / 255), Color(red: 196 / 255, green: 160 / 255, blue: 60 / 255)),
+        (Color(red: 155 / 255, green: 211 / 255, blue: 222 / 255), Color(red: 92 / 255, green: 160 / 255, blue: 176 / 255))
+    ]
+
+    static func tone(for host: String) -> (light: Color, dark: Color) {
+        let hash = host.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        return tones[abs(hash) % tones.count]
+    }
+}
+
+// MARK: - Layout
 
 private struct StartPageSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title.uppercased())
+                .font(.system(size: 12, weight: .semibold))
+                .tracking(0.96)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
             content()
         }
     }
 }
 
-// MARK: - Bookmark tile
-
-private struct BookmarkTileView: View {
-    let bookmark: BookmarkStore.Bookmark
-    let onTap: () -> Void
-
-    @ObservedObject private var faviconCache = FaviconCache.shared
-
-    private var host: String {
-        URL(string: bookmark.url)?.host ?? bookmark.url
-    }
-
-    private var domainLetter: String {
-        host.first.map { String($0).uppercased() } ?? "?"
-    }
-
-    private var tileColor: Color {
-        let palette: [Color] = [
-            Color(red: 0.40, green: 0.56, blue: 0.85),
-            Color(red: 0.55, green: 0.75, blue: 0.55),
-            Color(red: 0.85, green: 0.55, blue: 0.40),
-            Color(red: 0.70, green: 0.50, blue: 0.85),
-            Color(red: 0.85, green: 0.75, blue: 0.35),
-            Color(red: 0.50, green: 0.75, blue: 0.80)
-        ]
-        let hash = host.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
-        return palette[abs(hash) % palette.count]
-    }
+private struct SiteGrid: View {
+    let sites: [StartPageSite]
+    let compact: Bool
+    let firstOrder: Int
+    let onNavigate: (String) -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(tileColor)
-                        .frame(width: 56, height: 56)
-                    if let favicon = faviconCache.cachedImage(forHost: host) {
-                        Image(nsImage: favicon)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 28, height: 28)
-                    } else {
-                        Text(domainLetter)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                Text(bookmark.title.isEmpty ? host : bookmark.title)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .frame(maxWidth: 72)
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: compact ? 148 : 184), spacing: compact ? 18 : 22, alignment: .top)],
+            alignment: .leading,
+            spacing: compact ? 22 : 26
+        ) {
+            ForEach(Array(sites.enumerated()), id: \.element.id) { index, site in
+                SiteCard(site: site, compact: compact, order: firstOrder + index) { onNavigate(site.url) }
             }
         }
-        .buttonStyle(.plain)
-        .onAppear { faviconCache.image(forHost: host) }
     }
 }
 
-// MARK: - History row
-
-private struct HistoryRowView: View {
-    let entry: HistoryStore.HistoryEntry
-    let onTap: () -> Void
-    let onRemove: () -> Void
-
-    @ObservedObject private var faviconCache = FaviconCache.shared
-    @State private var isHovered = false
-
-    private var host: String {
-        URL(string: entry.url)?.host ?? entry.url
-    }
-
-    private var domainLetter: String {
-        host.first.map { String($0).uppercased() } ?? "?"
-    }
-
-    private var letterColor: Color {
-        let palette: [Color] = [
-            Color(red: 0.40, green: 0.56, blue: 0.85),
-            Color(red: 0.55, green: 0.75, blue: 0.55),
-            Color(red: 0.85, green: 0.55, blue: 0.40),
-            Color(red: 0.70, green: 0.50, blue: 0.85),
-            Color(red: 0.85, green: 0.75, blue: 0.35),
-            Color(red: 0.50, green: 0.75, blue: 0.80)
-        ]
-        let hash = host.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
-        return palette[abs(hash) % palette.count]
-    }
+/// Two soft glows in the app icon's mint and blue behind the content, as on the
+/// desktop page.
+private struct StartPageBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Icon area: letter avatar or delete button on hover
+        GeometryReader { proxy in
             ZStack {
-                if isHovered {
-                    Button(action: onRemove) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
-                            .background(Color.secondary.opacity(0.15), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(letterColor)
-                            .frame(width: 28, height: 28)
-                        if let favicon = faviconCache.cachedImage(forHost: host) {
-                            Image(nsImage: favicon)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 20, height: 20)
-                        } else {
-                            Text(domainLetter)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                }
+                Color(nsColor: .windowBackgroundColor)
+                glows(in: proxy.size)
+                    .opacity(colorScheme == .dark ? 0.32 : 0.5)
             }
-            .frame(width: 28, height: 28)
-            .animation(.easeOut(duration: 0.15), value: isHovered)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.title.isEmpty ? entry.url : entry.title)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(entry.url)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onHover { hovering in isHovered = hovering }
-        .onTapGesture { onTap() }
-        .background(isHovered ? Color.primary.opacity(0.04) : .clear)
-        .animation(.easeOut(duration: 0.1), value: isHovered)
-        .onAppear { faviconCache.image(forHost: host) }
+        .ignoresSafeArea()
+    }
+
+    private func glows(in size: CGSize) -> some View {
+        ZStack {
+            Circle()
+                .fill(RadialGradient(colors: [Color(red: 46 / 255, green: 230 / 255, blue: 176 / 255).opacity(0.75), .clear],
+                                     center: .center, startRadius: 0, endRadius: 220))
+                .frame(width: 640, height: 640)
+                .blur(radius: 80)
+                .position(x: size.width / 2 - 280, y: 160)
+            Circle()
+                .fill(RadialGradient(colors: [Color(red: 26 / 255, green: 156 / 255, blue: 1).opacity(0.6), .clear],
+                                     center: .center, startRadius: 0, endRadius: 220))
+                .frame(width: 640, height: 640)
+                .blur(radius: 80)
+                .position(x: size.width / 2 + 280, y: 120)
+        }
     }
 }
