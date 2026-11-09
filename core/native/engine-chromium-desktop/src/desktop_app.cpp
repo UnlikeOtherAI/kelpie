@@ -362,6 +362,7 @@ bool DesktopApp::Start(const Config& config) {
   DesktopHttpServer::Config server_config;
   server_config.port = config.port;
   server_config.bind_host = config.bind_host;
+  server_config.approval_available = config.approval_available;
   server_config.control_token = config.control_token;
   server_config.device_id = config.device_id;
   server_config.platform = PlatformToString(config.platform);
@@ -369,7 +370,7 @@ bool DesktopApp::Start(const Config& config) {
   server_config.server_name = config.app_name;
   server_config.server_version = config.app_version;
   if (!impl_->http_server.Start(server_config)) {
-    impl_->last_error = "The loopback control listener did not start";
+    impl_->last_error = "The control listener did not start";
     if (!impl_->engine.Shutdown()) {
       impl_->last_error = impl_->engine.last_error();
       // The engine retains live CEF callbacks until OnBeforeClose. Keep this

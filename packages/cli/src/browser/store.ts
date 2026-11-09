@@ -94,7 +94,7 @@ export interface LocalReadiness {
   deviceId: string;
   port: number;
   token: string;
-  controlMode: "loopback";
+  controlMode: "loopback" | "computer";
   mcp: { http: boolean; stdio: boolean; endpoint: "/mcp" };
 }
 
@@ -115,7 +115,7 @@ export async function readLocalReadiness(file: string): Promise<LocalReadiness |
     if (value.version !== 1 || !boundedId(value.launchId) || !boundedId(value.deviceId) ||
         !Number.isInteger(value.port) || (value.port ?? 0) < 1 || (value.port ?? 0) > 65_535 ||
         typeof value.token !== "string" || !/^[A-Za-z0-9_-]{32,512}$/.test(value.token) ||
-        value.controlMode !== "loopback" || value.mcp?.endpoint !== "/mcp" ||
+        (value.controlMode !== "loopback" && value.controlMode !== "computer") || value.mcp?.endpoint !== "/mcp" ||
         typeof value.mcp.http !== "boolean" || !value.mcp.http ||
         typeof value.mcp.stdio !== "boolean") return undefined;
     return value as LocalReadiness;

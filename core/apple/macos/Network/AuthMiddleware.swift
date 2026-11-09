@@ -21,8 +21,8 @@ struct ParsedHTTPRequest {
 enum AuthDecision: Equatable {
     /// Request is allowed without a bearer — endpoint is on the unauth allowlist.
     case unauthenticated
-    /// Request is bearer-authenticated; `clientId` is the resolved owner.
-    case authenticated(clientId: String)
+    /// Request has computer permission or a bearer; `clientId` is the resolved owner.
+    case authenticated(clientId: String, computerKey: String? = nil)
     /// Request must be rejected with the given status + JSON body keys.
     case reject(status: Int, errorCode: String, message: String)
 }
@@ -30,7 +30,7 @@ enum AuthDecision: Equatable {
 /// Enforces the pairing/auth state machine on every request.
 struct AuthMiddleware {
     /// Exact-match decoded-path allowlist. Pre-routing — every other path must
-    /// supply a valid bearer token.
+    /// have computer permission or supply a valid bearer token.
     static let unauthAllowlist: Set<String> = [
         "/v1/pair/status",
         "/v1/get-device-info",
@@ -50,9 +50,16 @@ struct AuthMiddleware {
             return .unauthenticated
         }
         if Self.unauthAllowlist.contains(req.path) { return .unauthenticated }
-        // Everything else requires bearer.
+        var computerRejection: AuthDecision?
+        if let clientId = store.trustedComputers.clientId(for: req.sourceAddress, token: extractBearer(req.headers) ?? "") {
+            computerRejection = trustedRequestReject(req)
+            if computerRejection == nil {
+                return .authenticated(clientId: clientId, computerKey: clientId == "localhost" ? nil : clientId)
+            }
+        }
+        // Legacy client tokens and narrow UOA grants retain their own authority.
         guard let bearer = extractBearer(req.headers) else {
-            return .reject(status: 401, errorCode: "UNAUTHORIZED", message: "Authentication required")
+            return computerRejection ?? .reject(status: 401, errorCode: "UNAUTHORIZED", message: "Authentication required")
         }
         guard let clientId = store.validateBearer(bearer) ?? verifiedAccountClientId else {
             return .reject(status: 401, errorCode: "UNAUTHORIZED", message: "Invalid bearer token")
@@ -80,14 +87,38 @@ struct AuthMiddleware {
     /// application/json` and no `Origin`. Browser fetches always send `Origin`
     /// (or `Origin: null` from sandboxed iframes); reject both.
     private func csrfReject(_ req: ParsedHTTPRequest) -> AuthDecision? {
-        let contentType = req.headers["content-type"]?.first?.lowercased() ?? ""
-        if !contentType.hasPrefix("application/json") {
+        let site = req.headers["sec-fetch-site"]
+        if site != nil, site != ["none"], site != ["same-origin"] {
+            return .reject(status: 403, errorCode: "FORBIDDEN", message: "Cross-site pairing is not permitted")
+        }
+        let contentType = req.headers["content-type"]?.first?.split(separator: ";").first?
+            .trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+        if contentType != "application/json" {
             return .reject(status: 415, errorCode: "UNSUPPORTED_MEDIA_TYPE", message: "Content-Type must be application/json")
         }
         if let origin = req.headers["origin"]?.first {
             // Any browser-supplied Origin (including `null` from sandboxed iframes)
             // is rejected. CLI fetch in Node does not set Origin.
             return .reject(status: 403, errorCode: "FORBIDDEN", message: "Origin '\(origin)' not permitted on pair endpoint")
+        }
+        return nil
+    }
+
+    /// IP permission belongs to local programs, never a page running in their browser.
+    private func trustedRequestReject(_ req: ParsedHTTPRequest) -> AuthDecision? {
+        if req.headers["origin"] != nil ||
+            req.headers["sec-fetch-site"].map({ $0 != ["none"] && $0 != ["same-origin"] }) == true {
+            return .reject(status: 403, errorCode: "FORBIDDEN", message: "Browser requests cannot use computer approval")
+        }
+        guard let hosts = req.headers["host"], hosts.count == 1, TrustedComputers.safeHost(hosts[0]) else {
+            return .reject(status: 403, errorCode: "FORBIDDEN", message: "A local Host header is required")
+        }
+        if req.method == "POST" {
+            let media = req.headers["content-type"]?.first?.split(separator: ";").first?
+                .trimmingCharacters(in: .whitespaces).lowercased()
+            if media != "application/json" {
+                return .reject(status: 415, errorCode: "UNSUPPORTED_MEDIA_TYPE", message: "Content-Type must be application/json")
+            }
         }
         return nil
     }

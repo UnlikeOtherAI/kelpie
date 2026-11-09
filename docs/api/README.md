@@ -24,7 +24,7 @@ All methods are available via three interfaces:
 
 - Base URL: `http://{device-ip}:{port}/v1/`
 - Content-Type: `application/json`
-- Auth: bearer token via `Authorization: Bearer <token>`. `POST /v1/pair` accepts a verified shared-account proof or on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
+- Auth: actual loopback programs need no bearer. Remote clients prove a signing key through `POST /v1/pair` and use a bearer from one on-device computer approval. Legacy bearer tokens and narrow shared-account grants remain supported on Apple/Android. See [Pairing & Auth](#pairing--auth).
 - Default Port: `8420`
 - Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`
 - Concurrency: The common native gateway and legacy browser mutations share one admission lease. A competing operation returns `BUSY`; it is never replayed automatically. A timed-out renderer operation retains the lease until its callback retires; later explicit requests can then reconcile or continue without restarting.
@@ -33,43 +33,17 @@ All methods are available via three interfaces:
 
 ## Pairing & Auth
 
-The HTTP server denies every `/v1/*` and `/mcp` call by default. The CLI obtains a bearer through verified same-account access or manual on-device approval. The same-account [challenge contract](account-pairing.md) uses the existing pair endpoint and never opens the approval prompt.
+Actual loopback programs are allowed automatically after request safety checks.
+Remote control requires a bearer from a proven, approved Ed25519 computer key,
+a retained legacy bearer or verified account authority. IP, port and mDNS are
+routing data. The [computer pairing protocol](computer-pairing.md) specifies the
+two-step signed `POST /v1/pair`, source-bound status polling, one approval per key,
+reconnection, storage and revocation. Discovery advertises
+`approvalMode: "computer-key"` and `localhostTrusted: true`.
 
-### Endpoints
-
-| Method | Auth | Body | Response |
-|---|---|---|---|
-| `POST /v1/pair` | none + CSRF gate | `{clientId, clientName}` | `202 {status: "pending", requestId, expiresAt, sourceAddress}` |
-| `GET /v1/pair/status?requestId=…` | none | — | `200 {status: "pending"\|"approved"\|"denied"\|"expired"\|"not_found", scope?, token?}` |
-| `DELETE /v1/pair` | bearer | — | `200 {success: true}` — revokes the caller's own pairing |
-| `GET or POST /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
-
-The CSRF gate on `POST /v1/pair` requires `Content-Type: application/json`, an absent `Origin` header, single `Authorization` / `Content-Length` headers, and no `Transfer-Encoding`. Browsers cannot satisfy these constraints; the CLI's plain `fetch` does.
-
-### Token lifecycle
-
-1. CLI generates a stable `clientId` (per-install UUID) and sends `POST /v1/pair` with a self-reported `clientName`.
-2. Device displays a modal showing `clientName` (labeled self-reported) and the socket peer address (authoritative).
-3. User picks one of `Yes once` (in-memory session), `Always allow` (persistent), or `No` (suppresses re-prompts from that source for 10 minutes).
-4. CLI polls `GET /v1/pair/status?requestId=…`. On approval, the plaintext bearer is returned **exactly once**, and the device persists only the SHA-256 hash. Token comparison on subsequent requests is constant-time over the 32-byte digest.
-
-### Source-address binding
-
-The server records the socket peer when `POST /v1/pair` is received. If a later status poll arrives from a different peer, the server returns `not_found` — the token is never disclosed to a third party even if they observe the `requestId`.
-
-### Error codes specific to pairing
-
-| Code | HTTP Status | When |
-|---|---|---|
-| `UNAUTHORIZED` | 401 | Missing/invalid/expired bearer token |
-| `DENIED` | 403 | Pair requests from this source are currently suppressed |
-| `MISSING_PARAM` | 400 | `POST /v1/pair` missing `clientId` or status poll missing `requestId` |
-| `INVALID_JSON` | 400 | `POST /v1/pair` body was not valid JSON |
-| `UNSUPPORTED_MEDIA_TYPE` | 415 | `POST /v1/pair` did not use `Content-Type: application/json` |
-| `FORBIDDEN` | 403 | `POST /v1/pair` included a browser `Origin` header |
-| `BAD_REQUEST` | 400 | Duplicate `Authorization` / `Content-Length` or any `Transfer-Encoding` header |
-
----
+The [account challenge contract](account-pairing.md) remains separate and never
+creates persistent computer trust. New manual pairing without a public key asks
+for a CLI update. Existing grants are not converted into computer-key approvals.
 
 ## Per-Tab Targeting (macOS only)
 

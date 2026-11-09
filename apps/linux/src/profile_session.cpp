@@ -40,7 +40,7 @@ void ProfileSession::Open(const std::filesystem::path& directory,const std::stri
 }
 void ProfileSession::Publish(const std::string& id,int port,bool stdio) {
   AtomicWrite(readiness_,nlohmann::json{{"version",1},{"launchId",launch_},{"deviceId",id},
-      {"port",port},{"token",token_},{"controlMode","loopback"},
+      {"port",port},{"token",token_},{"controlMode","computer"},
       {"mcp",{{"http",true},{"stdio",stdio},{"endpoint","/mcp"}}}}.dump());
 }
 void ProfileSession::Clear() {

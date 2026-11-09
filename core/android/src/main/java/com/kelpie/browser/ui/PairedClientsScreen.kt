@@ -40,6 +40,7 @@ fun PairedClientsScreen(
     var refreshTick by remember { mutableIntStateOf(0) }
     // `refreshTick` is read inside `remember(refreshTick)` to force a recomputation
     // after any revoke action — the underlying store is not Observable.
+    val computers = remember(refreshTick) { coordinator.store.trustedComputers.list() }
     val persistent = remember(refreshTick) { coordinator.store.listPersistent() }
     val sessions = remember(refreshTick) { coordinator.store.listSessions() }
     val denied = remember(refreshTick) { coordinator.store.listDeniedSources() }
@@ -53,7 +54,18 @@ fun PairedClientsScreen(
         },
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).padding(horizontal = 16.dp)) {
-            item { sectionHeader("Persistent (Always allow)") }
+            item { sectionHeader("Trusted computers") }
+            if (computers.isEmpty()) {
+                item { emptyRow("No remote computers approved. Localhost is always allowed.") }
+            } else {
+                items(computers, key = { it.address }) { computer ->
+                    pairingRow(name = computer.name, subtitle = "${computer.address} · ${computer.publicKey}") {
+                        coordinator.store.trustedComputers.revoke(computer.publicKey)
+                        refreshTick++
+                    }
+                }
+            }
+            item { sectionHeader("Earlier client approvals") }
             if (persistent.isEmpty()) {
                 item { emptyRow("No persistent pairings.") }
             } else {
@@ -68,7 +80,7 @@ fun PairedClientsScreen(
                 }
             }
 
-            item { sectionHeader("Active sessions (Yes, once)") }
+            item { sectionHeader("Account and temporary access") }
             if (sessions.isEmpty()) {
                 item { emptyRow("No active session pairings.") }
             } else {

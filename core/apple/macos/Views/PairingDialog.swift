@@ -4,8 +4,7 @@ import AppKit
 /// Modal sheet shown when an unauthenticated client requests pairing.
 /// Hosted by `BrowserView` and bound to the shared `PairApprovalCoordinator`.
 ///
-/// Per the design (Codex finding #24): the default button is `No`. `Always`
-/// is visually distinct and never the default — return-key triggers cancel.
+/// Deny is the default; allowing a computer grants persistent signing-key permission.
 ///
 /// The buttons are AppKit-backed (`AppKitPairingButton`) because the host
 /// window contains a WebView whose first-responder steals mouse events from
@@ -20,9 +19,9 @@ struct PairingDialog: View {
     }
 
     @ViewBuilder
-    private func content(for prompt: PairingStore.PendingRequest) -> some View {
+    private func content(for prompt: TrustedComputers.Request) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Allow this client to control this browser?")
+            Text("Allow this computer to control Kelpie?")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -43,11 +42,19 @@ struct PairingDialog: View {
                     .textSelection(.enabled)
             }
 
+            Text("Computer key: \(prompt.publicKey)")
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+
             Text(
-                "This client will be able to navigate, type, screenshot, run JavaScript, and read cookies."
+                "Allow this computer to control Kelpie, even when its IP changes. This stays allowed until you revoke it in Settings."
             )
             .font(.callout)
             .foregroundColor(.secondary)
+
+            if let error = coordinator.approvalError {
+                Text(error).font(.callout).foregroundColor(.red)
+            }
 
             VStack(spacing: 8) {
                 // No is the default — first in stacking order, prominent
@@ -61,18 +68,10 @@ struct PairingDialog: View {
                 .frame(height: 32)
 
                 AppKitPairingButton(
-                    title: "Yes, once",
-                    style: .normal,
-                    accessibilityID: "pair.dialog.yes-once",
-                    action: { coordinator.approve(requestId: prompt.requestId, persist: false) }
-                )
-                .frame(height: 32)
-
-                AppKitPairingButton(
-                    title: "Always allow",
+                    title: "Allow computer",
                     style: .warning,
                     accessibilityID: "pair.dialog.always",
-                    action: { coordinator.approve(requestId: prompt.requestId, persist: true) }
+                    action: { coordinator.approve(requestId: prompt.requestId) }
                 )
                 .frame(height: 32)
             }

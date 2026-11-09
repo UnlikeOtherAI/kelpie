@@ -58,6 +58,7 @@ final class PairingStore: @unchecked Sendable {
 
     private let lock = NSLock()
     private let storeURL: URL?
+    let trustedComputers: TrustedComputers
 
     /// Persistent pairings (token hashes only).
     private var persistent: [PairingRecord] = []
@@ -84,6 +85,7 @@ final class PairingStore: @unchecked Sendable {
 
     init(storeURL: URL? = PairingStore.defaultStoreURL()) {
         self.storeURL = storeURL
+        self.trustedComputers = TrustedComputers(pairingStoreURL: storeURL)
         load()
     }
 

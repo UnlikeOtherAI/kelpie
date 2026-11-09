@@ -97,6 +97,10 @@ Three properties an integrator can rely on:
   nothing else; no token, no store contents. Error text is redacted of the
   user's home path.
 
+`paired` includes computer permission reported by the public device-info endpoint;
+the probe sends no credentials and never starts pairing. Legacy tokens remain
+recognized for older app versions.
+
 Instances come from the mDNS browse *and* the loopback probe, so a Kelpie on the
 same host still appears when the announcement is missed. Every instance states
 its own `address` and `port`: each one picks its own, so neither may be assumed.
@@ -160,25 +164,31 @@ kelpie ping                       # ping all
 ```
 
 ### `kelpie pair`
-Pair the CLI with a device. An existing authorized UOA session for the same account connects automatically without on-device approval. Integrations supply `PairContext.accountPairingTicket` or `accountAccessToken`; standalone CLI/MCP processes can receive their existing account access token via `KELPIE_UOA_ACCESS_TOKEN`. The CLI sends that credential only to the fixed TLS UOA origin to obtain a narrow challenge proof. Tokens obtained this way are memory-only and expire within two minutes. A caller without an account uses the manual approval flow. Account verification failures return `ACCOUNT_AUTH_FAILED` without silently switching to a manual prompt. See [account pairing](api/account-pairing.md).
-
-Without prior pairing, authenticated commands return `401 UNAUTHORIZED`; the CLI retries pairing on the first failure. `kelpie pair` is also exposed for scripts that want to prime credentials before automation runs.
-
+Approve the calling computer's signing key on a remote Kelpie device. One **Allow computer** decision covers later CLI invocations, MCP clients and browser profiles, even if their client ids or tokens differ. Localhost never needs approval. A normal command can start this flow after a `401`; explicit `kelpie pair` remains useful before an account-only integration connects. A signed-in caller can use supported same-account access without a dialog. Targets that explicitly lack that protocol use the ordinary manual computer prompt.
 ```bash
 kelpie pair --device "My iPhone"
 kelpie pair --device 192.168.1.42 --client-name "ci-runner@build-host"
 kelpie pair --device "MyMac" --timeout-ms 60000   # give up after 60 s
 ```
 
-The user picks one of three responses on the device prompt:
+The device offers **Allow computer** or **No**. The CLI automatically creates a
+persistent Ed25519 signing key in `~/.kelpie/computer-key.pem`, shared by tools
+running as the same OS user. It proves key ownership before Kelpie shows a prompt.
+The prompt shows the current IP and verified public key. One approval covers all
+browser API/MCP operations until revoked in **Settings → Trusted computers**.
 
-| Response | Token persists across CLI invocations? | On-disk |
-|---|---|---|
-| Yes, once | No — kept in process memory only | — |
-| Always allow | Yes | `~/.kelpie/tokens.json` (mode 0600) |
-| No | n/a | suppresses re-prompts from the source for 10 min |
+Trust follows the signing key across changed IPs, mDNS names, HTTP ports, client
+IDs and app/CLI restarts. A fresh signed handshake reconnects automatically when
+a browser endpoint changes; cached bearer tokens are still pinned to their own
+socket and are never forwarded to a new discovery address. Another key using an
+old IP receives no authority. Do not delete or copy the private key as routine
+troubleshooting. A damaged key produces an error rather than silently replacing
+this computer's identity.
 
-Persistent tokens are keyed by `<deviceId>:<host>:<port>` (the *device fingerprint*). If the same `deviceId` appears at a new socket address, the CLI refuses the stored token and forces a re-pair, defending against mDNS spoofing. A device reachable on several interfaces (for example a Mac on both Ethernet and Wi-Fi) may be discovered at either address; before prompting again the CLI retries every approval that device id already holds, each only at the socket that issued it, and switches to the one the device accepts. Rejected tokens are dropped.
+Already trusted keys return `approvalRequired: false` and print no approval
+guidance. Localhost programs need no prompt. A headless desktop can reconnect a
+trusted key; unknown keys need the native approval UI. Existing account and
+legacy-token flows keep their original scopes. See [computer pairing](api/computer-pairing.md).
 
 ### `kelpie browser`
 Manage local macOS Kelpie app aliases stored in `~/.kelpie/browsers.json`.

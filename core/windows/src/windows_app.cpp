@@ -1,4 +1,6 @@
 #include "windows_app.h"
+#include "computer_approval.h"
+#include "kelpie/desktop_http_server.h"
 #include "inference_view.h"
 
 #include "windows_utf.h"
@@ -131,6 +133,7 @@ bool WindowsApp::ProcessMessage(const MSG& message) {
 void WindowsApp::Tick() {
   if (desktop_app_) desktop_app_->Tick();
   UpdateBrowserStateFromRuntime();
+  if (desktop_app_ && !close_lifecycle_.requested()) PollComputerApproval(desktop_app_->http_server().approvals(), shell_->hwnd());
   TryCompleteClose();
 }
 

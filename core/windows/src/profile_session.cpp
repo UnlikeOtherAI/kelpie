@@ -107,7 +107,7 @@ bool ProfileSession::PublishReadiness(const std::string& device_id,
       {"deviceId", device_id},
       {"port", port},
       {"token", token_},
-      {"controlMode", "loopback"},
+      {"controlMode", "computer"},
       {"mcp", {{"http", true}, {"stdio", stdio_mcp}, {"endpoint", "/mcp"}}},
   };
   const std::filesystem::path temporary = readiness_path_.wstring() + L"." +

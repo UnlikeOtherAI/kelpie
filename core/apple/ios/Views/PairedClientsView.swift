@@ -1,11 +1,6 @@
 import SwiftUI
 
-/// Settings sub-screen listing paired clients with revoke actions.
-///
-/// Three sections mirror the design doc:
-///   - Paired clients   — persistent ("Always allow") approvals.
-///   - Active sessions  — in-memory ("Yes, once") approvals.
-///   - Recently denied  — informational; cleared after 10 min.
+/// Computer permissions, legacy client grants, temporary account sessions and recent denials.
 struct PairedClientsView: View {
     @ObservedObject var coordinator: PairApprovalCoordinator
     @Environment(\.dismiss) private var dismiss
@@ -13,10 +8,12 @@ struct PairedClientsView: View {
 
     var body: some View {
         List {
+            trustedSection
             persistentSection
             sessionSection
             deniedSection
         }
+        .id(refreshTick)
         .navigationTitle("Paired Clients")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -27,8 +24,26 @@ struct PairedClientsView: View {
     }
 
     @ViewBuilder
+    private var trustedSection: some View {
+        Section("Trusted computers") {
+            let computers = coordinator.store.trustedComputers.list()
+            if computers.isEmpty {
+                Text("No remote computers approved. Localhost is always allowed.")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(computers) { computer in
+                    pairingRow(name: computer.name, subtitle: "\(computer.address) · \(computer.publicKey)") {
+                        _ = coordinator.store.trustedComputers.revoke(publicKey: computer.publicKey)
+                        refreshTick &+= 1
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var persistentSection: some View {
-        Section("Persistent (Always allow)") {
+        Section("Earlier client approvals") {
             let records = coordinator.store.listPersistent()
             if records.isEmpty {
                 Text("No persistent pairings.")
@@ -45,7 +60,7 @@ struct PairedClientsView: View {
 
     @ViewBuilder
     private var sessionSection: some View {
-        Section("Active sessions (Yes, once)") {
+        Section("Account and temporary access") {
             let sessions = coordinator.store.listSessions()
             if sessions.isEmpty {
                 Text("No active session pairings.")

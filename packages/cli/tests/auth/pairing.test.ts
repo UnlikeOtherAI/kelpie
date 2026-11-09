@@ -8,6 +8,7 @@ import {
 } from "../../src/auth/pairing.js";
 
 const baseCtx = {
+  computerIdentity: async () => ({ publicKey: "0".repeat(64), signChallenge: () => "1".repeat(128) }),
   host: "192.168.1.42",
   port: 8420,
   clientId: "client-1",
@@ -57,7 +58,7 @@ describe("requestPair", () => {
     expect(m.calls[0].url).toBe("http://192.168.1.42:8420/v1/pair");
     expect(m.calls[0].init?.method).toBe("POST");
     const body = JSON.parse(m.calls[0].init?.body as string);
-    expect(body).toEqual({ clientId: "client-1", clientName: "alice@thinkpad" });
+    expect(body).toEqual({ clientId: "client-1", clientName: "alice@thinkpad", computerPublicKey: "0".repeat(64) });
   });
 
   it("returns DENIED on a 403 response", async () => {

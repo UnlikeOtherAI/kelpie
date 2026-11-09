@@ -6,9 +6,11 @@ import SwiftUI
 /// SwiftUI hierarchy observes `currentPrompt` to show a modal.
 @MainActor
 final class PairApprovalCoordinator: ObservableObject {
-    @Published private(set) var currentPrompt: PairingStore.PendingRequest?
+    @Published private(set) var currentPrompt: TrustedComputers.Request?
     /// Last decision the user took, used by the prompt sheet to dismiss itself.
     @Published private(set) var lastResolvedRequestId: String?
+
+    @Published private(set) var approvalError: String?
 
     let store: PairingStore
 
@@ -18,18 +20,23 @@ final class PairApprovalCoordinator: ObservableObject {
 
     /// Called when a new pair request arrives; recomputes the visible prompt.
     func refresh() {
-        let next = store.visiblePending().first
+        let next = store.trustedComputers.pending()
         currentPrompt = next
     }
 
-    func approve(requestId: String, persist: Bool) {
-        _ = store.approve(requestId: requestId, persist: persist)
+    func approve(requestId: String) {
+        guard store.trustedComputers.approve(requestId: requestId) else {
+            approvalError = "Could not save approval. Check available storage and try again."
+            return
+        }
+        approvalError = nil
         lastResolvedRequestId = requestId
         refresh()
     }
 
     func deny(requestId: String) {
-        store.deny(requestId: requestId)
+        store.trustedComputers.deny(requestId: requestId)
+        approvalError = nil
         lastResolvedRequestId = requestId
         refresh()
     }

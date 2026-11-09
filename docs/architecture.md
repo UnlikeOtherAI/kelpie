@@ -97,11 +97,11 @@ Each browser app has four internal layers:
 - iOS: `WKWebView` native methods — `evaluateJavaScript`, `takeSnapshot`, scroll via `scrollView`
 - Android: `WebView` + CDP — `DOM.getDocument`, `Page.captureScreenshot`, `Runtime.evaluate`
 - macOS: two callable renderers share a persistent `core-mcp` browser gateway, including a private WebKit content world and a Chromium isolated world. Product extensions retain their native handlers. The current stack — `WKWebView` for Safari/WebKit parity and CEF for Chromium/Chrome parity. Both conform to a shared renderer interface so the HTTP and MCP surface stays the same while the active engine changes. CEF uses an external message pump with a process-owned browser handler and the existing owner-thread timer; initializing Chromium during a renderer switch does not attach default Apple loop observers after loop entry.
-- Linux: CEF-backed Chromium shell when the SDK/runtime is present, with a stub-safe fallback that keeps the HTTP server and persisted state alive when CEF is unavailable. The fallback uses the same loopback-only, readiness-token control contract as the Chromium build and is not advertised over mDNS.
+- Linux: CEF-backed Chromium shell when the SDK/runtime is present, with a stub-safe fallback that keeps the HTTP server and persisted state alive when CEF is unavailable. The fallback uses the same localhost trust and persistent remote-computer approvals as the Chromium build, and is not advertised over mDNS.
 
 **Command Handler** — Translates incoming HTTP requests into native browser calls. Android uses CDP for most operations (no scripts enter the page). iOS uses native `evaluateJavaScript` calls and, for features WebKit doesn't expose natively, ephemeral bridge scripts that are cleared on navigation (see [iOS bridge scripts](#ios--no-injection-dom-access)). macOS routes the same handlers through the active renderer and adds `set-renderer` / `get-renderer` so the UI and API can switch engines at runtime.
 
-**Network Layer** — Embedded HTTP server (Swifter/Telegraph on iOS, Ktor on Android, Network.framework-based server on macOS, shared desktop HTTP/MCP server on Windows and Linux Chromium), MCP server over the same transport, and mDNS service advertisement. The Windows and Linux Chromium listeners are authenticated loopback-only and are not advertised through mDNS. On macOS, advertisement stays tied to the long-lived server process. On iOS and Android, the app reasserts advertisement on foreground entry so discovery recovers after background suspension.
+**Network Layer** — Embedded HTTP server (Swifter/Telegraph on iOS, Ktor on Android, Network.framework-based server on macOS, shared desktop HTTP/MCP server on Windows and Linux Chromium), MCP server over the same transport, and mDNS service advertisement. The Windows and Linux Chromium listeners accept loopback automatically and remote clients with a bearer from an approved signing key; they are not advertised through mDNS. On macOS, advertisement stays tied to the long-lived server process. On iOS and Android, the app reasserts advertisement on foreground entry so discovery recovers after background suspension.
 
 ### Shared Native Libraries (`core/native/`)
 
@@ -284,28 +284,29 @@ over TLS; the separate outbound Nessie connection uses authenticated WSS.
 
 | Boundary | Control |
 |---|---|
-| Local network isolation | LAN HTTP/MCP clients must be on the same local network |
-| No internet exposure | HTTP servers bind to local/private IPs only |
+| Socket peer authority | Loopback is implicit; remote callers require a proven, approved signing key or existing account/client authority |
+| Remote admission | Listeners deny unapproved remote peers before browser dispatch; only read-only discovery and gated pairing are public |
 | No persistent scripts | No browser extensions or content scripts. Some iOS features use ephemeral bridge scripts (cleared on navigation) |
 | Account authority | UOA owns identity and revocation; account credentials go only to UOA |
 | Port access | Default 8420, configurable per device |
 
 ### Shared Network Risk
 
-Kelpie requires verified account authority or explicit on-device pairing before any `/v1/*` automation method or `/mcp` connection is allowed. Unauthenticated traffic is denied by default; only the three discovery/pair endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`) and `/health` are reachable without a bearer token.
+Kelpie allows actual loopback programs after browser-request safety checks.
+Remote computer permission belongs to an Ed25519 public key, independently of IP,
+port, mDNS, browser profile and caller UUID. A shared native queue obtains a random
+challenge, verifies proof of possession, and displays one approval per proven key.
+The atomically written, cross-process locked key store retains bearer hashes and
+is consulted on each request, so revocation affects every existing process.
 
-- Same-account access: the existing pairing store holds a hidden, source-bound challenge and memory-only account grant. UOA verifies the requester's proof against the receiving browser's current authenticated account on issuance and every automation request. Opaque native account generations fence sign-out and re-login, even to the same subject. Account grants cannot enter the manual bearer path or persistent pairing file. See [account pairing](api/account-pairing.md).
-
-- First contact: the CLI issues `POST /v1/pair` with a self-reported client id + name. The device shows a modal asking the user to allow the client — three responses: `Yes once` (in-memory), `Always allow` (persistent), `No` (suppresses re-prompts from that source for 10 minutes).
-- Token lifecycle: 32-byte CSPRNG bearer returned exactly once on the originating client's status poll. Only SHA-256 hashes are persisted on disk; comparison is constant-time. Theft of the device store does not yield usable tokens.
-- CLI side: persistent-scope tokens are stored at `~/.kelpie/tokens.json` (mode 0600), keyed by `<deviceId>:<host>:<port>` so mDNS spoofing at a new socket address forces a re-pair. Direct-address and discovered-ID aliases reuse a token only at the identical socket, with ambiguous token values refused and distinct native IDs kept separate. The persistent store is reread on each access so running MCP processes observe external approvals and revocation; after a rejection the client removes only aliases carrying that rejected token and retries any fresh saved token before requesting approval. Session-scope tokens live in process memory only and use the same alias rules.
-- TLS is still future work — bearer tokens travel plaintext on the LAN. Use Kelpie only on trusted networks until TLS lands.
-
-Operator-facing knobs:
-- The on-device HTTP server binds only to loopback + link-local + RFC1918 interfaces; VPN tunnels and public IPv6 addresses are excluded.
-- The CLI's `kelpie mcp --http` MCP server binds to `127.0.0.1` by default. `--bind 0.0.0.0` requires the additional `--unsafe-host` flag and emits a warning, because that mode forwards stored bearer tokens to anyone reachable on the bound interface.
-
----
+The CLI shares one protected private key per computer OS user. It automatically
+signs a fresh challenge after endpoint changes and never forwards a cached bearer
+to an unpinned socket. IP is display/routing data; another key at an old IP never
+inherits permission. Apple/Android UOA and retained legacy bearer grants keep their
+existing independent scopes. Browser Origin/cross-site requests, unsafe Host,
+ambiguous framing and non-JSON control POSTs cannot inherit localhost permission.
+See [computer pairing](api/computer-pairing.md) for the complete protocol, storage
+locations and migration rules. TLS is not added by this change.
 
 ## Platform-Specific Architecture Details
 
@@ -372,8 +373,7 @@ This is the same protocol Playwright and Chrome DevTools use.
 
 The Windows desktop server implements stateless Streamable HTTP at `POST /mcp`: initialized
 clients receive JSON replies, well-formed notifications receive `202` with an empty body, and
-`GET /mcp` returns `405` because no SSE stream is offered. Control routes require the local
-readiness bearer token; only health and device discovery are public. The runtime advertises only
+`GET /mcp` returns `405` because no SSE stream is offered. Control routes allow loopback automatically and remote clients with a bearer from one persistent signing-key approval. Only health, discovery and gated pairing are public. The runtime advertises only
 routes that are callable by its configured native shell callbacks.
 
 Windows and Linux Chromium shells share `DesktopApp`, tab leases, request routing,

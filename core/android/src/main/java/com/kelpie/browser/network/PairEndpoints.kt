@@ -2,8 +2,6 @@ package com.kelpie.browser.network
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 /** Handler for the v1 pair endpoints. Kept separate from the routing layer. */
 class PairEndpoints(
@@ -25,40 +23,13 @@ class PairEndpoints(
         bodyText: String,
         sourceAddress: String,
     ): JsonResult {
-        val (clientId, clientName) =
-            try {
-                val element =
-                    parser.parseToJsonElement(bodyText) as? JsonObject
-                        ?: return errorResult(400, "INVALID_JSON", "Request body is not a JSON object")
-                val id =
-                    element["clientId"]?.jsonPrimitive?.contentOrNull
-                        ?: return errorResult(400, "MISSING_PARAM", "clientId is required")
-                val name = element["clientName"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (id.isEmpty()) return errorResult(400, "MISSING_PARAM", "clientId is required")
-                id to name
-            } catch (_: Throwable) {
-                return errorResult(400, "INVALID_JSON", "Request body is not valid JSON")
-            }
-
-        val start = store.startPairing(clientId, clientName, sourceAddress)
-        return when (start.result) {
-            PairingStore.PairStartResult.DENIED ->
-                errorResult(403, "DENIED", "Pair requests from this source are currently suppressed")
-            PairingStore.PairStartResult.CREATED -> {
-                val req = start.request ?: return errorResult(500, "INTERNAL", "Failed to create pending request")
-                onPendingChanged()
-                JsonResult(
-                    status = 202,
-                    json =
-                        mapOf(
-                            "status" to "pending",
-                            "requestId" to req.requestId,
-                            "expiresAt" to req.expiresAt,
-                            "sourceAddress" to req.sourceAddress,
-                        ),
-                )
-            }
-        }
+        val parsed = try {
+            parser.parseToJsonElement(bodyText) as? JsonObject
+                ?: return errorResult(400, "INVALID_JSON", "Expected a JSON object")
+        } catch (_: Exception) { return errorResult(400, "INVALID_JSON", "Invalid JSON") }
+        val result = store.trustedComputers.start(parsed, sourceAddress)
+        onPendingChanged()
+        return result
     }
 
     fun handlePairStatus(
@@ -89,11 +60,12 @@ class PairEndpoints(
         if (store.wasRecentlyDenied(sourceAddress)) {
             return JsonResult(200, mapOf("status" to "denied"))
         }
-        return JsonResult(200, mapOf("status" to "not_found"))
+        onPendingChanged()
+        return JsonResult(200, store.trustedComputers.status(requestId, sourceAddress))
     }
 
-    fun handlePairDelete(authenticatedClientId: String): JsonResult {
-        val removed = store.revoke(authenticatedClientId)
+    fun handlePairDelete(authenticatedClientId: String, computerKey: String? = null): JsonResult {
+        val removed = computerKey?.let { store.trustedComputers.revoke(it) } ?: store.revoke(authenticatedClientId)
         return JsonResult(200, mapOf("success" to removed))
     }
 
@@ -101,6 +73,7 @@ class PairEndpoints(
         name: String,
         platform: String,
         version: String,
+        sourceAddress: String? = null,
     ): JsonResult =
         JsonResult(
             200,
@@ -108,7 +81,9 @@ class PairEndpoints(
                 "name" to name,
                 "platform" to platform,
                 "version" to version,
-                "requiresPairing" to true,
+                "requiresPairing" to (sourceAddress?.let { store.trustedComputers.clientId(it) } == null),
+                "approvalMode" to "computer-key",
+                "localhostTrusted" to true,
             ),
         )
 

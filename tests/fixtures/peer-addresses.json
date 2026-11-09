@@ -1,0 +1,21 @@
+[
+  {"input":"127.0.0.1","address":"127.0.0.1","loopback":true},
+  {"input":"127.12.34.56","address":"127.12.34.56","loopback":true},
+  {"input":"::1","address":"::1","loopback":true},
+  {"input":"[0:0:0:0:0:0:0:1]","address":"::1","loopback":true},
+  {"input":"[::ffff:127.0.0.1]","address":"127.0.0.1","loopback":true},
+  {"input":"::ffff:c0a8:015a","address":"192.168.1.90","loopback":false},
+  {"input":"192.168.1.90","address":"192.168.1.90","loopback":false},
+  {"input":"FE80:0:0:0:0:0:0:1%en0","address":"fe80::1%en0","loopback":false},
+  {"input":"fe80::1%5","address":"fe80::1%5","loopback":false},
+  {"input":"64:ff9b::c000:201","address":"64:ff9b::c000:201","loopback":false},
+  {"input":"::192.0.2.1","address":"::192.0.2.1","loopback":false},
+  {"input":"128.0.0.1","address":"128.0.0.1","loopback":false},
+  {"input":"localhost","address":null,"loopback":false},
+  {"input":"127.0.0.1.evil","address":null,"loopback":false},
+  {"input":"127.1","address":null,"loopback":false},
+  {"input":"127.0.0.1:8420","address":null,"loopback":false},
+  {"input":"unknown","address":null,"loopback":false},
+  {"input":"[::1","address":null,"loopback":false},
+  {"input":"fe80::1%","address":null,"loopback":false}
+]

@@ -38,7 +38,8 @@ class DesktopApp {
     std::string app_name = "kelpie-desktop";
     std::string app_version = "0.0.1";
     bool start_stdio_mcp = false;
-    std::string bind_host = "127.0.0.1";
+    std::string bind_host = "::";
+    bool approval_available = false;
     std::string control_token;
     std::string device_id;
     std::function<BrowserControlResult(bool enabled)> set_native_fullscreen;
