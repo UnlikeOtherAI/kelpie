@@ -11,3 +11,6 @@ add_sync_test(kelpie_sync_test_cookie test_cookie.cpp)
 add_sync_test(kelpie_sync_test_store_scan test_store_scan.cpp)
 add_sync_test(kelpie_sync_test_sync test_sync.cpp)
 add_sync_test(kelpie_sync_test_protocol test_protocol.cpp)
+
+target_compile_definitions(kelpie_sync_test_protocol PRIVATE
+  KELPIE_SYNC_VECTORS="${CMAKE_CURRENT_SOURCE_DIR}/vectors/handshake-v1.json")

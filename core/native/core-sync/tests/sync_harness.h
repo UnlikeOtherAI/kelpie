@@ -113,6 +113,13 @@ struct Device {
 
   Device(const std::string& id, const std::string& subject_id = "alice")
       : path(TempPath(id + ".json")), subject(subject_id) {}
+  ~Device() {
+    store.reset();
+    std::error_code ignored;
+    std::filesystem::remove_all(std::filesystem::u8path(path).parent_path(), ignored);
+  }
+  Device(const Device&) = delete;
+  Device& operator=(const Device&) = delete;
 
   void Open(bool launch, std::int64_t now, const std::string& as_subject = "") {
     if (!as_subject.empty()) subject = as_subject;

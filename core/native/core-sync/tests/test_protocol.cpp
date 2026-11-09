@@ -92,6 +92,30 @@ void TestTranscript() {
   assert(TranscriptChallenge(shifted) != challenge);
 }
 
+void TestSharedVectors() {
+  // The same file Swift, Kotlin, CNG and OpenSSL tests check; see
+  // packages/shared/tests/cookie-sync-vectors.test.ts for the Node proof.
+  std::ifstream input(std::filesystem::u8path(KELPIE_SYNC_VECTORS));
+  assert(input);
+  const json vectors = json::parse(input);
+  const json pair = {
+      {"initiator", {{"replica", vectors["initiator"]["replica"]}, {"key", vectors["initiator"]["key"]},
+                     {"nonce", vectors["initiator"]["nonce"]}}},
+      {"responder", {{"replica", vectors["responder"]["replica"]}, {"key", vectors["responder"]["key"]},
+                     {"nonce", vectors["responder"]["nonce"]}}},
+  };
+  assert(TranscriptChallenge(pair) == vectors["challenge"].get<std::string>());
+
+  json hello = Hello();
+  hello["replica"] = vectors["initiator"]["replica"];
+  hello["key"] = vectors["initiator"]["key"];
+  hello["nonce"] = vectors["initiator"]["nonce"];
+  assert(ValidateMessage("hello", hello).empty());
+  for (const auto& message : vectors["messages"]) {
+    assert(ValidateMessage("exchange", {{"seq", message["seq"]}, {"box", message["box"]}}).empty());
+  }
+}
+
 void TestHints() {
   assert(UtcDate(0) == "1970-01-01");
   assert(UtcDate(1767225600000) == "2026-01-01");
@@ -147,6 +171,7 @@ void TestCApi() {
 int main() {
   TestValidation();
   TestTranscript();
+  TestSharedVectors();
   TestHints();
   TestCApi();
   return 0;
