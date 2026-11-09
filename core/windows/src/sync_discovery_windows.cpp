@@ -53,11 +53,11 @@ struct DnsApi {
   decltype(&DnsServiceBrowseCancel) browse_cancel = nullptr;
   decltype(&DnsServiceResolve) resolve = nullptr;
   decltype(&DnsServiceResolveCancel) resolve_cancel = nullptr;
-  decltype(&DnsRecordListFree) record_list_free = nullptr;
+  decltype(&DnsFree) free_records = nullptr;
 
   bool available() const {
     return construct && free_instance && register_service && deregister_service && browse &&
-           browse_cancel && resolve && resolve_cancel && record_list_free;
+           browse_cancel && resolve && resolve_cancel && free_records;
   }
 };
 
@@ -80,7 +80,7 @@ const DnsApi& Api() {
     Load(module, "DnsServiceBrowseCancel", &loaded.browse_cancel);
     Load(module, "DnsServiceResolve", &loaded.resolve);
     Load(module, "DnsServiceResolveCancel", &loaded.resolve_cancel);
-    Load(module, "DnsRecordListFree", &loaded.record_list_free);
+    Load(module, "DnsFree", &loaded.free_records);
     return loaded;
   }();
   return api;
@@ -278,7 +278,7 @@ void WINAPI OnRegisterComplete(DWORD status, PVOID context, PDNS_SERVICE_INSTANC
 
 void WINAPI OnBrowseComplete(DWORD status, PVOID context, PDNS_RECORD records) {
   auto parsed = ParseRecords(records);
-  if (records != nullptr) Api().record_list_free(records, DnsFreeRecordList);
+  if (records != nullptr) Api().free_records(records, DnsFreeRecordList);
   const auto id = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(context));
   // ERROR_CANCELLED is the last callback of a cancelled browse.
   if (status == ERROR_CANCELLED) {

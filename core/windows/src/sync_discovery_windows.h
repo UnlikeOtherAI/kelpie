@@ -39,8 +39,9 @@ class SyncDiscoveryWindows final : public SyncDiscovery {
 
   static bool ApiAvailable();
 
+  struct State;  // Implementation detail, shared with the DNS callbacks.
+
  private:
-  struct State;
   std::shared_ptr<State> state_;
 };
 

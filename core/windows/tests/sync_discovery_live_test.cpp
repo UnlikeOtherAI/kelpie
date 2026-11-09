@@ -4,6 +4,8 @@
 // another machine can browse it (dns-sd -B _kelpie-sync._tcp).
 #include "sync_discovery_windows.h"
 
+#include <windows.h>
+
 #include <atomic>
 #include <cassert>
 #include <chrono>
