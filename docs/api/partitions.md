@@ -215,6 +215,11 @@ receive every other tab's cookies back. `get-cookies`, `set-cookie`, and
 `delete-cookies` targeting a partitioned tab operate directly on that tab's own
 cookie store.
 
+`get-cookies`, `set-cookies` and `copy-cookies` also take a `partition` target,
+so an agent can read or fill a partition's store, or copy the default store's
+cookies into it, without going through a tab. See [cookies.md](cookies.md).
+Partitions never take part in peer-to-peer cookie sync.
+
 These two paragraphs are macOS-specific. Windows has a single engine and no
 shared cookie jar to leak into, so neither the exclusion nor the engine-switch
 block applies there.
