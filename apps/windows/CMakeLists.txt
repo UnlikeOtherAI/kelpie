@@ -48,3 +48,13 @@ if(KELPIE_BUILD_EMBEDDING_HOST AND CEF_ROOT)
   )
   kelpie_stage_browser_runtime(kelpie_embed_host)
 endif()
+
+# Keep multi-config generators beside the shared runtime staging directory,
+# matching the single-config release build and package manifest.
+foreach(host IN ITEMS kelpie kelpie_embed_host)
+  if(TARGET ${host})
+    foreach(configuration IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+      set_property(TARGET ${host} PROPERTY RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}")
+    endforeach()
+  endif()
+endforeach()
