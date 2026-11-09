@@ -30,7 +30,7 @@ else()
 endif()
 
 if(BUILD_TESTING)
-  foreach(test sync_crypto_test sync_net_test sync_listener_test sync_service_test)
+  foreach(test sync_crypto_test sync_net_test sync_protocol_test sync_listener_test sync_service_test)
     add_executable(${test} tests/${test}.cpp)
     target_include_directories(${test} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
       "${CMAKE_CURRENT_SOURCE_DIR}/../core-sync/src")
