@@ -73,7 +73,7 @@ let kelpieLibraryTestHost = Target.target(
 )
 
 let kelpieUpdateTests = Target.target(
-    name: "KelpieUpdateTests",
+    name: "KelpieUpdateTestsIOS",
     destinations: [.iPhone, .iPad],
     product: .unitTests,
     bundleId: "com.unlikeotherai.kelpie.updates.tests.ios",
@@ -130,7 +130,7 @@ let kelpieScheme = Scheme.scheme(
     name: "Kelpie",
     shared: true,
     buildAction: .buildAction(targets: ["Kelpie"]),
-    testAction: .targets(["KelpieTests", "KelpieUpdateTests", "KelpieUITests"])
+    testAction: .targets(["KelpieTests", "KelpieUpdateTestsIOS", "KelpieUITests"])
 )
 
 // MARK: - Project
@@ -150,9 +150,12 @@ let project = Project(
         kelpieUITests,
     ],
     schemes: [
-        .scheme(name: "KelpieUpdateTests", shared: true,
-                buildAction: .buildAction(targets: ["KelpieUpdateTests"]),
-                testAction: .targets(["KelpieUpdateTests"])),
+        .scheme(name: "KelpieUpdatesIOS", shared: true,
+                buildAction: .buildAction(targets: ["Kelpie"]),
+                testAction: .targets(["KelpieUpdateTestsIOS", "KelpieUITests"])),
+        .scheme(name: "KelpieUpdateTestsIOS", shared: true,
+                buildAction: .buildAction(targets: ["KelpieUpdateTestsIOS"]),
+                testAction: .targets(["KelpieUpdateTestsIOS"])),
         kelpieScheme,
         .scheme(name: "KelpieEmbeddingHost", shared: true,
                 buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),

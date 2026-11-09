@@ -190,7 +190,7 @@ let kelpieLibraryTestHost = Target.target(
 )
 
 let kelpieUpdateTests = Target.target(
-    name: "KelpieUpdateTests",
+    name: "KelpieUpdateTestsMac",
     destinations: .macOS,
     product: .unitTests,
     bundleId: "com.unlikeotherai.kelpie.updates.tests.macos",
@@ -251,9 +251,12 @@ let project = Project(
         kelpieUpdateTests,
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [KelpieBrowserBuild.cefHelper(core: "../../core")]),
     schemes: [
-        .scheme(name: "KelpieUpdateTests", shared: true,
-                buildAction: .buildAction(targets: ["KelpieUpdateTests"]),
-                testAction: .targets(["KelpieUpdateTests"])),
+        .scheme(name: "KelpieUpdatesMac", shared: true,
+                buildAction: .buildAction(targets: ["Kelpie"]),
+                testAction: .targets(["KelpieUpdateTestsMac"])),
+        .scheme(name: "KelpieUpdateTestsMac", shared: true,
+                buildAction: .buildAction(targets: ["KelpieUpdateTestsMac"]),
+                testAction: .targets(["KelpieUpdateTestsMac"])),
         kelpieScheme,
         .scheme(name: "KelpieEmbeddingHost", shared: true,
                 buildAction: .buildAction(targets: ["KelpieEmbeddingHost"]),
