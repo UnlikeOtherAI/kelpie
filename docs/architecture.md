@@ -7,10 +7,11 @@ browser session. Profile locks alone cannot enforce it: two profiles and ports
 previously admitted two browsers, and the Mac CLI explicitly requested a new
 process. Windows now holds a fixed global named mutex after CEF subprocess
 dispatch; Linux holds a fixed abstract Unix socket after subprocess dispatch.
-macOS prohibits multiple instances through Launch Services and holds a fixed
-application-support file lock before entering SwiftUI, covering direct binary
-launches within the user account. All guards are independent of browser profiles
-and release with the owning process. Embedded hosts do not acquire them.
+macOS prohibits multiple instances through Launch Services and reserves loopback
+UDP port 8420 before entering SwiftUI. This reservation crosses user accounts and
+sandbox boundaries; HTTP uses TCP and can still use port 8420 or any configured
+port. All guards are independent of browser profiles and release with the owning
+process. Embedded hosts do not acquire them.
 
 
 ## Overview
