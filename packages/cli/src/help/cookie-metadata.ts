@@ -129,7 +129,7 @@ export const cookieMetadata: Record<string, CommandHelp> = {
   "delete-cookies": {
     purpose: "Delete cookies",
     when: "Clearing auth state or resetting to a clean state",
-    explanation: "Deletes cookies by name and/or domain, or all cookies with deleteAll. While cookie sync runs, deleting a few default-store cookies (a logout) reaches the person's other devices; deleting all of them clears only this device.",
+    explanation: "Deletes cookies by name and/or domain, or all cookies with deleteAll. While cookie sync runs, a small deletion from the default store (a site logout) reaches the person's other devices. Deleting more than 20 synced cookies that are also more than a quarter of the store at once (a clear-all) is treated as a purge and clears only this device.",
     related: ["get-cookies"],
   },
 };

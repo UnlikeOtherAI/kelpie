@@ -234,10 +234,11 @@ rather than wiping the store. `deleteAll` only clears the full store when no
 `url`/`name`/`domain` narrows the scope; otherwise it deletes just the matching
 cookies. `domain` matching is exact and tolerant of a leading dot.
 
-While cookie sync runs, deleting a few default-store cookies (a site logout)
-reaches the person's other devices. Deleting most of the store at once — more than
-20 cookies and more than a quarter of it — is treated as a purge: it clears this
-device only, and the other devices keep their cookies.
+While cookie sync runs, a small deletion from the default store, such as a site
+logout, reaches the person's other devices. Deleting more than 20 synced cookies
+that are also more than a quarter of the store at once — a clear-all, for
+example — is treated as a purge: it clears this device only, and the other
+devices keep their cookies.
 
 ### `getCookieSyncStatus`
 
