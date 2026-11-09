@@ -30,16 +30,33 @@ class CookieInfoContractTest {
                 "maxage=6; Max-Age=3600; Path=/",
                 "chips=7; Secure; SameSite=None; Path=/; Partitioned",
                 "nosamesite=8; Path=/",
+                "dup=hostonly; Path=/",
+                "dup=domain; Domain=www.probe.kelpie-sync.test; Path=/",
             ).forEach { manager.setCookie("$host/", it) }
+            manager.setCookie("http://www.probe.kelpie-sync.test/", "httpset=9; Path=/")
             manager.flush()
-            for (url in listOf("$host/", "$host/account", "https://probe.kelpie-sync.test/", "http://www.probe.kelpie-sync.test/")) {
-                val info = CookieManagerCompat.getCookieInfo(manager, url)
-                Log.i(TAG, "url=$url count=${info.size}")
-                info.forEach { Log.i(TAG, "  $it") }
-                instrumentation.sendStatus(0, android.os.Bundle().apply { putString("probe", "$url -> $info") })
-            }
+            dump(instrumentation, manager, listOf("$host/", "$host/account", "https://probe.kelpie-sync.test/", "http://www.probe.kelpie-sync.test/"))
+            // The sync delete shape, for a host-only and a domain variant of one name and an HttpOnly cookie.
+            manager.setCookie("$host/", "dup=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure")
+            manager.setCookie("$host/", "hostonly=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure")
+            manager.setCookie("$host/", "domaincookie=; Domain=www.probe.kelpie-sync.test; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure")
+            manager.flush()
+            dump(instrumentation, manager, listOf("$host/"))
             manager.removeAllCookies(null)
             manager.flush()
+        }
+    }
+
+    private fun dump(
+        instrumentation: android.app.Instrumentation,
+        manager: CookieManager,
+        urls: List<String>,
+    ) {
+        for (url in urls) {
+            val info = CookieManagerCompat.getCookieInfo(manager, url)
+            Log.i(TAG, "url=$url count=${info.size}")
+            info.forEach { Log.i(TAG, "  $it") }
+            instrumentation.sendStatus(0, android.os.Bundle().apply { putString("probe", "$url -> $info") })
         }
     }
 
