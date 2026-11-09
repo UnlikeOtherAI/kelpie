@@ -11,6 +11,8 @@ final class AddressTextFieldTests: XCTestCase {
         window.isReleasedWhenClosed = false
         window.contentView?.addSubview(field)
         field.stringValue = "https://example.org/a-long-address"
+        window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(nil)
         let event = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: NSPoint(x: 80, y: 20),
                                                     modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
                                                     context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
