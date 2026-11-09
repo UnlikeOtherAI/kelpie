@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CLI_MCP_PORT } from "@unlikeotherai/kelpie-shared";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn(), execFile: vi.fn() }));
+vi.mock("node:fs/promises", async (importOriginal) => ({
+  ...await importOriginal<typeof import("node:fs/promises")>(),
+  access: vi.fn(async () => undefined),
+}));
 // What the machine happens to have listening must not decide these results.
 vi.mock("../../src/browser/launch.js", () => ({ allocateBrowserPort: vi.fn() }));
-vi.mock("../../src/discovery/local-probe.js", () => ({ probeHealth: vi.fn(), probeLocalDevices: vi.fn(async () => []) }));
+vi.mock("../../src/discovery/local-probe.js", () => ({ probeHealth: vi.fn() }));
 vi.mock("../../src/browser/store.js", () => ({
   getBrowserAlias: vi.fn(), loadBrowserStore: vi.fn(), readLocalReadiness: vi.fn(),
   readinessPath: vi.fn(), clearRunningBrowser: vi.fn(), removeBrowserAlias: vi.fn(),
@@ -18,7 +22,7 @@ vi.mock("../../src/mcp/transport.js", () => ({
 
 import { execFile, spawn } from "node:child_process";
 import { allocateBrowserPort } from "../../src/browser/launch.js";
-import { probeHealth, probeLocalDevices } from "../../src/discovery/local-probe.js";
+import { probeHealth } from "../../src/discovery/local-probe.js";
 import { getBrowserAlias, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
 import { startHttp } from "../../src/mcp/transport.js";
 import { createProgram } from "../../src/program.js";
@@ -120,13 +124,20 @@ describe("browser launch --port on macOS", () => {
     expect(vi.mocked(execFile).mock.calls[0]?.slice(0, 2)).toEqual(["open", ["-a", process.execPath, "--args", "--port", "8424"]]);
   });
 
-  it("rejects a second alias even when it requests a different port", async () => {
-    vi.mocked(probeLocalDevices).mockResolvedValueOnce([{ platform: "macos", port: 8420 } as never]);
-    await run("browser", "launch", "other-alias", "--port", "8467");
-    expect(execFile).not.toHaveBeenCalled();
-    expect(setRunningBrowser).not.toHaveBeenCalled();
-    expect(process.exitCode).toBe(6);
-    expect(vi.mocked(console.log).mock.calls.join("\n")).toContain("already running on this computer");
+  it("does not record a second alias when opening the existing app produces no new listener", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(probeHealth).mockImplementation(async (port) => port === 8420);
+      const launch = run("browser", "launch", "other-alias", "--port", "8467");
+      await vi.advanceTimersByTimeAsync(13_000);
+      await launch;
+      expect(execFile).toHaveBeenCalledOnce();
+      expect(setRunningBrowser).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(6);
+      expect(vi.mocked(console.log).mock.calls.join("\n")).toContain("may already be running");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
