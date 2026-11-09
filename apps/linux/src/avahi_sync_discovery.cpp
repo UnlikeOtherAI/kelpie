@@ -223,8 +223,9 @@ bool AvahiSyncDiscovery::State::Connect() {
   poll = Api().poll_new();
   if (poll == nullptr) return false;
   int error = 0;
-  // NO_FAIL keeps the client alive across a daemon restart; the first
-  // connection still has to succeed, or sync reports mdns-unavailable.
+  // The first connection has to succeed, or sync reports mdns-unavailable.
+  // NO_FAIL matters for reconnects (see OnRetry): it waits for a restarting
+  // daemon instead of failing.
   client = Api().client_new(Api().poll_get(poll), AVAHI_CLIENT_NO_FAIL, OnClient, this, &error);
   if (client == nullptr || !Connected(Api().client_get_state(client))) {
     Log("avahi daemon unavailable", client == nullptr ? error : AVAHI_ERR_NO_DAEMON);
@@ -354,7 +355,18 @@ void AvahiSyncDiscovery::State::OnRetry(AvahiTimeout*, void* context) {
   auto* state = static_cast<State*>(context);
   Api().poll_get(state->poll)->timeout_free(state->retry);
   state->retry = nullptr;
-  if (state->client == nullptr || !Connected(Api().client_get_state(state->client))) return;
+  if (state->client == nullptr) {
+    if (!state->advertising && !state->browsing) return;
+    // Reconnect after the daemon went away; RUNNING restores everything.
+    int error = 0;
+    state->client = Api().client_new(Api().poll_get(state->poll), AVAHI_CLIENT_NO_FAIL, OnClient, state, &error);
+    if (state->client == nullptr) {
+      Log("avahi reconnect failed", error);
+      state->ScheduleRetry();
+    }
+    return;
+  }
+  if (!Connected(Api().client_get_state(state->client))) return;
   if (state->group == nullptr || Api().group_is_empty(state->group)) state->Publish();
   state->StartBrowser();
   for (auto& [key, resolver] : state->resolvers) {
@@ -377,11 +389,18 @@ void AvahiSyncDiscovery::State::OnClient(AvahiClient* client, AvahiClientState c
       if (state->group != nullptr) Api().group_reset(state->group);
       break;
     case AVAHI_CLIENT_CONNECTING:
+      // Waiting for the daemon after a reconnect; nothing exists yet.
+      break;
     case AVAHI_CLIENT_FAILURE:
-      // The daemon went away: every object is dead and every peer is gone.
-      if (client_state == AVAHI_CLIENT_FAILURE) Log("client failed", Api().client_errno(client));
+      // Usually AVAHI_ERR_DISCONNECTED: the daemon restarted or stopped. The
+      // client is unusable, every peer is gone, and a new client is made
+      // later, as avahi-browse does. Our objects go before the client.
+      Log("client failed", Api().client_errno(client));
       state->Withdraw();
       state->StopBrowser(true);
+      if (client == state->client) state->client = nullptr;
+      Api().client_free(client);
+      state->ScheduleRetry();
       break;
   }
 }
