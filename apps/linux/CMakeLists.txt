@@ -244,12 +244,13 @@ endif()
 
 # Discovery is portable C++ over a dlopen'ed Avahi; its tests run in both
 # configurations. Only the Chromium build syncs.
-add_library(kelpie_linux_sync_discovery STATIC src/avahi_sync_discovery.cpp src/sync_peer_events.cpp)
+add_library(kelpie_linux_sync_discovery STATIC src/sync_peer_events.cpp)
 target_include_directories(kelpie_linux_sync_discovery PUBLIC src)
-target_compile_definitions(kelpie_linux_sync_discovery PRIVATE
-  KELPIE_LINUX_HAS_AVAHI_HEADERS=${KELPIE_LINUX_HAS_AVAHI_HEADERS})
 if(KELPIE_LINUX_HAS_AVAHI_HEADERS)
+  target_sources(kelpie_linux_sync_discovery PRIVATE src/avahi_api.cpp src/avahi_sync_discovery.cpp)
   target_include_directories(kelpie_linux_sync_discovery PRIVATE ${AVAHI_CLIENT_INCLUDE_DIRS})
+else()
+  target_sources(kelpie_linux_sync_discovery PRIVATE src/avahi_sync_discovery_unavailable.cpp)
 endif()
 target_link_libraries(kelpie_linux_sync_discovery PUBLIC kelpie_desktop_sync Threads::Threads ${CMAKE_DL_LIBS})
 if(BUILD_TESTING)

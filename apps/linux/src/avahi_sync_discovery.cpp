@@ -1,152 +1,25 @@
 #include "avahi_sync_discovery.h"
 
-#include "sync_peer_events.h"
-
-#if KELPIE_LINUX_HAS_AVAHI_HEADERS
-
-#include <avahi-client/client.h>
-#include <avahi-client/lookup.h>
-#include <avahi-client/publish.h>
-#include <avahi-common/address.h>
-#include <avahi-common/alternative.h>
-#include <avahi-common/error.h>
-#include <avahi-common/malloc.h>
-#include <avahi-common/strlst.h>
-#include <avahi-common/thread-watch.h>
-#include <dlfcn.h>
 #include <sys/time.h>
 
-#include <iostream>
 #include <mutex>
 #include <tuple>
+
+#include "avahi_api.h"
+#include "sync_peer_events.h"
 
 namespace kelpie::linuxapp {
 namespace {
 
+using avahi::AddressText;
+using avahi::Api;
+using avahi::Connected;
+using avahi::Log;
+using avahi::Source;
+using avahi::TxtEntries;
+using avahi::TxtList;
+
 constexpr int kRetryMilliseconds = 5000;
-
-// Codes only: names, TXT values and addresses never reach the log.
-void Log(const char* event, int code) {
-  std::cerr << "kelpie sync discovery: " << event << " (" << code << ")\n";
-}
-
-// Only the functions are resolved at runtime; the types and constants come
-// from the Avahi headers, whose ABI (soname .3) has been stable since 2006.
-struct AvahiApi {
-  decltype(&avahi_threaded_poll_new) poll_new = nullptr;
-  decltype(&avahi_threaded_poll_free) poll_free = nullptr;
-  decltype(&avahi_threaded_poll_get) poll_get = nullptr;
-  decltype(&avahi_threaded_poll_start) poll_start = nullptr;
-  decltype(&avahi_threaded_poll_stop) poll_stop = nullptr;
-  decltype(&avahi_threaded_poll_lock) poll_lock = nullptr;
-  decltype(&avahi_threaded_poll_unlock) poll_unlock = nullptr;
-  decltype(&avahi_string_list_add) string_list_add = nullptr;
-  decltype(&avahi_string_list_free) string_list_free = nullptr;
-  decltype(&avahi_address_snprint) address_snprint = nullptr;
-  decltype(&avahi_alternative_service_name) alternative_service_name = nullptr;
-  decltype(&avahi_free) free = nullptr;
-  decltype(&avahi_client_new) client_new = nullptr;
-  decltype(&avahi_client_free) client_free = nullptr;
-  decltype(&avahi_client_get_state) client_get_state = nullptr;
-  decltype(&avahi_client_errno) client_errno = nullptr;
-  decltype(&avahi_entry_group_new) group_new = nullptr;
-  decltype(&avahi_entry_group_free) group_free = nullptr;
-  decltype(&avahi_entry_group_commit) group_commit = nullptr;
-  decltype(&avahi_entry_group_reset) group_reset = nullptr;
-  decltype(&avahi_entry_group_is_empty) group_is_empty = nullptr;
-  decltype(&avahi_entry_group_add_service_strlst) group_add_service = nullptr;
-  decltype(&avahi_entry_group_update_service_txt_strlst) group_update_txt = nullptr;
-  decltype(&avahi_service_browser_new) browser_new = nullptr;
-  decltype(&avahi_service_browser_free) browser_free = nullptr;
-  decltype(&avahi_service_resolver_new) resolver_new = nullptr;
-  decltype(&avahi_service_resolver_free) resolver_free = nullptr;
-  bool available = false;
-};
-
-template <typename Function>
-bool Bind(void* library, const char* name, Function* target) {
-  *target = reinterpret_cast<Function>(dlsym(library, name));
-  return *target != nullptr;
-}
-
-// Loaded once and never unloaded.
-const AvahiApi& Api() {
-  static const AvahiApi api = [] {
-    AvahiApi loaded;
-    void* common = dlopen("libavahi-common.so.3", RTLD_NOW | RTLD_LOCAL);
-    void* client = dlopen("libavahi-client.so.3", RTLD_NOW | RTLD_LOCAL);
-    if (common == nullptr || client == nullptr) return loaded;
-    loaded.available =
-        Bind(common, "avahi_threaded_poll_new", &loaded.poll_new) &&
-        Bind(common, "avahi_threaded_poll_free", &loaded.poll_free) &&
-        Bind(common, "avahi_threaded_poll_get", &loaded.poll_get) &&
-        Bind(common, "avahi_threaded_poll_start", &loaded.poll_start) &&
-        Bind(common, "avahi_threaded_poll_stop", &loaded.poll_stop) &&
-        Bind(common, "avahi_threaded_poll_lock", &loaded.poll_lock) &&
-        Bind(common, "avahi_threaded_poll_unlock", &loaded.poll_unlock) &&
-        Bind(common, "avahi_string_list_add", &loaded.string_list_add) &&
-        Bind(common, "avahi_string_list_free", &loaded.string_list_free) &&
-        Bind(common, "avahi_address_snprint", &loaded.address_snprint) &&
-        Bind(common, "avahi_alternative_service_name", &loaded.alternative_service_name) &&
-        Bind(common, "avahi_free", &loaded.free) &&
-        Bind(client, "avahi_client_new", &loaded.client_new) &&
-        Bind(client, "avahi_client_free", &loaded.client_free) &&
-        Bind(client, "avahi_client_get_state", &loaded.client_get_state) &&
-        Bind(client, "avahi_client_errno", &loaded.client_errno) &&
-        Bind(client, "avahi_entry_group_new", &loaded.group_new) &&
-        Bind(client, "avahi_entry_group_free", &loaded.group_free) &&
-        Bind(client, "avahi_entry_group_commit", &loaded.group_commit) &&
-        Bind(client, "avahi_entry_group_reset", &loaded.group_reset) &&
-        Bind(client, "avahi_entry_group_is_empty", &loaded.group_is_empty) &&
-        Bind(client, "avahi_entry_group_add_service_strlst", &loaded.group_add_service) &&
-        Bind(client, "avahi_entry_group_update_service_txt_strlst", &loaded.group_update_txt) &&
-        Bind(client, "avahi_service_browser_new", &loaded.browser_new) &&
-        Bind(client, "avahi_service_browser_free", &loaded.browser_free) &&
-        Bind(client, "avahi_service_resolver_new", &loaded.resolver_new) &&
-        Bind(client, "avahi_service_resolver_free", &loaded.resolver_free);
-    return loaded;
-  }();
-  return api;
-}
-
-bool Connected(AvahiClientState state) {
-  return state == AVAHI_CLIENT_S_RUNNING || state == AVAHI_CLIENT_S_REGISTERING ||
-         state == AVAHI_CLIENT_S_COLLISION;
-}
-
-std::string Source(AvahiIfIndex interface, AvahiProtocol protocol) {
-  return std::to_string(interface) + "/" + std::to_string(protocol);
-}
-
-// Link-local IPv6 carries its interface as a numeric scope, as on Windows.
-std::string AddressText(const AvahiAddress* address, AvahiIfIndex interface) {
-  if (address == nullptr) return {};
-  char text[AVAHI_ADDRESS_STR_MAX] = {};
-  if (Api().address_snprint(text, sizeof(text), address) == nullptr) return {};
-  std::string result = text;
-  if (address->proto == AVAHI_PROTO_INET6) {
-    const auto* bytes = address->data.ipv6.address;
-    if (bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0x80) {
-      if (interface < 0) return {};
-      result += "%" + std::to_string(interface);
-    }
-  }
-  return result;
-}
-
-std::vector<std::string> TxtEntries(AvahiStringList* list) {
-  std::vector<std::string> entries;
-  for (AvahiStringList* item = list; item != nullptr; item = item->next) {
-    entries.emplace_back(reinterpret_cast<const char*>(item->text), item->size);
-  }
-  return entries;
-}
-
-AvahiStringList* TxtList(const SyncTxt& txt) {
-  AvahiStringList* list = nullptr;
-  for (const auto& entry : EncodeSyncTxt(txt)) list = Api().string_list_add(list, entry.c_str());
-  return list;
-}
 
 }  // namespace
 
@@ -574,25 +447,3 @@ void AvahiSyncDiscovery::StopBrowsing() {
 }
 
 }  // namespace kelpie::linuxapp
-
-#else  // !KELPIE_LINUX_HAS_AVAHI_HEADERS
-
-namespace kelpie::linuxapp {
-
-// Built without the Avahi headers: sync reports mdns-unavailable.
-struct AvahiSyncDiscovery::State {};
-
-AvahiSyncDiscovery::AvahiSyncDiscovery() = default;
-AvahiSyncDiscovery::~AvahiSyncDiscovery() = default;
-bool AvahiSyncDiscovery::LibraryAvailable() { return false; }
-bool AvahiSyncDiscovery::Advertise(int, const std::map<std::string, std::string>&) { return false; }
-void AvahiSyncDiscovery::UpdateTxt(const std::map<std::string, std::string>&) {}
-void AvahiSyncDiscovery::StopAdvertising() {}
-bool AvahiSyncDiscovery::Browse(std::function<void(const SyncPeerAdvert&)>, std::function<void(const std::string&)>) {
-  return false;
-}
-void AvahiSyncDiscovery::StopBrowsing() {}
-
-}  // namespace kelpie::linuxapp
-
-#endif
