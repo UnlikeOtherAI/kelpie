@@ -162,22 +162,21 @@ API: `network-list`, `network-detail`, `network-select`, `network-current`, `net
 
 A visual debugging tool for inspecting element stacking and layer order. Click the 3D button in the floating menu (or call the `snapshot-3d-enter` endpoint) to explode the page DOM into a 3D layered view. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
 
-**Controls:**
-- **Native rotate mode** (`hand` tool) — pointer drag or one-finger drag rotates the scene
-- **Native scroll mode** (`vertical arrows` tool) — pointer drag or one-finger drag scrolls the underlying page while staying in 3D mode
-- **Pinch** on iPad and Android tablets — zoom the 3D camera in either mode
-- **Scroll wheel / trackpad scroll** — zoom in rotate mode, scroll the page in scroll mode
-- **Native `Zoom +`, `Zoom -`, `Reset`, and `Exit` controls** — available from the shell instead of injected page chrome
-- **Hover** — highlight element and show tag, classes, dimensions, position, z-index, stacking context
-- **+ / -** keys — increase or decrease layer spacing
-- **R** key — reset rotation and zoom to default
-- **Escape** or native exit button — exit 3D mode and restore the page
+**Controls on macOS, iOS, and Android:**
+- **Left toolbar** — Rotate orbits the page, Pan moves the camera horizontally and vertically, Scroll moves through the source page, and Inspect picks an element without moving the scene. Pointer and one-finger drags follow the selected tool.
+- **Page orientation card** — a native screenshot taken before disassembly shows the actual website inside red X, green Y, and blue Z rings. Drag the preview to orbit the scene, or choose Top, Side, and Front views. If snapshot capture is unavailable, the card says so; inspection remains available.
+- **Zoom controls** — zoom out/in or select a percentage from 15% to 250%. Wheel/trackpad and pinch gestures update the displayed level.
+- **Vertical layer slider** — adjust separation from 0 (assembled) to 80 pixels per DOM depth step. The current value is displayed beside the slider; + and - keys also adjust it.
+- **Elements toolbox** — open Elements to browse the page's DOM, including hidden elements, open shadow roots and accessible same-origin frames. Branches expand on demand. Hover or focus a tree row to highlight its plane; hovering a plane expands its ancestor branches and reveals the matching tree row. Off-screen planes are brought into view by camera translation, preserving the zoom level and rotation. Hidden elements and nodes outside the render limit are identified as having no rendered plane.
+- **Native shell controls** — existing rotate/scroll, zoom, reset and exit shortcuts remain available. R resets the camera; Escape or the native exit button restores normal browsing.
 
-iOS and macOS bundle the same inspector scripts. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open; on iOS activation keeps the native controls in sync with the WebKit scene.
+The camera pivots around the visible viewport, including on long pages. The toolbox supports keyboard expansion, navigation and selection; the layer slider supports keyboard adjustment. Controls adapt to narrow phone and landscape viewports.
 
-The 3D view shows DOM depth (tree nesting), not CSS paint order. Position, z-index, and whether the element creates a stacking context appear in the hover info panel. User interactions are suppressed while in 3D mode, but background page logic (timers, network callbacks) may still execute. The page is restored to its original state on exit. Works with both WebKit and Chromium renderers.
+iOS and macOS bundle the same inspector scripts, and Android bundles identical scene/tool sources. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open. Windows and Linux do not currently expose this experimental inspector.
 
-**Limitations:** Canvas, WebGL, and video elements appear as opaque layers. Cross-origin iframes appear as labeled blocks (showing the iframe's domain). Closed shadow DOM roots are not traversable. Hover detection degrades at steep rotation angles. Pages with more than 5,000 visible elements are capped with a warning toast.
+The 3D view shows DOM depth (tree nesting), not CSS paint order. Tag, classes, dimensions, original position and z-index appear in the hover info panel. Source-page interactions are suppressed while inspecting, but background page logic (timers, network callbacks) may still execute. Exit removes controls and listeners and restores the source styles. The screenshot remains in memory for that inspector session only. Works with WebKit and Chromium renderers.
+
+**Limitations:** Canvas, WebGL, and video elements appear as opaque layers. Cross-origin frames cannot expose their contents; closed shadow roots are not traversable. Hover detection degrades at steep rotation angles. Pages with more than 5,000 visible elements have their rendered planes capped with a warning toast; the toolbox can still browse their DOM. The tree reflects the structure when its branches are expanded; it does not continuously track background DOM changes.
 
 API: `snapshot-3d-enter`, `snapshot-3d-exit`, `snapshot-3d-status`, `snapshot-3d-set-mode`, `snapshot-3d-zoom`, `snapshot-3d-reset-view` (MCP: `kelpie_snapshot_3d_enter`, `kelpie_snapshot_3d_exit`, `kelpie_snapshot_3d_status`, `kelpie_snapshot_3d_set_mode`, `kelpie_snapshot_3d_zoom`, `kelpie_snapshot_3d_reset_view`).
 

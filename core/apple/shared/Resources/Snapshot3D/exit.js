@@ -44,6 +44,7 @@
     var bodyEl = document.body;
     bodyEl.style.transformStyle = state.origBodyStyles.transformStyle;
     bodyEl.style.transform = state.origBodyStyles.transform;
+        bodyEl.style.transformOrigin = state.origBodyStyles.transformOrigin || '';
     bodyEl.style.overflow = state.origBodyStyles.overflow;
 
     // Restore scroll positions

@@ -1,9 +1,16 @@
+    // ---- Phase 2: Write pass (batch all modifications) ----
+
+    // Apply perspective to html (not body — no transform on html)
+    htmlEl.style.perspective = '3000px';
     htmlEl.style.perspectiveOrigin = '50% 30%';
     htmlEl.style.overflow = 'visible';
 
+    // Apply preserve-3d + rotation base to body
     bodyEl.style.transformStyle = 'preserve-3d';
+    bodyEl.style.transformOrigin = (window.scrollX + window.innerWidth / 2) + 'px ' + (window.scrollY + window.innerHeight / 2) + 'px';
     bodyEl.style.overflow = 'visible';
 
+    // Process each collected element
     for (var w = 0; w < collected.length; w++) {
         var item = collected[w];
         var el = item.el;
@@ -13,6 +20,8 @@
         el.style.transform = 'translateZ(' + (depth * LAYER_SPACING) + 'px)';
         el.style.outline = '1px solid rgba(0, 150, 255, 0.25)';
         el.style.outlineOffset = '-1px';
+
+        // Override preserve-3d flattening properties
         el.style.opacity = '1';
         el.style.filter = 'none';
         el.style.clipPath = 'none';
@@ -25,14 +34,17 @@
         try { el.style.webkitMask = 'none'; } catch(e) {}
         try { el.style.mask = 'none'; } catch(e) {}
 
+        // Only override overflow on direct ancestors of processed 3D children
         if (item.hasProcessedChild) {
             el.style.overflow = 'visible';
         }
 
+        // Convert fixed/sticky to absolute (using Phase 1 stored value)
         if (item.position === 'fixed' || item.position === 'sticky') {
             el.style.position = 'absolute';
         }
 
+        // Subtle background for transparent containers (read bg before any writes above)
         if (!item.isLeaf && el.children.length > 0) {
             var bg = window.getComputedStyle(el).backgroundColor;
             if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') {
@@ -40,6 +52,7 @@
             }
         }
 
+        // Add domain label for cross-origin iframes
         if (item.isCrossOriginIframe) {
             var iframeSrc = el.getAttribute('src') || '';
             var domain = '';
@@ -56,6 +69,8 @@
         state.modifiedElements.push(el);
     }
 
+    // ---- Phase 3: Create overlay (outside 3D tree) ----
+
     var overlay = document.createElement('div');
     overlay.id = '__m3d_overlay';
     overlay.style.cssText = [
@@ -65,8 +80,10 @@
         'pointer-events: none',
         'transform: none'
     ].join(';');
+    // Append to <html> as sibling of <body> — outside the 3D tree
     document.documentElement.appendChild(overlay);
 
+    // Input capture layer
     var inputCapture = document.createElement('div');
     inputCapture.id = '__m3d_input';
     inputCapture.style.cssText = [
@@ -76,6 +93,7 @@
     ].join(';');
     overlay.appendChild(inputCapture);
 
+    // Info panel
     var infoPanel = document.createElement('div');
     infoPanel.id = '__m3d_info';
     infoPanel.style.cssText = [

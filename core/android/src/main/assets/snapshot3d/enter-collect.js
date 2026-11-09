@@ -1,3 +1,5 @@
+    // ---- Phase 1: Read pass (no writes) ----
+    // Collect elements, compute depths, read styles
 
     var OVERRIDE_PROPS = [
         'transform', 'transformStyle', 'overflow', 'outline',
@@ -44,6 +46,7 @@
         return false;
     }
 
+    // Collect processable elements (light DOM + open shadow roots + same-origin iframes)
     var collected = [];
 
     function collectElements(root, baseDepth) {
@@ -60,25 +63,28 @@
             if (el.tagName === 'IFRAME') {
                 try { var _d = el.contentDocument; } catch(e) { isCrossOriginIframe = true; }
             }
-            collected.push({ el: el, depth: depth, isLeaf: isLeafPlane(el), position: pos, isCrossOriginIframe: isCrossOriginIframe, hasProcessedChild: false });
+            collected.push({ el: el, depth: depth, isLeaf: isLeafPlane(el), position: pos, metadata: 'pos:' + pos + ' z:' + cs.zIndex, isCrossOriginIframe: isCrossOriginIframe, hasProcessedChild: false });
 
+            // Recurse into open shadow roots
             if (el.shadowRoot && collected.length < MAX_ELEMENTS) {
                 collectElements(el.shadowRoot, depth);
             }
 
+            // Recurse into same-origin iframes
             if (el.tagName === 'IFRAME') {
                 try {
                     var idoc = el.contentDocument;
                     if (idoc && idoc.body && collected.length < MAX_ELEMENTS) {
                         collectElements(idoc.body, depth);
                     }
-                } catch(e) {}
+                } catch(e) { /* cross-origin — skip */ }
             }
         }
     }
 
     collectElements(document.body, 0);
 
+    // Show warning toast if element cap was hit
     if (collected.length >= MAX_ELEMENTS) {
         var toast = document.createElement('div');
         toast.id = '__m3d_toast';
@@ -96,6 +102,7 @@
         setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 5000);
     }
 
+    // Mark ancestors of processed children for selective overflow override
     for (var a = 0; a < collected.length; a++) {
         var ancestor = collected[a].el.parentElement;
         while (ancestor && ancestor !== document.documentElement) {
@@ -108,6 +115,7 @@
         }
     }
 
+    // Read original styles for each element
     for (var r = 0; r < collected.length; r++) {
         var entry = collected[r];
         var orig = {};
@@ -117,6 +125,7 @@
         state.origStyles.set(entry.el, orig);
     }
 
+    // Save html/body original inline styles
     var htmlEl = document.documentElement;
     var bodyEl = document.body;
     state.origHtmlStyles = {
@@ -127,7 +136,6 @@
     state.origBodyStyles = {
         transformStyle: bodyEl.style.transformStyle || '',
         transform: bodyEl.style.transform || '',
+        transformOrigin: bodyEl.style.transformOrigin || '',
         overflow: bodyEl.style.overflow || ''
     };
-
-    htmlEl.style.perspective = '3000px';
