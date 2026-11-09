@@ -169,8 +169,10 @@ Response:
 - `expires` is ISO 8601 UTC, whole Unix seconds or `null` for a session cookie.
 - `index` is the cookie's position in the request. `error` is `INVALID_COOKIE`
   (the cookie could not be built, for example an unparseable `expires`) or
-  `NOT_STORED` (the engine did not keep it, for example `SameSite=None` without
-  `Secure`). `failed` never contains a value.
+  `NOT_STORED` (the engine did not keep it, for example a cookie for a domain
+  the engine refuses). Engines differ: WebKit keeps `SameSite=None` without
+  `Secure`, and some Chromium versions store it as `Unspecified` instead of
+  refusing it. `failed` never contains a value.
 - More than 500 cookies, or `cookies` that is not an array, fails the whole
   request with `INVALID_PARAMS` before anything is written.
 
@@ -282,11 +284,13 @@ Response:
 | `peers[].state` | `handshaking`, `connected`, `backoff` (retrying after a failure), `clock-skew` (clocks more than 2 minutes apart) or `failed` |
 | `peers[].lastSyncAt` | Unix milliseconds of the last completed pull or push |
 | `peers[].lastError` | Code of the last failure |
+| `store.head` | Position of the newest entry in this run's change feed. Peers pull from it; it is not a count of cookie edits |
 | `store.entries`, `store.tombstones` | Live cookies and remembered deletions in the sync metadata |
 | `store.localOnly` | Cookies kept from a different UOA account on this device. They never sync |
 | `store.unapplied` | Synced cookies this engine refused |
 | `store.skipped` | Synced cookies ignored to stay under 150 per site (a domain and its subdomains) and 3 000 in total |
 | `store.warming` | `true` for up to 30 s after launch while peers' cookies arrive |
+| `store.merging` | `true` while a batch of peer changes is being written |
 | `store.lastPurgeAt` | Unix milliseconds of the last scan treated as a purge, or `null` |
 
 The status reports counts only. It never names a cookie or a domain.
