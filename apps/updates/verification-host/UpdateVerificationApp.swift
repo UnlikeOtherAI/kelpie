@@ -1,5 +1,8 @@
 import SwiftUI
 import Foundation
+#if os(macOS)
+import AppKit
+#endif
 
 // This app is a separate, non-shipping target. It never opens the browser,
 // touches Kelpie's profile or runs an installer. Fixtures cannot enter real apps.
@@ -50,6 +53,31 @@ private final class VerificationSession: ObservableObject {
             self?.updates.installing = true
         })
     }()
+
+    // Export only this fixture's rendered views. This needs no permission to
+    // record the person's desktop and cannot capture another application's UI.
+    func captureViews() async {
+        #if os(macOS)
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "--screenshots"), args.indices.contains(index + 1),
+              args[index + 1].hasPrefix("/") else { return }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        let directory = URL(fileURLWithPath: args[index + 1], isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for window in NSApp.windows where window.isVisible {
+                let name = window.sheetParent != nil ? "mac-update-prompt.png" :
+                    (updates.installing ? "mac-update-progress.png" : nil)
+                guard let name, let view = window.contentView,
+                      let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+                view.layoutSubtreeIfNeeded()
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                guard let data = bitmap.representation(using: .png, properties: [:]) else { continue }
+                try data.write(to: directory.appendingPathComponent(name))
+            }
+        } catch { result = "Screenshot export failed: \(error.localizedDescription)" }
+        #endif
+    }
 }
 
 @main
@@ -65,6 +93,8 @@ private struct UpdateVerificationApp: App {
             }
             .padding(32)
             .modifier(AppUpdatePresentation(updates: session.updates))
+            .task { await session.captureViews() }
+            .onChange(of: session.result) { _ in Task { await session.captureViews() } }
         }
     }
 }
