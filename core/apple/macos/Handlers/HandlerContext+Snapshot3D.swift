@@ -6,6 +6,7 @@ extension HandlerContext {
         let snapshot = try? await target.takeSnapshot()
         let image = snapshot?.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?
             .representation(using: .png, properties: [:])?.base64EncodedString()
+        guard try visible3DInspectorRenderer(windowId: windowId) === target else { throw HandlerError.rendererHidden }
         _ = try await target.evaluateJS(Snapshot3DBridge.enterScript)
         if let image {
             _ = try? await target.evaluateJS(Snapshot3DBridge.previewScript(image))
