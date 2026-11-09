@@ -76,8 +76,11 @@
   native accessibility and keyboard focus. Maximize respects the monitor work
   area. The custom accessible caption buttons do not provide Windows 11's
   native Snap Layout hover flyout; dragging to screen edges remains available.
-- New tabs open the shared Chromium start page at `kelpie://start`, with
-  favorites and recent history. Settings retains **Isolate every new tab**,
+- New tabs open the shared Chromium start page at `kelpie://start`: screenshot
+  cards of favourites and recently visited sites, each with its favicon in the
+  corner and the domain underneath (see
+  [Start Page](../functionality.md#start-page-macos-windows-linux)). Dragging a
+  favourite off the favourites bar removes it with a cloud puff. Settings retains **Isolate every new tab**,
   off by default. Panels, settings, native toasts, agent control and Chromium's
   sandbox continue to use the existing Windows runtime.
 
