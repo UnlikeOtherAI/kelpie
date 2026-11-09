@@ -1,7 +1,6 @@
 import SwiftUI
 import KelpieBrowser
 
-@main
 struct KelpieApp: App {
     @StateObject private var browser = KelpieBrowserSession.standalone()
 

@@ -68,7 +68,7 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
   "browser launch": {
     command: "browser launch",
     purpose: "Launch a named local macOS browser instance",
-    when: "You want a fresh local Kelpie.app process for a saved alias",
+    when: "You want to start the one local Kelpie app for a saved alias; close the running app before switching profiles",
     platforms: ["macos"],
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
