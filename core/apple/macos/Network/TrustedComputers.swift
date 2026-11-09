@@ -1,3 +1,4 @@
+@_implementationOnly import KelpieNative
 import Foundation
 
 /// Durable computer permission follows an Ed25519 key. IP is display data only.
