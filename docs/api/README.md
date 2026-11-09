@@ -14,6 +14,7 @@ All methods are available via three interfaces:
 | [devtools.md](devtools.md) | Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception |
 | [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
 | [partitions.md](partitions.md) | Per-tab storage isolation — partition lifecycle, error matrix, cookie-jar interaction |
+| [computer-pairing.md](computer-pairing.md) | Signing-key computer approval, reconnection, storage and revocation |
 | [account-pairing.md](account-pairing.md) | Automatic LAN access for a verified shared UOA account, proof/session lifecycle |
 | [ai.md](ai.md) | Local inference backends, model switching, inference, and audio recording endpoints |
 | [ai-endpoints.md](ai-endpoints.md) | User-configured OpenAI-compatible endpoints: URL rules, health states, streaming, capabilities, the browser-agent tool loop, troubleshooting |

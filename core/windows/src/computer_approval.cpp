@@ -33,7 +33,7 @@ struct ComputerList {
     for (const auto& computer : store.List()) {
       const std::string address = computer.at("publicKey");
       addresses.push_back(address);
-      const auto label = utf::Utf8ToWideDisplay(address + "  " + computer.at("name").get<std::string>());
+      const auto label = utf::Utf8ToWideDisplay(address + "  " + computer.at("name").get<std::string>() + "  " + computer.at("address").get<std::string>());
       SendMessageW(list, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
     }
   }

@@ -63,7 +63,7 @@ void SettingsView::Refresh() {
     for (const auto& computer : app_.ComputerApprovals().store().List()) {
       const std::string address = computer.at("publicKey");
       auto* row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-      const auto label = address + "  " + computer.at("name").get<std::string>();
+      const auto label = computer.at("name").get<std::string>() + "  " + computer.at("address").get<std::string>() + "  " + address;
       gtk_box_pack_start(GTK_BOX(row), gtk_label_new(label.c_str()), TRUE, TRUE, 0);
       auto* revoke = gtk_button_new_with_label("Revoke");
       struct Action { SettingsView* self; std::string address; };

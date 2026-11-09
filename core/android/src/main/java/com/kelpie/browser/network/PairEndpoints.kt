@@ -23,10 +23,13 @@ class PairEndpoints(
         bodyText: String,
         sourceAddress: String,
     ): JsonResult {
-        val parsed = try {
-            parser.parseToJsonElement(bodyText) as? JsonObject
-                ?: return errorResult(400, "INVALID_JSON", "Expected a JSON object")
-        } catch (_: Exception) { return errorResult(400, "INVALID_JSON", "Invalid JSON") }
+        val parsed =
+            try {
+                parser.parseToJsonElement(bodyText) as? JsonObject
+                    ?: return errorResult(400, "INVALID_JSON", "Expected a JSON object")
+            } catch (_: Exception) {
+                return errorResult(400, "INVALID_JSON", "Invalid JSON")
+            }
         val result = store.trustedComputers.start(parsed, sourceAddress)
         onPendingChanged()
         return result
@@ -64,7 +67,10 @@ class PairEndpoints(
         return JsonResult(200, store.trustedComputers.status(requestId, sourceAddress))
     }
 
-    fun handlePairDelete(authenticatedClientId: String, computerKey: String? = null): JsonResult {
+    fun handlePairDelete(
+        authenticatedClientId: String,
+        computerKey: String? = null,
+    ): JsonResult {
         val removed = computerKey?.let { store.trustedComputers.revoke(it) } ?: store.revoke(authenticatedClientId)
         return JsonResult(200, mapOf("success" to removed))
     }

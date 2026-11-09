@@ -1,9 +1,11 @@
 # Shared verification avoids different computer identities on different platforms.
 enable_language(C)
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
 FetchContent_Declare(kelpie_ed25519
   URL https://codeload.github.com/orlp/ed25519/tar.gz/b1f19fab4aebe607805620d25a5e42566ce46a0e
   URL_HASH SHA256=aedb26c46d3dc3b721ab37c5248d5c923142e4d56009a9605c470383f32ce77a
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(kelpie_ed25519)
 add_library(kelpie_core_state STATIC

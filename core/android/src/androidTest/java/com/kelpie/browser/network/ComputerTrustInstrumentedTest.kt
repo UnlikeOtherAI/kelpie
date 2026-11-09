@@ -20,9 +20,16 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 33)
 class ComputerTrustInstrumentedTest {
-    private fun key(pair: KeyPair): String = pair.public.encoded.takeLast(32).joinToString("") { "%02x".format(it) }
+    private fun key(pair: KeyPair): String =
+        pair.public.encoded
+            .takeLast(32)
+            .joinToString("") { "%02x".format(it) }
 
-    private fun start(trust: ComputerTrust, pair: KeyPair, ip: String): String {
+    private fun start(
+        trust: ComputerTrust,
+        pair: KeyPair,
+        ip: String,
+    ): String {
         val publicKey = key(pair)
         val body = mapOf("clientId" to UUID.randomUUID().toString(), "clientName" to "Test computer", "computerPublicKey" to publicKey)
         val challenge = trust.start(JsonObject(body.mapValues { JsonPrimitive(it.value) }), ip)
