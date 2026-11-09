@@ -4,8 +4,10 @@ import Foundation
 /// `{domain, path, name, value, expires, secure, httpOnly, sameSite}` with `expires` in
 /// whole Unix seconds or null and `sameSite` one of `Strict|Lax|None|Unspecified`.
 ///
-/// A nil policy (no attribute) is `Unspecified`; Foundation and WebKit keep `none`
-/// distinct. Any other policy string cannot be described and the cookie is skipped.
+/// A nil policy (no attribute) is `Unspecified`. Foundation keeps `none`, but some WebKit
+/// stores read `SameSite=None` back as no attribute (seen on the iOS 26.5 default store);
+/// core-sync then keeps the accepted `None` record and records the engine's state as
+/// observed. Any other policy string cannot be described and the cookie is skipped.
 /// Apple's public cookie API does not expose partitioned (CHIPS) cookies; a cookie whose
 /// properties carry a partition is skipped as well.
 public enum SyncCookieWire {
