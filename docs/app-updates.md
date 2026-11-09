@@ -109,6 +109,16 @@ environment-variable or intent override for release data. Test their restart
 choices through the corresponding verification schemes; do not inject synthetic
 versions into an ordinary Kelpie app on a person's desktop.
 
+Windows and GTK use the same production dialog functions from isolated
+`kelpie_update_verification` hosts. Build them with
+`-DKELPIE_UPDATE_UI_VERIFICATION=ON` in the update test CMake project. Their
+preferences stay in the verification directory and Update is simulated.
+Android's separate `com.unlikeotherai.kelpie.updateverification` app is opt-in:
+run `gradlew -PupdateVerification=true :update-verification:assembleDebug` from
+`apps/android`. It compiles the production update controller with a local mock
+HTTP server and simulated Update action. None of these hosts is packaged with
+the ordinary apps or release artifacts.
+
 Before releasing, also exercise each native prompt, Not now followed by restart,
 Skip version followed by restart, a later version, offline recovery, a failed
 download/checksum, and installing/restarting an exact signed published package.

@@ -3,6 +3,7 @@
 #include <commctrl.h>
 #include <shlobj.h>
 #include "release_updates.h"
+#include "update_dialogs.h"
 #include "windows_utf.h"
 #include "../../updates/release_monitor.h"
 #include <fstream>
@@ -93,13 +94,7 @@ struct StandaloneUpdates::Impl {
       Require(CreateProcessW(powershell.c_str(), command.data(), nullptr, nullptr, FALSE,
           CREATE_NO_WINDOW, nullptr, operation.c_str(), &startup, &process));
       CloseHandle(process.hThread); helper = process.hProcess; busy = true;
-      RECT bounds{}; GetWindowRect(app.window(), &bounds);
-      progress = CreateWindowExW(WS_EX_DLGMODALFRAME, L"#32770", L"Updating Kelpie",
-          WS_POPUP | WS_CAPTION | WS_VISIBLE, bounds.left + 80, bounds.top + 100, 500, 110,
-          app.window(), nullptr, GetModuleHandleW(nullptr), nullptr);
-      if (progress) CreateWindowExW(0, L"STATIC",
-          L"Downloading and verifying update\u2026\nKelpie will restart when ready.",
-          WS_CHILD | WS_VISIBLE, 20, 15, 460, 60, progress, nullptr, GetModuleHandleW(nullptr), nullptr);
+      progress = updates_ui::Progress(app.window());
       // Keep browsing while the helper downloads and validates the complete CEF package.
     } catch (...) { Error(L"The updater could not start. Your current installation is unchanged. Try again after restarting Kelpie."); }
   }
@@ -118,14 +113,8 @@ struct StandaloneUpdates::Impl {
     const auto release = monitor.Tick();
     if (!release) return;
     const auto version = utf::Utf8ToWideDisplay(release->version);
-    const std::wstring text = L"Kelpie " + version + L" is available. Update now?\n\nUpdate downloads, verifies and installs the new version, then restarts Kelpie. Not now asks again next time you start the app.";
-    const TASKDIALOG_BUTTON buttons[] = {{100, L"Update"}, {101, L"Skip version"}, {102, L"Not now"}};
-    TASKDIALOGCONFIG dialog{}; dialog.cbSize = sizeof(dialog); dialog.hwndParent = app.window();
-    dialog.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_SIZE_TO_CONTENT;
-    dialog.pszWindowTitle = L"Kelpie update"; dialog.pszMainInstruction = L"A new Kelpie version is available";
-    dialog.pszContent = text.c_str(); dialog.cButtons = 3; dialog.pButtons = buttons; dialog.nDefaultButton = 102;
     int choice = 102;
-    if (FAILED(TaskDialogIndirect(&dialog, &choice, nullptr, nullptr))) { monitor.Retry(*release); return; }
+    if (FAILED(updates_ui::Prompt(app.window(), version, choice))) { monitor.Retry(*release); return; }
     if (choice == 100) Install(*release);
     if (choice == 101 && !monitor.Skip(*release)) Error(L"Kelpie could not save Skip version. Please try again after restarting the app.");
   }

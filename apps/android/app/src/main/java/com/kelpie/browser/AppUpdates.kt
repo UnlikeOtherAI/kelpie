@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit
 /** One process/session: recreating an Activity must not undo Not now. */
 class AppUpdates(
     context: Context,
+    private val feedURL: String = "https://api.github.com/repos/UnlikeOtherAI/kelpie/releases?per_page=100",
+    private val performUpdate: (() -> Unit)? = null,
 ) {
     private val preferences = context.getSharedPreferences("app-updates", Context.MODE_PRIVATE)
     private val dismissed = mutableSetOf<String>()
@@ -60,7 +62,7 @@ class AppUpdates(
                     val request =
                         Request
                             .Builder()
-                            .url("https://api.github.com/repos/UnlikeOtherAI/kelpie/releases?per_page=100")
+                            .url(feedURL)
                             .header("Accept", "application/vnd.github+json")
                             .header("User-Agent", "Kelpie-update-check")
                             .build()
@@ -103,8 +105,10 @@ class AppUpdates(
                 .setMessage("Kelpie ${item.version} is available. Not now asks again next time you start the app.")
                 .setPositiveButton("Update") { _, _ ->
                     dismiss(item)
-                    runCatching { owner.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url))) }
-                        .onFailure { showError(owner, "The update page could not open. Try again after restarting Kelpie.") }
+                    runCatching {
+                        val action = performUpdate
+                        if (action != null) action() else owner.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url)))
+                    }.onFailure { showError(owner, "The update page could not open. Try again after restarting Kelpie.") }
                 }.setNegativeButton("Skip version") { _, _ ->
                     val skipped = preferences.getStringSet("skippedVersions", emptySet()).orEmpty() + item.version
                     if (!preferences.edit().putStringSet("skippedVersions", skipped).commit()) {

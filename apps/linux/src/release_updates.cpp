@@ -1,6 +1,7 @@
 #include "release_updates.h"
 #if KELPIE_LINUX_HAS_GTK
 #include "linux_app.h"
+#include "update_dialogs.h"
 #include "../../updates/release_monitor.h"
 #include <curl/curl.h>
 #include <cstdlib>
@@ -80,10 +81,8 @@ struct StandaloneUpdates::Impl {
       std::vector<char*> args; for (auto& value : values) args.push_back(value.data()); args.push_back(nullptr);
       if (!g_spawn_async(nullptr, args.data(), nullptr, G_SPAWN_DO_NOT_REAP_CHILD, nullptr, nullptr, &helper, nullptr))
         throw std::runtime_error("The updater could not start");
-      progress = gtk_message_dialog_new(window, GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_INFO, GTK_BUTTONS_NONE,
-          "%s", "Downloading and verifying update… Kelpie will restart when ready.");
+      progress = updates_ui::Progress(window);
       g_object_add_weak_pointer(G_OBJECT(progress), reinterpret_cast<gpointer*>(&progress));
-      gtk_window_set_deletable(GTK_WINDOW(progress), FALSE);
       gtk_widget_show(progress);
     } catch (...) { Error("The updater could not start. Your installation is unchanged. Try again after restarting Kelpie."); }
   }
@@ -102,12 +101,7 @@ struct StandaloneUpdates::Impl {
     if (!gtk_window_is_active(window)) return;
     const auto release = monitor.Tick();
     if (!release) return;
-    auto* dialog = gtk_message_dialog_new(window, GTK_DIALOG_DESTROY_WITH_PARENT,
-        GTK_MESSAGE_INFO, GTK_BUTTONS_NONE, "Kelpie %s is available", release->version.c_str());
-    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog), "%s",
-        "Update downloads, verifies and installs the new version, then restarts Kelpie. Not now asks again next time you start the app.");
-    gtk_dialog_add_buttons(GTK_DIALOG(dialog), "Update", 100, "Skip version", 101, "Not now", 102, nullptr);
-    gtk_dialog_set_default_response(GTK_DIALOG(dialog), 102);
+    auto* dialog = updates_ui::Prompt(window, release->version.c_str());
     struct Choice { Impl* self; updates::Release release; };
     auto* choice = new Choice{this, *release};
     g_signal_connect_data(dialog, "response", G_CALLBACK(+[](GtkDialog* dialog, int response, gpointer raw) {
