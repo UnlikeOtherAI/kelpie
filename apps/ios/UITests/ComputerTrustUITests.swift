@@ -29,6 +29,7 @@ final class ComputerTrustUITests: XCTestCase {
         more.tap()
         app.buttons["Settings"].tap()
         let clients = app.buttons["Paired Clients"]
+        if !clients.exists { app.swipeUp() }
         XCTAssertTrue(clients.waitForExistence(timeout: 5))
         clients.tap()
         XCTAssertTrue(app.staticTexts["Trusted computers"].waitForExistence(timeout: 5))
