@@ -1,4 +1,8 @@
+#include <algorithm>
 #include <cassert>
+#include <filesystem>
+#include <fstream>
+#include <random>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -124,10 +128,16 @@ void TestCApi() {
   assert(json::parse(Take(kelpie_sync_canonical_cookie(
              R"({"domain":"localhost","name":"a","value":"b","sameSite":"Lax"})")))["reason"] == "loopback_host");
 
+  // A path whose parent is a regular file cannot be created on any platform.
+  const auto blocker = std::filesystem::temp_directory_path() /
+                       ("kelpie-sync-blocker-" + std::to_string(std::random_device{}()));
+  { std::ofstream(blocker) << "file"; }
+  const std::string unwritable = (blocker / "store.json").u8string();
   char* error = nullptr;
-  assert(kelpie_sync_store_open("/dev/null/cannot/exist.json", R"({"subject":"s","replica":"r"})", &error) == nullptr);
+  assert(kelpie_sync_store_open(unwritable.c_str(), R"({"subject":"s","replica":"r"})", &error) == nullptr);
   assert(json::parse(Take(error))["error"] == "IO");
-  assert(kelpie_sync_store_open("/tmp/x.json", R"({"subject":"","replica":"r"})", &error) == nullptr);
+  std::filesystem::remove(blocker);
+  assert(kelpie_sync_store_open(unwritable.c_str(), R"({"subject":"","replica":"r"})", &error) == nullptr);
   assert(json::parse(Take(error))["error"] == "INVALID_OPTIONS");
   assert(json::parse(Take(kelpie_sync_store_status(nullptr)))["error"] == "NO_STORE");
 }
