@@ -1,59 +1,35 @@
 import AppKit
 import SwiftUI
 
-/// The cell owns the transition into editing; later clicks belong to the
-/// existing field editor and retain native caret, drag selection and IME behavior.
-final class AddressTextFieldCell: NSTextFieldCell {
-    override func edit(
-        withFrame rect: NSRect,
-        in controlView: NSView,
-        editor textObj: NSText,
-        delegate: Any?,
-        event: NSEvent?
-    ) {
-        super.edit(withFrame: rect, in: controlView, editor: textObj, delegate: delegate, event: nil)
-        selectAfterEditingBegins(in: controlView)
-    }
-
-    override func select(
-        withFrame rect: NSRect,
-        in controlView: NSView,
-        editor textObj: NSText,
-        delegate: Any?,
-        start selStart: Int,
-        length selLength: Int
-    ) {
-        super.select(
-            withFrame: rect,
-            in: controlView,
-            editor: textObj,
-            delegate: delegate,
-            start: selStart,
-            length: selLength
-        )
-        selectAfterEditingBegins(in: controlView)
-    }
-
-    private func selectAfterEditingBegins(in controlView: NSView) {
-        // AppKit finishes positioning the caret after this cell returns. Apply
-        // the initial selection once that mouse event has finished unwinding.
-        DispatchQueue.main.async { [weak controlView] in
-            guard let field = controlView as? NSTextField, let editor = field.currentEditor(),
-                  field.window?.firstResponder === editor else { return }
-            editor.selectAll(nil)
-        }
-    }
-}
-
-class AddressTextField: NSTextField {
-    override class var cellClass: AnyClass? {
-        get { AddressTextFieldCell.self }
-        set { super.cellClass = newValue }
-    }
+/// Observe the initial click before AppKit transfers focus to its field editor.
+/// Later clicks retain native caret placement, drag selection and IME behavior.
+final class AddressTextField: NSTextField {
+    private var clickMonitor: Any?
 
     var isEditingAddress: Bool {
         guard let editor = currentEditor() else { return false }
         return window?.firstResponder === editor
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
+        guard window != nil else { return }
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+            guard let self, event.window === self.window,
+                  self.bounds.contains(self.convert(event.locationInWindow, from: nil)),
+                  !self.isEditingAddress else { return event }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isEditingAddress else { return }
+                self.currentEditor()?.selectAll(nil)
+            }
+            return event
+        }
+    }
+
+    deinit {
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
     }
 }
 

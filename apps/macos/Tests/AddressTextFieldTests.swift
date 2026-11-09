@@ -14,7 +14,11 @@ final class AddressTextFieldTests: XCTestCase {
         let event = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: NSPoint(x: 80, y: 20),
                                                     modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
                                                     context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
-        field.mouseDown(with: event)
+        let release = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseUp, location: NSPoint(x: 80, y: 20),
+                                                      modifierFlags: [], timestamp: 0.01, windowNumber: window.windowNumber,
+                                                      context: nil, eventNumber: 2, clickCount: 1, pressure: 0))
+        NSApp.postEvent(release, atStart: false)
+        NSApp.sendEvent(event)
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
         let editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
         XCTAssertTrue(window.firstResponder === editor)
