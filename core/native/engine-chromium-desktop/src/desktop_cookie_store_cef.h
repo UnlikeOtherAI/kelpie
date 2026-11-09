@@ -12,6 +12,8 @@ namespace kelpie {
 
 class CefCookieBackend final : public desktop_cookie_store::CookieBackend {
  public:
+  using Json = desktop_cookie_store::Json;
+
   explicit CefCookieBackend(CefRefPtr<CefCookieManager> manager);
 
   bool VisitAll(Json* cookies, const desktop_cookie_store::Cancelled& cancelled) override;
@@ -19,7 +21,6 @@ class CefCookieBackend final : public desktop_cookie_store::CookieBackend {
                                          const desktop_cookie_store::Cancelled& cancelled) override;
 
  private:
-  using Json = desktop_cookie_store::Json;
   CefRefPtr<CefCookieManager> manager_;
 };
 
