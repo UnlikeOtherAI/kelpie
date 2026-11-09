@@ -32,7 +32,7 @@ jobs:
       - name: Compile production update integration against supported GLib
         run: |
           g++-12 -std=c++20 -fsyntax-only \
-            -DKELPIE_LINUX_HAS_GTK=1 -DKELPIE_LINUX_VERSION='"0.2.4"' \
+            -DKELPIE_LINUX_HAS_GTK=1 -DKELPIE_LINUX_VERSION='"0.2.5"' \
             -Icore/native/engine-chromium-desktop/include \
             -Icore/native/core-automation/include -Icore/native/core-state/include \
             -Icore/native/core-protocol/include -Icore/native/desktop-account \

@@ -41,12 +41,6 @@ std::string Format() {
   }
   return "tar";
 }
-std::vector<std::string> RestartArguments() {
-  std::ifstream input("/proc/self/cmdline"); std::vector<std::string> args; std::string arg;
-  std::getline(input, arg, '\0');
-  while (std::getline(input, arg, '\0')) args.push_back(arg);
-  return args;
-}
 }
 struct StandaloneUpdates::Impl {
   LinuxApp& app; GtkWindow* window;
@@ -77,7 +71,7 @@ struct StandaloneUpdates::Impl {
       const std::string install_path = format == "appimage" ? image : Executable().string();
       std::vector<std::string> values{"/bin/bash", script.string(), operation.string(), std::to_string(getpid()),
         release.url, release.sha256, release.version, install_path, format, app.config().profile_dir};
-      for (auto& arg : RestartArguments()) values.push_back(arg);
+      for (const auto& arg : app.config().restart_arguments) values.push_back(arg);
       std::vector<char*> args; for (auto& value : values) args.push_back(value.data()); args.push_back(nullptr);
       if (!g_spawn_async(nullptr, args.data(), nullptr, G_SPAWN_DO_NOT_REAP_CHILD, nullptr, nullptr, &helper, nullptr))
         throw std::runtime_error("The updater could not start");

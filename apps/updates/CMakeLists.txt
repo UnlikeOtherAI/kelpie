@@ -22,6 +22,10 @@ else()
   target_compile_options(release_updates_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME release_updates_test COMMAND release_updates_test)
+add_executable(launch_arguments_test tests/launch_arguments_test.cpp)
+add_test(NAME launch_arguments_test COMMAND launch_arguments_test
+  --profile-dir "/tmp/Kelpie profile" --port 18537
+  --readiness-file "/tmp/Kelpie profile/readiness.json" --url https://example.com)
 
 option(KELPIE_UPDATE_UI_VERIFICATION "Build an isolated native prompt host; never package it" OFF)
 if(WIN32 AND KELPIE_UPDATE_UI_VERIFICATION)

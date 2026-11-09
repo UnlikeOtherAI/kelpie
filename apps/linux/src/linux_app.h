@@ -14,6 +14,7 @@
 namespace kelpie::linuxapp {
 
 struct AppConfig {
+  std::vector<std::string> restart_arguments;
   bool headless = false;
   bool mcp_stdio = false;
   std::string readiness_path;

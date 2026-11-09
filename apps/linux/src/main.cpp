@@ -4,6 +4,7 @@
 
 #include "linux_app.h"
 #include "standalone_instance.h"
+#include "launch_arguments.h"
 
 #if KELPIE_LINUX_HAS_CEF
 #include "kelpie/cef_app_factory.h"
@@ -44,6 +45,8 @@ void PrintHelp() {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  kelpie::linuxapp::AppConfig config;
+  config.restart_arguments = kelpie::linuxapp::CaptureLaunchArguments(argc, argv);
 #if KELPIE_LINUX_HAS_CEF
   CefMainArgs main_args(argc, argv);
   CefRefPtr<CefApp> cef_app = kelpie::CreateDesktopCefApp();
@@ -53,7 +56,6 @@ int main(int argc, char* argv[]) {
   }
 #endif
 
-  kelpie::linuxapp::AppConfig config;
   config.port = 8420;
   config.profile_dir = DefaultProfileDir();
   config.width = 1920;

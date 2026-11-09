@@ -86,6 +86,10 @@ the original arguments. Profiles and browsing data remain outside the package.
   failures are handled by the package manager; portable directory
   replacement is never applied to a managed installation.
 
+Linux retains owned copies of the original launch arguments before entering
+Chromium. Updates restart with the same profile, port and other explicit options;
+they do not reconstruct arguments from Chromium's rewritten process command line.
+
 Portable installs preserve a uniquely named `.previous-*` copy. If a directory
 swap or immediate restart fails, the helper attempts to restore and relaunch
 that copy. Failed new files are retained separately for diagnosis. Update helpers
