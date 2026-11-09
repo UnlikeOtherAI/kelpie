@@ -39,7 +39,7 @@ jobs:
             $(pkg-config --cflags gtk+-3.0 libcurl) apps/linux/src/release_updates.cpp
       - name: Check update policy and installer recovery
         run: |
-          cmake -S apps/updates -B .cache/update-tests
+          cmake -S apps/updates -B .cache/update-tests -DCMAKE_CXX_COMPILER=g++-12
           cmake --build .cache/update-tests
           ctest --test-dir .cache/update-tests --output-on-failure
           bash tests/linux/app-update-install.sh
