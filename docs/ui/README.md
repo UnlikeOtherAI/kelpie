@@ -5,6 +5,7 @@
 | Document | When to Read |
 |---|---|
 | [mobile.md](mobile.md) | Building or modifying the browser app UI on iOS or Android |
+| [3d-inspector.md](3d-inspector.md) | 3D camera tools, orientation preview, layer spacing and element toolbox |
 | [android-ai-sheet.md](android-ai-sheet.md) | Changing the Android AI sheet or its OpenAI-compatible endpoint settings |
 
 ---
@@ -59,7 +60,10 @@
   disc, with the busy or error dot on its edge.
 - The native EDIT preserves IME, text selection, accessibility and inline
   history completion. Escape rejects completion; Enter accepts. Ctrl+L focuses
-  the address. Ctrl+T/W/Tab/Shift+Tab retain their tab behavior after page focus.
+  and selects the address. Ctrl+T and the plus focus and select the address after
+  opening a tab, as does New isolated tab. The first click into an unfocused
+  address selects all text; later clicks position the caret normally.
+  Ctrl+W/Tab/Shift+Tab retain their tab behavior after page focus.
 - Favorites use the active local or UOA bookmark list. The 44-DIP row exists only when it
   has entries, opens entries with one click and moves excess entries to a menu.
   Changes through HTTP/MCP refresh it without requiring navigation. Showing or
@@ -80,8 +84,11 @@
   native accessibility and keyboard focus. Maximize respects the monitor work
   area. The custom accessible caption buttons do not provide Windows 11's
   native Snap Layout hover flyout; dragging to screen edges remains available.
-- New tabs open the shared Chromium start page at `kelpie://start`, with
-  favorites and recent history. Settings retains **Isolate every new tab**,
+- New tabs open the shared Chromium start page at `kelpie://start`: screenshot
+  cards of favourites and recently visited sites, each with its favicon in the
+  corner and the domain underneath (see
+  [Start Page](../functionality.md#start-page-macos-windows-linux)). Dragging a
+  favourite off the favourites bar removes it with a cloud puff. Settings retains **Isolate every new tab**,
   off by default. Panels, settings, native toasts, agent control and Chromium's
   sandbox continue to use the existing Windows runtime.
 - Settings (the three-dot control), Local AI, Bookmarks, History and Network

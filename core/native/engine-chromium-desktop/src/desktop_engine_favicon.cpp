@@ -24,8 +24,11 @@ namespace {
 // Receives the decoded icon on the UI thread and hands the PNG to the engine.
 class FaviconDownloadCallback final : public CefDownloadImageCallback {
  public:
-  FaviconDownloadCallback(std::weak_ptr<DesktopEngine::Impl> owner, CefRefPtr<CefBrowser> browser)
-      : owner_(std::move(owner)), browser_(std::move(browser)) {}
+  // `page_host` is the site whose page asked for the icon. The tab may have
+  // moved to another site by the time the download finishes.
+  FaviconDownloadCallback(std::weak_ptr<DesktopEngine::Impl> owner, CefRefPtr<CefBrowser> browser,
+                          std::string page_host)
+      : owner_(std::move(owner)), browser_(std::move(browser)), page_host_(std::move(page_host)) {}
 
   void OnDownloadImageFinished(const CefString&,
                                int http_status_code,
@@ -60,28 +63,32 @@ class FaviconDownloadCallback final : public CefDownloadImageCallback {
     if (copied != bytes.size()) {
       return;
     }
-    owner->StoreFavicon(browser_, Base64Encode(bytes));
+    owner->StoreFavicon(browser_, page_host_, Base64Encode(bytes));
   }
 
  private:
   std::weak_ptr<DesktopEngine::Impl> owner_;
   CefRefPtr<CefBrowser> browser_;
+  std::string page_host_;
 
   IMPLEMENT_REFCOUNTING(FaviconDownloadCallback);
 };
 
 }  // namespace
 
-void DesktopEngine::Impl::StoreFavicon(CefRefPtr<CefBrowser> browser, std::string png_base64) {
-  Tab* tab = FindTab(browser);
-  if (tab == nullptr || png_base64.empty()) {
+void DesktopEngine::Impl::StoreFavicon(CefRefPtr<CefBrowser> browser, const std::string& page_host,
+                                       std::string png_base64) {
+  if (page_host.empty() || png_base64.empty()) {
     return;
   }
-  const std::string host = FaviconRegistry::HostForUrl(tab->url);
+  // The icon belongs to the site that requested it. A slow download must not
+  // label the tab's next site, or the registry entry for it, with this icon.
   auto shared = std::make_shared<const std::string>(std::move(png_base64));
-  tab->favicon_png_base64 = shared;
-  if (!host.empty()) {
-    favicons.Store(host, *shared);
+  favicons.Store(page_host, *shared);
+  Tab* tab = FindTab(browser);
+  if (tab != nullptr && FaviconRegistry::HostForUrl(tab->url) == page_host) {
+    tab->favicon_png_base64 = shared;
+    tab->favicon_host = page_host;
   }
 }
 
@@ -96,6 +103,7 @@ void DesktopCefClient::OnFaviconURLChange(CefRefPtr<CefBrowser> browser,
     // letter avatar instead of showing the previous site's favicon.
     tab->favicon_url.clear();
     tab->favicon_png_base64.reset();
+    tab->favicon_host.clear();
     return;
   }
 
@@ -109,7 +117,8 @@ void DesktopCefClient::OnFaviconURLChange(CefRefPtr<CefBrowser> browser,
   // representations the tab strip needs.
   browser->GetHost()->DownloadImage(icon_url, /*is_favicon=*/true, /*max_image_size=*/32U,
                                     /*bypass_cache=*/false,
-                                    new FaviconDownloadCallback(owner_->weak_from_this(), browser));
+                                    new FaviconDownloadCallback(owner_->weak_from_this(), browser,
+                                                                FaviconRegistry::HostForUrl(tab->url)));
 }
 
 }  // namespace kelpie

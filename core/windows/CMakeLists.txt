@@ -114,6 +114,7 @@ set(WINDOWS_APP_SOURCES
   src/shell_tabs.cpp
   src/shell_chrome.cpp
   src/favorites_bar.cpp
+  src/drag_effects.cpp
   src/window_chrome.cpp
   src/maximized_frame.cpp
   src/win32_browser_view.cpp
@@ -161,6 +162,7 @@ set(WINDOWS_APP_HEADERS
   src/startup_diagnostics.h
   src/tab_tooltips.h
   src/toast_view.h
+  src/drag_effects.h
   src/device_info_windows.h
   src/mdns_windows.h
 )
@@ -258,6 +260,11 @@ include(runtime.cmake)
 
 if(BUILD_TESTING)
   add_windows_inference_tests()
+  add_executable(kelpie_windows_standalone_instance_test tests/standalone_instance_test.cpp)
+  target_include_directories(kelpie_windows_standalone_instance_test PRIVATE src)
+  target_link_libraries(kelpie_windows_standalone_instance_test PRIVATE user32)
+  target_compile_options(kelpie_windows_standalone_instance_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_standalone_instance_test COMMAND kelpie_windows_standalone_instance_test)
   add_executable(page_color_sampler_test tests/page_color_sampler_test.cpp src/page_color_sampler.cpp ${WINDOWS_THEME_SOURCES})
   target_include_directories(page_color_sampler_test PRIVATE src "${KELPIE_NATIVE_ROOT}/engine-chromium-desktop/include")
   target_link_libraries(page_color_sampler_test PRIVATE nlohmann_json::nlohmann_json user32 gdi32 gdiplus uxtheme dwmapi crypt32 ole32)
@@ -415,6 +422,7 @@ if(BUILD_TESTING)
     src/shell_tabs.cpp
     src/shell_chrome.cpp
     src/favorites_bar.cpp
+    src/drag_effects.cpp
     src/window_chrome.cpp
     src/maximized_frame.cpp
     src/url_bar.cpp

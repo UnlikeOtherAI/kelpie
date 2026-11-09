@@ -64,6 +64,9 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     // Immutable once set; replaced wholesale when a new icon arrives, so
     // TabSnapshot can share it without copying.
     std::shared_ptr<const std::string> favicon_png_base64;
+    // The site `favicon_png_base64` belongs to. Compared on commit rather
+    // than `url`, which Navigate sets before the new document commits.
+    std::string favicon_host;
     // CEF retains the browser until OnBeforeClose. A close request must not
     // erase this owner early, otherwise cancellation and shutdown can leave a
     // live callback pointing at destroyed state.
@@ -106,8 +109,9 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   // A tab's DevTools session, attached so its Network events reach network_sink.
   CefRefPtr<DesktopDevToolsSession> NewDevToolsSession(CefRefPtr<CefBrowser> browser);
   Tab* ActiveTab();
-  // Records a downloaded favicon against the tab and the host registry.
-  void StoreFavicon(CefRefPtr<CefBrowser> browser, std::string png_base64);
+  // Records a downloaded favicon against `page_host` in the registry, and on
+  // the tab when it is still showing that site.
+  void StoreFavicon(CefRefPtr<CefBrowser> browser, const std::string& page_host, std::string png_base64);
   TabSnapshot Snapshot(const Tab& tab) const;
   BrowserControlResult RunOnUi(std::function<BrowserControlResult()> operation, Timeout timeout);
   BrowserControlResult CreateTabOnUi(const NewTabRequest& request, TabSnapshot* snapshot,

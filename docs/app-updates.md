@@ -23,18 +23,17 @@ machine-readable comment to the release notes:
 <!-- kelpie-update: {"target":"windows-x64","version":"0.2.1","url":"https://github.com/UnlikeOtherAI/kelpie/releases/download/release/2026-11-09/kelpie-windows-x64-0.2.1.zip","sha256":"<64 lowercase hex characters>"} -->
 ```
 
-Supported targets are `windows-x64`, `macos-arm64`, `macos-x64`,
-`linux-x64-appimage`, `linux-x64-deb`, `linux-x64-rpm`, `linux-x64-tar`, `ios`,
+Enabled app targets are `windows-x64`, `macos-arm64`, `macos-x64`,
+`linux-x64-appimage`, `linux-x64-deb`, `linux-x64-rpm`, `linux-x64-tar`,
 and `android`. Only advertise architectures that were actually built. Versions
 are numeric `major.minor.patch` from the component manifest, never the date tag.
 
-Mobile store releases use `--store-url` instead of `--asset`; iOS accepts an
-`https://apps.apple.com/.../id...` page and Android accepts the Kelpie Play Store
-page. Publish this metadata only once that version is available to the relevant
-users. A Simulator ZIP cannot update a physical iPhone or iPad and is rejected
-by the publisher. Physical iOS distribution must have a supported store route
-through its App Store page; this feature does not create a store listing or bypass
-Apple's installation requirements.
+Android store releases use `--store-url` instead of `--asset` with the Kelpie
+Play Store page. Publish metadata only once that version is available to users.
+iOS app integration is deferred until its distribution route is ready. The
+metadata tooling reserves an `ios` target for an App Store page, but the iOS app
+does not check for updates in this delivery. A Simulator ZIP cannot update a
+physical iPhone or iPad and is rejected by the publisher.
 
 The release workflow advertises Linux and Android only after their verified
 artifacts have been attached. Direct Mac and Windows publishers run the command
@@ -102,9 +101,9 @@ node --test tests/packaging/app-updates.test.mjs
 bash tests/linux/app-update-install.sh  # Linux portable install and recovery fixtures
 ```
 
-Prompt UI fixtures live only in the non-shipping `KelpieUpdateVerificationMac`
-and `KelpieUpdateVerificationIOS` targets. These have separate bundle identities,
-preferences and an in-memory HTTP response. Their Update action is simulated and
+The Mac prompt UI fixture lives only in the non-shipping
+`KelpieUpdateVerificationMac` target. It has a separate bundle identity,
+preferences and an in-memory HTTP response. Its Update action is simulated and
 cannot run an installer or change a real Kelpie profile. Regular apps have no
 environment-variable or intent override for release data. Test their restart
 choices through the corresponding verification schemes; do not inject synthetic

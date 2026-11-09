@@ -21,8 +21,8 @@ export function resolveAppPath(alias: Pick<BrowserAlias, "platform" | "appPath">
  * The port `browser launch` uses when none was given: the first free one from
  * DEFAULT_PORT upward, skipping the reserved ones. The Windows app fails its
  * startup on an occupied port rather than moving, so the CLI has to hand it a
- * free one; the macOS app's own fallback stays behind this as a safety net.
- * Two launches started at the same moment can still pick the same port.
+ * free one. Native application ownership still permits only one standalone
+ * browser on this computer, regardless of the selected profile or port.
  */
 export async function allocateBrowserPort(
   isFree: (port: number) => Promise<boolean> = isPortFree,

@@ -73,6 +73,9 @@ class DesktopEngine final : public DesktopBrowserControl {
     // the application wires this to its BookmarkStore and HistoryStore. Called
     // on the CEF IO thread; the implementation must be thread-safe.
     std::function<std::string()> start_page_data_supplier;
+    // Supplies a host's stored screenshot (raw JPEG) for
+    // `kelpie://start/preview/<key>.jpg`. Same thread rules as above.
+    std::function<std::optional<std::string>(const std::string& host)> start_page_preview_supplier;
   };
 
   struct SessionState {
@@ -195,6 +198,7 @@ class DesktopEngine final : public DesktopBrowserControl {
                                 Timeout timeout) override;
 
   BrowserControlResult ReadAppearance(TabLease lease, Json* result, Timeout timeout) override;
+  BrowserControlResult CaptureSitePreview(TabLease lease, Json* result, Timeout timeout) override;
 
   class Impl;
 

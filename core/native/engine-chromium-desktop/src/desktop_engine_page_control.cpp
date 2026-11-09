@@ -164,15 +164,25 @@ BrowserControlResult DesktopEngine::DevTools(TabLease lease, std::string method,
   return RunDevTools(impl_, lease, std::move(method), params, output, timeout);
 }
 
-BrowserControlResult DesktopEngine::ReadAppearance(TabLease lease, Json* output, Timeout timeout) {
+namespace {
+
+// Captures the visible viewport once, fenced on both sides by the frame tree
+// and layout viewport so a navigation or scroll during the capture is reported
+// instead of returning a picture of the wrong document. Purpose-specific
+// internal reads alone opt out of the action fence; public DevTools, Evaluate
+// and the canonical fixed reader always retain it.
+BrowserControlResult CaptureStableViewport(const std::shared_ptr<DesktopEngine::Impl>& impl,
+                                           TabLease lease, nlohmann::json capture_params,
+                                           nlohmann::json* output,
+                                           DesktopBrowserControl::Timeout timeout,
+                                           const char* unavailable) {
+  using Json = nlohmann::json;
   if (!output) return BrowserControlResult::Failure("INTERNAL", "Result is required");
   const auto started = std::chrono::steady_clock::now();
-  // Purpose-specific internal reads alone opt out of the action fence. Public
-  // DevTools, Evaluate and the canonical fixed reader always retain it.
   const auto read = [&](const std::string& method, const Json& params, Json* value) {
     const auto remaining = RemainingTimeout(started, timeout);
-    if (remaining <= Timeout::zero()) return DeadlineExceeded();
-    return RunDevTools(impl_, lease, method, params, value, remaining, {}, false);
+    if (remaining <= DesktopBrowserControl::Timeout::zero()) return DeadlineExceeded();
+    return RunDevTools(impl, lease, method, params, value, remaining, {}, false);
   };
   Json before, viewport, captured, after, after_viewport;
   auto result = read("Page.getFrameTree", Json::object(), &before);
@@ -183,10 +193,11 @@ BrowserControlResult DesktopEngine::ReadAppearance(TabLease lease, Json* output,
     const auto& layout = viewport.at("layoutViewport");
     const double width = layout.at("clientWidth"), height = layout.at("clientHeight");
     if (width <= 0 || width > 32768 || height <= 0)
-      return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance viewport is unavailable");
+      return BrowserControlResult::Failure("COMMAND_FAILED", unavailable);
     // A clip can resize Alloy's live view: capture without clipping/emulation.
-    result = read("Page.captureScreenshot", {{"format", "png"}, {"fromSurface", true},
-                                           {"captureBeyondViewport", false}}, &captured);
+    capture_params["fromSurface"] = true;
+    capture_params["captureBeyondViewport"] = false;
+    result = read("Page.captureScreenshot", capture_params, &captured);
     if (!result.ok) return result;
     result = read("Page.getFrameTree", Json::object(), &after);
     if (!result.ok) return result;
@@ -196,12 +207,25 @@ BrowserControlResult DesktopEngine::ReadAppearance(TabLease lease, Json* output,
     const auto& current = after.at("frameTree").at("frame");
     if (frame.at("id") != current.at("id") || frame.at("loaderId") != current.at("loaderId") ||
         frame.at("url") != current.at("url") || layout != after_viewport.at("layoutViewport"))
-      return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance document changed");
+      return BrowserControlResult::Failure("COMMAND_FAILED", "The document changed during capture");
     *output = {{"url", frame.at("url")}, {"data", captured.at("data").get<std::string>()}};
     return BrowserControlResult::Success();
   } catch (...) {
-    return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance observation is unavailable");
+    return BrowserControlResult::Failure("COMMAND_FAILED", unavailable);
   }
+}
+
+}  // namespace
+
+BrowserControlResult DesktopEngine::ReadAppearance(TabLease lease, Json* output, Timeout timeout) {
+  return CaptureStableViewport(impl_, lease, {{"format", "png"}}, output, timeout,
+                               "Appearance observation is unavailable");
+}
+
+BrowserControlResult DesktopEngine::CaptureSitePreview(TabLease lease, Json* output, Timeout timeout) {
+  // JPEG keeps the round trip small; the preview is re-encoded after scaling.
+  return CaptureStableViewport(impl_, lease, {{"format", "jpeg"}, {"quality", 90}}, output, timeout,
+                               "Site preview capture is unavailable");
 }
 
 }  // namespace kelpie

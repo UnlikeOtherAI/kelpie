@@ -232,6 +232,7 @@ let kelpieTests = Target.target(
     infoPlist: .default,
     sources: [
         .glob("Tests/**/*.swift"),
+        .glob("Kelpie/StandaloneInstance.swift"),
         .glob("Tests/**/*.mm", excluding: KelpieBrowserBuild.webKitOnly ? ["Tests/BrowserControlCDPLifetimeTests.mm"] : []),
     ],
     dependencies: [

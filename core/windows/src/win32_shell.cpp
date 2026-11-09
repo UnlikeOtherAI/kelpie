@@ -42,6 +42,7 @@ bool Win32Shell::Create(const std::wstring& title, int width, int height, std::o
   hwnd_ = CreateWindowExW(0, window_class.lpszClassName, title.c_str(), style,
                           origin ? origin->x : CW_USEDEFAULT, origin ? origin->y : CW_USEDEFAULT, width, height, nullptr, nullptr, instance_, this);
   if (hwnd_ != nullptr) {
+    if (!hosted_) SetPropW(hwnd_, L"UnlikeOtherAI.Kelpie.Standalone", reinterpret_cast<HANDLE>(1));
     SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     window_chrome_.UpdateDwmFrame();
   }
@@ -198,7 +199,8 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       new_tab_button_ = CreateWindowExW(0, L"BUTTON", L"New tab", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                                         0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_NEW_TAB_BUTTON), instance_, nullptr);
       SetWindowSubclass(new_tab_button_, &Win32Shell::NewTabProc, 1, reinterpret_cast<DWORD_PTR>(this));
-      favorites_bar_.Attach(hwnd_, instance_, [this](const std::string& url) { delegate_->OnNavigateRequested(url); });
+      favorites_bar_.Attach(hwnd_, instance_, [this](const std::string& url) { delegate_->OnNavigateRequested(url); },
+                            [this](const std::string& id) { delegate_->OnRemoveFavoriteRequested(id); });
       url_bar_.Create(hwnd_, instance_, rect, delegate_);
       UpdateChromePalette();
       browser_view_->Create(hwnd_, instance_, rect, observer_);

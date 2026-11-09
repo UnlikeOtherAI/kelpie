@@ -92,6 +92,7 @@ void HistoryStore::Record(const std::string& url, const std::string& title) {
 void HistoryStore::Clear() {
   std::lock_guard<std::mutex> lock(mutex_);
   entries_.clear();
+  ++clear_generation_;
 }
 
 bool HistoryStore::RemoveById(const std::string& id) {

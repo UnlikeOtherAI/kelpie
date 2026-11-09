@@ -14,14 +14,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 struct KelpieApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var browser = KelpieBrowserSession(externalDisplaysEnabled: true)
-    @StateObject private var updates = AppUpdates()
 
     init() { AppRevealSetup.configure() }
 
     var body: some Scene {
-        WindowGroup {
-            KelpieBrowserView(session: browser).modifier(AppUpdatePresentation(updates: updates))
-        }
+        WindowGroup { KelpieBrowserView(session: browser) }
             .commands { KelpieBrowserCommands() }
     }
 }

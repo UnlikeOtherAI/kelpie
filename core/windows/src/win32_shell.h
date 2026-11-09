@@ -43,6 +43,8 @@ class ShellDelegate : public UrlBarDelegate {
   virtual void OnCreateIsolatedTabRequested() = 0;
   virtual void OnActivateTabRequested(std::string id, std::uint64_t generation) = 0;
   virtual void OnCloseTabRequested(std::string id, std::uint64_t generation) = 0;
+  // A favourite was dragged off the favourites bar.
+  virtual void OnRemoveFavoriteRequested(const std::string& id) { (void)id; }
   virtual void OnWindowCloseRequested() = 0;
   // Empties the request log, as the HTTP `clear-network-log` method does.
   virtual void OnClearNetworkRequested() {}
@@ -63,6 +65,7 @@ class Win32Shell {
   // their controls and Escape closes them. True when the message was handled.
   bool HandlePanelMessage(const MSG& message);
   void UpdateBrowserState(const BrowserState& state);
+  void FocusAddress() { url_bar_.Focus(); }
   void SetPageColor(COLORREF color);
   void UpdateAccount(const std::string& avatar, const std::wstring& label, bool error, bool busy) {
     url_bar_.SetAccount(avatar, label, error, busy);

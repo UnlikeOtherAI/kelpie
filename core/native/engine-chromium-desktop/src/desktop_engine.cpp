@@ -131,7 +131,8 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 
   // `kelpie://start` is first-party content served by this process, not a script
   // injected into a page. The supplier reads the application's own stores.
-  if (!RegisterStartPageSchemeHandler(config.start_page_data_supplier)) {
+  if (!RegisterStartPageSchemeHandler(config.start_page_data_supplier,
+                                      config.start_page_preview_supplier)) {
     last_error = "Chromium rejected the kelpie:// scheme handler";
     CefShutdown();
     initialized = false;

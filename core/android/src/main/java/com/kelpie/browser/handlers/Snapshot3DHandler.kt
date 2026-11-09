@@ -26,7 +26,7 @@ class Snapshot3DHandler(
         }
 
         return try {
-            context.evaluateJS(Snapshot3DBridge.ENTER_SCRIPT)
+            context.enter3DInspector()
             val active = context.evaluateJS("!!window.__m3d")
             if (active.contains("true")) {
                 context.isIn3DInspector = true

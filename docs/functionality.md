@@ -7,7 +7,7 @@ Every user-facing feature is described here. When adding or changing a feature, 
 
 ## App updates
 
-Standalone Kelpie apps check GitHub for compatible stable releases at launch and
+Standalone Kelpie apps on macOS, Windows, Linux and Android check GitHub for compatible stable releases at launch and
 every six hours while running. A new component version offers **Update**, **Skip
 version**, and **Not now**. Skip version remembers that component version across
 restarts; a later version can still prompt. Not now dismisses the prompt for this
@@ -21,7 +21,7 @@ DLL and `chrome_elf.dll`. All desktop downloads must match the SHA-256 published
 by GitHub. Portable installs retain the previous installation for recovery;
 Linux `.deb` and `.rpm` installs use the system package manager and its normal
 authorization prompt. Mobile Update opens the published APK or store update page.
-Simulator archives are never advertised as physical iOS updates.
+iOS update notifications are deferred. Simulator archives are never advertised as physical iOS updates.
 
 Unrelated component releases, prereleases, drafts, missing packages and installed
 or older versions do not prompt. Offline checks retry after fifteen minutes without
@@ -38,6 +38,21 @@ For information about browser engine availability by platform and Apple's regula
 Kelpie has two parts: **native browser apps** (iOS, Android, macOS, Linux, and an in-progress Windows shell) and a **Node.js CLI**. The apps run real browsers with embedded HTTP and MCP servers. The CLI discovers them on the local network via mDNS and sends commands. An LLM can control everything through the CLI's MCP server — or talk to device MCP servers directly.
 
 No emulators, no cloud, no persistent scripts. Real browsers on real devices, fully controllable by language models.
+
+## One Desktop App per Computer
+
+Only one standalone Kelpie app may run on a computer. Another executable copy,
+CLI alias, profile directory or HTTP port cannot start a second browser. Close
+the running app before switching copies or profiles. Tabs and browser windows
+remain part of that one app; embedded Kelpie sessions belong to their containing
+apps and do not take standalone ownership.
+
+Ownership is acquired before opening profiles or starting browser services and
+is released automatically on normal exit or a crash. A rejected launch leaves
+the running app's tabs, port and readiness record intact. Windows and direct
+macOS relaunches bring the existing app forward when its window is available;
+Linux reports that Kelpie is already running. macOS also asks Launch Services to
+prohibit simultaneous app instances, and the CLI no longer requests a new one.
 
 ## Device Discovery
 
@@ -186,22 +201,21 @@ API: `network-list`, `network-detail`, `network-select`, `network-current`, `net
 
 A visual debugging tool for inspecting element stacking and layer order. Click the 3D button in the floating menu (or call the `snapshot-3d-enter` endpoint) to explode the page DOM into a 3D layered view. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
 
-**Controls:**
-- **Native rotate mode** (`hand` tool) — pointer drag or one-finger drag rotates the scene
-- **Native scroll mode** (`vertical arrows` tool) — pointer drag or one-finger drag scrolls the underlying page while staying in 3D mode
-- **Pinch** on iPad and Android tablets — zoom the 3D camera in either mode
-- **Scroll wheel / trackpad scroll** — zoom in rotate mode, scroll the page in scroll mode
-- **Native `Zoom +`, `Zoom -`, `Reset`, and `Exit` controls** — available from the shell instead of injected page chrome
-- **Hover** — highlight element and show tag, classes, dimensions, position, z-index, stacking context
-- **+ / -** keys — increase or decrease layer spacing
-- **R** key — reset rotation and zoom to default
-- **Escape** or native exit button — exit 3D mode and restore the page
+**Controls on macOS, iOS, and Android:**
+- **Left toolbar** — Rotate orbits the page, Pan moves the camera horizontally and vertically using drag or wheel/trackpad input, without changing zoom, Scroll moves through the source page, and Inspect picks an element without moving the scene. Pointer and one-finger drags follow the selected tool.
+- **Page orientation card** — a native screenshot taken before disassembly shows the actual website inside red X, green Y, and blue Z rings. Drag the preview to orbit the scene, or choose Top, Side, and Front views. If snapshot capture is unavailable, the card says so; inspection remains available.
+- **Zoom controls** — zoom out/in or select a percentage from 15% to 250%. Wheel/trackpad and pinch gestures update the displayed level.
+- **Vertical layer slider** — adjust separation from 0 (assembled) to 80 pixels per DOM depth step. The current value is displayed beside the slider; + and - keys also adjust it.
+- **Elements toolbox** — open Elements to browse the page's DOM, including hidden elements, open shadow roots and accessible same-origin frames. Branches expand on demand. Hover or focus a tree row to highlight its plane; hovering a plane expands its ancestor branches and reveals the matching tree row. Off-screen planes are brought into view by camera translation, preserving the zoom level and rotation. Hidden elements and nodes outside the render limit are identified as having no rendered plane.
+- **Native shell controls** — existing rotate/scroll, zoom, reset and exit shortcuts remain available. R resets the camera; Escape or the native exit button restores normal browsing.
 
-iOS and macOS bundle the same inspector scripts. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open; on iOS activation keeps the native controls in sync with the WebKit scene.
+The camera pivots around the visible viewport, including on long pages. The toolbox supports keyboard expansion, navigation and selection; the layer slider supports keyboard adjustment. Controls adapt to narrow phone and landscape viewports.
 
-The 3D view shows DOM depth (tree nesting), not CSS paint order. Position, z-index, and whether the element creates a stacking context appear in the hover info panel. User interactions are suppressed while in 3D mode, but background page logic (timers, network callbacks) may still execute. The page is restored to its original state on exit. Works with both WebKit and Chromium renderers.
+iOS and macOS bundle the same inspector scripts, and Android bundles identical scene/tool sources. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open. Windows and Linux do not currently expose this experimental inspector.
 
-**Limitations:** Canvas, WebGL, and video elements appear as opaque layers. Cross-origin iframes appear as labeled blocks (showing the iframe's domain). Closed shadow DOM roots are not traversable. Hover detection degrades at steep rotation angles. Pages with more than 5,000 visible elements are capped with a warning toast.
+The 3D view shows DOM depth (tree nesting), not CSS paint order. Tag, classes, dimensions, original position and z-index appear in the hover info panel. Source-page interactions are suppressed while inspecting, but background page logic (timers, network callbacks) may still execute. Exit removes controls and listeners and restores the source styles. The screenshot remains in memory for that inspector session only. Works with WebKit and Chromium renderers.
+
+**Limitations:** Canvas, WebGL, and video elements appear as opaque layers. Cross-origin frames cannot expose their contents; closed shadow roots are not traversable. Hover detection degrades at steep rotation angles. Pages with more than 5,000 visible elements have their rendered planes capped with a warning toast; the toolbox can still browse their DOM. The tree reflects the structure when its branches are expanded; it does not continuously track background DOM changes.
 
 API: `snapshot-3d-enter`, `snapshot-3d-exit`, `snapshot-3d-status`, `snapshot-3d-set-mode`, `snapshot-3d-zoom`, `snapshot-3d-reset-view` (MCP: `kelpie_snapshot_3d_enter`, `kelpie_snapshot_3d_exit`, `kelpie_snapshot_3d_status`, `kelpie_snapshot_3d_set_mode`, `kelpie_snapshot_3d_zoom`, `kelpie_snapshot_3d_reset_view`).
 
@@ -219,19 +233,39 @@ API: `history-list` (with limit), `history-clear`.
 
 ## Start Page (macOS, Windows, Linux)
 
-New tabs open Kelpie's own start page instead of a blank document. It shows the
-app icon, a "Favourites" grid of bookmark tiles, a "Recent" list of the last 20
-history entries, and the "Open a website to get started" empty state when both
-are empty. It follows the system light and dark appearance. Clicking a tile or a
-row navigates that tab.
+New tabs open Kelpie's own start page instead of a blank document. Under a small
+app icon it shows two grids of site cards: "Favourites", with every saved page,
+and "Recent", with the eight most recently visited sites that are not already
+favourites (one card per site, linking to its latest visit). Each card is a
+16:10 screenshot of the site with its favicon in the bottom-left corner and the
+domain, without `www.`, underneath; the page title appears on hover. A site
+Kelpie has not captured yet shows a two-tone tile in one of six colours chosen
+from its host, with its favicon or initial. Cards lift on hover and rise in on
+load unless reduced motion is on. Soft mint and blue glows from the app icon sit
+behind the content. The page follows the system light and dark appearance, and
+shows "Open a website to get started" when there is nothing to list. Clicking a
+card navigates that tab.
 
-On macOS the page is the SwiftUI `StartPageView`. On Windows and Linux it is the same
-layout served to the tab as first-party content from Kelpie's own `kelpie://`
-scheme, which the browser registers as standard, secure, CORS- and
-fetch-enabled. The page reads its bookmarks and history from `data.json` on that
-same origin — it is not a script injected into a third-party page, and no bridge
-script is involved. Favicons already downloaded this session appear on the tiles
-and rows; a site without one shows a coloured letter tile.
+Screenshots are taken automatically. About 1.5 seconds after a page in the
+active tab finishes loading and stops changing, Kelpie captures the visible
+viewport, keeps its top-left corner at the card's 16:10 shape, scales it to 640 by 400
+pixels and stores it as a JPEG, keyed by host, with the site's favicon. A site is
+recaptured at most every two minutes while browsing around it. Start pages,
+error pages, pages still loading, non-web URLs and in-memory (non-persistent)
+partitions are never captured, and a capture showing a single flat colour is
+discarded. The store keeps the 96 most recently captured sites in the profile
+(`site-previews` on Windows and Linux, `SitePreviews` in the macOS caches
+directory). Clearing history deletes every screenshot except the favourites'.
+
+On macOS the page is the SwiftUI `StartPageView`, and screenshots come from the
+tab's WebKit snapshot. On Windows and Linux it is the same layout served to the
+tab as first-party content from Kelpie's own `kelpie://` scheme, which the
+browser registers as standard, secure, CORS- and fetch-enabled. The page reads
+its bookmarks and history from `data.json` on that same origin and each
+screenshot from `kelpie://start/preview/<hex host>.jpg`. It is not a script
+injected into a third-party page, and no bridge script is involved. Screenshots
+are captured through a fixed internal DevTools observation that is fenced to one
+document, on a background worker, so the page and agent control are not held up.
 
 A tab on the start page reports its URL as `kelpie://start` from `get-tabs`, and
 its tab pill shows a star instead of a favicon. `new-tab` without a `url` opens
@@ -247,8 +281,12 @@ Each tab shows the page's favicon in its pill. macOS fetches it per host and
 caches it on disk; Windows takes it from Chromium itself — the browser reports
 the page's icon URLs and downloads them without sending cookies, keeping the 32
 px representation where the site offers one and the 16 px one otherwise. Icons
-are cached by host, so every tab on a site and every start page row for it share
-one image.
+are cached by host, so every tab on a site and every start page card for it share
+one image. An icon belongs to the site whose page requested it: a download that
+finishes after the tab has moved to another site never labels the new site, and
+a site that declares no icon shows no icon rather than the previous site's. On
+Windows and Linux the session's icons are in memory; the copy stored with each
+start page screenshot lets cards show icons after a restart.
 
 A tab whose site has no favicon yet shows a letter avatar: the first letter of
 the host, white on one of six colours chosen deterministically from the host
@@ -335,6 +373,8 @@ Query elements inside shadow roots, even nested ones. List all shadow DOM hosts 
 ## Tabs
 
 List open tabs, create new ones, switch between them, close them. Each tab tracks its URL, title, and active state. Each tab owns its own WebView instance so page state, scroll position, and history are preserved across tab switches.
+
+On macOS, `Cmd+T` focuses the address field immediately after opening a new tab. Windows does the same with `Ctrl+T`, the new-tab plus and **New isolated tab**. Clicking an unfocused address field selects its full contents on both desktops, so typing replaces the existing address; later clicks allow normal caret placement and text selection. On Windows, address text follows the window DPI, including 200% scaling and moves between displays.
 
 On macOS, Windows and Linux, every tab-scoped browser command accepts an optional `tabId` and `generation` lease so multiple agents can control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. `new-tab` returns the tab identifier and generation. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, cookies, storage, and dialogs execute against the resolved lease. iOS and Android always operate on the active tab. Legacy mobile requests capture that tab's WebView at dispatch, so a pending UI refresh cannot redirect navigation or cookie access to the previous tab's store.
 
@@ -644,7 +684,9 @@ The shared browser gateway preserves rich native extension argument schemas thro
 
 ### Favourites folders and live updates
 
-On macOS, the favourites bar shows the ordered top-level pages and folders, including empty folders. Click or hover over a folder to open its menu; nested folders open cascading submenus. Drag items along the bar to reorder them, onto a folder to move them inside, or more than 32 points outside the bar to remove them with a brief puff. Escape cancels the drag. Removal supports Undo; Reduce Motion disables the expanding puff.
+On macOS, the favourites bar shows the ordered top-level pages and folders, including empty folders. Click or hover over a folder to open its menu; nested folders open cascading submenus. Dragging an item lifts a copy of it onto a floating chip with a shadow that follows the pointer, while its slot in the bar stays faintly visible. Drop it along the bar to reorder, onto a folder to move it inside, or more than 32 points outside the bar to remove it: once the pointer is that far out, the chip dims and shows a red remove badge, and the drop bursts it into a cloud puff. Escape, or a drop in the margin around the bar, glides the chip back to its slot. Removal supports Undo; Reduce Motion replaces the glide and the expanding puff with a brief fade.
+
+On Windows, dragging a favourite off the favourites bar works the same way: the item lifts out of the bar and follows the pointer, leaving an outlined empty slot, shows the red remove badge more than 32 DIPs from the bar, and dropping it there removes the favourite with the same cloud puff. A drop anywhere else, Escape, or losing the pointer to another window glides it back. The favourite disappears from the bar immediately while a signed-in account saves the change. Windows has no favourites reordering or Undo; the "Show animations" setting turns the glide and the puff off. Linux has no favourites drag.
 
 Edit Favourites opens a tree with expandable folders, drag-and-drop reordering and nesting, name/URL editing, folder creation, removal and Undo Remove. A folder cannot be moved into itself or one of its descendants. Removing a folder removes its contents; a concurrent change to that subtree rejects the removal so the user can review it again.
 

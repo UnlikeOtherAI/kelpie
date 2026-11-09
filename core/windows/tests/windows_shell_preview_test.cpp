@@ -67,6 +67,61 @@ bool Expect(bool value, const char* message) {
   return false;
 }
 
+bool CheckAddressFocus(kelpie::windows::Win32Shell& shell,
+                       kelpie::windows::Win32BrowserView& browser) {
+  shell.Show(SW_SHOWNOACTIVATE);
+  HWND address = GetDlgItem(shell.hwnd(), IDC_URL_EDIT);
+  LOGFONTW font{};
+  GetObjectW(reinterpret_cast<HFONT>(SendMessageW(address, WM_GETFONT, 0, 0)), sizeof(font), &font);
+  bool passed = Expect(font.lfHeight == -kelpie::windows::ui::Dip(shell.hwnd(), 16),
+                       "the address font must match the window DPI after initial layout");
+  const auto selection = [address] {
+    DWORD start = 0, end = 0;
+    SendMessageW(address, EM_GETSEL, reinterpret_cast<WPARAM>(&start), reinterpret_cast<LPARAM>(&end));
+    return std::pair(start, end);
+  };
+  constexpr wchar_t url[] = L"https://kelpie.dev/long-address";
+  SetWindowTextW(address, url);
+  browser.Focus();
+  const LPARAM click = MAKELPARAM(35, 10);
+  SendMessageW(address, WM_LBUTTONDOWN, MK_LBUTTON, click);
+  SendMessageW(address, WM_LBUTTONUP, 0, click);
+  passed &= Expect(GetFocus() == address && selection() == std::pair<DWORD, DWORD>(0, wcslen(url)),
+                       "initial address click must focus and select the full URL");
+  SendMessageW(address, WM_LBUTTONDOWN, MK_LBUTTON, click);
+  SendMessageW(address, WM_LBUTTONUP, 0, click);
+  passed &= Expect(selection().first == selection().second,
+                   "a second address click must allow caret placement");
+  SendMessageW(address, EM_SETSEL, 8, 14);
+  SendMessageW(address, WM_CHAR, L'x', 0);
+  wchar_t edited[100]{};
+  GetWindowTextW(address, edited, 100);
+  passed &= Expect(std::wstring(edited) == L"https://x.dev/long-address",
+                   "editing an existing selection must retain the rest of the URL");
+  browser.Focus();
+  SetWindowTextW(address, url);
+  SetFocus(address);
+  passed &= Expect(selection() == std::pair<DWORD, DWORD>(0, wcslen(url)),
+                   "keyboard focus must select the full address");
+  SendMessageW(address, EM_SETSEL, 3, 3);
+  shell.FocusAddress();
+  passed &= Expect(selection() == std::pair<DWORD, DWORD>(0, wcslen(url)),
+                   "explicit address focus must reselect while already editing");
+  SendMessageW(address, WM_CHAR, L'z', 0);
+  GetWindowTextW(address, edited, 100);
+  passed &= Expect(std::wstring(edited) == L"z", "typing after focus must replace the address");
+  browser.Focus();
+  SetWindowTextW(address, L"");
+  SendMessageW(address, WM_LBUTTONDOWN, MK_LBUTTON, click);
+  SendMessageW(address, WM_LBUTTONUP, 0, click);
+  passed &= Expect(GetFocus() == address && selection() == std::pair<DWORD, DWORD>(0, 0),
+                   "an empty address must remain focused and ready to type");
+  browser.Focus();
+  shell.UpdateBrowserState({"https://kelpie.dev", "Kelpie workspace", false, true, true});
+  ShowWindow(shell.hwnd(), SW_HIDE);
+  return passed;
+}
+
 bool SavePng(HBITMAP bitmap, const std::filesystem::path& path) {
   Gdiplus::Bitmap image(bitmap, nullptr);
   UINT encoders = 0;
@@ -181,6 +236,8 @@ int main() {
   passed &= Expect(many >= minimum, "a crowded strip shrank a pill below the clamp");
   delegate.tab_count = 20;
   shell.UpdateBrowserState(state);
+
+  passed &= CheckAddressFocus(shell, browser);
 
   constexpr int kWidth = 1120;
   constexpr int kHeight = 760;

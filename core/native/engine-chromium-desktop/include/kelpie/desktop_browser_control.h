@@ -237,6 +237,13 @@ class DesktopBrowserControl {
     return BrowserControlResult::Failure("UNSUPPORTED", "Appearance sampling requires Chromium");
   }
 
+  // Internal start page previews only. Captures the visible viewport as a
+  // base64 JPEG under the same fixed, fenced CDP observation as ReadAppearance;
+  // `result` receives {url, data}.
+  virtual BrowserControlResult CaptureSitePreview(TabLease, Json*, Timeout) {
+    return BrowserControlResult::Failure("UNSUPPORTED", "Site previews require Chromium");
+  }
+
  protected:
   static BrowserControlResult PartitionsUnsupported() {
     // `activeEngine` is omitted rather than nulled when there is no engine to

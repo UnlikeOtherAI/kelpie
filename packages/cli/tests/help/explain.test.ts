@@ -38,6 +38,7 @@ describe("explainCommand", () => {
     const output = explainCommand("browser launch");
     expect(output).toContain("browser launch");
     expect(output).toContain("Platforms: macos");
-    expect(output).toContain("launches a new macOS app instance");
+    expect(output).toContain("opens Kelpie without requesting another instance");
+    expect(output).toContain("Only one standalone app may run on this computer");
   });
 });

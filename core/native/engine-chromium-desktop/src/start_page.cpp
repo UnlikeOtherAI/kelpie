@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
 #include "kelpie/favicon_registry.h"
+#include "kelpie/site_preview_store.h"
 
 namespace kelpie::start_page {
 namespace {
@@ -13,6 +15,8 @@ namespace {
 using nlohmann::json;
 
 constexpr std::string_view kDataPath = "data.json";
+constexpr std::string_view kPreviewPrefix = "preview/";
+constexpr std::string_view kPreviewSuffix = ".jpg";
 
 // Strips `kelpie://start` and any leading slash, so both `kelpie://start` and
 // `kelpie://start/` resolve to the document and `kelpie://start/start.css`
@@ -103,65 +107,79 @@ bool IsDataRequest(std::string_view url) {
   return IsStartPageUrl(url) && PathForUrl(url) == kDataPath;
 }
 
-std::string BuildDataJson(const std::string& bookmarks_json,
-                          const std::string& history_json,
-                          std::size_t recent_limit) {
-  return BuildDataJson(bookmarks_json, history_json, recent_limit, nullptr);
+std::optional<std::string> PreviewHostForUrl(std::string_view url) {
+  const std::string_view path = PathForUrl(url);
+  if (path.size() <= kPreviewPrefix.size() + kPreviewSuffix.size() ||
+      path.substr(0, kPreviewPrefix.size()) != kPreviewPrefix ||
+      path.substr(path.size() - kPreviewSuffix.size()) != kPreviewSuffix) {
+    return std::nullopt;
+  }
+  const std::string_view key =
+      path.substr(kPreviewPrefix.size(), path.size() - kPreviewPrefix.size() - kPreviewSuffix.size());
+  return SitePreviewStore::HostForKey(key);
+}
+
+std::string PreviewPath(const std::string& host, std::uint64_t version) {
+  return std::string(kPreviewPrefix) + SitePreviewStore::KeyForHost(host) + std::string(kPreviewSuffix) +
+         "?v=" + std::to_string(version);
 }
 
 std::string BuildDataJson(const std::string& bookmarks_json,
                           const std::string& history_json,
                           std::size_t recent_limit,
-                          const FaviconLookup& favicon_lookup) {
+                          const SiteLookup& site_lookup) {
   const json bookmarks = json::parse(bookmarks_json, nullptr, false);
   const json history = json::parse(history_json, nullptr, false);
 
   json payload{{"bookmarks", json::array()}, {"recent", json::array()}};
+  // Hosts already on the page; Recent shows each site once, and never one that
+  // is already a favourite.
+  std::unordered_set<std::string> shown_hosts;
 
-  const auto append = [&favicon_lookup](json& target, const json& source) {
+  // Returns the entry for a usable store record, or null to skip it.
+  const auto entry_for = [&site_lookup](const json& source) -> json {
     // `value()` throws on a type mismatch, and store JSON can be anything after
     // a hand-edited or corrupted profile file, so the types are checked first.
+    if (!source.is_object()) return nullptr;
     const auto url_field = source.find("url");
-    if (url_field == source.end() || !url_field->is_string()) {
-      return;
-    }
+    if (url_field == source.end() || !url_field->is_string()) return nullptr;
     const auto url = url_field->get<std::string>();
-    if (!IsWebUrl(url)) {
-      return;
-    }
+    if (!IsWebUrl(url)) return nullptr;
     const auto title_field = source.find("title");
     const std::string title =
         title_field != source.end() && title_field->is_string() ? title_field->get<std::string>()
                                                                 : std::string();
     json entry{{"url", url}, {"title", title}};
-    if (favicon_lookup) {
-      const std::string host = FaviconRegistry::HostForUrl(url);
-      const std::string favicon = host.empty() ? std::string() : favicon_lookup(host);
-      if (!favicon.empty()) {
-        entry["favicon"] = FaviconDataUri(favicon);
-      }
+    const std::string host = FaviconRegistry::HostForUrl(url);
+    if (site_lookup && !host.empty()) {
+      const SiteImages images = site_lookup(host);
+      if (!images.favicon_png_base64.empty()) entry["favicon"] = FaviconDataUri(images.favicon_png_base64);
+      if (images.preview_version) entry["thumbnail"] = PreviewPath(host, *images.preview_version);
     }
-    target.push_back(std::move(entry));
+    return entry;
   };
 
   if (bookmarks.is_array()) {
     for (const json& bookmark : bookmarks) {
-      if (bookmark.is_object()) {
-        append(payload["bookmarks"], bookmark);
-      }
+      json entry = entry_for(bookmark);
+      if (entry.is_null()) continue;
+      shown_hosts.insert(FaviconRegistry::HostForUrl(entry["url"].get<std::string>()));
+      payload["bookmarks"].push_back(std::move(entry));
     }
   }
 
-  // `HistoryStore::ToJson` is already newest-first, matching
-  // `historyStore.entries.prefix(20)` on macOS.
+  // `HistoryStore::ToJson` is newest-first, so the first entry per host is that
+  // site's latest visit.
   if (history.is_array()) {
-    for (const json& entry : history) {
-      if (payload["recent"].size() >= recent_limit) {
-        break;
-      }
-      if (entry.is_object()) {
-        append(payload["recent"], entry);
-      }
+    for (const json& visit : history) {
+      if (payload["recent"].size() >= recent_limit) break;
+      if (!visit.is_object() || !visit.contains("url") || !visit["url"].is_string()) continue;
+      const std::string host = FaviconRegistry::HostForUrl(visit["url"].get<std::string>());
+      if (host.empty() || shown_hosts.count(host) != 0) continue;
+      json entry = entry_for(visit);
+      if (entry.is_null()) continue;
+      shown_hosts.insert(host);
+      payload["recent"].push_back(std::move(entry));
     }
   }
 
