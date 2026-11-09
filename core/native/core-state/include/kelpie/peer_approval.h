@@ -29,6 +29,7 @@ class PeerApprovalQueue {
   std::function<std::int64_t()> clock_;
   std::mutex mutex_;
   bool available_ = false;
+  std::string presented_request_id_;
   std::unordered_map<std::string, Json> requests_;
   std::unordered_map<std::string, std::int64_t> denied_;
 };

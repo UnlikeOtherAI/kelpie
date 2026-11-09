@@ -13,9 +13,10 @@ remain available.
 
 The tool accepts `{device?, request:{version:1, method, tabId?, params}}`.
 Call `documentation` once for method details, then `capabilities` for the exact
-methods available on the selected device. The CLI transport authorizes an existing
-same-account UOA session automatically; callers without account authorization
-must pair explicitly. See [account pairing](account-pairing.md). Device
+methods available on the selected device. The CLI transport automatically reuses
+same-account UOA access or the calling computer's signing-key permission. A new
+computer receives one native approval, shared with ordinary CLI commands. See
+[account pairing](account-pairing.md) and [computer pairing](computer-pairing.md). Device
 capabilities and existing authentication remain authoritative. Read and action
 requests use one queue per exact device socket and local launch identity.
 

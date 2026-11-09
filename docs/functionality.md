@@ -91,11 +91,15 @@ verifies possession before showing a prompt. One decision resolves concurrent
 requests from that key. A trusted key completes automatically, including from a
 new IP. A different key still needs approval even when it uses the same IP or
 self-reported name. Challenges are single use and polling is bound to the source
-of that short handshake. The issued bearer is stored by the CLI for reuse at its
+of that short handshake. A verified computer already displayed in the native
+gate stays answerable until the person decides, even if an OS dialog covers it
+or the original CLI times out. The issued bearer is stored by the CLI for reuse at its
 pinned browser socket; only its hash is stored by Kelpie. Revoking the key
 invalidates all its tokens immediately. Token pinning prevents forwarding a
 credential to a changed discovery endpoint; signing a fresh challenge recovers
-without another prompt. See [computer pairing](api/computer-pairing.md).
+without another prompt. Ordinary commands, `browser-control` and CLI MCP use
+this same automatic flow; users do not need a separate pairing command for each
+tool or discovery endpoint. See [computer pairing](api/computer-pairing.md).
 
 Discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`)
 are public. Remote API/MCP requests require a bearer issued to an approved signing

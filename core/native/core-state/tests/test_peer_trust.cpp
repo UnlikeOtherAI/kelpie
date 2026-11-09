@@ -62,6 +62,25 @@ int main() {
   const auto revoked = computer.Start(restarted, "203.0.113.7");
   assert(!restarted.Pending().is_null());
   assert(restarted.Status("203.0.113.7", revoked)["status"] == "pending");
+  // An OS dialog may cover the native gate longer than the proof deadline.
+  // Keep the displayed, verified identity answerable until the human decides.
+  std::int64_t human_now = 1000;
+  kelpie::PeerApprovalQueue waiting(root / "waiting.json", [&] { return human_now; });
+  waiting.SetAvailable(true);
+  const auto displayed = computer.Start(waiting, "192.0.2.20");
+  assert(waiting.Pending()["requestId"] == displayed);
+  const auto undisplayed = other.Start(waiting, "192.0.2.21");
+  human_now += 600001;
+  assert(waiting.Status("192.0.2.20", displayed)["status"] == "pending");
+  assert(waiting.Status("192.0.2.21", undisplayed)["status"] == "not_found");
+  assert(waiting.Pending()["requestId"] == displayed);
+  assert(waiting.Approve(displayed));
+  assert(waiting.Status("192.0.2.20", displayed)["status"] == "approved");
+  const auto declined = other.Start(waiting, "192.0.2.21");
+  assert(waiting.Pending()["requestId"] == declined);
+  human_now += 600001;
+  waiting.Deny(declined);
+  assert(waiting.Status("192.0.2.21", declined)["status"] == "denied");
   // Expiry, replay bounds and failed persistence must not grant authority.
   std::int64_t now = 1000;
   kelpie::PeerApprovalQueue bounded(root / "bounded.json", [&] { return now; });

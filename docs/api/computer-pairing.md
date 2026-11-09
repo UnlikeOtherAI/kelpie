@@ -25,8 +25,13 @@ normal CLI handles the protocol and private-key storage automatically.
    or `denied`/`not_found`. The token is returned once. Send it as
    `Authorization: Bearer <token>` on subsequent API and MCP requests.
 
-Each challenge expires after five minutes. One approval resolves concurrent
-proven requests for the same key. Denial suppresses that key for ten minutes.
+Each unproven challenge expires after five minutes. Once the native gate displays
+a verified computer, that decision stays answerable until the person allows or
+denies it, including when an OS dialog covers Kelpie. Other abandoned requests
+still expire. An approval gets a fresh five-minute token-collection window; if
+the original CLI already timed out, its next command reconnects to the approved
+key without another prompt. One approval resolves concurrent proven requests
+for the same key. Denial suppresses that key for ten minutes.
 The queue admits at most 32 requests per source and 256 in total, including
 unverified challenges. Account challenges use their separate UOA protocol.
 
@@ -37,6 +42,10 @@ key. An approved computer does not prompt again. Bearers also remain usable
 after the computer's source IP changes and after Kelpie restarts. The CLI pins
 cached bearers to a browser endpoint and uses a fresh signed handshake rather
 than forwarding credentials to a newly discovered socket.
+
+Ordinary CLI commands, `browser-control`, and CLI MCP share this reconnection
+flow. No separate `kelpie pair` step is required. A new computer receives one
+native approval; existing computer permission reconnects silently.
 
 The protected server store retains public keys and at most 64 token hashes per
 key. Evicting an old bearer causes an automatic signed reconnection. Settings

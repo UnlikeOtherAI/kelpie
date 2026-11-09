@@ -987,9 +987,9 @@ exclusive profile lock. The CLI reads the bearer capability locally and rejects
 
 ## Versioned browser core
 
-`kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It reuses approved sockets and automatically authorizes existing same-account UOA sessions; callers without an account must pair explicitly. The default catalog advertises four tools: core controls, extension names, extension schemas, and a generic extension caller. Existing rich commands and legacy MCP names remain callable. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.
+`kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It automatically reuses account access or computer-key permission, including after a port or address changes. A new computer receives the same single native approval as an ordinary CLI command. The default catalog advertises four tools: core controls, extension names, extension schemas, and a generic extension caller. Existing rich commands and legacy MCP names remain callable. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.
 
-`kelpie browser-control <request-json>` sends one strict versioned request to the selected device using existing `--device` or `--browser` routing. For example: `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`. Native owns all observed refs; the CLI does not pair or retry automatically.
+`kelpie browser-control <request-json>` sends one strict versioned request to the selected device using existing `--device` or `--browser` routing. For example: `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`. Native owns all observed refs. Authentication uses the same automatic account/computer pairing as other CLI commands; a command retries once after a `401` when pairing succeeds.
 
 ### Favourites tree through MCP
 

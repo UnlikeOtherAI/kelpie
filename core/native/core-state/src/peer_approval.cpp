@@ -12,7 +12,10 @@ PeerApprovalQueue::Response Error(int status, const char* code, const char* mess
 }
 PeerApprovalQueue::PeerApprovalQueue(std::filesystem::path path, std::function<std::int64_t()> clock)
     : store_(std::move(path)), clock_(clock ? std::move(clock) : Now) {}
-void PeerApprovalQueue::SetAvailable(bool available) { std::lock_guard lock(mutex_); available_ = available; }
+void PeerApprovalQueue::SetAvailable(bool available) {
+  std::lock_guard lock(mutex_); available_ = available;
+  if (!available) presented_request_id_.clear();
+}
 std::optional<std::string> PeerApprovalQueue::Authorize(const std::string& source, const std::string& token) const {
   if (IsLoopbackPeer(source)) return "localhost";
   return store_.Authorize(token);
@@ -20,7 +23,10 @@ std::optional<std::string> PeerApprovalQueue::Authorize(const std::string& sourc
 void PeerApprovalQueue::Collect() {
   const auto now = clock_();
   for (auto it = requests_.begin(); it != requests_.end();) {
-    if (it->second.at("expiresAt").get<std::int64_t>() <= now) it = requests_.erase(it); else ++it;
+    // The signature challenge expires; a verified computer already shown to a
+    // person stays answerable until their decision, including behind OS dialogs.
+    if (it->second.at("expiresAt").get<std::int64_t>() <= now && it->first != presented_request_id_)
+      it = requests_.erase(it); else ++it;
   }
   for (auto it = denied_.begin(); it != denied_.end();) {
     if (it->second <= now) it = denied_.erase(it); else ++it;
@@ -97,6 +103,7 @@ PeerApprovalQueue::Json PeerApprovalQueue::Pending() {
     if (request.at("approved").get<bool>()) continue;
     if (result.is_null() || request["createdAt"] < result["createdAt"]) result = request;
   }
+  presented_request_id_ = result.is_null() ? std::string() : result.at("requestId").get<std::string>();
   return result;
 }
 bool PeerApprovalQueue::Approve(const std::string& id) {
@@ -106,7 +113,11 @@ bool PeerApprovalQueue::Approve(const std::string& id) {
   if (it == requests_.end() || !it->second.value("verified", false) || it->second.value("denied", false)) return false;
   const std::string key = it->second["publicKey"];
   try { store_.Approve(key, it->second["clientName"], it->second["sourceAddress"]); } catch (...) { return false; }
-  for (auto& [request_id, request] : requests_) if (request["publicKey"] == key && request.value("verified", false)) request["approved"] = true;
+  for (auto& [request_id, request] : requests_) if (request["publicKey"] == key && request.value("verified", false)) {
+    request["approved"] = true;
+    request["expiresAt"] = clock_() + 300000;
+  }
+  presented_request_id_.clear();
   return true;
 }
 void PeerApprovalQueue::Deny(const std::string& id) {
@@ -116,6 +127,10 @@ void PeerApprovalQueue::Deny(const std::string& id) {
   if (it == requests_.end()) return;
   const std::string key = it->second["publicKey"];
   denied_[key] = clock_() + 600000;
-  for (auto& [request_id, request] : requests_) if (request["publicKey"] == key) request["denied"] = true;
+  for (auto& [request_id, request] : requests_) if (request["publicKey"] == key) {
+    request["denied"] = true;
+    request["expiresAt"] = clock_() + 300000;
+  }
+  presented_request_id_.clear();
 }
 }  // namespace kelpie
