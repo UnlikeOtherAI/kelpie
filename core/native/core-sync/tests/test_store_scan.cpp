@@ -195,6 +195,33 @@ void TestTombstonesSurviveRestart() {
   assert(FindStored(a, "sid")["del"] == true);
 }
 
+void TestRendererSwitchRebaseStampsNothing() {
+  Device a("rebase");
+  a.Open(false, kNow);
+  a.engine.Put(MakeCookie(".example.com", "sid", "v"));
+  a.engine.Put(MakeCookie(".example.com", "gone", "v"));
+  a.Scan(kNow);
+  a.Scan(kNow + 1);  // normal mode from here on
+  const auto head_before = a.store->Status()["head"].get<std::uint64_t>();
+
+  // The new engine normalises SameSite, lacks one cookie and holds one extra.
+  FakeEngine chromium;
+  json reshaped = MakeCookie(".example.com", "sid", "v");
+  reshaped["sameSite"] = "Unspecified";
+  chromium.Put(reshaped);
+  chromium.Put(MakeCookie(".chromium-only.com", "c", "v"));
+  a.engine = chromium;
+  const json result = a.store->Rebase(a.engine.Snapshot(), json{{"all", true}}, kNow + 1000);
+  assert(result["adopted"] == 1);
+  assert(FindStored(a, "c")["v"][0] == 0);       // zero version: any peer wins
+  assert(!FindStored(a, "gone").contains("del"));  // missing is not a deletion
+  assert(FindStored(a, "gone")["ua"] == true);
+  assert(a.store->Status()["head"].get<std::uint64_t>() == head_before + 1);  // only the adoption
+
+  // Nothing after the switch looks like a local edit.
+  assert(a.Scan(kNow + 2000)["changed"] == 0);
+}
+
 }  // namespace
 
 int main() {
@@ -209,5 +236,6 @@ int main() {
     TestForeignSubjectStaysLocal();
     TestCorruptFileIsReplaced();
     TestTombstonesSurviveRestart();
+    TestRendererSwitchRebaseStampsNothing();
   });
 }

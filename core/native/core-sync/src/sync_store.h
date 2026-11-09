@@ -46,6 +46,9 @@ class SyncStore {
   void FinishWarmup() { warming_ = false; }
 
   nlohmann::json Scan(const nlohmann::json& cookies, const nlohmann::json& coverage, std::int64_t now);
+  // The default store moved to another engine (macOS renderer switch). Adopt
+  // what the new engine holds as observed state: stamp nothing, tombstone nothing.
+  nlohmann::json Rebase(const nlohmann::json& cookies, const nlohmann::json& coverage, std::int64_t now);
   nlohmann::json AnswerPull(const nlohmann::json& pull, const nlohmann::json& cookies,
                             const nlohmann::json& coverage, std::int64_t now);
   nlohmann::json BuildPush(const nlohmann::json& watermark, const nlohmann::json& cookies,

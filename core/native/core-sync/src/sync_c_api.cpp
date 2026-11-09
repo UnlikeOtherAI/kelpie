@@ -103,6 +103,13 @@ char* kelpie_sync_store_scan(KelpieSyncStoreRef store, const char* cookies_json,
   });
 }
 
+char* kelpie_sync_store_rebase(KelpieSyncStoreRef store, const char* cookies_json, const char* coverage_json,
+                               int64_t now_millis) {
+  return Guard([&] {
+    return Require(store).Rebase(Parse(cookies_json, "cookies"), Parse(coverage_json, "coverage"), now_millis);
+  });
+}
+
 char* kelpie_sync_store_answer_pull(KelpieSyncStoreRef store, const char* pull_json, const char* cookies_json,
                                     const char* coverage_json, int64_t now_millis) {
   return Guard([&] {

@@ -96,7 +96,7 @@ jobs:
         # Project.swift expects them at core/native/.build-ios-sim/<lib>/lib*.a.
         run: |
           set -euo pipefail
-          for lib in core-state core-connect core-protocol core-automation core-mcp core-ai \
+          for lib in core-state core-connect core-protocol core-automation core-mcp core-ai core-sync \
             _deps/kelpie_llama-build/src _deps/kelpie_llama-build/ggml/src _deps/kelpie_llama-build/ggml/src/ggml-cpu; do
             src="core/native/.build-ios-sim/${lib}/Debug-iphonesimulator"
             dst="core/native/.build-ios-sim/${lib}"

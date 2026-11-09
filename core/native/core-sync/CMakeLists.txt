@@ -7,6 +7,7 @@ add_library(kelpie_core_sync STATIC
   src/sync_entry.cpp
   src/sync_feed.cpp
   src/sync_merge.cpp
+  src/sync_rebase.cpp
   src/sync_scan.cpp
   src/sync_store.cpp
 )

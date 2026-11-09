@@ -160,28 +160,8 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         try await BrowserControlWebKit.evaluate(script, in: webView)
     }
 
-    func allCookies() async -> [HTTPCookie] {
-        await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
-    }
-
-    func setCookies(_ cookies: [HTTPCookie]) async {
-        let store = webView.configuration.websiteDataStore.httpCookieStore
-        for cookie in cookies {
-            await store.setCookie(cookie)
-        }
-    }
-
-    func deleteCookie(_ cookie: HTTPCookie) async {
-        await webView.configuration.websiteDataStore.httpCookieStore.deleteCookie(cookie)
-    }
-
-    func deleteAllCookies() async {
-        let store = webView.configuration.websiteDataStore.httpCookieStore
-        let all = await store.allCookies()
-        for cookie in all {
-            await store.deleteCookie(cookie)
-        }
-    }
+    /// The tab's cookie store: the default store, or its partition's store.
+    var websiteDataStore: WKWebsiteDataStore { webView.configuration.websiteDataStore }
 
     func takeSnapshot() async throws -> NSImage {
         let config = WKSnapshotConfiguration()

@@ -28,6 +28,7 @@ Kelpie is an open-source browser for macOS, Windows, Linux, iOS and Android. Use
 - **Browse with native controls.** Tabs, bookmarks, history and desktop start pages keep your sites close at hand.
 - **Explore a page in 3D.** Rotate its layers, inspect individual elements and move between the header and footer without losing your zoom level.
 - **Inspect what happened.** Read network requests, console output and JavaScript errors, or capture annotated screenshots for visual automation.
+- **Stay signed in on every device.** Kelpie devices signed in to the same account on one network share their website cookies directly, with no server in between. See [cookie sync](docs/functionality.md#cookie-sync).
 - **Connect your AI tools.** Use the built-in HTTP/MCP interfaces or the Node.js CLI to control a browser and send group commands across devices.
 - **Work on real mobile browsers.** Discover phones and tablets on the local network. AirPlay from an iPhone or iPad to expose an Apple TV as another controllable screen.
 
