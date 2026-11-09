@@ -243,6 +243,32 @@ class OpenAIEndpointServiceTest {
     }
 
     @Test
+    fun cancellationSeesRequestAsSoonAsTransportStarts() {
+        val endpoint = save()
+        runBlocking { service.activate(endpoint.id, null) }
+        lateinit var inference: OpenAIInference
+        var cancelledRequests = 0
+        val hanging =
+            FakeTransport {
+                cancelledRequests = inference.cancelAll()
+                FakeResponse(hang = true)
+            }
+        val hangingService = OpenAIEndpointService(store, OpenAIClient(hanging), backend)
+        // Unconfined starts transport work before async returns, making the registration race deterministic.
+        inference = OpenAIInference(hangingService, CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
+        val result =
+            runBlocking {
+                withTimeout(5_000) {
+                    inference.infer(InferRequest.fromBody(mapOf("prompt" to "x", "text" to "y")), { _, _ -> emptyMap() }) { null }
+                }
+            }
+        assertEquals(1, cancelledRequests)
+        assertEquals(OpenAIErrorCode.INFERENCE_CANCELLED, (result["error"] as Map<*, *>)["code"])
+        assertTrue(hanging.cancelled)
+        assertEquals(0, hangingService.inFlightCount(endpoint.id))
+    }
+
+    @Test
     fun openAIFailureNeverFallsBackToAnotherBackend() {
         val endpoint = save()
         runBlocking { service.activate(endpoint.id, null) }

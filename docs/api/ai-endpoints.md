@@ -231,6 +231,10 @@ request itself fails. Errors after steps were taken still include `steps`.
 | `ai-infer` | adds `agent?`, `allowActions?`, `maxSteps?` | adds `reasoning?`, `finishReason`, `steps[] {tool, args, ok, ms, preview}`, `tasks[] {task, done}`, `completed`, `stopReason`, `endpointId`, `model` |
 | `ai-cancel` | — | `{cancelled: n}` |
 
+Android registers inference requests for cancellation before their HTTP transport
+starts. Cancelling returns `INFERENCE_CANCELLED` to the pending caller and allows
+the next request to run normally.
+
 Platform tab errors from `ai-infer` with the agent: macOS keeps the existing
 `TAB_REQUIRED` / `TAB_NOT_FOUND` rules (several tabs open → pass `tabId`); iOS
 returns `NO_WEBVIEW`, `TAB_NOT_FOUND` or `TAB_NOT_ACTIVE` (switch to the tab
