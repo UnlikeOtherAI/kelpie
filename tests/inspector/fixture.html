@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Northstar — 3D inspector fixture</title>
+<style>
+* { box-sizing: border-box; } body { margin: 0; background: #e7edf3; color: #152b3b; font: 16px/1.5 system-ui; }
+header { background: #132d40; color: #fff; padding: 24px 9%; display: flex; justify-content: space-between; }
+main { width: min(780px, 80%); margin: 56px auto; } h1 { font-size: 40px; line-height: 1.1; }
+.card { padding: 28px; background: white; border-radius: 16px; box-shadow: 0 8px 24px #1232; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+button { background: #246e70; border: 0; color: #fff; border-radius: 8px; padding: 14px 18px; }
+.badge { color: #246e70; font-weight: bold; } #far { margin-top: 1500px; }
+@media(max-width:600px) { h1 { font-size: 28px; } .grid { grid-template-columns: 1fr; } main { width: 84%; } }
+</style></head>
+<body>
+<header><strong>Northstar</strong><span>Your next chapter</span></header>
+<main id="main"><section class="card" id="intro"><span class="badge">Made for exploring</span>
+<h1>A little space<br>for big ideas.</h1><p>See how every element fits together.</p>
+<button id="action" onclick="window.fixtureClicked=true">Explore the collection</button></section>
+<section class="grid" id="cards"><article class="card"><h2>Find your focus</h2><p>A place to start.</p></article>
+<article class="card"><h2>Make it yours</h2><p>Room to grow.</p></article></section>
+<div id="shadow-host"></div><div hidden id="hidden-node">Hidden content</div>
+<section class="card" id="far"><h2>Further down the page</h2><p>Reveal this without changing the camera zoom.</p></section>
+</main>
+<script>document.querySelector('#shadow-host').attachShadow({mode:'open'}).innerHTML='<section style="padding:16px;background:#d5e9de"><button id="shadow-action">Inside an open shadow root</button></section>';</script>
+</body></html>

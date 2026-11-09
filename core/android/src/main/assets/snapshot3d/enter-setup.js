@@ -1,6 +1,8 @@
 (function() {
     'use strict';
+    // Guard: clean up any stale partial state first
     if (window.__m3d) {
+        // Previous enter failed or wasn't cleaned up — run exit
         var staleState = window.__m3d;
         for (var i = 0; i < staleState.listeners.length; i++) {
             var listener = staleState.listeners[i];
@@ -31,6 +33,7 @@
         var staleBody = document.body;
         staleBody.style.transformStyle = staleState.origBodyStyles.transformStyle;
         staleBody.style.transform = staleState.origBodyStyles.transform;
+        staleBody.style.transformOrigin = staleState.origBodyStyles.transformOrigin || '';
         staleBody.style.overflow = staleState.origBodyStyles.overflow;
 
         window.scrollTo(staleState.scrollX, staleState.scrollY);
@@ -54,6 +57,7 @@
     var MIN_SIZE = 4;
     var SKIP_TAGS = {SCRIPT:1, STYLE:1, META:1, LINK:1, HEAD:1, BR:1, WBR:1, NOSCRIPT:1};
 
+    // ---- State object ----
     var state = {
         origStyles: new WeakMap(),
         origHtmlStyles: {},
@@ -69,6 +73,7 @@
     };
     window.__m3d = state;
 
+    // ---- Phase 0: Save scroll positions for custom scroll containers ----
     var allEls = document.body.querySelectorAll('*');
     for (var s = 0; s < allEls.length; s++) {
         var se = allEls[s];
@@ -81,6 +86,7 @@
         }
     }
 
+    // ---- Phase 0b: Pause media ----
     var media = document.querySelectorAll('video, audio');
     for (var m = 0; m < media.length; m++) {
         if (!media[m].paused) {
@@ -89,6 +95,7 @@
         }
     }
 
+    // ---- Phase 0c: Inject suppression stylesheet ----
     var suppressStyle = document.createElement('style');
     suppressStyle.id = '__m3d_suppress';
     suppressStyle.textContent = [

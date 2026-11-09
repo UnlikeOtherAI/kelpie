@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The enter and exit scripts live as standalone JS sources under
 /// `Resources/Snapshot3D/`. The enter script is assembled at first access
-/// from four phase files (setup, collect, apply, input) so each individual
+/// from scene and tool phase files so each individual
 /// source file stays within the project's 500-line limit. The phases share
 /// closure state inside one IIFE, so the concatenation is what runs.
 ///
@@ -13,7 +13,8 @@ import Foundation
 enum Snapshot3DBridge {
 
     private static let enterResult = Result {
-        try ["enter-setup", "enter-collect", "enter-apply", "enter-input"]
+        try ["enter-setup", "enter-collect", "enter-apply", "enter-scene",
+             "enter-tree", "enter-tools", "enter-input"]
             .map { try loadResource(named: $0) }
             .joined(separator: "\n")
     }
@@ -35,6 +36,10 @@ enum Snapshot3DBridge {
             return window.__m3d.setMode('\(JSEscape.string(mode))');
         })();
         """
+    }
+
+    static func previewScript(_ image: String) -> String {
+        "window.__m3d?.setPreview('data:image/png;base64,\(JSEscape.string(image))');"
     }
 
     static let resetViewScript = #"""
