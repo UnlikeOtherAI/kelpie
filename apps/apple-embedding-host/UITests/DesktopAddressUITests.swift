@@ -31,6 +31,8 @@ final class DesktopAddressUITests: XCTestCase {
         let pageInput = app.webViews.textFields["Page focus"]
         XCTAssertTrue(pageInput.waitForExistence(timeout: 15))
         pageInput.click()
+        app.typeText("page-focus-check")
+        XCTAssertEqual(pageInput.value as? String, "page-focus-check")
         address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         capture("macos-address-selected", app)
         app.typeText("replacement")
@@ -38,6 +40,9 @@ final class DesktopAddressUITests: XCTestCase {
         app.typeKey(.leftArrow, modifierFlags: [])
         app.typeText("x")
         XCTAssertEqual(address.value as? String, "replacemenxt")
+        address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        app.typeText("z")
+        XCTAssertEqual((address.value as? String)?.replacingOccurrences(of: "z", with: ""), "replacemenxt")
         XCTAssertEqual(typedAfterNewTab, "address-focus-check")
     }
 

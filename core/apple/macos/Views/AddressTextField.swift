@@ -12,6 +12,23 @@ final class AddressTextFieldCell: NSTextFieldCell {
         event: NSEvent?
     ) {
         super.edit(withFrame: rect, in: controlView, editor: textObj, delegate: delegate, event: nil)
+        selectAfterEditingBegins(in: controlView)
+    }
+
+    override func select(
+        withFrame rect: NSRect,
+        in controlView: NSView,
+        editor textObj: NSText,
+        delegate: Any?,
+        start selStart: Int,
+        length selLength: Int
+    ) {
+        super.select(withFrame: rect, in: controlView, editor: textObj, delegate: delegate,
+                     start: selStart, length: selLength)
+        selectAfterEditingBegins(in: controlView)
+    }
+
+    private func selectAfterEditingBegins(in controlView: NSView) {
         // AppKit finishes positioning the caret after this cell returns. Apply
         // the initial selection once that mouse event has finished unwinding.
         DispatchQueue.main.async { [weak controlView] in
