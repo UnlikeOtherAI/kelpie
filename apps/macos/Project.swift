@@ -200,6 +200,18 @@ let kelpieUpdateVerification = Target.target(
     settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )
 
+let kelpieUpdateVerificationTests = Target.target(
+    name: "KelpieUpdateVerificationUITestsMac",
+    destinations: .macOS,
+    product: .uiTests,
+    bundleId: "com.unlikeotherai.kelpie.update-verification.uitests.macos",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [.glob("../updates/verification-tests/**/*.swift")],
+    dependencies: [.target(name: "KelpieUpdateVerificationMac")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieUpdateTests = Target.target(
     name: "KelpieUpdateTestsMac",
     destinations: .macOS,
@@ -261,10 +273,12 @@ let project = Project(
         kelpieTests,
         kelpieUpdateTests,
         kelpieUpdateVerification,
+        kelpieUpdateVerificationTests,
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [KelpieBrowserBuild.cefHelper(core: "../../core")]),
     schemes: [
         .scheme(name: "KelpieUpdateVerificationMac", shared: true,
-                buildAction: .buildAction(targets: ["KelpieUpdateVerificationMac"])),
+                buildAction: .buildAction(targets: ["KelpieUpdateVerificationMac"]),
+                testAction: .targets(["KelpieUpdateVerificationUITestsMac"])),
         .scheme(name: "KelpieUpdatesMac", shared: true,
                 buildAction: .buildAction(targets: ["Kelpie"]),
                 testAction: .targets(["KelpieUpdateTestsMac"])),

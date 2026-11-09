@@ -40,7 +40,12 @@ private final class VerificationSession: ObservableObject {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [VerificationFeed.self]
         let session = URLSession(configuration: configuration)
-        return AppUpdates(session: session, installed: "0.2.1", performUpdate: { [weak self] item in
+        let arguments = ProcessInfo.processInfo.arguments
+        let index = arguments.firstIndex(of: "--run-id")
+        let requested = index.flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+        let run = requested.flatMap(UUID.init(uuidString:))?.uuidString ?? "manual"
+        let defaults = UserDefaults(suiteName: "com.unlikeotherai.kelpie.update-verification.\(run)") ?? .standard
+        return AppUpdates(defaults: defaults, session: session, installed: "0.2.1", performUpdate: { [weak self] item in
             self?.result = "Update \(item.version) selected. No software was changed."
         })
     }()
