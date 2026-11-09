@@ -44,6 +44,8 @@ class ShellDelegate : public UrlBarDelegate {
   virtual void OnCreateIsolatedTabRequested() = 0;
   virtual void OnActivateTabRequested(std::string id, std::uint64_t generation) = 0;
   virtual void OnCloseTabRequested(std::string id, std::uint64_t generation) = 0;
+  // A favourite was dragged off the favourites bar.
+  virtual void OnRemoveFavoriteRequested(const std::string& id) { (void)id; }
   virtual void OnWindowCloseRequested() = 0;
 };
 

@@ -28,4 +28,19 @@ void WindowsApp::OnAddFavoriteRequested() {
 
 }
 
+// The bar has already hidden the favourite and played its puff. The periodic
+// browser state refresh picks up the changed list, so the bar is not rebuilt
+// from inside its own drag handling.
+void WindowsApp::OnRemoveFavoriteRequested(const std::string& id) {
+  if (!desktop_app_ || id.empty()) return;
+  if (account_ && !account_->State().signed_in) {
+    account_->BookmarkAction("remove", {{"id", id}});
+    SaveStores();
+    return;
+  }
+  if (!account_ || !account_->StartBookmarkAction("remove", {{"id", id}})) {
+    shell_->ShowToast(L"Favorites are syncing. Please try again shortly.");
+  }
+}
+
 }  // namespace kelpie::windows

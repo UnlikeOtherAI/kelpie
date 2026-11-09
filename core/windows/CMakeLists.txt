@@ -114,6 +114,7 @@ set(WINDOWS_APP_SOURCES
   src/shell_tabs.cpp
   src/shell_chrome.cpp
   src/favorites_bar.cpp
+  src/drag_effects.cpp
   src/window_chrome.cpp
   src/maximized_frame.cpp
   src/win32_browser_view.cpp
@@ -157,6 +158,7 @@ set(WINDOWS_APP_HEADERS
   src/startup_diagnostics.h
   src/tab_tooltips.h
   src/toast_view.h
+  src/drag_effects.h
   src/device_info_windows.h
   src/mdns_windows.h
 )
@@ -411,6 +413,7 @@ if(BUILD_TESTING)
     src/shell_tabs.cpp
     src/shell_chrome.cpp
     src/favorites_bar.cpp
+    src/drag_effects.cpp
     src/window_chrome.cpp
     src/maximized_frame.cpp
     src/url_bar.cpp
