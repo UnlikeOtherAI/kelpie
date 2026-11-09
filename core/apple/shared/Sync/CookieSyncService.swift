@@ -314,6 +314,8 @@ final class CookieSyncService {
         let deadline = Date().addingTimeInterval(timeout)
         await scan(run)
         for channel in run.initiatorChannels { schedulePush(run, channel) }
+        // Let long polls woken by the scan pick up their records before counting them.
+        try? await Task.sleep(nanoseconds: 100_000_000)
         while isCurrent(run), Date() < deadline,
               run.answering > 0 || run.initiatorChannels.contains(where: \.pushing) {
             try? await Task.sleep(nanoseconds: 50_000_000)

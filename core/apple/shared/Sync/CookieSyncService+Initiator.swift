@@ -111,7 +111,7 @@ extension CookieSyncService {
             throw SyncFailure("PROTOCOL")
         }
         guard abs(peerNow - now()) <= SyncLimits.maxClockSkewMillis else { throw SyncFailure("CLOCK_SKEW") }
-        let peerKey = try SyncCrypto.publicKey(peerKeyText)
+        guard let peerKey = try? SyncCrypto.publicKey(peerKeyText) else { throw SyncFailure("PROTOCOL") }
         peer.platform = reply["platform"] as? String ?? peer.platform
         peer.name = reply["name"] as? String ?? peer.name
         let challenge = try SyncStoreBridge.challenge(
@@ -178,7 +178,17 @@ extension CookieSyncService {
     func installed(_ run: SyncRun, _ channel: SyncChannel) {
         run.install(channel)
         run.peer(channel.peer).timer?.cancel()
-        guard channel.isInitiator else { return }
+        guard channel.isInitiator else {
+            // The initiator re-handshakes when the session expires; if it does not, the
+            // expired session must not keep this side from initiating.
+            channel.spawn { [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(nanoseconds: UInt64(max(0, channel.expiresAt - self.now())) * 1_000_000)
+                guard !Task.isCancelled else { return }
+                self.channelFailed(run, channel, SyncFailure("SYNC_SESSION"))
+            }
+            return
+        }
         channel.spawn { [weak self] in await self?.pullLoop(run, channel) }
         schedulePush(run, channel)
     }
