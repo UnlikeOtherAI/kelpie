@@ -93,6 +93,7 @@ set(WINDOWS_THEME_HEADERS
 
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-connect" "${CMAKE_BINARY_DIR}/desktop-connect")
+add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-sync" "${CMAKE_BINARY_DIR}/desktop-sync")
 
 include(inference.cmake)
 
@@ -186,7 +187,7 @@ target_include_directories(kelpie_windows_browser
     "${CMAKE_CURRENT_SOURCE_DIR}/resources"
 )
 
-target_link_libraries(kelpie_windows_browser PUBLIC kelpie_desktop_account kelpie_desktop_connect shlwapi)
+target_link_libraries(kelpie_windows_browser PUBLIC kelpie_desktop_account kelpie_desktop_connect kelpie_desktop_sync shlwapi)
 
 target_link_libraries(kelpie_windows_browser
   PUBLIC
