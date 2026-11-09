@@ -59,6 +59,7 @@ class Win32Shell {
   HACCEL accelerators() const { return accelerators_; }
   bool HandleKeyboardNavigation(const MSG& message);
   void UpdateBrowserState(const BrowserState& state);
+  void FocusAddress() { url_bar_.Focus(); }
   void SetPageColor(COLORREF color);
   void UpdateAccount(const std::string& avatar, const std::wstring& label, bool error, bool busy) {
     url_bar_.SetAccount(avatar, label, error, busy);

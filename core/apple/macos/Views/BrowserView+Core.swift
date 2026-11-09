@@ -102,6 +102,7 @@ extension BrowserView {
         guard rendererState.activeEngine != .chromium else { return }
         let tab = tabStore.addTab()
         connectNewTab(tab)
+        addressFocusRequest += 1
     }
 
     /// Cmd+W handler. Routed per-window by `BrowserCommandRouter`. Closes the

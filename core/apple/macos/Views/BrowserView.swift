@@ -32,6 +32,7 @@ struct BrowserView: View {
     @State var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
     @AppStorage("skipInsecureWarning", store: KelpieStorage.defaults) var skipInsecureWarning = false
     @State var pendingInsecureURL: URL?
+    @State var addressFocusRequest = 0
     /// Stable per-window id used by `WindowRegistry` so HTTP handlers can
     /// route `(windowId, tabId)` requests to the correct shell.
     let ownsWindowChrome: Bool
@@ -108,7 +109,8 @@ struct BrowserView: View {
                         onBookmarks: { showBookmarks = true },
                         onAddBookmark: addCurrentBookmark,
                         onNetworkInspector: { showNetworkInspector = true },
-                        onSettings: { showSettings = true }
+                        onSettings: { showSettings = true },
+                        addressFocusRequest: addressFocusRequest
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     .layoutPriority(1)

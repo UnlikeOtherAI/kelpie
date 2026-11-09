@@ -113,6 +113,7 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
 int UrlBar::Height() const { return ui::Dip(parent_, 72); }
 
 void UrlBar::Resize(const RECT& bounds) {
+  RefreshFont();
   const int control_height = ui::Dip(parent_, 44);
   const int button_width = ui::Dip(parent_, 40);
   const int gap = ui::Dip(parent_, 8);
@@ -158,12 +159,15 @@ void UrlBar::Destroy() {
 
 void UrlBar::RefreshFont() {
   if (url_edit_ == nullptr) return;
+  const UINT dpi = ui::WindowDpi(parent_);
+  if (edit_font_ != nullptr && font_dpi_ == dpi) return;
   // Keep the address readable at the reference navigation-row size.
   HFONT next = ui::MakeFont(parent_, 16, FW_NORMAL);
   if (next == nullptr) return;
   SendMessageW(url_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(next), TRUE);
   if (edit_font_ != nullptr) DeleteObject(edit_font_);
   edit_font_ = next;
+  font_dpi_ = dpi;
 }
 
 void UrlBar::SetPalette(ui::ChromePalette palette) { palette_ = palette; }
@@ -319,8 +323,21 @@ LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM
   } else if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MOUSEWHEEL) {
     self->completion_active_ = false;
     self->completion_navigation_url_.clear();
+    if (message == WM_LBUTTONDOWN && GetFocus() != hwnd) {
+      // The initial click enters address editing. Do not let EDIT's default
+      // mouse handler collapse the selection to the clicked character.
+      self->Focus();
+      return 0;
+    }
   } else if (message == WM_SETFOCUS || message == WM_KILLFOCUS) {
     self->InvalidateSurface();
+    if (message == WM_SETFOCUS) {
+      const LRESULT result = CallWindowProcW(self->original_edit_proc_, hwnd, message, wparam, lparam);
+      self->completion_active_ = false;
+      self->completion_navigation_url_.clear();
+      SendMessageW(hwnd, EM_SETSEL, 0, -1);
+      return result;
+    }
   }
   return CallWindowProcW(self->original_edit_proc_, hwnd, message, wparam, lparam);
 }
