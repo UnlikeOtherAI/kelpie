@@ -13,6 +13,11 @@ $installed = $false
 $backup = $null
 $request = $null
 function Set-Status([string]$Value) { [IO.File]::WriteAllText($statusPath, $Value) }
+function Extended-Path([string]$Path) {
+    if ($Path.StartsWith('\\?\')) { return $Path }
+    if ($Path.StartsWith('\\')) { return '\\?\UNC\' + $Path.Substring(2) }
+    return '\\?\' + $Path
+}
 function Assert-PlainDirectory([string]$Path) {
     $item = Get-Item -LiteralPath $Path
     if (-not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
@@ -98,18 +103,22 @@ try {
         }
     }
     $closed = $true
+    # CEF children can outlive the browser parent while flushing their caches.
+    # The profile must have no writers before copying it or moving its app tree.
+    while (@(Get-Process -Name kelpie -ErrorAction SilentlyContinue | Where-Object {
+        $_.Path -and [string]::Equals($_.Path, (Join-Path $destination 'kelpie.exe'), [StringComparison]::OrdinalIgnoreCase)
+    }).Count -gt 0) {
+        if ([DateTime]::UtcNow -gt $deadline) { throw 'Another Kelpie process is still using this installation.' }
+        Start-Sleep -Milliseconds 200
+    }
     if ($profile.StartsWith($destination + '\', [StringComparison]::OrdinalIgnoreCase)) {
         $relative = $profile.Substring($destination.Length + 1)
         $stagedProfile = Join-Path $staged $relative
         if (Test-Path -LiteralPath $stagedProfile) { throw 'The package conflicts with the browser profile directory.' }
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stagedProfile) | Out-Null
-        Copy-Item -LiteralPath $profile -Destination $stagedProfile -Recurse
-    }
-    # Refuse rather than replace files used by another profile/process.
-    foreach ($other in @(Get-Process -Name kelpie -ErrorAction SilentlyContinue)) {
-        if ($other.Path -and [string]::Equals($other.Path, (Join-Path $destination 'kelpie.exe'), [StringComparison]::OrdinalIgnoreCase)) {
-            throw 'Another Kelpie instance is still using this installation.'
-        }
+        # Windows PowerShell otherwise fails when staging makes a profile path
+        # exceed MAX_PATH, even though Chromium can read and write that profile.
+        Copy-Item -LiteralPath (Extended-Path $profile) -Destination (Extended-Path $stagedProfile) -Recurse
     }
     Assert-PlainDirectory $destination
     Move-Item -LiteralPath $destination -Destination $backup
@@ -134,8 +143,10 @@ try {
     Set-Status 'error'
     if ($closed) {
         try { $null = Start-Kelpie $destination } catch { $message += ' Kelpie could not restart.' }
-        Add-Type -AssemblyName System.Windows.Forms
-        [Windows.Forms.MessageBox]::Show($message, 'Kelpie could not update') | Out-Null
+        if ([Environment]::UserInteractive) {
+            Add-Type -AssemblyName System.Windows.Forms
+            [Windows.Forms.MessageBox]::Show($message, 'Kelpie could not update') | Out-Null
+        }
     }
     exit 1
 }

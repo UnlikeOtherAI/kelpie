@@ -54,6 +54,16 @@ for ((attempt=0; attempt<600; attempt++)); do
   /bin/sleep 0.5
 done
 $closed
+# Chromium helpers may finish writing their profiles after the parent exits.
+for ((attempt=0; attempt<300; attempt++)); do
+  remaining=false
+  while IFS= read -r command; do
+    if [[ "$command" == "$destination/Contents/"* ]]; then remaining=true; break; fi
+  done <<< "$(/bin/ps -axww -o comm=)"
+  if ! $remaining; then break; fi
+  /bin/sleep 0.1
+done
+! $remaining
 /bin/mv "$destination" "$backup"; moved=true
 /bin/mv "$app" "$destination"; installed=true
 /usr/bin/open -n "$destination" --args "${restart_args[@]}"

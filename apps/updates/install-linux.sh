@@ -94,6 +94,17 @@ for ((attempt=0; attempt<600; attempt++)); do
   sleep 0.5
 done
 $closed
+# CEF subprocesses may still be flushing the profile after their parent exits.
+# Wait for the exact executable, without matching or stopping unrelated apps.
+for ((attempt=0; attempt<300; attempt++)); do
+  remaining=false
+  for process in /proc/[0-9]*/exe; do
+    if [[ "$(readlink "$process" 2>/dev/null || true)" == "$executable" ]]; then remaining=true; break; fi
+  done
+  if ! $remaining; then break; fi
+  sleep 0.1
+done
+! $remaining
 if [[ "$format" == tar && "$(realpath "$profile")" == "$(realpath "$destination")/"* ]]; then
   relative="${profile#"$destination/"}"
   [[ ! -e "$staged/$relative" ]]

@@ -125,3 +125,13 @@ download/checksum, and installing/restarting an exact signed published package.
 Capture the new prompt and download state on each changed native screen. The
 absence of a previous prompt should be identified in each screenshot's Before
 cell; no unchanged browser screens need screenshot evidence.
+
+On Windows, `tests/windows/app-update-install.ps1 -SignedPackage <absolute ZIP>`
+exercises the shipping helper against an isolated signed installation. Transport
+is replaced only in the test process; signatures, hash, shutdown, directory swap,
+profile preservation and restart are real. It keeps its evidence under `.cache/`.
+Desktop installers wait for CEF children to finish after the browser parent exits
+before copying a profile or replacing the installation, so cache journals cannot
+disappear during the copy.
+Windows profile copies use extended paths because staging can put existing
+Chromium cache filenames beyond the legacy 260-character PowerShell limit.
