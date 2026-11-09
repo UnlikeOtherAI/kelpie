@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './release-assets.test.mjs';
 import test from 'node:test';
 import { marker, updateNotes, componentVersion } from '../../scripts/publish-app-update.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';

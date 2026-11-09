@@ -41,6 +41,23 @@ above after signing and verifying the published download. Each target is updated
 independently; release notes and other targets' metadata are preserved. Run
 publishers sequentially to avoid concurrent edits to the same release body.
 
+Asset attachment uploads files without rewriting the release tag or target commit.
+It verifies GitHub's SHA-256 digests, resumes matching completed uploads and refuses
+to overwrite different assets. Publication always reads component versions from
+the release tag, including when the publisher runs from a newer checkout.
+
+The **Recover release publication** workflow retries attachment after a failed
+release workflow when all selected build artifacts exist. It validates the run,
+workflow, tag and source revision before downloading anything. To retry an earlier
+completed run through the same recovery path:
+
+```sh
+gh workflow run recover-release.yml -f artifact_run_id=<release-workflow-run-id>
+```
+
+Recovery reuses the recorded build artifacts; it does not rebuild native apps or
+delete the failed run or previous uploads.
+
 ## Prompt and preference behavior
 
 Apps check the public GitHub releases API without credentials on launch and
