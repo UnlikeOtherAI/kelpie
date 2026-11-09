@@ -4,11 +4,19 @@ final class UpdatePromptUITests: XCTestCase {
     func testPromptChoicesAcrossRestarts() {
         let run = UUID().uuidString
         let app = XCUIApplication()
+        defer { app.terminate() }
         func action(_ title: String) -> XCUIElement {
             #if os(macOS)
             return app.windows.firstMatch.buttons[title]
             #else
             return app.buttons[title]
+            #endif
+        }
+        func choose(_ title: String) {
+            #if os(macOS)
+            action(title).click()
+            #else
+            action(title).tap()
             #endif
         }
         func launch(_ version: String) {
@@ -22,13 +30,13 @@ final class UpdatePromptUITests: XCTestCase {
         prompt.name = "Update prompt — isolated verification host"
         prompt.lifetime = .keepAlways
         add(prompt)
-        action("Not now").tap()
+        choose("Not now")
         XCTAssertFalse(action("Update").exists)
         app.terminate()
 
         launch("0.2.2")
         XCTAssertTrue(action("Update").waitForExistence(timeout: 10))
-        action("Skip version").tap()
+        choose("Skip version")
         app.terminate()
 
         launch("0.2.2")
@@ -37,7 +45,7 @@ final class UpdatePromptUITests: XCTestCase {
 
         launch("0.2.3")
         XCTAssertTrue(action("Update").waitForExistence(timeout: 10))
-        action("Update").tap()
+        choose("Update")
         XCTAssertTrue(app.staticTexts["Update 0.2.3 selected. No software was changed."].waitForExistence(timeout: 5))
         app.terminate()
     }
