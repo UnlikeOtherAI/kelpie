@@ -1,6 +1,6 @@
 import Foundation
 
-/// `set-cookies` and `copy-cookies`.
+/// `set-cookies`, `copy-cookies` and `get-cookie-sync-status`.
 ///
 /// A store is named by `{tabId?, partition?}`: a tab's store, a partition's store, or the
 /// live default store when both are absent. Writing the default store syncs like any other
@@ -80,6 +80,12 @@ extension BrowserManagementHandler {
         } catch {
             return Self.cookieStoreUnavailable()
         }
+    }
+
+    @MainActor
+    func getCookieSyncStatus(_ body: [String: Any]) async -> [String: Any] {
+        guard let sync = context.cookieSync else { return successResponse(MacCookieSync.unavailableStatus()) }
+        return successResponse(await sync.status())
     }
 
     private static func copyFailure(_ key: BrowserCookie.Key, _ error: CookieRequest.CookieError) -> [String: Any] {

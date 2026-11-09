@@ -29,6 +29,8 @@ final class HandlerContext {
 
     /// The live default cookie store; the only path agents, sync and renderer switches use.
     let defaultCookies = DefaultCookieStore(engine: .webkit)
+    /// Peer-to-peer cookie sync for the standalone app; nil in embedded hosts.
+    var cookieSync: MacCookieSync?
 
     init() {}
 

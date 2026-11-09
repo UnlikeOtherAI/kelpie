@@ -26,6 +26,7 @@ struct BrowserManagementHandler {
         router.register("delete-cookies") { body in await deleteCookies(body) }
         router.register("set-cookies") { body in await setCookies(body) }
         router.register("copy-cookies") { body in await copyCookies(body) }
+        router.register("get-cookie-sync-status") { body in await getCookieSyncStatus(body) }
 
         // Storage
         router.register("get-storage") { body in await getStorage(body) }

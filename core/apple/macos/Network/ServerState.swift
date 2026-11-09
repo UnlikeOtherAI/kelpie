@@ -245,10 +245,11 @@ final class ServerState: ObservableObject {
         source.willDeactivate()
 
         // The incoming engine's store takes over the outgoing one's cookies, then
-        // becomes the live default store.
+        // becomes the live default store; sync rebases onto it without stamping.
         await handlerContext.defaultCookies.switchEngine(to: engine == .chromium ? .chromium : .webkit)
         handlerContext.renderer = target
         handlerContext.activeEngineIsChromium = (engine == .chromium)
+        handlerContext.cookieSync?.rendererDidSwitch()
 
         // Load the same URL in the target renderer
         if let url = source.currentURL, url.absoluteString != "about:blank" {
