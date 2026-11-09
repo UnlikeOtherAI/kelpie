@@ -273,7 +273,8 @@ void Handlers() {
   DesktopHandlerRuntime runtime;
   runtime.browser_control = &control;
   DesktopRouter router;
-  CookieHandler(runtime).Register(router);
+  const CookieHandler handler(runtime);  // routes capture the handler; it must outlive them
+  handler.Register(router);
 
   auto result = router.Dispatch("get-cookies", {{"all", true}, {"domain", "example.com"}});
   assert(result.status_code == 200 && result.body["complete"] == true && result.body["cookies"].size() == 2 &&
@@ -325,7 +326,8 @@ void Handlers() {
          result.body["listening"] == false && result.body["peers"].empty() && result.body["store"]["warming"] == false);
   runtime.cookie_sync_status = [] { return Json{{"supported", true}, {"signedIn", false}}; };
   DesktopRouter with_sync;
-  CookieHandler(runtime).Register(with_sync);
+  const CookieHandler sync_handler(runtime);
+  sync_handler.Register(with_sync);
   result = with_sync.Dispatch("get-cookie-sync-status", Json::object());
   assert(result.status_code == 200 && result.body["supported"] == true && result.body["signedIn"] == false);
 }
