@@ -117,8 +117,10 @@ final class FavouriteDragGhost {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(target, display: true)
             panel.animator().alphaValue = 0.6
-        }, completionHandler: { [weak self] in
-            Task { @MainActor in self?.close() }
+        }, completionHandler: {
+            // The drag loop has returned by now; this handler keeps the ghost
+            // alive until its panel is closed.
+            Task { @MainActor in self.close() }
         })
     }
 
@@ -131,8 +133,10 @@ final class FavouriteDragGhost {
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.12
             panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            Task { @MainActor in self?.close() }
+        }, completionHandler: {
+            // The drag loop has returned by now; this handler keeps the ghost
+            // alive until its panel is closed.
+            Task { @MainActor in self.close() }
         })
     }
 

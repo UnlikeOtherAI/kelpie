@@ -210,7 +210,7 @@ card navigates that tab.
 
 Screenshots are taken automatically. About 1.5 seconds after a page in the
 active tab finishes loading and stops changing, Kelpie captures the visible
-viewport, keeps the top of it at the card's 16:10 shape, scales it to 640 by 400
+viewport, keeps its top-left corner at the card's 16:10 shape, scales it to 640 by 400
 pixels and stores it as a JPEG, keyed by host, with the site's favicon. A site is
 recaptured at most every two minutes while browsing around it. Start pages,
 error pages, pages still loading, non-web URLs and in-memory (non-persistent)

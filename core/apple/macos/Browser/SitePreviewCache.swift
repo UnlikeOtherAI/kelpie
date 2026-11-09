@@ -110,7 +110,7 @@ final class SitePreviewCache: ObservableObject {
         return String(bytes: bytes, encoding: .utf8)
     }
 
-    /// The top of the page at the card's 16:10 shape, scaled down to at most
+    /// The top-left of the page at the card's 16:10 shape, scaled down to at most
     /// `previewSize`, or nil when the snapshot is effectively one flat colour.
     static func preview(from snapshot: NSImage) -> CGImage? {
         guard let source = snapshot.cgImage(forProposedRect: nil, context: nil, hints: nil),
@@ -120,7 +120,7 @@ final class SitePreviewCache: ObservableObject {
         let crop: CGRect
         if width / height > 1.6 {
             let cropWidth = (height * 1.6).rounded(.down)
-            crop = CGRect(x: ((width - cropWidth) / 2).rounded(.down), y: 0, width: cropWidth, height: height)
+            crop = CGRect(x: 0, y: 0, width: cropWidth, height: height)
         } else {
             crop = CGRect(x: 0, y: 0, width: width, height: (width / 1.6).rounded(.down))
         }

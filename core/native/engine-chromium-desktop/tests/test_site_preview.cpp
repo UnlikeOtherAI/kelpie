@@ -23,9 +23,9 @@ using namespace kelpie;
 using namespace kelpie::site_preview;
 
 void TestCrop() {
-  // 16:9 is wider than the card: full height, sides trimmed equally.
+  // 16:9 is wider than the card: full height, the right-hand side trimmed.
   const PixelRect wide = PreviewCrop(1920, 1080);
-  assert(wide.width == 1728 && wide.height == 1080 && wide.x == 96 && wide.y == 0);
+  assert(wide.width == 1728 && wide.height == 1080 && wide.x == 0 && wide.y == 0);
   // A tall viewport keeps the full width and the top of the page.
   const PixelRect tall = PreviewCrop(1280, 1400);
   assert(tall.width == 1280 && tall.height == 800 && tall.x == 0 && tall.y == 0);

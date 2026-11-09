@@ -11,9 +11,9 @@ PixelRect PreviewCrop(int width, int height) {
   const long long wide = static_cast<long long>(width) * kPreviewHeight;
   const long long tall = static_cast<long long>(height) * kPreviewWidth;
   if (wide > tall) {
-    // Wider than 16:10: keep the full height and trim both sides.
+    // Wider than 16:10: keep the full height and trim the right-hand side.
     const int crop_width = static_cast<int>(tall / kPreviewHeight);
-    return {(width - crop_width) / 2, 0, crop_width, height};
+    return {0, 0, crop_width, height};
   }
   // Taller than (or exactly) 16:10: keep the full width and the top of the page.
   return {0, 0, width, static_cast<int>(wide / kPreviewWidth)};

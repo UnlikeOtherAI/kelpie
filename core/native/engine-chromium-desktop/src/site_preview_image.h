@@ -24,9 +24,9 @@ struct PixelRect {
   int height = 0;
 };
 
-// The largest 16:10 region of a `width` x `height` capture, anchored to the top
-// of the page and centred horizontally. Pages put their identity at the top, so
-// a tall viewport loses its bottom and a wide one loses both sides equally.
+// The largest 16:10 region of a `width` x `height` capture, anchored to its
+// top-left corner. Pages put their identity, usually the logo, at the top left,
+// so a tall viewport loses its bottom and a wide one its right-hand side.
 // Returns an empty rect for an empty capture.
 PixelRect PreviewCrop(int width, int height);
 
