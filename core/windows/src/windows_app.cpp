@@ -248,9 +248,18 @@ void WindowsApp::CreateTabFromShell(bool isolated) {
   TabSnapshot tab;
   // No URL in the request: the engine opens the start page, the same default
   // the HTTP and MCP `new-tab` commands get.
-  const auto result = desktop_app_->engine().CreateTab(request, &tab, std::chrono::seconds(5));
-  if (result.ok) { desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2)); SaveSession(); }
-  else if (shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
+  auto result = desktop_app_->engine().CreateTab(request, &tab, std::chrono::seconds(5));
+  if (result.ok) result = desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2));
+  if (!result.ok) {
+    if (shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
+    return;
+  }
+  // Synchronize the active tab before editing begins, so the next runtime
+  // refresh cannot replace the address after the person starts typing.
+  const auto& active = result.tab.value_or(tab);
+  OnBrowserStateChanged({active.url, active.title, active.is_loading, active.can_go_back, active.can_go_forward});
+  SaveSession();
+  shell_->FocusAddress();
 }
 
 void WindowsApp::OnActivateTabRequested(std::string id, std::uint64_t generation) {

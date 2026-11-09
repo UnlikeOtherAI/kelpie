@@ -88,6 +88,7 @@ class UrlBar {
   WNDPROC original_edit_proc_ = nullptr;
   mutable HBRUSH edit_brush_ = nullptr;
   HFONT edit_font_ = nullptr;
+  UINT font_dpi_ = 0;
   HWND tooltip_ = nullptr;
   HWND hovered_button_ = nullptr;
   bool secure_ = false;

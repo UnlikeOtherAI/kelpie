@@ -29,12 +29,13 @@ struct URLBarView: View {
     let onAddBookmark: () -> Void
     let onNetworkInspector: () -> Void
     let onSettings: () -> Void
+    @Binding var addressFocusRequested: Bool
 
     @ObservedObject var bookmarkStore = BookmarkStore.shared
     @State var showTools = false
     @State private var showHistory = false
     @State private var urlText = ""
-    @FocusState private var isAddressFieldFocused: Bool
+    @State private var isAddressFieldFocused = false
 
     var pageURL: URL? {
         guard !isStartPage, let url = URL(string: browserState.currentURL),
@@ -115,6 +116,7 @@ struct URLBarView: View {
         .onAppear { syncAddress() }
         .onChange(of: browserState.currentURL) { _, _ in if !isAddressFieldFocused || urlText.isEmpty { syncAddress() } }
         .onChange(of: isStartPage) { _, _ in syncAddress() }
+        .onChange(of: addressFocusRequested) { _, requested in if requested { syncAddress() } }
     }
 
     private func syncAddress() { urlText = isStartPage ? "" : browserState.currentURL }
@@ -182,14 +184,14 @@ struct URLBarView: View {
                     .allowsHitTesting(false)
                 }
 
-                TextField("Search or enter website name", text: $urlText)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(Color(nsColor: appearance.palette.foreground.color))
-                    .font(.system(size: 14))
-                    .lineLimit(1)
-                    .focused($isAddressFieldFocused)
-                    .accessibilityIdentifier("browser.address")
-                    .onSubmit { navigate() }
+                AddressField(
+                    text: $urlText,
+                    isFocused: $isAddressFieldFocused,
+                    focusRequested: $addressFocusRequested,
+                    color: appearance.palette.foreground.color,
+                    onSubmit: navigate
+                )
+                .frame(height: 18)
             }
             AppKitToolbarButton(
                     systemName: isBookmarked ? "star.fill" : "star",
