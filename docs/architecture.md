@@ -118,6 +118,7 @@ Cross-platform C++17 static libraries with C ABI, shared by all platforms via br
 | `core-automation` | Viewport presets and device fitting |
 | `core-mcp` | MCP protocol types |
 | `core-ai` | AI model catalog, device fitness evaluation, HF token, and shared AI metadata/store helpers |
+| `core-sync` | Peer-to-peer cookie sync: cookie canonicalisation, the metadata store, hybrid logical clock, merge, change feed, message validation and the handshake transcript ([protocol](api/cookie-sync.md)) |
 | `engine-chromium-desktop` | CEF integration (macOS/Windows/Linux) |
 
 **`core-ai`** manages the shareable AI catalog and storage primitives: the approved model catalog (Gemma 4 E2B Q4/Q8), device fitness evaluation, HF token storage, and model-store helpers. Platform networking stays native: Apple apps use URLSession for downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
@@ -249,6 +250,28 @@ TXT Records:
   version  = "1.0.0"               # App version
 ```
 
+### Cookie Sync Service
+
+Signed-in standalone apps also run a separate, sync-only listener that keeps the
+default cookie store in step with the person's other Kelpie devices on the same
+network. It advertises `_kelpie-sync._tcp` on an ephemeral port, so the CLI never
+mistakes it for the automation API, and serves only `/v1/sync/hello`,
+`/v1/sync/auth` and `/v1/sync/exchange`. Two devices prove they share a UOA
+account with transcript-bound UOA tickets, derive AES-GCM session keys with
+ECDH and HKDF, and exchange cookie changes directly. No server stores or sees a
+cookie. Windows and Linux keep automation on loopback; this listener is their only
+LAN listener. See the [cookie sync protocol](api/cookie-sync.md).
+
+```
+Service Type: _kelpie-sync._tcp
+Port: ephemeral
+
+TXT Records:
+  v  = "1"
+  id = "<replicaId>"     # 16 random bytes, new on every launch and sign-in
+  h  = "<accountHint>"   # daily hash of the UOA subject; public, authorises nothing
+```
+
 ### Device Identity
 
 Every Kelpie browser instance has a **stable unique device ID** used for reliable targeting across sessions:
@@ -289,6 +312,7 @@ over TLS; the separate outbound Nessie connection uses authenticated WSS.
 | No persistent scripts | No browser extensions or content scripts. Some iOS features use ephemeral bridge scripts (cleared on navigation) |
 | Account authority | UOA owns identity and revocation; account credentials go only to UOA |
 | Port access | Default 8420, configurable per device |
+| Cookie sync | Separate sync-only listener; peers must prove the same UOA account over an encrypted, transcript-bound handshake before any cookie moves |
 
 ### Shared Network Risk
 
@@ -307,6 +331,15 @@ existing independent scopes. Browser Origin/cross-site requests, unsafe Host,
 ambiguous framing and non-JSON control POSTs cannot inherit localhost permission.
 See [computer pairing](api/computer-pairing.md) for the complete protocol, storage
 locations and migration rules. TLS is not added by this change.
+
+Cookie sync puts the person's sessions from their signed-in devices into each
+device's default store. A computer approved on one device can read and plant
+cookies in that shared store. Sync traffic itself is encrypted and carries no
+spendable credential. See [cookies](api/cookies.md#who-can-read-synced-cookies).
+
+The CLI's `kelpie mcp --http` server binds to `127.0.0.1` by default. A non-loopback
+`--bind` requires `--unsafe-host`, because the listener forwards stored bearer
+tokens to its callers.
 
 ## Platform-Specific Architecture Details
 

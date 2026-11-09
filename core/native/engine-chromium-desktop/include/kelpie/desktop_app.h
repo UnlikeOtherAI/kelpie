@@ -56,6 +56,9 @@ class DesktopApp {
     // Optional account-aware favorites; callbacks must be thread-safe.
     std::function<nlohmann::json(const std::string&, const nlohmann::json&)> bookmark_action;
     std::function<std::string()> bookmarks_supplier;
+    // get-cookie-sync-status: the shell's DesktopCookieSync::Status. Without
+    // it the method reports {supported:false, reason:"unavailable"}.
+    std::function<nlohmann::json()> cookie_sync_status;
     // Directory for the start page's site screenshots and favicons, normally
     // inside the profile. Empty keeps them in memory for this session only.
     std::filesystem::path site_previews_path;

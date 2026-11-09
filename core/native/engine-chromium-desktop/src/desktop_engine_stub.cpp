@@ -1,4 +1,5 @@
 #include "kelpie/desktop_engine.h"
+#include "kelpie/desktop_sync_cookie_store.h"
 
 namespace kelpie {
 
@@ -109,6 +110,11 @@ void DesktopEngine::SetNetworkSink(JsonEventSink) {}
 
 void DesktopEngine::SetNavigationSink(NavigationSink) {}
 
+void DesktopEngine::SetDefaultStoreLoadSink(std::function<void()>) {}
+
+// Cookie sync needs the Chromium engine's cookie manager.
+std::unique_ptr<SyncCookieStore> CreateSyncCookieStore(DesktopEngine&) { return nullptr; }
+
 CefRenderer& DesktopEngine::renderer() {
   return *renderer_;
 }
@@ -190,6 +196,19 @@ BrowserControlResult DesktopEngine::SetCookies(TabLease, const Json&, Json*, Tim
 }
 
 BrowserControlResult DesktopEngine::DeleteCookies(TabLease, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::ReadCookieStore(const CookieStoreTarget&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::WriteCookieStore(const CookieStoreTarget&, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::CopyCookieStore(const CookieStoreTarget&, const CookieStoreTarget&,
+                                                    const std::optional<std::string>&, Json*, Timeout) {
   return UnsupportedControl();
 }
 

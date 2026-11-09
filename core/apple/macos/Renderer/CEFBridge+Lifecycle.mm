@@ -53,6 +53,10 @@ cef_app_t* MessagePumpApplication() {
 }
 
 static BOOL gCEFInitialized = NO;
+
+BOOL CEFBridgeIsCEFInitialized(void) {
+    return gCEFInitialized;
+}
 static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 
 @protocol CrAppProtocol

@@ -148,9 +148,10 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.2.5";
+  runtime.app_version = "0.2.6";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
+  runtime.cookie_sync_status = [this] { return CookieSyncStatus(); };
   runtime.site_previews_path = config_.profile_dir / "site-previews";
   runtime.start_stdio_mcp = config_.mcp_stdio;
   runtime.bind_host = "::";
@@ -305,6 +306,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   // the requested configuration value.
   connection_installation_id_ = runtime.device_id;
   device_info_provider_.Configure(bound_port, config_.width, config_.height, runtime.app_version);
+  StartCookieSync(device_info_provider_.Collect(bound_port, config_.width, config_.height, runtime.app_version).name);
   startup_diagnostics_.Enter(StartupStage::kReadinessPublication);
   std::string readiness_error;
   if (!profile_session_.PublishReadiness(runtime.device_id, bound_port,
@@ -339,6 +341,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // CEF must deliver every OnBeforeClose before CefShutdown. Keep the owner
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
+    StopCookieSync();
     if(connection_) { connection_->Shutdown(); if(!connection_->Drain())return false; connection_.reset(); }
     if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
     if (!CloseAccountLoginWindow()) return false;
@@ -365,6 +368,7 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (!desktop_app_) return;
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
+    TickCookieSync();
     if(connection_) {
       const auto model=inference_->Execute("ai-status");
       if(model.value("success",false)) { connect_model_ready_=model.value("loaded",false) && model.value("backend","")=="native";connect_model_installed_=model.value("modelInstalled",false); }

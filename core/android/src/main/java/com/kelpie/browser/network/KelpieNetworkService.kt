@@ -54,6 +54,9 @@ class KelpieNetworkService : Service() {
             }
         }
         stage.mdnsAdvertiser.ensureRegistered()
+        // Cookie sync lives inside this foreground-service lifetime (standalone app, signed in).
+        com.kelpie.browser.sync.CookieSync
+            .start(applicationContext)
 
         // If the user removes the app from the recent task list we want the
         // service to stop with it (matches the Activity's onDestroy path).
@@ -61,6 +64,8 @@ class KelpieNetworkService : Service() {
     }
 
     override fun onDestroy() {
+        com.kelpie.browser.sync.CookieSync
+            .stop()
         current?.let {
             it.stop()
             NetworkServiceState.clearIf(it)

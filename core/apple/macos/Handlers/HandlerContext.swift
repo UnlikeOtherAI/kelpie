@@ -27,9 +27,10 @@ final class HandlerContext {
     var annotationPageURL: String?
     var annotationElementCount: Int?
 
-    var sharedCookiePoller: Timer?
-    var lastSharedCookieSignature: String = ""
-    var lastSharedCookieModifiedAt: Date?
+    /// The live default cookie store; the only path agents, sync and renderer switches use.
+    let defaultCookies = DefaultCookieStore(engine: .webkit)
+    /// Peer-to-peer cookie sync for the standalone app; nil in embedded hosts.
+    var cookieSync: MacCookieSync?
 
     init() {}
 

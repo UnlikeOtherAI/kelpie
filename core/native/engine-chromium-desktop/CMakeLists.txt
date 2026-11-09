@@ -62,6 +62,7 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/renderer_handler.cpp
   src/handlers/viewport_handler.cpp
   src/handlers/cookie_handler.cpp
+  src/handlers/cookie_store_handler.cpp
   src/handlers/shell_handler.cpp
   src/handlers/dialog_handler.cpp
   src/handlers/inspection_handler.cpp
@@ -71,7 +72,8 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
 # CEF dependency, so both configurations compile them and both run their tests.
 list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_input_planner.cpp
-  src/desktop_cookie_planner.cpp)
+  src/desktop_cookie_planner.cpp
+  src/desktop_cookie_store.cpp)
 
 # The favicon registry, the start page payload builder and the site preview
 # store, scaler and capture worker are pure data handling with no CEF
@@ -122,6 +124,9 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/account_login_window.cpp
     src/desktop_engine.cpp
     src/desktop_engine_client.cpp
+    src/desktop_engine_cookie_store.cpp
+    src/desktop_cookie_store_cef.cpp
+    src/desktop_sync_cookie_store.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
     src/desktop_engine_control_support.cpp
@@ -142,9 +147,12 @@ add_library(kelpie_engine_chromium_desktop STATIC
   ${MOLOTOV_DESKTOP_ENGINE_SOURCES}
 )
 
+# The cookie sync adapter implements desktop-sync's header-only SyncCookieStore
+# interface; nothing from desktop-sync is linked here.
 target_include_directories(kelpie_engine_chromium_desktop
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../desktop-sync/include
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )

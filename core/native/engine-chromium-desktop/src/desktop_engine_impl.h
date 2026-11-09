@@ -87,6 +87,10 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   DesktopEngine::JsonEventSink console_sink;
   DesktopEngine::JsonEventSink network_sink;
   DesktopEngine::NavigationSink navigation_sink;
+  // Set from any thread, run on the UI thread (desktop_engine_cookie_store.cpp).
+  std::mutex default_store_sink_mutex;
+  std::function<void()> default_store_sink;
+  void NotifyDefaultStoreLoad();
 
   bool initialized = false;
   std::atomic<bool> shutting_down = false;

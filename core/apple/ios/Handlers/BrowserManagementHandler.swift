@@ -2,15 +2,13 @@ import WebKit
 
 // swiftlint:disable line_length
 
-/// Handles cookies, storage, clipboard, dialogs, keyboard, viewport, and unsupported endpoints.
+/// Handles storage, clipboard, dialogs, keyboard, viewport, and unsupported endpoints.
 struct BrowserManagementHandler {
     let context: HandlerContext
 
     func register(on router: Router) {
         // Cookies
-        router.register("get-cookies") { body in await getCookies(body) }
-        router.register("set-cookie") { body in await setCookie(body) }
-        router.register("delete-cookies") { body in await deleteCookies(body) }
+        MobileCookieHandler(context: context).register(on: router)
 
         // Storage
         router.register("get-storage") { body in await getStorage(body) }
@@ -50,77 +48,6 @@ struct BrowserManagementHandler {
 
         // Tabs
         MobileTabHandler(context: context).register(on: router)
-    }
-
-    // MARK: - Cookies
-
-    @MainActor
-    private func getCookies(_ body: [String: Any]) async -> [String: Any] {
-        guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
-        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
-        let name = body["name"] as? String
-        let filtered = name != nil ? cookies.filter { $0.name == name } : cookies
-        // Default the scope to the current page when no `url` is supplied, so
-        // `get-cookies` returns current-page cookies by default (matches Android).
-        let scopeURL = body["url"] as? String ?? webView.url?.absoluteString ?? "http://localhost/"
-        let scoped = CookieScope.scoped(filtered, toURL: scopeURL)
-        let cookieList = scoped.map { cookie -> [String: Any] in
-            ["name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
-             "expires": cookie.expiresDate?.description ?? NSNull(), "httpOnly": cookie.isHTTPOnly,
-             "secure": cookie.isSecure, "sameSite": cookie.sameSitePolicy?.rawValue ?? ""]
-        }
-        return successResponse(["cookies": cookieList, "count": cookieList.count])
-    }
-
-    @MainActor
-    private func setCookie(_ body: [String: Any]) async -> [String: Any] {
-        guard let webView = context.webView,
-              let name = body["name"] as? String,
-              let value = body["value"] as? String else {
-            return errorResponse(code: "MISSING_PARAM", message: "name and value required")
-        }
-        let defaultHost = webView.url?.host ?? "localhost"
-        guard let cookie = CookieFactory.make(name: name, value: value, body: body, defaultHost: defaultHost) else {
-            return errorResponse(code: "COOKIE_ERROR", message: "Failed to create cookie")
-        }
-        await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
-        return successResponse()
-    }
-
-    @MainActor
-    private func deleteCookies(_ body: [String: Any]) async -> [String: Any] {
-        guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
-        let store = webView.configuration.websiteDataStore.httpCookieStore
-        var candidates = await store.allCookies()
-        if let url = body["url"] as? String {
-            candidates = CookieScope.scoped(candidates, toURL: url)
-        }
-        let deleteAll = body["deleteAll"] as? Bool ?? false
-        let nameFilter = body["name"] as? String
-        let domainFilter = body["domain"] as? String
-
-        // No selector supplied: preserve prior behavior (no-op) rather than
-        // wiping the store on an empty request.
-        guard deleteAll || nameFilter != nil || domainFilter != nil else {
-            return successResponse(["deleted": 0])
-        }
-
-        // Fast path: wipe everything in scope only when no name/domain filter narrows it.
-        if deleteAll && nameFilter == nil && domainFilter == nil {
-            for cookie in candidates { await store.deleteCookie(cookie) }
-            return successResponse(["deleted": candidates.count])
-        }
-
-        var deleted = 0
-        for cookie in candidates {
-            let matchesName = nameFilter == nil || cookie.name == nameFilter
-            let matchesDomain = domainFilter.map { CookieScope.domainMatches(cookie.domain, filter: $0) } ?? true
-            if matchesName && matchesDomain {
-                await store.deleteCookie(cookie)
-                deleted += 1
-            }
-        }
-        return successResponse(["deleted": deleted])
     }
 
     // MARK: - Storage

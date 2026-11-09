@@ -93,6 +93,7 @@ set(WINDOWS_THEME_HEADERS
 
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-connect" "${CMAKE_BINARY_DIR}/desktop-connect")
+add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-sync" "${CMAKE_BINARY_DIR}/desktop-sync")
 
 include(inference.cmake)
 
@@ -108,6 +109,7 @@ set(WINDOWS_APP_SOURCES
   src/shell_actions.cpp
   src/account_menu.cpp
   src/windows_runtime.cpp
+  src/windows_cookie_sync.cpp
   src/page_color_sampler.cpp
   src/win32_shell.cpp
   src/window_placement.cpp
@@ -135,7 +137,10 @@ set(WINDOWS_APP_SOURCES
   src/tab_tooltips.cpp
   src/toast_view.cpp
   src/device_info_windows.cpp
-  src/mdns_windows.cpp
+  src/dnssd_browse_cache.cpp
+  src/dnssd_windows.cpp
+  src/sync_advertise_windows.cpp
+  src/sync_discovery_windows.cpp
 )
 
 set(WINDOWS_APP_HEADERS
@@ -165,7 +170,10 @@ set(WINDOWS_APP_HEADERS
   src/toast_view.h
   src/drag_effects.h
   src/device_info_windows.h
-  src/mdns_windows.h
+  src/dnssd_browse_cache.h
+  src/dnssd_windows.h
+  src/sync_discovery_windows.h
+  src/sync_discovery_windows_state.h
 )
 
 add_library(kelpie_windows_browser STATIC ${WINDOWS_APP_SOURCES} ${WINDOWS_APP_HEADERS})
@@ -187,7 +195,7 @@ target_include_directories(kelpie_windows_browser
     "${CMAKE_CURRENT_SOURCE_DIR}/resources"
 )
 
-target_link_libraries(kelpie_windows_browser PUBLIC kelpie_desktop_account kelpie_desktop_connect shlwapi)
+target_link_libraries(kelpie_windows_browser PUBLIC kelpie_desktop_account kelpie_desktop_connect kelpie_desktop_sync shlwapi)
 
 target_link_libraries(kelpie_windows_browser
   PUBLIC
@@ -472,6 +480,23 @@ if(BUILD_TESTING)
   target_link_libraries(kelpie_windows_network_rows_test PRIVATE nlohmann_json::nlohmann_json user32 kernel32)
   target_compile_options(kelpie_windows_network_rows_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_network_rows_test COMMAND kelpie_windows_network_rows_test)
+
+  # Cookie-sync discovery: the OS-free rules, then a real DNS-SD round trip
+  # that only runs with KELPIE_SYNC_MDNS_LIVE=1 (it needs working multicast).
+  add_executable(kelpie_windows_sync_discovery_test
+    tests/sync_discovery_test.cpp src/dnssd_browse_cache.cpp)
+  target_include_directories(kelpie_windows_sync_discovery_test PRIVATE src)
+  target_link_libraries(kelpie_windows_sync_discovery_test PRIVATE kelpie_desktop_sync)
+  target_compile_options(kelpie_windows_sync_discovery_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_sync_discovery_test COMMAND kelpie_windows_sync_discovery_test)
+  add_executable(kelpie_windows_sync_discovery_live_test
+    tests/sync_discovery_live_test.cpp src/sync_discovery_windows.cpp src/sync_advertise_windows.cpp
+    src/dnssd_windows.cpp src/dnssd_browse_cache.cpp)
+  target_compile_definitions(kelpie_windows_sync_discovery_live_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+  target_include_directories(kelpie_windows_sync_discovery_live_test PRIVATE src)
+  target_link_libraries(kelpie_windows_sync_discovery_live_test PRIVATE kelpie_desktop_sync ws2_32)
+  target_compile_options(kelpie_windows_sync_discovery_live_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_sync_discovery_live_test COMMAND kelpie_windows_sync_discovery_live_test)
 
   include(tests/close_tab.cmake)
   include(tests/native_window_control.cmake)

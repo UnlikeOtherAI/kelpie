@@ -128,6 +128,9 @@ class DesktopEngine final : public DesktopBrowserControl {
   void SetConsoleSink(JsonEventSink sink);
   void SetNetworkSink(JsonEventSink sink);
   void SetNavigationSink(NavigationSink sink);
+  // Runs on the CEF UI thread when a main-frame load finishes in a tab that
+  // uses the default store; cookie sync scans after it. nullptr removes it.
+  void SetDefaultStoreLoadSink(std::function<void()> sink);
 
   CefRenderer& renderer();
   const CefRenderer& renderer() const;
@@ -182,6 +185,12 @@ class DesktopEngine final : public DesktopBrowserControl {
                                      const Json& query,
                                      Json* result,
                                      Timeout timeout) override;
+  BrowserControlResult ReadCookieStore(const CookieStoreTarget& target, Json* cookies, Timeout timeout) override;
+  BrowserControlResult WriteCookieStore(const CookieStoreTarget& target, const Json& cookies, Json* result,
+                                        Timeout timeout) override;
+  BrowserControlResult CopyCookieStore(const CookieStoreTarget& from, const CookieStoreTarget& to,
+                                       const std::optional<std::string>& domain, Json* result,
+                                       Timeout timeout) override;
   BrowserControlResult DispatchTrustedInput(TabLease lease,
                                             const Json& input,
                                             Json* result,

@@ -345,7 +345,7 @@ private let iosCapabilityMethods = [
     "get-dialog", "handle-dialog", "set-dialog-auto-handler",
     "get-tabs", "new-tab", "switch-tab", "close-tab", "get-partitions", "delete-partition",
     "get-iframes", "switch-to-iframe", "switch-to-main", "get-iframe-context",
-    "get-cookies", "set-cookie", "delete-cookies",
+    "get-cookies", "set-cookie", "set-cookies", "copy-cookies", "delete-cookies", "get-cookie-sync-status",
     "get-storage", "set-storage", "clear-storage",
     "watch-mutations", "get-mutations", "stop-watching",
     "query-shadow-dom", "get-shadow-roots",

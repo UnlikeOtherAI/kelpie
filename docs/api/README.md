@@ -12,7 +12,9 @@ All methods are available via three interfaces:
 | [core.md](core.md) | Navigation, screenshots, DOM access, interaction, scrolling, viewport/device info, wait/sync |
 | [llm.md](llm.md) | LLM-optimized methods — accessibility tree, annotated screenshots, visible elements, page text, form state, smart queries |
 | [devtools.md](devtools.md) | Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception |
-| [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
+| [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
+| [cookies.md](cookies.md) | Cookie stores (default, tab, partition), whole-store export, set/copy cookies, cookie sync status, who can read synced cookies |
+| [cookie-sync.md](cookie-sync.md) | Peer-to-peer cookie sync protocol for implementers: discovery, handshake, encrypted channel, exchange messages, limits, error codes |
 | [partitions.md](partitions.md) | Per-tab storage isolation — partition lifecycle, error matrix, cookie-jar interaction |
 | [computer-pairing.md](computer-pairing.md) | Signing-key computer approval, reconnection, storage and revocation |
 | [account-pairing.md](account-pairing.md) | Automatic LAN access for a verified shared UOA account, proof/session lifecycle |
@@ -99,7 +101,7 @@ Not all methods have identical implementations on Android, iOS, and macOS. Andro
 | Tabs | App-managed | App-managed | App-managed | All platforms manage multiple browser instances in app code |
 | Iframes (same-origin) | CDP | Native | Native | |
 | Iframes (cross-origin) | CDP (limited) | Not supported | Renderer-dependent | WebKit cannot evaluate JS in cross-origin iframes; Chromium-backed paths can expose more context |
-| Cookies | CDP `Network.getCookies` | Native | Native | iOS uses `WKHTTPCookieStore`; macOS migrates cookies automatically on renderer switch |
+| Cookies | CDP `Network.getCookies` | Native | Native | iOS uses `WKHTTPCookieStore`; macOS migrates cookies automatically on renderer switch. `get-cookies all:true` is complete everywhere except Android, which reads the cookies for the URLs it knows ([cookies.md](cookies.md)) |
 | Storage (local/session) | CDP/evaluate | Bridge | Native | macOS storage access goes through the active renderer |
 | Clipboard read | Native | Restricted | Native | iOS shows a system paste permission banner; Android 10+ restricts background access |
 | Clipboard write | Native | Native | Native | |
@@ -308,6 +310,9 @@ Internal HTTP-only debug surfaces are not exposed as MCP tools:
 | `/v1/set-cookie` | `kelpie_set_cookie` |
 | `/v1/delete-cookies` | `kelpie_delete_cookies` |
 | `/v1/clear-cookies` | `kelpie_clear_cookies` |
+| `/v1/set-cookies` | `kelpie_set_cookies` |
+| `/v1/copy-cookies` | `kelpie_copy_cookies` |
+| `/v1/get-cookie-sync-status` | `kelpie_get_cookie_sync_status` |
 | `/v1/get-storage` | `kelpie_get_storage` |
 | `/v1/set-storage` | `kelpie_set_storage` |
 | `/v1/clear-storage` | `kelpie_clear_storage` |

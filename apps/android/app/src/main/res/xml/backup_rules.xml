@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. Cookie sync metadata is bound to this device's run and never leaves it. -->
+<full-backup-content>
+    <exclude domain="file" path="sync/" />
+</full-backup-content>

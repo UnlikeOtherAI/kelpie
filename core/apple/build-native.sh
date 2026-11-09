@@ -27,7 +27,7 @@ fi
 cmake -S "$root/core/native" -B "$build" -G Ninja "${args[@]}"
 cmake --build "$build" --parallel 2
 archives=()
-for module in state connect protocol automation mcp ai; do archives+=("$build/core-$module/libkelpie_core_$module.a"); done
+for module in state connect protocol automation mcp ai sync; do archives+=("$build/core-$module/libkelpie_core_$module.a"); done
 for library in llama ggml ggml-base ggml-cpu; do
     found="$(find "$build/_deps/kelpie_llama-build" -name "lib$library.a" -type f)"
     if [ -z "$found" ] || [ "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" != 1 ]; then

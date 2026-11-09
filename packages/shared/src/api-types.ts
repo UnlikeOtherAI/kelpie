@@ -841,52 +841,6 @@ export interface GetIframeContextResponse extends SuccessResponse {
   iframe?: { id: number; src: string };
 }
 
-// --- Browser: Cookies ---
-
-export interface CookieInfo {
-  name: string;
-  value: string;
-  domain: string;
-  path: string;
-  expires: string | null;
-  httpOnly: boolean;
-  secure: boolean;
-  sameSite: string;
-}
-
-export interface GetCookiesRequest {
-  url?: string;
-  name?: string;
-}
-
-export interface GetCookiesResponse extends SuccessResponse {
-  cookies: CookieInfo[];
-  count: number;
-}
-
-export interface SetCookieRequest {
-  name: string;
-  value: string;
-  domain?: string;
-  path?: string;
-  httpOnly?: boolean;
-  secure?: boolean;
-  sameSite?: string;
-  expires?: string;
-}
-
-export interface DeleteCookiesRequest {
-  /** Scope deletion to cookies that would be sent to this URL (host/path/secure match). */
-  url?: string;
-  name?: string;
-  domain?: string;
-  deleteAll?: boolean;
-}
-
-export interface DeleteCookiesResponse extends SuccessResponse {
-  deleted: number;
-}
-
 // --- Browser: Storage ---
 
 export interface GetStorageRequest {

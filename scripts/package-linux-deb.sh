@@ -55,6 +55,8 @@ install -m 644 packaging/linux/kelpie.desktop "${PKG_ROOT}/usr/share/application
 install -m 644 "${BUNDLE_DIR}/icon-1024.png" "${PKG_ROOT}/usr/share/icons/hicolor/1024x1024/apps/kelpie.png"
 ln -s /opt/kelpie/kelpie-linux "${PKG_ROOT}/usr/bin/kelpie-linux"
 
+# Avahi is a recommendation, not a dependency: cookie-sync discovery dlopens
+# libavahi-client.so.3 and reports mdns-unavailable without it.
 cat > "${PKG_ROOT}/DEBIAN/control" <<EOF
 Package: kelpie
 Version: ${VERSION}
@@ -62,10 +64,15 @@ Section: net
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: ${MAINTAINER}
-Depends: libcurl4, libssl3, libasound2, libatk-bridge2.0-0, libatk1.0-0, libavahi-client3, libc6, libcups2, libdbus-1-3, libdrm2, libfontconfig1, libgbm1, libglib2.0-0, libgtk-3-0, libnspr4, libnss3, libpango-1.0-0, libstdc++6 (>= 12), libx11-6, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, zlib1g
+Depends: libcurl4, libssl3, libasound2, libatk-bridge2.0-0, libatk1.0-0, libc6, libcups2, libdbus-1-3, libdrm2, libfontconfig1, libgbm1, libglib2.0-0, libgtk-3-0, libnspr4, libnss3, libpango-1.0-0, libstdc++6 (>= 12), libx11-6, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, zlib1g
+Recommends: avahi-daemon, libavahi-client3
 Description: Kelpie LLM-first browser for Linux
  Linux desktop browser shell for Kelpie with embedded Chromium runtime,
  local HTTP/MCP control surface, and mDNS discovery.
+ .
+ Avahi is optional. Kelpie loads libavahi-client at runtime to find other
+ signed-in Kelpie devices for cookie sync; without avahi-daemon it runs and
+ reports sync as unavailable.
 EOF
 
 chmod 755 "${PKG_ROOT}/opt/kelpie/kelpie-linux"

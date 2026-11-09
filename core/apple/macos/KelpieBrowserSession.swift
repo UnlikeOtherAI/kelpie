@@ -48,9 +48,19 @@ public final class KelpieBrowserSession: ObservableObject {
         _ = AIState.shared
         serverState.startHTTPServer(rendererState: rendererState, listen: localControlEnabled)
         UOALoginCookies.context = serverState.handlerContext
+        startCookieSync()
         NessieConnection.shared.acceptsPersonEvent = { [weak self] event in self?.contains(event) == true }
         NessieConnection.shared.start(context: serverState.handlerContext)
         UOAAccount.shared.restoreSession()
+    }
+
+    /// Cookie sync belongs to the standalone app; embedded hosts never run it. It follows
+    /// the account from before the session restore, so a restored sign-in starts it.
+    private func startCookieSync() {
+        guard KelpieStorage.standalone else { return }
+        let sync = MacCookieSync(defaultCookies: serverState.handlerContext.defaultCookies)
+        serverState.handlerContext.cookieSync = sync
+        sync.start()
     }
 
     public func setForeground(_ foreground: Bool) {
@@ -75,7 +85,8 @@ public final class KelpieBrowserSession: ObservableObject {
         KelpieBrowserProfile.release(runtimeID)
         NessieConnection.shared.detach(context: serverState.handlerContext)
         serverState.stop()
-        serverState.handlerContext.stopSharedCookieSync()
+        serverState.handlerContext.cookieSync?.close()
+        serverState.handlerContext.cookieSync = nil
         _ = serverState.scriptPlaybackState.requestAbort()
         serverState.router.retire()
         NetworkTrafficStore.shared.flush()

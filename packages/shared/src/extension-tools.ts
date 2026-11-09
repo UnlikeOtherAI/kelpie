@@ -34,6 +34,25 @@ const timeout = z.number().optional().describe("Timeout in milliseconds");
 const message = z.string().optional().describe("Optional message to show on device screen as a toast overlay while this action runs. Use this to narrate what you are doing, e.g. 'Clicking the login button' or 'Scrolling to pricing section'. The toast appears at the bottom of the viewport with a semi-transparent background.");
 const screenshotResolution = z.enum(["native", "viewport"]).optional().describe("Screenshot resolution: 'viewport' returns CSS-pixel/non-retina output that lines up with tap coordinates more directly; 'native' preserves full renderer detail.");
 const tabId = z.string().optional().describe("Tab ID to target (macOS only). Required when multiple tabs are open. Use kelpie_get_tabs to list available tabs with their IDs, URLs, and titles.");
+
+// Cookie stores: no tabId and no partition means the default store, the one
+// cookie sync keeps in step across the person's signed-in Kelpie devices.
+const cookieTabId = z.string().optional().describe("Tab whose cookie store to use: its partition's store, or the default store for an unpartitioned tab. Use kelpie_get_tabs for IDs. Pass tabId or partition, not both.");
+const cookiePartition = partitionId.optional().describe("Partition whose cookie store to use. Pass tabId or partition, not both.");
+const cookieDomain = z.string().optional().describe("Keep cookies whose host is this domain or a subdomain of it, e.g. example.com");
+const cookieStore = z.object({ tabId: cookieTabId, partition: cookiePartition });
+/** One cookie in the shape `get-cookies` returns and `set-cookies` accepts. */
+export const cookieInfoSchema = z.object({
+  name: z.string().describe("Cookie name"),
+  value: z.string().describe("Cookie value"),
+  domain: z.string().describe("Cookie domain. A leading dot (.example.com) makes a domain cookie; without it the cookie is host-only"),
+  path: z.string().describe("Cookie path, usually /"),
+  expires: z.string().nullable().describe("Expiry as kelpie_get_cookies returns it (ISO 8601), or null for a session cookie"),
+  httpOnly: z.boolean(),
+  secure: z.boolean(),
+  sameSite: z.enum(["Strict", "Lax", "None", "Unspecified"]).describe("Unspecified means the cookie has no SameSite attribute"),
+});
+
 const point = z.object({
   x: z.number().describe("Viewport X coordinate"),
   y: z.number().describe("Viewport Y coordinate"),
@@ -114,7 +133,7 @@ function filterBody(args: Record<string, unknown>): Record<string, unknown> {
   return rest;
 }
 
-// --- Browser tool definitions (120 tools) ---
+// --- Browser tool definitions ---
 
 export const sharedBrowserTools: BrowserToolDef[] = [
   // Navigation
@@ -259,10 +278,13 @@ export const sharedBrowserTools: BrowserToolDef[] = [
   { name: "kelpie_get_iframe_context", description: "Get current iframe context", method: "getIframeContext", schema: { device, tabId }, bodyFromArgs: passthrough },
 
   // Cookies
-  { name: "kelpie_get_cookies", description: "Get cookies", method: "getCookies", schema: { device, url: url.optional().describe("Filter by URL"), name: z.string().optional().describe("Filter by name"), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_cookies", description: "Get cookies, HttpOnly ones included. Without all, returns the cookies the current page would send. all:true returns every cookie in one store: with no tabId and no partition that is the default store, which also holds the cookies synced from the person's other signed-in Kelpie devices. complete:false in the reply (Android) means only cookies for URLs the device knows were found.", method: "getCookies", schema: { device, url: url.optional().describe("Keep cookies that would be sent to this URL"), name: z.string().optional().describe("Filter by name"), all: z.boolean().optional().describe("Return every cookie in the target store, not just the current page's"), domain: cookieDomain, tabId: z.string().optional().describe("Tab to read: its current page's cookies, or with all:true its whole store (its partition, or the default store). Use kelpie_get_tabs for IDs. Pass tabId or partition, not both."), partition: cookiePartition }, bodyFromArgs: passthrough },
   { name: "kelpie_set_cookie", description: "Set a cookie", method: "setCookie", schema: { device, url: url.optional(), name: z.string().describe("Cookie name"), value: z.string().describe("Cookie value"), domain: z.string().optional(), path: z.string().optional(), httpOnly: z.boolean().optional(), secure: z.boolean().optional(), sameSite: z.enum(["Strict", "Lax", "None", "strict", "lax", "none"]).optional(), expires: z.string().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_delete_cookies", description: "Delete cookies", method: "deleteCookies", schema: { device, name: z.string().optional().describe("Cookie name"), domain: z.string().optional(), deleteAll: z.boolean().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_clear_cookies", description: "Delete all cookies", method: "clearCookies", schema: { device, tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_set_cookies", description: "Write up to 500 cookies, in the shape kelpie_get_cookies returns, into one store: the default store when neither tabId nor partition is given, otherwise that tab's or partition's store. Returns how many were set and each refused cookie by index. Cookies written to the default store sync to the person's other signed-in Kelpie devices. To move cookies between stores on one device, use kelpie_copy_cookies instead.", method: "setCookies", schema: { device, cookies: z.array(cookieInfoSchema).max(500).describe("Cookies to write, at most 500"), tabId: cookieTabId, partition: cookiePartition }, bodyFromArgs: passthrough },
+  { name: "kelpie_copy_cookies", description: "Copy cookies from one store to another on the same device; the values never pass through you. {} (no tabId, no partition) is the default store, which holds the cookies synced from the person's other signed-in Kelpie devices. To sign an isolated tab in with those sessions: open it with kelpie_new_tab and a partition, then call this with from:{} and to:{tabId:<that tab>}, optionally with domain. Copying into the default store syncs the cookies to every signed-in device. Using the same store for from and to fails with INVALID_PARAMS.", method: "copyCookies", schema: { device, from: cookieStore.describe("Source store; {} is the default store"), to: cookieStore.describe("Target store; {} is the default store"), domain: cookieDomain }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_cookie_sync_status", description: "Report peer-to-peer cookie sync on this device: whether it runs and why not (reason), sign-in state, this run's replica id, whether the sync listener is up, every peer's platform, name, state, last sync and last error, and the store's counts. Sync covers the default store only and never names a cookie.", method: "getCookieSyncStatus", schema: { device }, bodyFromArgs: passthrough },
 
   // Storage
   { name: "kelpie_get_storage", description: "Get localStorage or sessionStorage entries", method: "getStorage", schema: { device, type: z.enum(["local", "session"]).optional().describe("Storage type"), key: z.string().optional(), tabId }, bodyFromArgs: passthrough },

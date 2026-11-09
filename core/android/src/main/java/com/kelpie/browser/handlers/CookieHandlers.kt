@@ -1,147 +1,165 @@
 package com.kelpie.browser.handlers
 
-import android.webkit.CookieManager
-import com.kelpie.browser.browser.PartitionRegistry
+import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
-import java.net.URI
+import com.kelpie.browser.sync.CookieSync
+import com.kelpie.browser.sync.SetCookieLine
 
 /**
- * Cookie handlers that use Android's [CookieManager] so that HttpOnly/Secure
- * cookies set by the server are visible to the API (unlike `document.cookie`,
- * which silently omits them).
- *
- * Note: Android does not surface HttpOnly/Secure/SameSite/expires metadata on
- * the cookies it stores — only the Set-Cookie header is consumed. The shape we
- * return matches [CookieInfo] in shared/api-types.ts; the metadata fields are
- * best-effort and may be defaults.
+ * Cookie endpoints over WebView's `CookieManager`, HttpOnly cookies included.
+ * Reads use `CookieManagerCompat.getCookieInfo`, so every cookie carries its real
+ * domain (leading dot = domain cookie), path, expiry, Secure, HttpOnly and SameSite.
+ * WebView cannot enumerate a store: `all:true` reads every URL Kelpie knows
+ * (sync metadata, history, recent pages) and reports `complete:false`.
  */
 class CookieHandlers(
     private val ctx: HandlerContext,
 ) {
-    fun getCookies(body: Map<String, Any?>): Map<String, Any?> {
-        val nameFilter = body["name"] as? String
-        val url = body["url"] as? String ?: defaultCookieUrl()
-        val raw = cookieManager().getCookie(url).orEmpty()
-        val host = hostFromUrl(url) ?: ""
-        val parsed = parseCookieHeader(raw, defaultDomain = host)
-        val filtered = if (nameFilter != null) parsed.filter { it["name"] == nameFilter } else parsed
-        return successResponse(mapOf("cookies" to filtered, "count" to filtered.size))
+    private val stores = CookieStores(ctx)
+    private val legacy = LegacyCookieHandlers(ctx)
+
+    fun register(router: Router) {
+        router.register("get-cookies") { getCookies(it) }
+        router.register("set-cookie") { legacy.setCookie(it) }
+        router.register("set-cookies") { setCookies(it) }
+        router.register("copy-cookies") { copyCookies(it) }
+        router.register("delete-cookies") { deleteCookies(it) }
+        router.register("get-cookie-sync-status") { successResponse(CookieSync.status()) }
     }
 
-    fun setCookie(body: Map<String, Any?>): Map<String, Any?> {
-        val name = body["name"] as? String ?: return errorResponse("MISSING_PARAM", "name required")
-        val value = body["value"] as? String ?: return errorResponse("MISSING_PARAM", "value required")
-        val path = body["path"] as? String ?: "/"
-        val domain = body["domain"] as? String
-        val httpOnly = body["httpOnly"] as? Boolean ?: false
-        val secure = body["secure"] as? Boolean ?: false
-        val sameSite = body["sameSite"] as? String
-        val expires = body["expires"] as? String
-
-        val attrs =
-            buildList {
-                add("Path=$path")
-                if (domain != null) add("Domain=$domain")
-                if (expires != null) add("Expires=$expires")
-                if (secure) add("Secure")
-                if (httpOnly) add("HttpOnly")
-                if (sameSite != null) add("SameSite=$sameSite")
-            }
-        val header = (listOf("$name=$value") + attrs).joinToString("; ")
-        val url = body["url"] as? String ?: currentPageUrl() ?: domain?.let { "http://$it/" } ?: "http://localhost/"
-        val cm = cookieManager()
-        cm.setCookie(url, header)
-        cm.flush()
-        return successResponse()
-    }
-
-    fun deleteCookies(body: Map<String, Any?>): Map<String, Any?> {
-        val deleteAll = body["deleteAll"] as? Boolean ?: false
-        val nameFilter = body["name"] as? String
-        val domainFilter = body["domain"] as? String
-        val cm = cookieManager()
-        val url = body["url"] as? String ?: defaultCookieUrl()
-        val host = hostFromUrl(url) ?: ""
-        val existing = parseCookieHeader(cm.getCookie(url).orEmpty(), defaultDomain = host)
-
-        // No selector supplied: no-op rather than wiping cookies on an empty
-        // request. Matches the iOS/macOS safe semantics.
-        if (!deleteAll && nameFilter == null && domainFilter == null) {
-            return successResponse(mapOf("deleted" to 0))
-        }
-
-        if (deleteAll && nameFilter == null && domainFilter == null) {
-            val pending = existing.size
-            cm.removeAllCookies(null)
-            cm.flush()
-            return successResponse(mapOf("deleted" to pending))
-        }
-
-        val removed =
-            existing.filter { cookie ->
-                val matchesName = nameFilter == null || cookie["name"] == nameFilter
-                val matchesDomain = domainFilter == null || cookie["domain"] == domainFilter
-                matchesName && matchesDomain
-            }
-        val expiredAttr = "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-        for (cookie in removed) {
-            val name = cookie["name"] as? String ?: continue
-            val path = cookie["path"] as? String ?: "/"
-            val cookieDomain = cookie["domain"] as? String
-            val attrs =
-                buildList {
-                    add("Path=$path")
-                    if (!cookieDomain.isNullOrEmpty()) add("Domain=$cookieDomain")
-                    add(expiredAttr)
+    suspend fun getCookies(body: Map<String, Any?>): Map<String, Any?> {
+        val all = body["all"] ?: false
+        if (all !is Boolean) return errorResponse("INVALID_PARAMS", "all must be a boolean")
+        val domain = body["domain"]
+        if (domain != null && domain !is String) return errorResponse("INVALID_PARAMS", "domain must be a string")
+        if (!CookieSync.supported()) return if (all) unsupported() else legacy.getCookies(body)
+        return guarded {
+            val store = stores.resolve(body, create = false, currentPage = !all)
+            val url = body["url"] as? String
+            val urls =
+                when {
+                    url != null -> listOf(url)
+                    all -> knownUrls(store, domain as? String)
+                    else -> listOf(store.page ?: "http://localhost/")
                 }
-            cm.setCookie(url, (listOf("$name=") + attrs).joinToString("; "))
+            val (read, skipped) = stores.read(store, urls)
+            val name = body["name"] as? String
+            val cookies =
+                read
+                    .filter { name == null || it.name == name }
+                    .filter { domain == null || CookieStores.inDomain(it.domain, domain as String) }
+                    .map(CookieStores::api)
+            successResponse(
+                buildMap {
+                    put("cookies", cookies)
+                    put("count", cookies.size)
+                    if (all) put("complete", false)
+                    if (skipped > 0) put("skipped", skipped)
+                },
+            )
         }
-        cm.flush()
-        return successResponse(mapOf("deleted" to removed.size))
     }
 
-    private fun cookieManager(): CookieManager = PartitionRegistry.cookies(requireNotNull(ctx.webView) { "No target WebView" })
+    /** Writes up to 500 cookies in the `get-cookies` shape; a malformed one fails the whole call first. */
+    suspend fun setCookies(body: Map<String, Any?>): Map<String, Any?> {
+        val items = body["cookies"] as? List<*>
+        if (items == null || items.size > MAX_COOKIES_PER_WRITE) {
+            return errorResponse("INVALID_PARAMS", "cookies must be an array of at most $MAX_COOKIES_PER_WRITE")
+        }
+        val cookies = items.map { CookieStores.fromApi(it) }
+        val malformed = cookies.indexOfFirst { it == null }
+        if (malformed >= 0) return errorResponse("INVALID_PARAMS", "cookies[$malformed] is not a complete cookie")
+        if (!CookieSync.supported()) return unsupported()
+        return guarded {
+            val store = stores.resolve(body, create = true)
+            val parsed = cookies.filterNotNull()
+            val refused = stores.write(store, parsed)
+            successResponse(
+                mapOf(
+                    "set" to parsed.size - refused.size,
+                    "failed" to refused.map { mapOf("index" to it, "name" to parsed[it].name, "domain" to parsed[it].domain, "error" to "NOT_STORED") },
+                ),
+            )
+        }
+    }
 
-    private fun currentPageUrl(): String? = ctx.webView?.url
+    /** Copies cookies between two stores on this device; values never leave it. */
+    suspend fun copyCookies(body: Map<String, Any?>): Map<String, Any?> {
+        val from = body["from"] as? Map<*, *> ?: return errorResponse("INVALID_PARAMS", "from must be an object")
+        val to = body["to"] as? Map<*, *> ?: return errorResponse("INVALID_PARAMS", "to must be an object")
+        val domain = body["domain"]
+        if (domain != null && domain !is String) return errorResponse("INVALID_PARAMS", "domain must be a string")
+        if (!CookieSync.supported()) return unsupported()
+        return guarded {
+            val source = stores.resolve(from, create = false)
+            val target = stores.resolve(to, create = true)
+            if (source.identity == target.identity) return@guarded errorResponse("INVALID_PARAMS", "from and to are the same cookie store")
+            val (read, _) = stores.read(source, knownUrls(source, domain as? String))
+            val selected = read.filter { domain == null || CookieStores.inDomain(it.domain, domain as String) }
+            val refused = stores.write(target, selected)
+            successResponse(
+                mapOf(
+                    "copied" to selected.size - refused.size,
+                    "failed" to refused.map { mapOf("name" to selected[it].name, "domain" to selected[it].domain, "error" to "NOT_STORED") },
+                ),
+            )
+        }
+    }
 
-    private fun defaultCookieUrl(): String = currentPageUrl() ?: "http://localhost/"
+    /** `deleteCookies` on the current tab, matching the real domain and path of each cookie. */
+    suspend fun deleteCookies(body: Map<String, Any?>): Map<String, Any?> {
+        if (!CookieSync.supported()) return legacy.deleteCookies(body)
+        val deleteAll = body["deleteAll"] as? Boolean ?: false
+        val name = body["name"] as? String
+        val domain = body["domain"] as? String
+        if (!deleteAll && name == null && domain == null) return successResponse(mapOf("deleted" to 0))
+        return guarded {
+            val store = stores.resolve(body, create = false, currentPage = true)
+            if (deleteAll && name == null && domain == null && body["url"] == null) {
+                val (existing, _) = stores.read(store, listOf(store.page ?: "http://localhost/"))
+                store.manager.removeAllCookies(null)
+                store.manager.flush()
+                return@guarded successResponse(mapOf("deleted" to existing.size))
+            }
+            val url = body["url"] as? String ?: store.page ?: "http://localhost/"
+            val (existing, _) = stores.read(store, listOf(url))
+            val doomed =
+                existing.filter { cookie ->
+                    (name == null || cookie.name == name) &&
+                        (domain == null || cookie.domain.removePrefix(".").equals(domain.removePrefix("."), ignoreCase = true))
+                }
+            for (cookie in doomed) {
+                store.manager.setCookie(SetCookieLine.url(cookie.domain, cookie.path), SetCookieLine.forDelete(cookie.domain, cookie.path, cookie.name))
+            }
+            store.manager.flush()
+            successResponse(mapOf("deleted" to doomed.size))
+        }
+    }
 
-    private fun hostFromUrl(url: String?): String? =
-        try {
-            url?.let { URI(it).host }
-        } catch (_: Exception) {
-            null
+    /** Every URL Kelpie knows for the default store, the target tab's page and the domain's root. */
+    private suspend fun knownUrls(
+        store: CookieStores.Store,
+        domain: String?,
+    ): List<String> =
+        buildList {
+            addAll(CookieSync.coverageUrls())
+            store.page?.takeIf { it.startsWith("http") }?.let(::add)
+            domain?.let { add(SetCookieLine.url(it.removePrefix("."))) }
         }
 
-    private fun parseCookieHeader(
-        header: String,
-        defaultDomain: String,
-    ): List<Map<String, Any?>> {
-        if (header.isBlank()) return emptyList()
-        return header
-            .split(";")
-            .mapNotNull { rawPair ->
-                val pair = rawPair.trim()
-                if (pair.isEmpty()) return@mapNotNull null
-                val eq = pair.indexOf('=')
-                val (name, value) =
-                    if (eq < 0) {
-                        pair to ""
-                    } else {
-                        pair.substring(0, eq).trim() to pair.substring(eq + 1).trim()
-                    }
-                if (name.isEmpty()) return@mapNotNull null
-                mapOf<String, Any?>(
-                    "name" to name,
-                    "value" to value,
-                    "domain" to defaultDomain,
-                    "path" to "/",
-                    "expires" to null,
-                    "httpOnly" to false,
-                    "secure" to false,
-                    "sameSite" to "",
-                )
-            }
+    private inline fun guarded(block: () -> Map<String, Any?>): Map<String, Any?> =
+        try {
+            block()
+        } catch (refusal: CookieStores.Refusal) {
+            refusal.response
+        } catch (error: Exception) {
+            errorResponse("COOKIE_ERROR", error.message ?: "Cookie store error")
+        }
+
+    private fun unsupported() = errorResponse("PLATFORM_NOT_SUPPORTED", "Update Android System WebView: cookie attributes are unavailable")
+
+    private companion object {
+        const val MAX_COOKIES_PER_WRITE = 500
     }
 }
