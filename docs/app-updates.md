@@ -14,7 +14,9 @@ node scripts/publish-app-update.mjs --tag release/2026-11-09 \
   --target windows-x64 --version 0.2.1 --asset kelpie-windows-x64-0.2.1.zip
 ```
 
-The command verifies the uploaded asset has GitHub's SHA-256 digest and adds one
+The command requires the version from the tagged component manifest and checks
+that the asset name matches its platform and architecture. It verifies the
+uploaded asset has GitHub's SHA-256 digest and adds one
 machine-readable comment to the release notes:
 
 ```text
@@ -76,8 +78,11 @@ the original arguments. Profiles and browsing data remain outside the package.
   not eligible for automatic installation.
 - Linux AppImages and extracted tar bundles stage alongside the existing
   installation. `.deb` and `.rpm` installations at `/opt/kelpie` retain package
-  manager ownership through `pkexec apt-get` or `pkexec dnf`. System authorization
-  and dependency failures are handled by the package manager; portable directory
+  manager ownership through their existing root-owned update helper, invoked
+  through `pkexec`. The privileged helper downloads and verifies a separate copy
+  in a root-owned temporary directory before invoking `apt-get` or `dnf`; it never
+  installs the mutable user-owned download. System authorization and dependency
+  failures are handled by the package manager; portable directory
   replacement is never applied to a managed installation.
 
 Portable installs preserve a uniquely named `.previous-*` copy. If a directory
@@ -94,7 +99,16 @@ cmake -S apps/updates -B .cache/update-tests
 cmake --build .cache/update-tests
 ctest --test-dir .cache/update-tests --output-on-failure
 node --test tests/packaging/app-updates.test.mjs
+bash tests/linux/app-update-install.sh  # Linux portable install and recovery fixtures
 ```
+
+Prompt UI fixtures live only in the non-shipping `KelpieUpdateVerificationMac`
+and `KelpieUpdateVerificationIOS` targets. These have separate bundle identities,
+preferences and an in-memory HTTP response. Their Update action is simulated and
+cannot run an installer or change a real Kelpie profile. Regular apps have no
+environment-variable or intent override for release data. Test their restart
+choices through the corresponding verification schemes; do not inject synthetic
+versions into an ordinary Kelpie app on a person's desktop.
 
 Before releasing, also exercise each native prompt, Not now followed by restart,
 Skip version followed by restart, a later version, offline recovery, a failed

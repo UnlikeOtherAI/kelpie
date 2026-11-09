@@ -9,8 +9,8 @@ import { tmpdir } from 'node:os';
 
 const digest = 'a'.repeat(64);
 const release = { draft: false, prerelease: false, body: '<!-- kelpie-release-components: windows -->\n\nWindows 0.2.1',
-  assets: [{ name: 'Kelpie-windows-0.2.1-x64.zip', state: 'uploaded', digest: `sha256:${digest}`,
-    browser_download_url: 'https://github.com/UnlikeOtherAI/kelpie/releases/download/release/2026-11-09/Kelpie-windows-0.2.1-x64.zip' }] };
+  assets: [{ name: 'kelpie-windows-x64-0.2.1.zip', state: 'uploaded', digest: `sha256:${digest}`,
+    browser_download_url: 'https://github.com/UnlikeOtherAI/kelpie/releases/download/release/2026-11-09/kelpie-windows-x64-0.2.1.zip' }] };
 const options = { target: 'windows-x64', version: '0.2.1', asset: release.assets[0].name };
 
 test('takes the component version from the tagged source manifest', () => {
@@ -43,6 +43,7 @@ test('refuses incomplete, unsigned-digest, unrelated and incompatible assets', (
   }
   assert.throws(() => updateNotes(release, { ...options, version: 'release/2026-11-09' }));
   assert.throws(() => updateNotes(release, { ...options, target: 'ios' }));
+  assert.throws(() => updateNotes(release, { ...options, target: 'macos-arm64' }));
   assert.throws(() => updateNotes(release, { ...options, storeURL: 'https://example.com' }));
 });
 

@@ -73,4 +73,12 @@ NEW
 run_case valid success
 run_case corrupt checksum-failure
 run_case rollback restart-failure
+if [ "$(id -u)" != 0 ]; then
+  if bash "$root/apps/updates/install-linux.sh" --apply-managed \
+    'https://github.com/UnlikeOtherAI/kelpie/releases/download/test/package.deb' "$(printf '%064d' 0)" deb; then
+    echo 'The privileged installer accepted an unprivileged caller.' >&2
+    exit 1
+  fi
+  printf 'PASS: managed install requires system authorization\n'
+fi
 printf 'Installer test evidence: %s\n' "$scratch"

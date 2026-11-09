@@ -34,6 +34,17 @@ export function updateNotes(release, { target, version, asset, storeURL }) {
     if (!uploaded || !/^sha256:[a-f0-9]{64}$/.test(uploaded.digest ?? '')) {
       throw new Error('The complete uploaded asset and its GitHub SHA-256 digest are required.');
     }
+    const names = {
+      'windows-x64': /^kelpie-windows-x64-[0-9.]+\.zip$/i,
+      'macos-arm64': /^kelpie-macos-[0-9.]+-arm64\.zip$/i,
+      'macos-x64': /^kelpie-macos-[0-9.]+-(x64|x86_64)\.zip$/i,
+      'linux-x64-appimage': /^Kelpie-.+-x86_64\.AppImage$/,
+      'linux-x64-deb': /^kelpie_.+_amd64\.deb$/,
+      'linux-x64-rpm': /^kelpie-.+\.x86_64\.rpm$/,
+      'linux-x64-tar': /^kelpie-linux-.+-x86_64\.tar\.gz$/,
+      android: /^kelpie-android-.+-release\.apk$/,
+    };
+    if (!names[target]?.test(uploaded.name)) throw new Error(`Asset name does not match ${target}.`);
     url = uploaded.browser_download_url;
     const prefix = 'https://github.com/UnlikeOtherAI/kelpie/releases/download/';
     if (!url?.startsWith(prefix) || /[\s\\?#%]|\.\./.test(url)) throw new Error('Unexpected release asset URL.');

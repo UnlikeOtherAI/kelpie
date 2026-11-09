@@ -1,5 +1,32 @@
 #!/bin/bash
 set -euo pipefail
+# Managed installs use the existing root-owned helper. The privileged process
+# downloads into its own private directory rather than installing a mutable
+# user-owned file after a checksum check in another process.
+if [ "${1:-}" = --apply-managed ]; then
+  [[ "$(id -u)" = 0 && "$#" = 4 ]]
+  export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  root_url="$2"; root_hash="$3"; root_format="$4"
+  [[ "$root_url" == https://github.com/UnlikeOtherAI/kelpie/releases/download/* &&
+     "$root_url" != *..* && "$root_url" != *'%'* && "$root_url" != *'?'* && "$root_url" != *'#'* &&
+     "$root_hash" =~ ^[a-f0-9]{64}$ ]]
+  [[ "$root_format" == deb || "$root_format" == rpm ]]
+  [[ "$root_url" == *."$root_format" ]]
+  root_scratch="$(mktemp -d /var/tmp/kelpie-managed-update-XXXXXX)"
+  case "$root_scratch" in /var/tmp/kelpie-managed-update-*) ;; *) exit 1;; esac
+  trap 'rm -rf -- "$root_scratch"' EXIT
+  root_archive="$root_scratch/package.$root_format"
+  curl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 300 --output "$root_archive" "$root_url"
+  [[ "$(sha256sum "$root_archive" | cut -d ' ' -f 1)" == "$root_hash" ]]
+  if [ "$root_format" = deb ]; then
+    [[ "$(dpkg-deb -f "$root_archive" Package)" == kelpie && "$(dpkg-deb -f "$root_archive" Architecture)" == amd64 ]]
+    apt-get install -y --allow-downgrades "$root_archive"
+  else
+    [[ "$(rpm -qp --queryformat '%{NAME} %{ARCH}' "$root_archive")" == 'kelpie x86_64' ]]
+    dnf install -y "$root_archive"
+  fi
+  exit 0
+fi
 operation="$1"; parent="$2"; url="$3"; expected_hash="$4"; version="$5"; executable="$6"; format="$7"
 profile="$8"
 shift 8
@@ -31,6 +58,14 @@ case "$format" in
   rpm) extension=rpm; command -v pkexec; command -v dnf; [[ "$executable" == /opt/kelpie/kelpie-linux ]];;
   *) false;;
 esac
+if [[ "$format" == deb || "$format" == rpm ]]; then
+  [[ ! -L /opt/kelpie && ! -L /opt/kelpie/install-update.sh ]]
+  [[ "$(stat -c %u /opt/kelpie)" = 0 && "$(stat -c %u /opt/kelpie/install-update.sh)" = 0 ]]
+  for path in /opt/kelpie /opt/kelpie/install-update.sh; do
+    mode="$(stat -c %a "$path")"
+    (( (8#$mode & 022) == 0 ))
+  done
+fi
 [[ "$url" == *."$extension" ]]
 archive="$operation/package.$extension"
 printf 'downloading\n' > "$operation/status"
@@ -71,8 +106,7 @@ case "$format" in
     mv -- "$destination" "$backup"; moved=true
     mv -- "$staged" "$destination"; installed=true
     ;;
-  deb) pkexec /usr/bin/apt-get install -y --allow-downgrades "$archive";;
-  rpm) pkexec /usr/bin/dnf install -y "$archive";;
+  deb|rpm) pkexec /bin/bash /opt/kelpie/install-update.sh --apply-managed "$url" "$expected_hash" "$format";;
 esac
 restart
 child=$!

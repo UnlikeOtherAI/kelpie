@@ -15,7 +15,7 @@ fail() {
     if $installed; then /bin/mv "$destination" "${destination}.failed-$(/usr/bin/uuidgen)"; fi
     /bin/mv "$backup" "$destination"
   fi
-  if $closed; then /usr/bin/open "$destination" --args "${restart_args[@]}"; fi
+  if $closed; then /usr/bin/open -n "$destination" --args "${restart_args[@]}"; fi
   exit "${code:-1}"
 }
 trap fail ERR
@@ -56,7 +56,7 @@ done
 $closed
 /bin/mv "$destination" "$backup"; moved=true
 /bin/mv "$app" "$destination"; installed=true
-/usr/bin/open "$destination" --args "${restart_args[@]}"
+/usr/bin/open -n "$destination" --args "${restart_args[@]}"
 /bin/sleep 5
 /usr/bin/pgrep -f "${destination}/Contents/MacOS/Kelpie" >/dev/null
 printf 'installed\n' > "$operation/status"
