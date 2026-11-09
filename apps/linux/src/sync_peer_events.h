@@ -112,8 +112,9 @@ class SyncSerialQueue {
 
 // Holds the browse callbacks and delivers table events in posting order
 // through `post` (the discovery's serial queue). A browse generation fences
-// delivery: once End() returns no further callback starts; one that already
-// passed the fence may still be running.
+// delivery: once End() returns no callback is running or will start. End()
+// waits for a callback in progress, so its caller must not hold a lock that
+// callback needs; called from inside a callback it returns at once.
 class SyncPeerDelivery {
  public:
   using Found = std::function<void(const SyncPeerAdvert&)>;
@@ -131,8 +132,11 @@ class SyncPeerDelivery {
  private:
   Post post_;
   mutable std::mutex mutex_;
+  std::condition_variable idle_;
   std::uint64_t generation_ = 0;
   bool active_ = false;
+  bool running_ = false;
+  std::thread::id running_thread_;
   Found found_;
   Lost lost_;
 };

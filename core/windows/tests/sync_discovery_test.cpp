@@ -251,6 +251,33 @@ void TestDeliveryFence() {
   queue.Flush();
   assert(lost == 0 && !delivery.Active());
 
+  // End() waits for a callback that is already running.
+  std::atomic<bool> inside{false};
+  std::atomic<bool> finished{false};
+  const auto slow = delivery.Begin(
+      [&](const kelpie::SyncPeerAdvert&) {
+        inside = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(80));
+        finished = true;
+      },
+      [&](const std::string&) {});
+  delivery.Deliver(slow, event);
+  while (!inside) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  delivery.End();
+  assert(finished);
+
+  // Ending from inside a callback does not wait for itself.
+  std::atomic<bool> ended_inside{false};
+  const auto self = delivery.Begin(
+      [&](const kelpie::SyncPeerAdvert&) {
+        delivery.End();
+        ended_inside = true;
+      },
+      [&](const std::string&) {});
+  delivery.Deliver(self, event);
+  queue.Flush();
+  assert(ended_inside && !delivery.Active());
+
   const auto next = delivery.Begin([&](const kelpie::SyncPeerAdvert&) { ++found; }, [&](const std::string&) { ++lost; });
   delivery.Deliver(generation, event);
   delivery.Deliver(next, SyncPeerTable::Event{false, kelpie::SyncPeerAdvert{"kelpie-a", {}, 0, {}}});

@@ -5,11 +5,13 @@
 // functions are looked up at runtime, so Windows builds without them (older
 // releases, Wine) still start and simply report mDNS as unavailable.
 //
-// Threading: every public method may be called from any thread except a
-// found/lost callback's own destructor path. found/lost run one at a time on
+// Threading: every public method may be called from any thread; never
+// destroy the object from inside a found/lost callback. found/lost run one at a time on
 // this object's worker thread, never on a DNS callback thread and never under
-// this object's lock, so they may call back into it. After StopBrowsing()
-// returns no new callback starts; one that is already running may finish.
+// this object's lock, so they may call back into it. When StopBrowsing()
+// returns no callback is running or will start: it waits for one in progress
+// (so its caller must not hold a lock that callback takes), except when it is
+// called from inside that callback.
 // The automation API's `_kelpie._tcp` is never advertised from here.
 
 #include <memory>

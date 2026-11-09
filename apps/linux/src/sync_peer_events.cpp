@@ -200,11 +200,13 @@ std::uint64_t SyncPeerDelivery::Begin(Found found, Lost lost) {
 }
 
 void SyncPeerDelivery::End() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   ++generation_;
   active_ = false;
   found_ = nullptr;
   lost_ = nullptr;
+  if (running_thread_ == std::this_thread::get_id()) return;
+  idle_.wait(lock, [this] { return !running_; });
 }
 
 bool SyncPeerDelivery::Active() const {
@@ -227,12 +229,20 @@ void SyncPeerDelivery::Deliver(std::uint64_t generation, std::optional<SyncPeerT
       if (!active_ || generation != generation_) return;
       found = found_;
       lost = lost_;
+      running_ = true;
+      running_thread_ = std::this_thread::get_id();
     }
     if (event.found) {
       if (found) found(event.advert);
     } else if (lost) {
       lost(event.advert.instance);
     }
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      running_ = false;
+      running_thread_ = {};
+    }
+    idle_.notify_all();
   });
 }
 

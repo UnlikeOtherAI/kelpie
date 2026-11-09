@@ -11,9 +11,12 @@
 //
 // Threading: public methods may be called from any thread except Avahi's own
 // poll thread. found/lost run one at a time on this object's worker thread,
-// never under the Avahi lock, so they may call back into this object. After
-// StopBrowsing() returns no new callback starts; one already running may
-// finish. The automation API's `_kelpie._tcp` is never advertised from here.
+// never under the Avahi lock, so they may call back into this object. When
+// StopBrowsing() returns no callback is running or will start: it waits for
+// one in progress (so its caller must not hold a lock that callback takes),
+// except when it is called from inside that callback. Never destroy the
+// object from inside a callback. The automation API's `_kelpie._tcp` is never
+// advertised from here.
 
 #include <map>
 #include <memory>
