@@ -67,10 +67,10 @@ async function readText(source: string, stdin: NodeJS.ReadableStream): Promise<s
 
 /** The cookie list inside a JSON array, or inside the object `cookies list` prints. */
 function cookieList(parsed: unknown): unknown[] | undefined {
-  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed)) return parsed as unknown[];
   if (typeof parsed === "object" && parsed !== null) {
     const cookies = (parsed as { cookies?: unknown }).cookies;
-    if (Array.isArray(cookies)) return cookies;
+    if (Array.isArray(cookies)) return cookies as unknown[];
   }
   return undefined;
 }
