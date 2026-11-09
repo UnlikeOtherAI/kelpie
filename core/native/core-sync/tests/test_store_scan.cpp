@@ -198,15 +198,16 @@ void TestTombstonesSurviveRestart() {
 }  // namespace
 
 int main() {
-  TestFirstSignInAdoptsWithZeroVersion();
-  TestLocalEditsAndDeletions();
-  TestExpiredCookiesAreDroppedNotTombstoned();
-  TestPurgeGuard();
-  TestUrlCoverageNeverInventsDeletions();
-  TestLaunchWarmupAndSessionCookies();
-  TestSignInLaterKeepsSessionEntries();
-  TestForeignSubjectStaysLocal();
-  TestCorruptFileIsReplaced();
-  TestTombstonesSurviveRestart();
-  return 0;
+  return RunGuarded([] {
+    TestFirstSignInAdoptsWithZeroVersion();
+    TestLocalEditsAndDeletions();
+    TestExpiredCookiesAreDroppedNotTombstoned();
+    TestPurgeGuard();
+    TestUrlCoverageNeverInventsDeletions();
+    TestLaunchWarmupAndSessionCookies();
+    TestSignInLaterKeepsSessionEntries();
+    TestForeignSubjectStaysLocal();
+    TestCorruptFileIsReplaced();
+    TestTombstonesSurviveRestart();
+  });
 }

@@ -233,18 +233,19 @@ void TestWarmingPeerAnswersEmpty() {
 }  // namespace
 
 int main() {
-  TestLoginAndLogoutPropagate();
-  TestPushCarriesInitiatorChanges();
-  TestEchoGuardWithNormalisingEngine();
-  TestThirdDeviceGetsTheAcceptedRecord();
-  TestRefusedWriteIsNotALocalChange();
-  TestReshapedWriteDoesNotLoop();
-  TestConflictLastWriterWins();
-  TestRestartRestoresSessionCookiesFromPeer();
-  TestDeletionReachesDeviceThatWasAway();
-  TestPaginationWithConcurrentChanges();
-  TestCapsKeepStoresBelowEngineLimits();
-  TestBusyDuringMerge();
-  TestWarmingPeerAnswersEmpty();
-  return 0;
+  return RunGuarded([] {
+    TestLoginAndLogoutPropagate();
+    TestPushCarriesInitiatorChanges();
+    TestEchoGuardWithNormalisingEngine();
+    TestThirdDeviceGetsTheAcceptedRecord();
+    TestRefusedWriteIsNotALocalChange();
+    TestReshapedWriteDoesNotLoop();
+    TestConflictLastWriterWins();
+    TestRestartRestoresSessionCookiesFromPeer();
+    TestDeletionReachesDeviceThatWasAway();
+    TestPaginationWithConcurrentChanges();
+    TestCapsKeepStoresBelowEngineLimits();
+    TestBusyDuringMerge();
+    TestWarmingPeerAnswersEmpty();
+  });
 }

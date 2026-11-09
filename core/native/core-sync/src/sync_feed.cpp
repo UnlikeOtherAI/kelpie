@@ -12,10 +12,11 @@ Cursor ParseCursor(const nlohmann::json& json, const char* what) {
   if (!json.is_object()) throw SyncError{"INVALID_MESSAGE", std::string(what) + " must be an object"};
   const auto replica = json.find("replica");
   const auto seq = json.find("seq");
-  if (replica == json.end() || !replica->is_string() || seq == json.end() || !seq->is_number_unsigned()) {
+  std::uint64_t value = 0;
+  if (replica == json.end() || !replica->is_string() || seq == json.end() || !ReadUnsigned(*seq, &value)) {
     throw SyncError{"INVALID_MESSAGE", std::string(what) + " needs replica and seq"};
   }
-  return Cursor{replica->get<std::string>(), seq->get<std::uint64_t>()};
+  return Cursor{replica->get<std::string>(), value};
 }
 
 }  // namespace

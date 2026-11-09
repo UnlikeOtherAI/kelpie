@@ -24,6 +24,18 @@ bool ReadBool(const nlohmann::json& json, const char* field, bool* out) {
 
 }  // namespace
 
+bool ReadUnsigned(const nlohmann::json& value, std::uint64_t* out) {
+  if (value.is_number_unsigned()) {
+    *out = value.get<std::uint64_t>();
+    return true;
+  }
+  if (value.is_number_integer() && value.get<std::int64_t>() >= 0) {
+    *out = static_cast<std::uint64_t>(value.get<std::int64_t>());
+    return true;
+  }
+  return false;
+}
+
 nlohmann::json HlcToJson(const Hlc& hlc) {
   return nlohmann::json::array({hlc.wall, hlc.counter, hlc.replica});
 }

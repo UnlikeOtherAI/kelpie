@@ -5,6 +5,7 @@
 
 #include "base64url.h"
 #include "sha256.h"
+#include "sync_entry.h"
 
 namespace kelpie::sync {
 namespace {
@@ -96,7 +97,8 @@ std::string ValidateMessage(const std::string& kind, const nlohmann::json& messa
   }
   if (kind == "exchange") {
     const auto seq = message.find("seq");
-    if (seq == message.end() || !seq->is_number_unsigned() || seq->get<std::uint64_t>() == 0) return "invalid seq";
+    std::uint64_t seq_value = 0;
+    if (seq == message.end() || !ReadUnsigned(*seq, &seq_value) || seq_value == 0) return "invalid seq";
     const auto box = message.find("box");
     if (box == message.end() || !box->is_string()) return "invalid box";
     const auto decoded = Base64UrlDecode(box->get<std::string>());

@@ -5,6 +5,7 @@
 // attributes, refusing writes and storing a cookie under a different key.
 
 #include <cassert>
+#include <cstdio>
 #include <cstdint>
 #include <filesystem>
 #include <map>
@@ -156,6 +157,20 @@ inline void PushAll(Device& from, Device& to, std::int64_t now) {
 inline void Sync(Device& a, Device& b, std::int64_t now) {
   PullAll(a, b, now);
   PushAll(a, b, now);
+}
+
+// Reports an escaping exception instead of a bare abort, so CTest shows why.
+template <typename Body>
+int RunGuarded(Body&& body) {
+  try {
+    body();
+    return 0;
+  } catch (const SyncError& error) {
+    std::fprintf(stderr, "SyncError %s: %s\n", error.code.c_str(), error.message.c_str());
+  } catch (const std::exception& error) {
+    std::fprintf(stderr, "exception: %s\n", error.what());
+  }
+  return 1;
 }
 
 }  // namespace kelpie::sync::testing

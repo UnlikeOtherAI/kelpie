@@ -83,9 +83,10 @@ nlohmann::json SyncStore::PlanMerge(const nlohmann::json& records, const nlohman
   if (source.is_object()) {
     const auto replica = source.find("replica");
     const auto seq = source.find("seq");
-    if (replica != source.end() && replica->is_string() && seq != source.end() && seq->is_number_unsigned()) {
+    std::uint64_t value = 0;
+    if (replica != source.end() && replica->is_string() && seq != source.end() && ReadUnsigned(*seq, &value)) {
       pending.source_replica = replica->get<std::string>();
-      pending.source_seq = seq->get<std::uint64_t>();
+      pending.source_seq = value;
     }
   }
 
@@ -189,10 +190,11 @@ nlohmann::json SyncStore::CommitMerge(const nlohmann::json& results) {
   // store exactly as it was.
   std::map<std::size_t, const nlohmann::json*> by_id;
   for (const auto& result : results) {
-    if (!result.is_object() || !result.contains("id") || !result["id"].is_number_unsigned()) {
+    std::uint64_t id = 0;
+    if (!result.is_object() || !result.contains("id") || !ReadUnsigned(result["id"], &id)) {
       throw SyncError{"INVALID_RESULTS", "every result needs an id"};
     }
-    by_id[result["id"].get<std::size_t>()] = &result;
+    by_id[static_cast<std::size_t>(id)] = &result;
   }
   std::vector<std::pair<bool, EngineMap>> outcomes;
   outcomes.reserve(pending.ops.size());

@@ -26,6 +26,10 @@ struct Hlc {
   bool operator>(const Hlc& other) const { return other < *this; }
 };
 
+// Accepts any non-negative JSON integer. nlohmann types a parsed positive
+// number as unsigned but a C++-constructed one as signed; both are valid.
+bool ReadUnsigned(const nlohmann::json& value, std::uint64_t* out);
+
 nlohmann::json HlcToJson(const Hlc& hlc);
 std::optional<Hlc> HlcFromJson(const nlohmann::json& json);
 
