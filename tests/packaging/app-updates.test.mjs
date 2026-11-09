@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { marker, updateNotes } from '../../scripts/publish-app-update.mjs';
+import { marker, updateNotes, componentVersion } from '../../scripts/publish-app-update.mjs';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -12,6 +12,13 @@ const release = { draft: false, prerelease: false, body: '<!-- kelpie-release-co
   assets: [{ name: 'Kelpie-windows-0.2.1-x64.zip', state: 'uploaded', digest: `sha256:${digest}`,
     browser_download_url: 'https://github.com/UnlikeOtherAI/kelpie/releases/download/release/2026-11-09/Kelpie-windows-0.2.1-x64.zip' }] };
 const options = { target: 'windows-x64', version: '0.2.1', asset: release.assets[0].name };
+
+test('takes the component version from the tagged source manifest', () => {
+  assert.equal(componentVersion('project(kelpie_windows VERSION 0.2.1 LANGUAGES CXX RC)', 'windows-x64'), '0.2.1');
+  assert.equal(componentVersion('<key>CFBundleShortVersionString</key>\n<string>0.2.1</string>', 'macos-arm64'), '0.2.1');
+  assert.equal(componentVersion('KELPIE_LINUX_VERSION="0.2.1"', 'linux-x64-tar'), '0.2.1');
+  assert.throws(() => componentVersion('release/2026-11-09', 'windows-x64'));
+});
 
 test('publishes a ready component and preserves release selection and notes', () => {
   const body = updateNotes(release, options);

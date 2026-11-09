@@ -35,7 +35,10 @@ printf 'verifying\n' > "$operation/status"
 # Reject traversal before extraction. Symlinks inside a signed app framework are
 # required, so signature validation, rather than stripping links, seals its tree.
 ! /usr/bin/unzip -Z1 "$operation/package.zip" | /usr/bin/grep -Eq '(^/|(^|/)\.\.(/|$))'
-/usr/bin/ditto -x -k "$operation/package.zip" "$staged"
+# libarchive's default extraction refuses writes through symlink directories.
+# Preserve legitimate framework links without letting an unverified ZIP write
+# outside staging before its Developer ID signature has been checked.
+/usr/bin/tar -xf "$operation/package.zip" -C "$staged"
 app="$staged/Kelpie.app"
 [[ -d "$app" && ! -L "$app" ]]
 /usr/bin/codesign --verify --deep --strict "$app"

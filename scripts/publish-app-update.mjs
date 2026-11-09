@@ -5,6 +5,16 @@ export const marker = '<!-- kelpie-update: ';
 export const targets = ['macos-arm64', 'macos-x64', 'windows-x64',
   'linux-x64-appimage', 'linux-x64-deb', 'linux-x64-rpm', 'linux-x64-tar', 'ios', 'android'];
 
+export function componentVersion(source, target) {
+  const expression = target.startsWith('windows-') ? /project\(kelpie_windows VERSION ([0-9.]+)/ :
+    target.startsWith('linux-') ? /KELPIE_LINUX_VERSION="([0-9.]+)"/ :
+      target.startsWith('macos-') ? /<key>CFBundleShortVersionString<\/key>\s*<string>([0-9.]+)<\/string>/ :
+        target === 'ios' ? /"MARKETING_VERSION": "([0-9.]+)"/ : /versionName = "([0-9.]+)"/;
+  const version = source.match(expression)?.[1];
+  if (!version || !/^\d{1,6}\.\d{1,6}\.\d{1,6}$/.test(version)) throw new Error('No canonical component version in the release source.');
+  return version;
+}
+
 export function updateNotes(release, { target, version, asset, storeURL }) {
   if (!targets.includes(target) || !/^\d{1,6}\.\d{1,6}\.\d{1,6}$/.test(version ?? '')) {
     throw new Error('A supported target and numeric component version are required.');
@@ -56,6 +66,13 @@ function main() {
   }
   const api = (...args) => execFileSync('gh', ['api', ...args], { encoding: 'utf8' });
   const release = JSON.parse(api(`repos/UnlikeOtherAI/kelpie/releases/tags/${encodeURIComponent(options.tag)}`));
+  const sourcePath = options.target.startsWith('windows-') ? 'apps/windows/CMakeLists.txt' :
+    options.target.startsWith('linux-') ? 'apps/linux/CMakeLists.txt' :
+      options.target.startsWith('macos-') ? 'apps/macos/Kelpie/Info.plist' :
+        options.target === 'ios' ? 'apps/ios/Project.swift' : 'apps/android/app/build.gradle.kts';
+  const file = JSON.parse(api(`repos/UnlikeOtherAI/kelpie/contents/${sourcePath}?ref=${encodeURIComponent(options.tag)}`));
+  const canonical = componentVersion(Buffer.from(file.content, 'base64').toString('utf8'), options.target);
+  if (options.version !== canonical) throw new Error(`Update version must match the release's ${options.target} component version ${canonical}.`);
   const body = updateNotes(release, { ...options, storeURL: options['store-url'] });
   execFileSync('gh', ['api', `repos/UnlikeOtherAI/kelpie/releases/${release.id}`, '--method', 'PATCH', '--input', '-'], {
     input: JSON.stringify({ body }), stdio: ['pipe', 'ignore', 'inherit'],
