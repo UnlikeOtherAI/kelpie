@@ -58,6 +58,11 @@ gh workflow run recover-release.yml -f artifact_run_id=<release-workflow-run-id>
 Recovery reuses the recorded build artifacts; it does not rebuild native apps or
 delete the failed run or previous uploads.
 
+Pages publishers name their upload for the current run attempt and deploy that
+exact artifact. Retrying a failed publisher therefore preserves earlier uploads
+without a duplicate-name collision. To republish an index after the release has
+finished, run the `Deploy to GitHub Pages` workflow; it reads the published packages.
+
 ## Prompt and preference behavior
 
 Apps check the public GitHub releases API without credentials on launch and
