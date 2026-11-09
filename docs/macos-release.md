@@ -53,3 +53,11 @@ after downloading it. A successful Xcode signature alone is not notarization.
 
 This direct-distribution procedure is separate from the WebKit-only, sandboxed
 Store build described in [the browser core contract](../core/README.md).
+
+After verifying the published signed, notarized ZIP, run
+`scripts/publish-app-update.mjs` with the release tag, canonical Mac version,
+the matching `macos-arm64` or `macos-x64` target and that ZIP's asset name.
+Advertise only architectures that were built and verified. This marks the update
+ready for installed apps; creating the release before its asset is ready does
+not. Ad-hoc development builds are not eligible. See
+[App update delivery](app-updates.md).

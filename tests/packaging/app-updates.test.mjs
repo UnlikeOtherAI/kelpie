@@ -13,6 +13,16 @@ const release = { draft: false, prerelease: false, body: '<!-- kelpie-release-co
     browser_download_url: 'https://github.com/UnlikeOtherAI/kelpie/releases/download/release/2026-11-09/kelpie-windows-x64-0.2.1.zip' }] };
 const options = { target: 'windows-x64', version: '0.2.1', asset: release.assets[0].name };
 
+test('keeps test feed overrides out of regular apps', async () => {
+  for (const file of ['apps/updates/apple/AppUpdates.swift',
+    'apps/android/app/src/main/java/com/kelpie/browser/AppUpdates.kt',
+    'apps/windows/src/release_updates.cpp', 'apps/linux/src/release_updates.cpp']) {
+    const source = await readFile(resolve(file), 'utf8');
+    assert.ok(!source.includes('KELPIE_UPDATE_TEST_FEED'), file);
+    assert.ok(!source.includes('updateTestFeed'), file);
+  }
+});
+
 test('takes the component version from the tagged source manifest', () => {
   assert.equal(componentVersion('project(kelpie_windows VERSION 0.2.1 LANGUAGES CXX RC)', 'windows-x64'), '0.2.1');
   assert.equal(componentVersion('<key>CFBundleShortVersionString</key>\n<string>0.2.1</string>', 'macos-arm64'), '0.2.1');
