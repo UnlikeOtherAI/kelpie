@@ -141,6 +141,9 @@ T = SHA-256("kelpie-sync-v1" || 0x00 || initiatorReplica || 0x00 || initiatorKey
 challenge = base64url(T)            // 43 chars, UOA's challenge format
 ```
 
+The six values are hashed as their base64url **text** exactly as sent, not as
+decoded bytes. `kelpie_sync_transcript` computes it; every platform uses that.
+
 ### 2. Mutual UOA proof
 
 Each side asks UOA for a ticket over the same transcript with a role-specific
@@ -200,7 +203,12 @@ never falls back to an unauthenticated mode.
 - Only the initiator sends requests. Requests are sealed with `i2r`, responses
   with `r2i`. Both use nonce = 4 zero bytes || 64-bit big-endian request `seq`,
   so a nonce never repeats under one key.
-- AAD = `"kelpie-sync-v1" || 0x00 || sessionId || 0x00 || ("req"|"res") || seq`.
+- AAD = the UTF-8 text `kelpie-sync-v1\0<sessionId>\0<req|res>\0<seq in decimal>`.
+- `box` = ciphertext || 16-byte tag, base64url.
+- The vectors in `core/native/core-sync/tests/vectors/handshake-v1.json` fix
+  every byte of this: keys, transcript, shared secret, HKDF output, nonces, AAD
+  and boxes. `packages/shared/tests/cookie-sync-vectors.test.ts` re-derives them
+  with Node's crypto.
 - The initiator numbers requests from 1 and may have a pull and a push in flight
   at once. The responder keeps a 64-entry replay window: it accepts a `seq` it has
   not seen that is no more than 64 below the highest seen.
@@ -369,7 +377,8 @@ and sends a push whenever it has local changes.
 
 ```json
 // pull request: wait up to `wait` ms (max 25000) for changes after since.seq
-{ "op": "pull", "since": { "replica": "<responder replica>", "seq": 120 }, "wait": 25000 }
+{ "op": "pull", "replica": "<initiator replica>",
+  "since": { "replica": "<responder replica>", "seq": 120 }, "wait": 25000 }
 
 // pull response
 { "replica": "<responder replica>", "head": 304, "seq": 180, "more": true,
@@ -411,58 +420,47 @@ Tombstones carry only `domain`, `path`, `name`, `hlc` and `deleted:true`.
 
 ## core-sync C API
 
-JSON strings in and out, freed with `kelpie_free_string`, like `state_c_api.h`.
-All calls for one store run on one serial executor per platform; a merge
-transaction holds it from plan to commit. A mutating call made while a merge is
-open fails with `BUSY`.
+Header: `core/native/core-sync/include/kelpie/sync_c_api.h`. JSON strings in and
+out; results are freed with `kelpie_sync_free_string` (its own symbol, so it never
+collides with `kelpie_free_string` in core-state). Any failure returns
+`{"error":"<CODE>","message":"…"}`. All calls for one store run on one serial
+executor per platform; a merge transaction holds it from plan to commit, and a
+mutating call made while a merge is open fails with `BUSY`.
 
-```c
-typedef struct KelpieSyncStore* KelpieSyncStoreRef;
+| Function | Input | Output |
+|---|---|---|
+| `kelpie_sync_store_open(path, options, &error)` | `{"subject","replica","launch":bool,"nowMillis"}` | handle, or NULL with `{"error"}` in `error` (caller frees) |
+| `kelpie_sync_store_close(store)` | | |
+| `kelpie_sync_store_status(store)` | | `{"replica","head","entries","tombstones","localOnly","unapplied","skipped","warming","merging","lastPurgeAt"}` — counts only |
+| `kelpie_sync_store_finish_warmup(store)` | | |
+| `kelpie_sync_store_scan(store, cookies, coverage, now)` | engine cookies (wire shape); `{"all":true}` or `{"urls":[…]}` | `{"deferred":true}` while warming, else `{"changed","head","purge"}` |
+| `kelpie_sync_store_answer_pull(store, pull, cookies, coverage, now)` | pull request plaintext | pull response plaintext (scans first) |
+| `kelpie_sync_store_build_push(store, watermark, cookies, coverage, now)` | the responder's last `yourWatermark` | `{"push":<push request>|null,"incomplete"}` (scans first) |
+| `kelpie_sync_store_plan_merge(store, records, source, now)` | records from a pull response or push; source `{"replica","seq"}` (the page cursor) | `{"ops":[{"id","op":"set"|"delete","cookie"}],"ignored","invalid"}` |
+| `kelpie_sync_store_commit_merge(store, results)` | `[{"id","ok","readback":[…]}]`, one per op | `{"applied","head"}`; the source watermark moves here |
+| `kelpie_sync_store_abort_merge(store)` | | |
+| `kelpie_sync_store_watermark(store, replica)` | | `{"replica","seq"}` — what this store has committed from that peer |
+| `kelpie_sync_validate(kind, json)` | `hello`, `hello-reply`, `auth`, `auth-reply`, `exchange` | `{"ok":true}` or `{"ok":false,"error"}` |
+| `kelpie_sync_transcript(pair)` | `{"initiator":{"replica","key","nonce"},"responder":{…}}` | `{"challenge"}` |
+| `kelpie_sync_account_hints(subject, now)` | | `{"current","accepted":[yesterday,today,tomorrow]}` |
+| `kelpie_sync_canonical_cookie(cookie)` | one engine cookie | `{"syncable":true,"key","cookie"}` or `{"syncable":false,"reason"}` |
 
-// options: {"subject","replica","launch":bool,"nowMillis"}. NULL on I/O failure.
-KelpieSyncStoreRef kelpie_sync_store_open(const char* path, const char* options_json);
-void kelpie_sync_store_close(KelpieSyncStoreRef store);
+**Read-back contract.** After each planned op the adapter returns every cookie
+in the engine with the same `name` whose domain, with or without a leading dot,
+equals the op's domain without its dot. core-sync uses that to detect refused and
+reshaped writes. A missing or failed read-back must be reported as `ok:false` with
+whatever the engine still holds; never invent an empty result.
 
-// {"replica","head","entries","tombstones","localOnly","unapplied","skipped",
-//  "warming","lastPurgeAt"} — counts only, never keys or values.
-char* kelpie_sync_store_status(KelpieSyncStoreRef store);
-void  kelpie_sync_store_finish_warmup(KelpieSyncStoreRef store);
-
-// cookies: engine cookies in wire shape. coverage: {"all":true} | {"urls":[…]}.
-// {"deferred":true} while warming, else {"changed":n,"head":s,"purge":bool}.
-char* kelpie_sync_store_scan(KelpieSyncStoreRef store, const char* cookies_json,
-                             const char* coverage_json, int64_t now_millis);
-
-// Answers a pull (records after since, at most one page) from a fresh scan.
-char* kelpie_sync_store_answer_pull(KelpieSyncStoreRef store, const char* pull_json,
-                                    const char* cookies_json, const char* coverage_json,
-                                    int64_t now_millis);
-// Builds the next push for a peer from its watermark; {"push":null} when idle.
-char* kelpie_sync_store_build_push(KelpieSyncStoreRef store, const char* watermark_json,
-                                   const char* cookies_json, const char* coverage_json,
-                                   int64_t now_millis);
-
-// Merge transaction. source: {"replica","seq"} — the page's cursor, recorded as
-// the watermark on commit. plan returns {"ops":[{"id","op":"set"|"delete","cookie"}]}.
-// commit takes [{"id","ok","readback":[cookies with that name for the domain]}].
-char* kelpie_sync_store_plan_merge(KelpieSyncStoreRef store, const char* records_json,
-                                   const char* source_json, int64_t now_millis);
-char* kelpie_sync_store_commit_merge(KelpieSyncStoreRef store, const char* results_json);
-void  kelpie_sync_store_abort_merge(KelpieSyncStoreRef store);
-
-char* kelpie_sync_store_watermark(KelpieSyncStoreRef store, const char* replica);
-
-// Stateless helpers.
-char* kelpie_sync_validate(const char* kind, const char* json);           // {"ok","error"}
-char* kelpie_sync_transcript(const char* hello_pair_json);               // {"challenge"}
-char* kelpie_sync_account_hints(const char* subject, int64_t now_millis); // {"current","accepted":[…]}
-char* kelpie_sync_canonical_cookie(const char* cookie_json);             // {"syncable","key","cookie","reason"}
-```
+**Pull/push loop (initiator).** `answer_pull` on the responder → `plan_merge` →
+engine writes → `commit_merge` with source `{"replica":response.replica,
+"seq":response.seq}` → repeat while `more`. For pushes, `build_push` with the
+last `yourWatermark` → send → the responder runs `plan_merge`/`commit_merge` with
+source `{"replica":push.replica,"seq":push.seq}` and answers with
+`yourWatermark = watermark(push.replica)`.
 
 core-sync carries its own SHA-256 (checked against NIST vectors) because the
 Apple and Android builds of `core/native` link no crypto library. ECDH, HKDF and
-AES-GCM stay in platform code and must pass the shared vectors in
-`core/native/core-sync/tests/vectors/handshake-v1.json`.
+AES-GCM stay in platform code and must pass the shared vectors.
 
 ## Platform contract
 
