@@ -108,7 +108,8 @@ class CookieInfoContractTest {
     }
 
     @Test fun measuresScanCost() {
-        val entries = (0 until 200).map { EntryLocation("site$it.kelpie-sync.test", "/") }
+        // Distinct registrable domains: Chromium caps cookies per eTLD+1 (180), not per host.
+        val entries = (0 until 200).map { EntryLocation("www.kelpie-sync-$it.test", "/") }
         main { entries.forEach { manager.setCookie("https://${it.domain}/", "c=1; Path=/") } }
         manager.flush()
         source.snapshot(entries.take(10))
