@@ -15,6 +15,7 @@ final class AddressTextFieldTests: XCTestCase {
                                                     modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
                                                     context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         field.mouseDown(with: event)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
         let editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
         XCTAssertTrue(window.firstResponder === editor)
         XCTAssertEqual(editor.selectedRange(), NSRange(location: 0, length: field.stringValue.utf16.count))
