@@ -1,13 +1,13 @@
 import XCTest
 
 #if os(macOS)
-/// Run against the already-launched standalone app so the same journey can
-/// verify the built candidate and the installed release.
+/// Run against an isolated copy of the standalone app. Other native verification
+/// jobs can otherwise relaunch the same bundle identifier during this journey.
 final class DesktopAddressUITests: XCTestCase {
     @MainActor
     func testNewTabAndInitialAddressSelection() throws {
         continueAfterFailure = false
-        let app = XCUIApplication(bundleIdentifier: "com.kelpie.browser.macos")
+        let app = XCUIApplication(bundleIdentifier: "com.kelpie.browser.address-focus-verification")
         app.activate()
         let address = app.textFields["browser.address"]
         XCTAssertTrue(address.waitForExistence(timeout: 15))
