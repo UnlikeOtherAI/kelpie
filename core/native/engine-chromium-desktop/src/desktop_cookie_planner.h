@@ -41,7 +41,8 @@ std::optional<double> ParseExpirySeconds(const Json& value);
 // The returned parameters target either Network.getCookies or getAllCookies.
 Plan PlanGetCookies(const Json& query);
 
-// Filters only the selectors Chromium does not apply to URL-scoped results.
+// Filters only the selectors Chromium does not apply to URL-scoped results:
+// `name` exactly, `domain` as the cookie host or any subdomain of it.
 bool MatchesFilter(const Json& cookie, const Json& query);
 
 }  // namespace kelpie::desktop_cookie
