@@ -17,8 +17,7 @@ target_link_libraries(kelpie PRIVATE Kelpie::Browser)
 target_link_libraries(kelpie PRIVATE winhttp comctl32)
 target_compile_definitions(kelpie PRIVATE KELPIE_APP_VERSION="${PROJECT_VERSION}")
 
-add_custom_command(TARGET kelpie POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  "${CMAKE_CURRENT_SOURCE_DIR}/../updates/install-windows.ps1" "$<TARGET_FILE_DIR:kelpie>/install-update.ps1")
+configure_file("../updates/install-windows.ps1" "${CMAKE_BINARY_DIR}/install-update.ps1" COPYONLY)
 target_compile_features(kelpie PRIVATE cxx_std_20)
 target_include_directories(kelpie PRIVATE ../../core/windows/resources)
 set_target_properties(kelpie PROPERTIES
