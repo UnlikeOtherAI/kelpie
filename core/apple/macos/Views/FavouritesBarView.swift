@@ -58,7 +58,9 @@ final class FavouritesBar: NSScrollView {
                     guard let self, let button else { return }
                     if node.isFolder { self.openFolder(node.id, from: button) } else { self.open(node.id) }
                 }
-                button.finishDrag = { [weak self] point, generation in self?.drop(node.id, at: point, generation: generation) }
+                button.finishDrag = { [weak self] point, generation in
+                    self?.drop(node.id, at: point, generation: generation) ?? .ignored
+                }
                 button.sourceGeneration = { [weak self] in self?.store.generation ?? UUID() }
                 button.dragRect = { [weak self] in self?.screenRect ?? .zero }
                 button.menu = contextMenu(for: node.id)
@@ -128,25 +130,37 @@ final class FavouritesBar: NSScrollView {
         if let id = sender.representedObject as? UUID { FavouriteRemoval.remove(id, from: store, undo: window?.undoManager) }
     }
 
-    private func drop(_ id: UUID, at screenPoint: NSPoint, generation: UUID) {
-        guard generation == store.generation else { return }
+    private func drop(_ id: UUID, at screenPoint: NSPoint, generation: UUID) -> FavouriteDropResult {
+        guard generation == store.generation else { return .ignored }
         if screenRect.contains(screenPoint) {
             let point = strip.convert(window?.convertPoint(fromScreen: screenPoint) ?? .zero, from: nil)
             let target = strip.subviews.compactMap { $0 as? FavouriteButton }.first { $0.frame.maxX > point.x }
             if let target, target.isFolder, target.nodeID != id, abs(point.x - target.frame.midX) < target.frame.width / 4 {
                 store.mutate(.move(id, parentId: target.nodeID, beforeId: nil))
             } else { store.mutate(.move(id, parentId: nil, beforeId: target?.nodeID)) }
-        } else if !screenRect.insetBy(dx: -32, dy: -32).contains(screenPoint) {
+            return .moved
+        } else if !screenRect.insetBy(dx: -FavouriteButton.removalMargin, dy: -FavouriteButton.removalMargin)
+            .contains(screenPoint) {
             FavouriteRemoval.remove(id, from: store, undo: window?.undoManager, puffAt: screenPoint)
+            return .removed
         }
+        return .ignored
     }
 }
 
+/// What a drop on or off the bar did, so the lifted item can land accordingly.
+enum FavouriteDropResult {
+    case moved, removed, ignored
+}
+
 final class FavouriteButton: NSButton {
+    /// Points beyond the bar's edge at which dropping removes the favourite.
+    static let removalMargin: CGFloat = 32
+
     var nodeID = UUID()
     var isFolder = false
     var activate: () -> Void = {}
-    var finishDrag: (NSPoint, UUID) -> Void = { _, _ in }
+    var finishDrag: (NSPoint, UUID) -> FavouriteDropResult = { _, _ in .ignored }
     var sourceGeneration: () -> UUID = { UUID() }
     var dragRect: () -> NSRect = { .zero }
     private var hover: DispatchWorkItem?
@@ -177,26 +191,54 @@ final class FavouriteButton: NSButton {
     override func keyDown(with event: NSEvent) {
         if [36, 49, 125].contains(event.keyCode) { activate() } else { super.keyDown(with: event) }
     }
+    /// Tracks a press: a click opens the favourite, a drag lifts a copy of it
+    /// that follows the pointer while the slot it left stays faintly visible.
     override func mouseDown(with event: NSEvent) {
         hover?.cancel()
         let generation = sourceGeneration()
         let start = event.locationInWindow
-        var dragged = false
+        let grab = convert(event.locationInWindow, from: nil)
+        var ghost: FavouriteDragGhost?
         highlight(true)
         defer { highlight(false); alphaValue = 1; NSCursor.arrow.set() }
         while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .keyDown]) {
-            if next.type == .keyDown { if next.keyCode == 53 { return }; continue }
-            let distance = hypot(next.locationInWindow.x - start.x, next.locationInWindow.y - start.y)
-            dragged = dragged || distance > 5
-            let point = window?.convertPoint(toScreen: next.locationInWindow) ?? NSEvent.mouseLocation
-            if next.type == .leftMouseUp {
-                if dragged { finishDrag(point, generation) } else { activate() }
+            if next.type == .keyDown {
+                guard next.keyCode == 53 else { continue }
+                ghost?.flyBack(to: screenFrame)
                 return
             }
-            if dragged {
-                alphaValue = 0.45
-                if dragRect().insetBy(dx: -32, dy: -32).contains(point) { NSCursor.closedHand.set() } else { NSCursor.disappearingItem.set() }
+            let point = window?.convertPoint(toScreen: next.locationInWindow) ?? NSEvent.mouseLocation
+            if ghost == nil, hypot(next.locationInWindow.x - start.x, next.locationInWindow.y - start.y) > 5 {
+                ghost = lift(grab: grab, at: point)
             }
+            let removing = !dragRect().insetBy(dx: -Self.removalMargin, dy: -Self.removalMargin).contains(point)
+            if next.type == .leftMouseUp {
+                guard let ghost else { return activate() }
+                switch finishDrag(point, generation) {
+                case .removed: ghost.close()
+                case .moved: ghost.fadeOut()
+                case .ignored: ghost.flyBack(to: screenFrame)
+                }
+                return
+            }
+            guard let ghost else { continue }
+            ghost.move(to: point, removing: removing)
+            (removing ? NSCursor.disappearingItem : NSCursor.closedHand).set()
         }
+    }
+
+    private var screenFrame: NSRect {
+        window?.convertToScreen(convert(bounds, to: nil)) ?? .zero
+    }
+
+    private func lift(grab: NSPoint, at point: NSPoint) -> FavouriteDragGhost {
+        // Grab is measured from the bottom-left, whatever the view's flipping.
+        let fromBottom = NSPoint(x: grab.x, y: isFlipped ? bounds.height - grab.y : grab.y)
+        let ghost = FavouriteDragGhost(title: title, isFolder: isFolder, itemSize: bounds.size,
+                                       grab: fromBottom, appearance: window?.effectiveAppearance)
+        ghost.show(at: point)
+        highlight(false)
+        alphaValue = 0.25
+        return ghost
     }
 }
