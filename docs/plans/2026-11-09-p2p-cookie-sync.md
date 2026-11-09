@@ -315,9 +315,16 @@ commutative and idempotent, so changes forwarded through a third device converge
 ### Caps
 
 The synced set is held below the smallest engine's limits (Chromium: 180 per
-domain, about 3 300 in total). A remote set that would give a domain more than
+registrable domain, about 3 300 in total). A remote set that would give a site
+(a registrable domain, approximated without the Public Suffix List) more than
 150 cookies, or the store more than 3 000, is ignored and counted in status. That
 keeps a full WebKit store from making a CEF device evict cookies.
+
+A key the engine reports more than once in one snapshot is unobservable: it is
+neither synced nor treated as deleted. Chromium lists every CHIPS partition of a
+cookie without marking it, so this keeps those from churning versions. A CHIPS
+cookie with a single partition is indistinguishable from an ordinary cookie on
+Chromium and syncs as one.
 
 ### Local change detection (scan)
 
@@ -434,6 +441,7 @@ mutating call made while a merge is open fails with `BUSY`.
 | `kelpie_sync_store_status(store)` | | `{"replica","head","entries","tombstones","localOnly","unapplied","skipped","warming","merging","lastPurgeAt"}` — counts only |
 | `kelpie_sync_store_finish_warmup(store)` | | |
 | `kelpie_sync_store_scan(store, cookies, coverage, now)` | engine cookies (wire shape); `{"all":true}` or `{"urls":[…]}` | `{"deferred":true}` while warming, else `{"changed","head","purge"}` |
+| `kelpie_sync_store_rebase(store, cookies, coverage, now)` | the incoming engine's cookies after a macOS renderer switch | `{"adopted","head"}`; refreshes `observed`, stamps and tombstones nothing. Scan the outgoing engine first |
 | `kelpie_sync_store_answer_pull(store, pull, cookies, coverage, now)` | pull request plaintext | pull response plaintext (scans first) |
 | `kelpie_sync_store_build_push(store, watermark, cookies, coverage, now)` | the responder's last `yourWatermark` | `{"push":<push request>|null,"incomplete"}` (scans first) |
 | `kelpie_sync_store_plan_merge(store, records, source, now)` | records from a pull response or push; source `{"replica","seq"}` (the page cursor) | `{"ops":[{"id","op":"set"|"delete","cookie"}],"ignored","invalid"}` |

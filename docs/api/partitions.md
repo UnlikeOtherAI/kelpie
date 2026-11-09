@@ -208,21 +208,18 @@ those IDs remain invalid for creating tabs.
 
 ### Cookie endpoints and partitioned tabs
 
-macOS syncs cookies between WebKit tabs and the Chromium renderer through a
-shared cookie jar. Partitioned tabs are excluded from that sync entirely —
-otherwise every partition would leak its cookies into the shared jar and
-receive every other tab's cookies back. `get-cookies`, `set-cookie`, and
-`delete-cookies` targeting a partitioned tab operate directly on that tab's own
-cookie store.
+On macOS, a renderer switch copies the default store's cookies directly between
+the WebKit default store and Chromium's global cookie store. Partitioned tabs
+never take part in that copy. `get-cookies`, `set-cookie`, and `delete-cookies`
+targeting a partitioned tab operate directly on that tab's own cookie store.
 
 `get-cookies`, `set-cookies` and `copy-cookies` also take a `partition` target,
 so an agent can read or fill a partition's store, or copy the default store's
 cookies into it, without going through a tab. See [cookies.md](cookies.md).
 Partitions never take part in peer-to-peer cookie sync.
 
-These two paragraphs are macOS-specific. Windows has a single engine and no
-shared cookie jar to leak into, so neither the exclusion nor the engine-switch
-block applies there.
+The renderer-switch copy and the block below are macOS-specific. Windows and
+Linux have a single engine, so neither applies there.
 
 For the same reason, `set-renderer` to `chromium` is **rejected** with
 `ENGINE_SWITCH_BLOCKED_BY_PARTITION` while any partitioned tab is open:
