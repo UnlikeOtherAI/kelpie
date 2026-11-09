@@ -55,6 +55,7 @@ add_subdirectory(core-state)
 add_subdirectory(core-automation)
 add_subdirectory(core-mcp)
 add_subdirectory(core-ai)
+add_subdirectory(core-sync)
 
 option(KELPIE_BUILD_DESKTOP_ENGINES "Build desktop browser engines (CEF/Chromium)" ON)
 if(KELPIE_BUILD_DESKTOP_ENGINES)

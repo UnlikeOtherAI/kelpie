@@ -1,0 +1,13 @@
+function(add_sync_test name)
+  add_executable(${name} ${ARGN})
+  kelpie_enable_test_assertions(${name})
+  target_link_libraries(${name} PRIVATE kelpie_core_sync)
+  target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+  add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+add_sync_test(kelpie_sync_test_encoding test_encoding.cpp)
+add_sync_test(kelpie_sync_test_cookie test_cookie.cpp)
+add_sync_test(kelpie_sync_test_store_scan test_store_scan.cpp)
+add_sync_test(kelpie_sync_test_sync test_sync.cpp)
+add_sync_test(kelpie_sync_test_protocol test_protocol.cpp)
