@@ -158,6 +158,11 @@ struct BrowserView: View {
                             .zIndex(30)
                         }
                     }
+                    .overlay {
+                        if !serverState.isScriptRecording {
+                            BrowserLinkPreview(url: hoveredLinkURL)
+                        }
+                    }
 
                     // AI panel — outside the overlay ZStack so buttons are always clickable
                     if isAIPanelOpen && !serverState.isScriptRecording, let tab = tabStore.activeTab {
@@ -170,9 +175,6 @@ struct BrowserView: View {
                         )
                         .frame(width: aiPanelWidth)
                     }
-                }
-                if !serverState.isScriptRecording {
-                    BrowserLinkStatusBar(appearance: chromeAppearance, url: hoveredLinkURL)
                 }
             }
             .clipped()
@@ -295,6 +297,7 @@ struct BrowserView: View {
             NetworkTrafficStore.shared.flush()
         }
         .onChange(of: rendererState.activeEngine) { _, _ in
+            hoveredLinkURL = ""
             Task { @MainActor in
                 await connectRendererState()
             }

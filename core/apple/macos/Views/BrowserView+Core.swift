@@ -91,6 +91,7 @@ extension BrowserView {
     }
 
     func activateTab(_ tab: Tab) {
+        hoveredLinkURL = ""
         isChromeCollapsed = false
         connectNewTab(tab)
     }
