@@ -17,13 +17,13 @@ final class LinkPreviewUITests: XCTestCase {
         let html = """
         <meta charset="utf-8"><title>Link preview</title>
         <style>html{background:#f7f9fc;color:#26334d;font:18px -apple-system}body{margin:40px;height:1600px}
-        a{display:block;width:max-content;margin:24px 0;color:#1767b7}#bottom{position:fixed;bottom:8px;left:10px}</style>
+        a{display:block;width:max-content;margin:24px 0;color:#1767b7}#bottom{position:fixed;bottom:8px;left:10px;margin:0}</style>
         <h1>Link preview</h1><p>Hover over a link to see its destination.</p>
         <p>Move onto this text to hide the preview.</p>
         <a href="https://example.org/">Short destination</a>
         <a href="https://example.org/another-page">Another destination</a>
         <a href="https://example.org/\(String(repeating: "segment/", count: 60))">Long destination</a>
-        <a id="bottom" href="#clicked" onclick="this.textContent='Bottom link clicked'">Link underneath the preview</a>
+        <a id="bottom" href="https://example.org/click-through" onclick="event.preventDefault();this.textContent='Bottom link clicked'">Link underneath the preview</a>
         """
         let pasteboard = NSPasteboard.general
         let previous = pasteboard.pasteboardItems?.map { item -> NSPasteboardItem in
