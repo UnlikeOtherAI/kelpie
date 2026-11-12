@@ -142,7 +142,7 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
 
     // MARK: - Completion
 
-    private nonisolated static func measure(path: String) -> Result<(size: Int64, sha256: String), Error> {
+    nonisolated private static func measure(path: String) -> Result<(size: Int64, sha256: String), Error> {
         Result {
             let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
             defer { try? handle.close() }

@@ -30,7 +30,7 @@ describe("download tools", () => {
     expect(download.parse({ device: "mac" }).success).toBe(false);
     const parsed = download.parse({ device: "mac", url: "https://example.com/a.zip", tabId: "tab-1" });
     expect(parsed.success).toBe(true);
-    expect(download.bodyFromArgs(parsed.data as Record<string, unknown>)).toMatchObject({ url: "https://example.com/a.zip", tabId: "tab-1" });
+    expect(download.bodyFromArgs(parsed.data!)).toMatchObject({ url: "https://example.com/a.zip", tabId: "tab-1" });
     expect(download.parse({ device: "mac", url: "https://example.com/a.zip", path: "/etc" }).success).toBe(false);
   });
 
