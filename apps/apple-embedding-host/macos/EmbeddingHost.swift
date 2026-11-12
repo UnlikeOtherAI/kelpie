@@ -5,8 +5,35 @@ import SwiftUI
 
 @main
 struct EmbeddingHost: App {
+    @NSApplicationDelegateAdaptor(ControlledLaunch.self) private var controlledLaunch
+
     var body: some Scene {
         WindowGroup { HostView().frame(minWidth: 920, minHeight: 650) }
+    }
+}
+
+/// `--control-port <port>` opens a Kelpie window at launch with its HTTP/MCP
+/// control service on that port, so a development build can be driven beside
+/// an installed Kelpie on 8420. Without the flag, local control stays off.
+@MainActor
+private final class ControlledLaunch: NSObject, NSApplicationDelegate {
+    private var session: KelpieBrowserSession?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--control-port"), arguments.indices.contains(index + 1),
+              let port = UInt16(arguments[index + 1]), port > 0 else { return }
+        let provider = KelpieUOASession(
+            subject: nil,
+            request: { _, _, _, _ in throw URLError(.userAuthenticationRequired) },
+            settingsSocket: { _, _ in throw URLError(.userAuthenticationRequired) },
+            signIn: {},
+            signOut: {}
+        )
+        let session = KelpieBrowserSession(uoaSession: provider, port: port, localControlEnabled: true)
+        session.start()
+        session.openWindow()
+        self.session = session
     }
 }
 
