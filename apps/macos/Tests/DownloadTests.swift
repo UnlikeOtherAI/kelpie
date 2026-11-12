@@ -66,7 +66,7 @@ final class RealWebKitDownloadTests: XCTestCase {
     func testAgentDownloadUsesTheTabSessionAndReportsPathSizeAndHash() async throws {
         let (router, tab) = harness()
         try await load(tab, "\(origin)/login")
-        let started = await router.handle(method: "download", body: ["url": "\(origin)/file.zip", "tabId": tab.id.uuidString])
+        let started = await call(router, method: "download", body: ["url": "\(origin)/file.zip", "tabId": tab.id.uuidString])
         let id = try XCTUnwrap((started["download"] as? [String: Any])?["id"] as? String)
         XCTAssertEqual((started["download"] as? [String: Any])?["origin"] as? String, "agent")
 
@@ -83,7 +83,7 @@ final class RealWebKitDownloadTests: XCTestCase {
     func testSignedOutDownloadFailsWithTheStatusAndLeavesNoFile() async throws {
         let (router, tab) = harness()
         try await load(tab, "\(origin)/page")
-        let started = await router.handle(method: "download", body: ["url": "\(origin)/file.zip", "tabId": tab.id.uuidString])
+        let started = await call(router, method: "download", body: ["url": "\(origin)/file.zip", "tabId": tab.id.uuidString])
         let id = try XCTUnwrap((started["download"] as? [String: Any])?["id"] as? String)
 
         let done = try await settled(router, id: id)
@@ -103,7 +103,7 @@ final class RealWebKitDownloadTests: XCTestCase {
         var record: [String: Any]?
         for _ in 0..<250 where record == nil {
             try await Task.sleep(nanoseconds: 20_000_000)
-            let listed = await router.handle(method: "get-downloads", body: [:])
+            let listed = await call(router, method: "get-downloads", body: [:])
             record = (listed["downloads"] as? [[String: Any]])?.first
         }
         let id = try XCTUnwrap(record?["id"] as? String, "A page click must create a download")
@@ -119,13 +119,17 @@ final class RealWebKitDownloadTests: XCTestCase {
 
     func testUnknownDownloadIdIsNotFound() async {
         let (router, _) = harness()
-        let missing = await router.handle(method: "get-downloads", body: ["id": "absent"])
+        let missing = await call(router, method: "get-downloads", body: ["id": "absent"])
         XCTAssertEqual((missing["error"] as? [String: Any])?["code"] as? String, "NOT_FOUND")
-        let invalid = await router.handle(method: "download", body: ["url": "file:///etc/hosts"])
+        let invalid = await call(router, method: "download", body: ["url": "file:///etc/hosts"])
         XCTAssertEqual((invalid["error"] as? [String: Any])?["code"] as? String, "INVALID_URL")
     }
 
     // MARK: - Harness
+
+    private func call(_ router: Router, method: String, body: [String: Any]) async -> [String: Any] {
+        await router.handle(method: method, body: body).json
+    }
 
     private func harness() -> (Router, Tab) {
         let context = HandlerContext()
@@ -158,7 +162,7 @@ final class RealWebKitDownloadTests: XCTestCase {
 
     private func settled(_ router: Router, id: String) async throws -> [String: Any] {
         for _ in 0..<500 {
-            let listed = await router.handle(method: "get-downloads", body: ["id": id])
+            let listed = await call(router, method: "get-downloads", body: ["id": id])
             let record = try XCTUnwrap((listed["downloads"] as? [[String: Any]])?.first)
             if record["state"] as? String != "in-progress" { return record }
             try await Task.sleep(nanoseconds: 20_000_000)

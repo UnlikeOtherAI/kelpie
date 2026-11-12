@@ -21,7 +21,7 @@ enum DownloadPolicy {
     /// hide itself. Falls back to `download` when nothing usable remains.
     static func sanitizedFilename(_ suggested: String) -> String {
         let forbidden = CharacterSet(charactersIn: "/\\:").union(.controlCharacters).union(.newlines)
-        let cleaned = suggested.unicodeScalars
+        let cleaned = suggested.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars
             .map { forbidden.contains($0) ? "_" : String($0) }
             .joined()
             .trimmingCharacters(in: .whitespaces)

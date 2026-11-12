@@ -55,12 +55,12 @@ void TestRegistryFiltering() {
   // Exact counts: a tool that quietly appears on or disappears from a platform
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
-  assert(all_tools.size() == 127);
+  assert(all_tools.size() == 129);
   assert(ios_tools.size() == 124);
   assert(android_tools.size() == 124);
-  assert(macos_tools.size() == 121);
+  assert(macos_tools.size() == 123);
   assert(windows_tools.size() == 117);
-  assert(webkit_tools.size() == 127);
+  assert(webkit_tools.size() == 129);
   assert(chromium_tools.size() == 127);
 
   // Store-level cookie methods and sync status exist on every platform.
