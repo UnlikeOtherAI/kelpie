@@ -153,7 +153,7 @@ let kelpieEmbeddingHost = Target.target(
     deploymentTargets: .macOS("14.0"),
     infoPlist: .extendingDefault(with: [
         "NSLocalNetworkUsageDescription": "Inspect the local embedding verification host.",
-        "NSBonjourServices": ["_appreveal._tcp"]
+        "NSBonjourServices": ["_appreveal._tcp", "_kelpie._tcp"]
     ]),
     sources: [.glob("../apple-embedding-host/macos/**/*.swift")],
     scripts: [KelpieBrowserBuild.embedMacResources] +
