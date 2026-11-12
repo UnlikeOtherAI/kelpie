@@ -55,6 +55,7 @@ private final class HostController: NSViewController {
         super.viewDidAppear()
         view.window?.title = "Kelpie embedding host"
         AppReveal.start()
+        if Self.controlPort != nil, browser == nil { openBrowser() }
         if closingObserver == nil, let window = view.window {
             closingObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification, object: window, queue: .main
@@ -65,6 +66,15 @@ private final class HostController: NSViewController {
     deinit {
         if let closingObserver { NotificationCenter.default.removeObserver(closingObserver) }
     }
+
+    /// `--control-port <port>` opens the browser at launch with its HTTP/MCP
+    /// control service on that port, beside an installed Kelpie on 8420.
+    private static let controlPort: UInt16? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--control-port"), arguments.indices.contains(index + 1),
+              let port = UInt16(arguments[index + 1]), port > 0 else { return nil }
+        return port
+    }()
 
     private func retireBrowser() {
         session?.close()
@@ -86,7 +96,11 @@ private final class HostController: NSViewController {
                 signIn: { [weak self] in self?.status.stringValue = "Host sign-in requested" },
                 signOut: { [weak self] in self?.status.stringValue = "Host sign-out requested" }
             )
-            let session = KelpieBrowserSession(uoaSession: provider, localControlEnabled: false)
+            // Local control stays off unless verification asks for its own port.
+            let session = Self.controlPort.map {
+                KelpieBrowserSession(uoaSession: provider, port: $0, localControlEnabled: true)
+            } ?? KelpieBrowserSession(uoaSession: provider, localControlEnabled: false)
+            if Self.controlPort != nil { session.start() }
             let surface = session.makeSurface()
             self.session = session
             self.surface = surface
