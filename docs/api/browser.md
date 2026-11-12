@@ -893,6 +893,11 @@ handle downloads yet: `download` answers `WEBKIT_ONLY` and neither tool is
 advertised while Chromium is active. The App Store build carries the sandbox
 Downloads-folder entitlement.
 
+macOS asks once before an app writes to the Downloads folder. Until the person
+answers that prompt, the first download waits and the browser does not respond.
+An embedding host can pass `downloadsDirectory:` to `KelpieBrowserSession` to
+save downloads in a folder it may already write.
+
 ## Favourites tree (macOS, iOS and Android)
 
 `bookmarksList` returns every node in sibling order, including folders. Each node adds `kind: "bookmark" | "folder"` and `parentId: UUID | null`; legacy flat entries are root bookmarks. Folder URLs are empty. `bookmarksAdd` accepts optional `parentId`.

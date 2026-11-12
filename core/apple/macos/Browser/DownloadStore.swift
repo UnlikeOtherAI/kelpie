@@ -39,7 +39,8 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     /// finished records are dropped, oldest first.
     static let recordLimit = 200
 
-    private let directoryProvider: () -> URL
+    /// Where new downloads are saved; a host can choose it through `KelpieBrowserSession`.
+    var directoryProvider: () -> URL
     private let fileManager = FileManager.default
     private var records: [Record] = []
     private var active: [String: WKDownload] = [:]

@@ -110,7 +110,9 @@ fixture uses a signed-out host UOA provider and AppReveal for local inspection;
 it is a separate package and is never included in the standalone app. Launch the
 Mac fixture with `--control-port <port>` to open its browser at once with HTTP/MCP
 control on that port. Its bundle has its own profile and website data, so it runs
-beside an installed Kelpie on 8420 without sharing its tabs or cookies. Run its
+beside an installed Kelpie on 8420 without sharing its tabs or cookies. Add
+`--downloads-directory <path>` to save its downloads there instead of the
+Downloads folder, which macOS guards with a one-time consent prompt. Run its
 local-only UI journey with `xcodebuild -scheme KelpieEmbeddingHost test` and a
 matching native destination; UI tests are excluded from CI. Generate
 the Mac fixture with the WebKit-only flag to verify the Store renderer path.

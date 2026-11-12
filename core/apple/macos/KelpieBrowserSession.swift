@@ -18,8 +18,17 @@ public final class KelpieBrowserSession: ObservableObject {
     private var windows: [NSWindow] = []
     private var regions: [WeakBrowserRegion] = []
 
-    public init(uoaSession: KelpieUOASession? = nil, port: UInt16 = 8420, localControlEnabled: Bool = true) {
+    /// - Parameter downloadsDirectory: where downloads are saved for this process;
+    ///   `nil` keeps the user's Downloads folder. Sandboxed or verification hosts
+    ///   can choose a folder they are allowed to write without a consent prompt.
+    public init(
+        uoaSession: KelpieUOASession? = nil,
+        port: UInt16 = 8420,
+        localControlEnabled: Bool = true,
+        downloadsDirectory: URL? = nil
+    ) {
         connectionInstallationID = NessieConnection.shared.installationID
+        if let downloadsDirectory { DownloadStore.shared.directoryProvider = { downloadsDirectory } }
         serverState = ServerState(port: port)
         self.localControlEnabled = localControlEnabled
         if let uoaSession { UOAAccount.shared.useHostSession(uoaSession) }
