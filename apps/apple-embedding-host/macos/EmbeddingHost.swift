@@ -5,8 +5,41 @@ import SwiftUI
 
 @main
 struct EmbeddingHost: App {
+    @NSApplicationDelegateAdaptor(ControlledLaunch.self) private var controlledLaunch
+
     var body: some Scene {
         WindowGroup { HostView().frame(minWidth: 920, minHeight: 650) }
+    }
+}
+
+/// `--control-port <port>` opens a Kelpie window at launch with its HTTP/MCP
+/// control service on that port, so a development build can be driven beside
+/// an installed Kelpie on 8420. `--downloads-directory <path>` saves its
+/// downloads there instead of the Downloads folder, which macOS guards with a
+/// one-time consent prompt. Without the flags, local control stays off.
+@MainActor
+private final class ControlledLaunch: NSObject, NSApplicationDelegate {
+    private var session: KelpieBrowserSession?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--control-port"), arguments.indices.contains(index + 1),
+              let port = UInt16(arguments[index + 1]), port > 0 else { return }
+        let provider = KelpieUOASession(
+            subject: nil,
+            request: { _, _, _, _ in throw URLError(.userAuthenticationRequired) },
+            settingsSocket: { _, _ in throw URLError(.userAuthenticationRequired) },
+            signIn: {},
+            signOut: {}
+        )
+        let downloads = arguments.firstIndex(of: "--downloads-directory")
+            .flatMap { arguments.indices.contains($0 + 1) ? URL(fileURLWithPath: arguments[$0 + 1], isDirectory: true) : nil }
+        let session = KelpieBrowserSession(
+            uoaSession: provider, port: port, localControlEnabled: true, downloadsDirectory: downloads
+        )
+        session.start()
+        session.openWindow()
+        self.session = session
     }
 }
 

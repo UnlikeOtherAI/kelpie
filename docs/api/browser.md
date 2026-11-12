@@ -844,6 +844,60 @@ tab; Chromium uses its live renderer. The shared `kelpie_get_links` extension
 is read-only and remains admitted only by the local model profile, not the
 narrower remote inference profile.
 
+### Downloads (macOS WebKit)
+
+A link or response that the site serves as a file is saved instead of shown:
+`Content-Disposition: attachment`, a type WebKit cannot render (zip, dmg,
+binary) or an `<a download>` link. Inline PDFs and images still render. The
+navigation is cancelled, so the source tab keeps its current page. Files go to
+the user's Downloads folder under the suggested name, numbered Finder-style when
+the name is taken (`archive (1).zip`). Each download runs in the web view that
+started it, so it uses that tab's website data store: its cookies, sign-ins and
+partition.
+
+| HTTP method | MCP extension | Body |
+| --- | --- | --- |
+| `POST /v1/download` | `kelpie_download` | `url` (http/https), optional `tabId`/`windowId` |
+| `POST /v1/get-downloads` | `kelpie_get_downloads` | optional `id` |
+
+`download` returns at once with `{download: <record>}`. `get-downloads` returns
+`{downloads: [<record>]}`, newest first, covering page-started and agent-started
+downloads since the browser launched (at most 200 are kept). A record is:
+
+```json
+{
+  "id": "6F1C…",
+  "url": "https://example.com/archive.zip",
+  "tabId": "A41E…",
+  "origin": "page",
+  "state": "complete",
+  "filename": "archive.zip",
+  "path": "/Users/me/Downloads/archive.zip",
+  "mimeType": "application/zip",
+  "bytesReceived": 10574958,
+  "totalBytes": 10574958,
+  "sha256": "9b1e…",
+  "error": null,
+  "startedAt": "2026-11-12T10:00:00Z",
+  "finishedAt": "2026-11-12T10:00:03Z"
+}
+```
+
+`origin` is `page` (a click or navigation) or `agent` (`download`). `state` is
+`in-progress`, `complete` or `failed`. A download is `complete` only after the
+file is on disk and its size and SHA-256 are measured. An HTTP error status fails
+it with `error: "HTTP 403"`; an interrupted transfer fails with WebKit's reason.
+A failed download removes its partial file and reports `path: null`. Retry by
+calling `download` again; it creates a new record. The Chromium renderer does not
+handle downloads yet: `download` answers `WEBKIT_ONLY` and neither tool is
+advertised while Chromium is active. The App Store build carries the sandbox
+Downloads-folder entitlement.
+
+macOS asks once before an app writes to the Downloads folder. Until the person
+answers that prompt, the first download waits and the browser does not respond.
+An embedding host can pass `downloadsDirectory:` to `KelpieBrowserSession` to
+save downloads in a folder it may already write.
+
 ## Favourites tree (macOS, iOS and Android)
 
 `bookmarksList` returns every node in sibling order, including folders. Each node adds `kind: "bookmark" | "folder"` and `parentId: UUID | null`; legacy flat entries are root bookmarks. Folder URLs are empty. `bookmarksAdd` accepts optional `parentId`.

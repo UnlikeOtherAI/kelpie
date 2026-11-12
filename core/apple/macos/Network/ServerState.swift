@@ -145,6 +145,7 @@ final class ServerState: ObservableObject {
         NavigationHandler(context: ctx).register(on: router)
         ScreenshotHandler(context: ctx).register(on: router)
         DOMHandler(context: ctx).register(on: router)
+        DownloadHandler(context: ctx).register(on: router)
         InteractionHandler(context: ctx).register(on: router)
         TapCalibrationHandler().register(on: router)
         ScrollHandler(context: ctx).register(on: router)

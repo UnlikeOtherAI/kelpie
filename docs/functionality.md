@@ -746,6 +746,10 @@ Native `/v1/browser-control`, direct `/mcp`, `kelpie browser-control <request-js
 
 The shared browser gateway preserves rich native extension argument schemas through the shared CLI catalogue projection. macOS `get-links` exposes bounded href/text pairs to existing local agent tools; other platforms do not advertise it. See [shared control](api/browser-control.md).
 
+### Downloads (macOS)
+
+With the WebKit renderer, a link or response the site serves as a file (an attachment, or a type such as zip, dmg or binary) is saved to the Downloads folder instead of opening an empty page, and the tab stays on its page. The download uses the tab's own cookies and sign-ins. Agents start a download with `kelpie_download` and read its state, local path, size and SHA-256 with `kelpie_get_downloads`; a refused or interrupted download is reported as failed with a reason and leaves no partial file. The Chromium renderer and the mobile apps do not handle downloads yet. See [downloads](api/browser.md#downloads-macos-webkit).
+
 ### Favourites folders and live updates
 
 On macOS, the favourites bar shows the ordered top-level pages and folders, including empty folders. Click or hover over a folder to open its menu; nested folders open cascading submenus. Dragging an item lifts a copy of it onto a floating chip with a shadow that follows the pointer, while its slot in the bar stays faintly visible. Drop it along the bar to reorder, onto a folder to move it inside, or more than 32 points outside the bar to remove it: once the pointer is that far out, the chip dims and shows a red remove badge, and the drop bursts it into a cloud puff. Escape, or a drop in the margin around the bar, glides the chip back to its slot. Removal supports Undo; Reduce Motion replaces the glide and the expanding puff with a brief fade.

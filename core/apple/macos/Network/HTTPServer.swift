@@ -39,6 +39,9 @@ final class HTTPServer: @unchecked Sendable {
     private let lock = NSLock()
     private var listener: NWListener?
     private var bonjourService: NWListener.Service?
+    /// macOS refused the advertisement (for example, Local Network access is
+    /// not granted). Local control keeps serving without mDNS until restart.
+    private var bonjourRefused = false
     var onBonjourStateChange: ((Bool) -> Void)? {
         get { lock.withLock { _onBonjourStateChange } }
         set { lock.withLock { _onBonjourStateChange = newValue } }
@@ -84,8 +87,22 @@ final class HTTPServer: @unchecked Sendable {
     ) {
         lock.lock()
         defer { lock.unlock() }
+        guard !bonjourRefused else { return }
         bonjourService = NWListener.Service(name: name, type: type, txtRecord: txtRecord)
         listener?.service = bonjourService
+    }
+
+    /// A DNS-SD refusal fails the whole NWListener. Drop only the advertisement
+    /// and report whether the listener should be started again without it.
+    private func withdrawRefusedBonjour(after error: NWError, from failed: NWListener) -> Bool {
+        guard case .dns = error else { return false }
+        lock.lock()
+        defer { lock.unlock() }
+        guard bonjourService != nil, listener === failed else { return false }
+        bonjourRefused = true
+        bonjourService = nil
+        listener = nil
+        return true
     }
 
     func start() {
@@ -132,8 +149,8 @@ final class HTTPServer: @unchecked Sendable {
         newListener.newConnectionHandler = { [weak self] connection in
             self?.handleConnection(connection)
         }
-        newListener.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+        newListener.stateUpdateHandler = { [weak self, weak newListener] state in
+            guard let self, let newListener else { return }
             switch state {
             case .ready:
                 print("[HTTPServer] Listening on port \(self.port)")
@@ -142,8 +159,16 @@ final class HTTPServer: @unchecked Sendable {
             case .failed(let error):
                 print("[HTTPServer] Listener failed: \(error)")
                 self.onBonjourStateChange?(false)
+                if self.withdrawRefusedBonjour(after: error, from: newListener) {
+                    print("[HTTPServer] mDNS advertisement refused; serving without it")
+                    newListener.cancel()
+                    self.start()
+                    return
+                }
                 self.onStateChange?(false)
             case .cancelled:
+                // A listener replaced after a refused advertisement is no longer the server.
+                guard self.lock.withLock({ self.listener === newListener }) else { return }
                 self.onBonjourStateChange?(false)
                 self.onStateChange?(false)
             default:

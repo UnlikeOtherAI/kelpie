@@ -91,7 +91,11 @@ configuration retains its separate protected key path. Device handlers still
 validate semantic constraints such as partition identities and endpoint URLs.
 Generation refuses unsupported JSON Schema keywords; native tests cover every
 registered extension and forwarded argument shape. `get-links` is a read-only
-macOS WebKit/Chromium extension returning up to 200 href/text pairs.
+macOS WebKit/Chromium extension returning up to 200 href/text pairs. macOS WebKit
+also advertises `kelpie_download` (save a URL through the tab's own session) and
+read-only `kelpie_get_downloads` (state, local path, size and SHA-256 of page- and
+agent-started downloads); see [downloads](browser.md#downloads-macos-webkit).
+The browser-control v1 core is unchanged; downloads are extensions.
 
 The Linux fallback advertises only its actual metadata/legacy capabilities. Its
 MCP HTTP route uses the desktop local-client, bearer, content/accept and protocol
