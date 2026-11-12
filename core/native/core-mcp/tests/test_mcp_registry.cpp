@@ -1,5 +1,6 @@
 #include "kelpie/mcp_c_api.h"
 #include "kelpie/mcp_registry.h"
+#include "kelpie/native_extension_schema.h"
 #include "kelpie/platform.h"
 
 #include <algorithm>
@@ -107,6 +108,15 @@ void TestAvailabilityChecks() {
   assert(registry.is_tool_available("kelpie_set_orientation", kelpie::Platform::kMacos, "webkit"));
   assert(registry.is_tool_available("kelpie_show_keyboard", kelpie::Platform::kAndroid, "chromium"));
   assert(!registry.is_tool_available("kelpie_show_keyboard", kelpie::Platform::kMacos, "webkit"));
+  // Downloads are handled by the macOS WebKit renderer only.
+  for (const char* tool : {"kelpie_download", "kelpie_get_downloads"}) {
+    assert(registry.is_tool_available(tool, kelpie::Platform::kMacos, "webkit"));
+    assert(!registry.is_tool_available(tool, kelpie::Platform::kMacos, "chromium"));
+    assert(!registry.is_tool_available(tool, kelpie::Platform::kWindows, "chromium"));
+    assert(!registry.is_tool_available(tool, kelpie::Platform::kIos, "webkit"));
+  }
+  assert(kelpie::NativeExtensionMutates("download"));
+  assert(!kelpie::NativeExtensionMutates("get-downloads"));
 }
 
 void TestCapabilitiesClassification() {

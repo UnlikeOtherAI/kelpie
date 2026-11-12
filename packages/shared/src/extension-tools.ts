@@ -215,6 +215,10 @@ export const sharedBrowserTools: BrowserToolDef[] = [
 
   { name: "kelpie_get_links", description: "Read up to 200 page links with their href and visible text", method: "getLinks", platforms: macosOnlyPlatforms, schema: { device, tabId, windowId: z.string().optional() }, bodyFromArgs: passthrough },
 
+  // Downloads (macOS WebKit). Page-started downloads are recorded too.
+  { name: "kelpie_download", description: "Save a URL as a file in the browser's Downloads folder through the tab's own session, so the request carries that tab's cookies and sign-ins. Returns at once with a download id; poll kelpie_get_downloads until its state is complete or failed.", method: "download", platforms: macosOnlyPlatforms, schema: { device, url: z.string().describe("http or https URL of the file"), tabId, windowId: z.string().optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_downloads", description: "List downloads started by pages (links or responses served as files) or by kelpie_download, newest first. Each has state in-progress, complete or failed with an error; complete downloads include the local path, size in bytes and SHA-256.", method: "getDownloads", platforms: macosOnlyPlatforms, schema: { device, id: z.string().optional().describe("Return only this download") }, bodyFromArgs: passthrough },
+
   // Evaluate
   { name: "kelpie_evaluate", description: "Evaluate JavaScript in the page context", method: "evaluate", schema: { device, expression: z.string().describe("JavaScript expression to evaluate"), tabId, message }, bodyFromArgs: passthrough },
 

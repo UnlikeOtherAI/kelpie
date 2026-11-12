@@ -82,6 +82,9 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
+    /// The owning tab, reported on downloads this page starts.
+    var downloadTabId: String?
+    var downloadStore: DownloadStore = .shared
 
     /// - Parameter dataStore: the partition's website data store, or `nil` for
     ///   the shared default store. Supplied by the caller rather than resolved
@@ -292,18 +295,58 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
         self.recordMainDocumentResponse(navigationResponse)
-        decisionHandler(.allow)
+        let disposition = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")
+        let download = DownloadPolicy.shouldDownload(
+            canShowMIMEType: navigationResponse.canShowMIMEType,
+            contentDisposition: disposition
+        )
+        decisionHandler(download ? .download : .allow)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        // `<a download>` asks for a file before any response arrives.
+        decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+    }
+
+    // The navigation is cancelled and the tab keeps its current document.
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        downloadStore.track(download, tabId: downloadTabId, origin: .page)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        downloadStore.track(download, tabId: downloadTabId, origin: .page)
+    }
+
+    /// Fetches `url` as a file through this tab's own website data store, so
+    /// the request carries the tab's cookies and sign-ins. `track` runs inside
+    /// WebKit's callback so the delegate is in place before any response.
+    func startDownload<T>(url: URL, track: @escaping (WKDownload) -> T) async -> T {
+        await withCheckedContinuation { continuation in
+            webView.startDownload(using: URLRequest(url: url)) { download in
+                continuation.resume(returning: track(download))
+            }
+        }
     }
 
     /// Captures a real main-frame load failure, ignoring benign cancellations
     /// that do not represent a navigation error: `NSURLErrorCancelled` (-999)
     /// is fired for a superseded load (e.g. a redirect, an http→https upgrade,
     /// or a programmatic stopLoading), not an actual failure to load.
+    /// WebKit's frame-load-interrupted (102) is the policy change that turns a
+    /// navigation into a download; the tab stays on its document.
     private func recordNavigationFailure(_ error: Error) {
         let ns = error as NSError
         if ns.code == NSURLErrorCancelled { return }
+        if ns.domain == "WebKitErrorDomain", ns.code == Self.frameLoadInterruptedByPolicyChange { return }
         self.lastNavigationError = error.localizedDescription
     }
+
+    nonisolated static let frameLoadInterruptedByPolicyChange = 102
 
     // MARK: - WKUIDelegate
 

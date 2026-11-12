@@ -60,6 +60,7 @@ final class Tab: ObservableObject, Identifiable {
         self.persistent = spec.persistent
         self.renderer = WKWebViewRenderer(dataStore: spec.dataStore)
         self.chatSession = AIChatSession(tabId: id.uuidString)
+        renderer.downloadTabId = id.uuidString
     }
 
     deinit {

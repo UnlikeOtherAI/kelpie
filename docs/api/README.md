@@ -12,7 +12,7 @@ All methods are available via three interfaces:
 | [core.md](core.md) | Navigation, screenshots, DOM access, interaction, scrolling, viewport/device info, wait/sync |
 | [llm.md](llm.md) | LLM-optimized methods — accessibility tree, annotated screenshots, visible elements, page text, form state, smart queries |
 | [devtools.md](devtools.md) | Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception |
-| [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
+| [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, storage, clipboard, geolocation, JS evaluation, bookmarks, history, macOS downloads, fullscreen, renderer management |
 | [cookies.md](cookies.md) | Cookie stores (default, tab, partition), whole-store export, set/copy cookies, cookie sync status, who can read synced cookies |
 | [cookie-sync.md](cookie-sync.md) | Peer-to-peer cookie sync protocol for implementers: discovery, handshake, encrypted channel, exchange messages, limits, error codes |
 | [partitions.md](partitions.md) | Per-tab storage isolation — partition lifecycle, error matrix, cookie-jar interaction |
