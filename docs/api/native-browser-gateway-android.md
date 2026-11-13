@@ -94,3 +94,15 @@ extension discovery, renderer timeout retirement, and the actual OpenAI agent
 catalog/admission/uncertainty stop using a local mock endpoint. It also runs the
 standard MCP SDK initialize/list/call journey from the CLI's installed dependency.
 Bearer contents stay in memory and stdin; no persistent pairing is created.
+
+### Canonical scroll correctness on Android
+
+`page.scroll` uses the same active, authorized WebView as the native scrolling
+tools. Its JavaScript operation must be one executable IIFE expression because
+`HandlerContext.evaluateJSReturningJSON` wraps expressions in
+`JSON.stringify((expression))`. Invalid scripts, missing renderer results and
+non-finite/over-limit deltas are errors, not successful no-op responses.
+`scroll-to-top` and `scroll-to-bottom` report observed `window.scrollY`
+rather than assuming a requested scroll was applied. Pages with no scroll
+range can naturally retain their previous position; confirm the resulting
+scroll offset when validating browser automation.
