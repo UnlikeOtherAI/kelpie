@@ -1,7 +1,6 @@
 package com.kelpie.browser.handlers
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
@@ -22,7 +21,6 @@ import java.io.ByteArrayOutputStream
 import java.util.Base64
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -323,35 +321,37 @@ class HandlerContext(
         resolution: ScreenshotResolution = ScreenshotResolution.NATIVE,
     ): Map<String, Any?>? {
         val wv = webView ?: return null
+        // An active tab ID can still point to a paused/hidden renderer. Do not
+        // represent a blank or stale hardware buffer as a successful screenshot.
+        if (!hasVisibleDocument()) return null
         val normalizedFormat = if (format == "jpeg") "jpeg" else "png"
-        val viewport = viewportMetrics()
-        val bitmap =
-            suspendCoroutine<Bitmap?> { cont ->
-                mainHandler.post {
-                    try {
-                        val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(bmp)
-                        wv.draw(canvas)
-                        cont.resume(bmp)
-                    } catch (_: Exception) {
-                        cont.resume(null)
-                    }
+        val bitmap = WebViewHardwareCapture.capture(wv) ?: return null
+        var rendered: Bitmap? = null
+        try {
+            // Ensure the Activity did not pause while the asynchronous capture ran.
+            if (!hasVisibleDocument()) return null
+            val viewport =
+                try {
+                    viewportMetrics()
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    return null
                 }
-            } ?: return null
-        val rendered =
-            if (resolution == ScreenshotResolution.VIEWPORT) {
-                val targetWidth = max((bitmap.width / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
-                val targetHeight = max((bitmap.height / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
-                if (targetWidth == bitmap.width && targetHeight == bitmap.height) {
-                    bitmap
-                } else {
-                    Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
-                }
-            } else {
-                bitmap
-            }
 
-        return try {
+            rendered =
+                if (resolution == ScreenshotResolution.VIEWPORT) {
+                    val targetWidth = max((bitmap.width / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
+                    val targetHeight = max((bitmap.height / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
+                    if (targetWidth == bitmap.width && targetHeight == bitmap.height) {
+                        bitmap
+                    } else {
+                        Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+                    }
+                } else {
+                    bitmap
+                }
+            val output = rendered ?: return null
             val stream = ByteArrayOutputStream()
             val compressFormat =
                 if (normalizedFormat == "jpeg") {
@@ -359,21 +359,47 @@ class HandlerContext(
                 } else {
                     Bitmap.CompressFormat.PNG
                 }
-            rendered.compress(compressFormat, quality, stream)
-            mapOf("image" to Base64.getEncoder().encodeToString(stream.toByteArray())) +
+            // Bitmap.compress returns false on an unsuccessful encode.
+            if (!output.compress(compressFormat, quality, stream)) return null
+            return mapOf("image" to Base64.getEncoder().encodeToString(stream.toByteArray())) +
                 viewport.metadata(
-                    imageWidth = rendered.width,
-                    imageHeight = rendered.height,
+                    imageWidth = output.width,
+                    imageHeight = output.height,
                     format = normalizedFormat,
                     resolution = resolution,
                 )
+        } catch (_: OutOfMemoryError) {
+            return null
         } finally {
+            // Bitmap resizing and encoding can fail before the old try/finally
+            // was entered. Always reclaim both the scaled and source frames.
             if (rendered !== bitmap) {
-                rendered.recycle()
+                rendered?.recycle()
             }
             bitmap.recycle()
         }
     }
+
+    private suspend fun hasVisibleDocument(): Boolean =
+        try {
+            val state =
+                evaluateJSReturningJSON(
+                    """
+                    (function() {
+                        return {
+                            visibility: document.visibilityState,
+                            width: window.innerWidth,
+                            height: window.innerHeight
+                        };
+                    })()
+                    """.trimIndent(),
+                )
+            state["visibility"] == "visible" &&
+                ((state["width"] as? Number)?.toInt() ?: 0) > 0 &&
+                ((state["height"] as? Number)?.toInt() ?: 0) > 0
+        } catch (_: Exception) {
+            false
+        }
 
     suspend fun viewportMetrics(): ScreenshotViewportMetrics {
         val result =
