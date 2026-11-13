@@ -1,7 +1,6 @@
 package com.kelpie.browser.handlers
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
@@ -323,21 +322,23 @@ class HandlerContext(
         resolution: ScreenshotResolution = ScreenshotResolution.NATIVE,
     ): Map<String, Any?>? {
         val wv = webView ?: return null
+        // An active tab ID can still point to a paused/hidden renderer. Do not
+        // represent a blank or stale hardware buffer as a successful screenshot.
+        if (!hasVisibleDocument()) return null
         val normalizedFormat = if (format == "jpeg") "jpeg" else "png"
-        val viewport = viewportMetrics()
-        val bitmap =
-            suspendCoroutine<Bitmap?> { cont ->
-                mainHandler.post {
-                    try {
-                        val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(bmp)
-                        wv.draw(canvas)
-                        cont.resume(bmp)
-                    } catch (_: Exception) {
-                        cont.resume(null)
-                    }
-                }
-            } ?: return null
+        val bitmap = WebViewHardwareCapture.capture(wv) ?: return null
+        // The Activity may have paused while the asynchronous pixel copy ran.
+        if (!hasVisibleDocument()) {
+            bitmap.recycle()
+            return null
+        }
+        val viewport =
+            try {
+                viewportMetrics()
+            } catch (_: Exception) {
+                bitmap.recycle()
+                return null
+            }
         val rendered =
             if (resolution == ScreenshotResolution.VIEWPORT) {
                 val targetWidth = max((bitmap.width / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
@@ -374,6 +375,27 @@ class HandlerContext(
             bitmap.recycle()
         }
     }
+
+    private suspend fun hasVisibleDocument(): Boolean =
+        try {
+            val state =
+                evaluateJSReturningJSON(
+                    """
+                    (function() {
+                        return {
+                            visibility: document.visibilityState,
+                            width: window.innerWidth,
+                            height: window.innerHeight
+                        };
+                    })()
+                    """.trimIndent(),
+                )
+            state["visibility"] == "visible" &&
+                ((state["width"] as? Number)?.toInt() ?: 0) > 0 &&
+                ((state["height"] as? Number)?.toInt() ?: 0) > 0
+        } catch (_: Exception) {
+            false
+        }
 
     suspend fun viewportMetrics(): ScreenshotViewportMetrics {
         val result =
