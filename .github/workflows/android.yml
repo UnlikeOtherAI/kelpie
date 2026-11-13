@@ -65,3 +65,6 @@ jobs:
       - name: Lint, ktlint, build
         working-directory: apps/android
         run: ./gradlew --no-daemon lint ktlintCheck build
+
+      - name: Verify 16 KiB ELF and APK ZIP alignment
+        run: python3 scripts/testing/check_android_16kb_apk.py apps/android/app/build/outputs/apk/debug/app-debug.apk
