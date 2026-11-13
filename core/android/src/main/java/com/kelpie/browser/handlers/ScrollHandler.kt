@@ -18,9 +18,16 @@ class ScrollHandler(
     private suspend fun scroll(body: Map<String, Any?>): Map<String, Any?> {
         val dx = (body["deltaX"] as? Number)?.toDouble() ?: 0.0
         val dy = (body["deltaY"] as? Number)?.toDouble() ?: 0.0
-        val js = "window.scrollBy($dx, $dy); ({scrollX: window.scrollX, scrollY: window.scrollY})"
+        if (!dx.isFinite() || !dy.isFinite() || kotlin.math.abs(dx) > 10_000 || kotlin.math.abs(dy) > 10_000) {
+            return errorResponse("INVALID_PARAMS", "Scroll delta must be finite and within 10000 pixels")
+        }
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
+            val observed = ctx.evaluateJSReturningJSON(ScrollJavaScript.byDelta(dx, dy))
+            if (observed.isEmpty()) {
+                errorResponse("EVAL_ERROR", "Scroll was not evaluated by the renderer")
+            } else {
+                successResponse(observed)
+            }
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
@@ -52,14 +59,13 @@ class ScrollHandler(
     }
 
     private suspend fun scrollTo(top: Boolean): Map<String, Any?> {
-        val js =
-            if (top) {
-                "window.scrollTo(0, 0); ({scrollY: 0})"
-            } else {
-                "window.scrollTo(0, document.documentElement.scrollHeight); ({scrollY: window.scrollY})"
-            }
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
+            val observed = ctx.evaluateJSReturningJSON(ScrollJavaScript.edge(top))
+            if (observed.isEmpty()) {
+                errorResponse("EVAL_ERROR", "Scroll was not evaluated by the renderer")
+            } else {
+                successResponse(observed)
+            }
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
@@ -87,4 +93,26 @@ class ScrollHandler(
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
     }
+}
+
+/**
+ * The handler context wraps its input inside JSON.stringify((expression)).
+ * Multi-statement snippets must therefore be a *single IIFE expression*.
+ * A semicolon-delimited top-level snippet silently produced empty results,
+ * falsely reporting success for canonical page.scroll requests.
+ */
+internal object ScrollJavaScript {
+    fun byDelta(
+        dx: Double,
+        dy: Double,
+    ): String =
+        "(function(){window.scrollBy($dx,$dy);return{scrollX:window.scrollX,scrollY:window.scrollY};})()"
+
+    fun edge(top: Boolean): String =
+        if (top) {
+            "(function(){window.scrollTo(0,0);return{scrollX:window.scrollX,scrollY:window.scrollY};})()"
+        } else {
+            "(function(){window.scrollTo(0,document.documentElement.scrollHeight);" +
+                "return{scrollX:window.scrollX,scrollY:window.scrollY};})()"
+        }
 }
