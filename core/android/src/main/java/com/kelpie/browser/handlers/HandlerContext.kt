@@ -326,32 +326,32 @@ class HandlerContext(
         if (!hasVisibleDocument()) return null
         val normalizedFormat = if (format == "jpeg") "jpeg" else "png"
         val bitmap = WebViewHardwareCapture.capture(wv) ?: return null
-        // The Activity may have paused while the asynchronous pixel copy ran.
-        if (!hasVisibleDocument()) {
-            bitmap.recycle()
-            return null
-        }
-        val viewport =
-            try {
-                viewportMetrics()
-            } catch (_: Exception) {
-                bitmap.recycle()
-                return null
-            }
-        val rendered =
-            if (resolution == ScreenshotResolution.VIEWPORT) {
-                val targetWidth = max((bitmap.width / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
-                val targetHeight = max((bitmap.height / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
-                if (targetWidth == bitmap.width && targetHeight == bitmap.height) {
-                    bitmap
-                } else {
-                    Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+        var rendered: Bitmap? = null
+        try {
+            // Ensure the Activity did not pause while the asynchronous capture ran.
+            if (!hasVisibleDocument()) return null
+            val viewport =
+                try {
+                    viewportMetrics()
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    return null
                 }
-            } else {
-                bitmap
-            }
 
-        return try {
+            rendered =
+                if (resolution == ScreenshotResolution.VIEWPORT) {
+                    val targetWidth = max((bitmap.width / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
+                    val targetHeight = max((bitmap.height / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
+                    if (targetWidth == bitmap.width && targetHeight == bitmap.height) {
+                        bitmap
+                    } else {
+                        Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+                    }
+                } else {
+                    bitmap
+                }
+            val output = rendered ?: return null
             val stream = ByteArrayOutputStream()
             val compressFormat =
                 if (normalizedFormat == "jpeg") {
@@ -359,17 +359,22 @@ class HandlerContext(
                 } else {
                     Bitmap.CompressFormat.PNG
                 }
-            rendered.compress(compressFormat, quality, stream)
-            mapOf("image" to Base64.getEncoder().encodeToString(stream.toByteArray())) +
+            // Bitmap.compress returns false on an unsuccessful encode.
+            if (!output.compress(compressFormat, quality, stream)) return null
+            return mapOf("image" to Base64.getEncoder().encodeToString(stream.toByteArray())) +
                 viewport.metadata(
-                    imageWidth = rendered.width,
-                    imageHeight = rendered.height,
+                    imageWidth = output.width,
+                    imageHeight = output.height,
                     format = normalizedFormat,
                     resolution = resolution,
                 )
+        } catch (_: OutOfMemoryError) {
+            return null
         } finally {
+            // Bitmap resizing and encoding can fail before the old try/finally
+            // was entered. Always reclaim both the scaled and source frames.
             if (rendered !== bitmap) {
-                rendered.recycle()
+                rendered?.recycle()
             }
             bitmap.recycle()
         }
