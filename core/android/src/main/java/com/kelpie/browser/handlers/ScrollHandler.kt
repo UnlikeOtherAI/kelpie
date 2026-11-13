@@ -101,8 +101,10 @@ class ScrollHandler(
  * falsely reporting success for canonical page.scroll requests.
  */
 internal object ScrollJavaScript {
-    fun byDelta(dx: Double, dy: Double): String =
-        "(function(){window.scrollBy($dx,$dy);return{scrollX:window.scrollX,scrollY:window.scrollY};})()"
+    fun byDelta(
+        dx: Double,
+        dy: Double,
+    ): String = "(function(){window.scrollBy($dx,$dy);return{scrollX:window.scrollX,scrollY:window.scrollY};})()"
 
     fun edge(top: Boolean): String =
         if (top) {
