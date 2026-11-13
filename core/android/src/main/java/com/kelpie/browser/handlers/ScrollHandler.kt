@@ -58,8 +58,8 @@ class ScrollHandler(
         }
     }
 
-    private suspend fun scrollTo(top: Boolean): Map<String, Any?> {
-        return try {
+    private suspend fun scrollTo(top: Boolean): Map<String, Any?> =
+        try {
             val observed = ctx.evaluateJSReturningJSON(ScrollJavaScript.edge(top))
             if (observed.isEmpty()) {
                 errorResponse("EVAL_ERROR", "Scroll was not evaluated by the renderer")
@@ -69,7 +69,6 @@ class ScrollHandler(
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
-    }
 
     /**
      * Constrains scroll-into-view `block` value to the documented allowlist.
@@ -102,10 +101,7 @@ class ScrollHandler(
  * falsely reporting success for canonical page.scroll requests.
  */
 internal object ScrollJavaScript {
-    fun byDelta(
-        dx: Double,
-        dy: Double,
-    ): String =
+    fun byDelta(dx: Double, dy: Double): String =
         "(function(){window.scrollBy($dx,$dy);return{scrollX:window.scrollX,scrollY:window.scrollY};})()"
 
     fun edge(top: Boolean): String =
