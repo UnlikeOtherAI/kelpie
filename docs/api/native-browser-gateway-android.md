@@ -77,6 +77,14 @@ extensions retain their existing events. Android has no registered native keypre
 handler, so common keypress is omitted. Common screenshots support viewport PNG;
 the rich extension retains its formats and full-page options.
 
+On Android, foreground viewport capture uses the Activity window's hardware buffer
+through `PixelCopy`, not `WebView.draw(Canvas)`. The requested WebView must be
+attached, visible, fully unobscured in its viewport rectangle, and backed by a
+nonzero visible document. Requests on hidden or detached targets fail rather
+than return a successful blank/stale screenshot. The native full-page tile path
+is separate and is not changed by this viewport-capture improvement. This does
+not keep background tabs rendering or bypass Android lifecycle restrictions.
+
 Build on Ubuntu with Java 17, Android SDK, Node 20+ and pnpm in PATH:
 `cd apps/android && ./gradlew build`. CMake generates the common contract from
 shared sources and links `kelpie_core_mcp` into `kelpie_jni`; schema copies are
