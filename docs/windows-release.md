@@ -22,6 +22,12 @@ Build and package through `scripts/build-windows.ps1` and
 archive SHA-256. Obtain the existing profile-specific `WINDOWS_SIGNER_EKU` from
 the Nessie repository's Actions variables; it is configuration, not a credential.
 
+The CMake staging step writes `cef-runtime-files.txt` for the selected CEF SDK.
+Packaging uses that inventory for DLLs and resources, validates every entry, and
+includes it in the ZIP. Retired SDK libraries are not required; newly staged
+libraries are included. Bootstrap identity checks and the ban on development
+files remain enforced independently of this inventory.
+
 Run `scripts/sign-windows-package.ps1` with these mandatory parameters:
 
 - `InputPackage`: the unsigned ZIP.

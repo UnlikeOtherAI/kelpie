@@ -18,7 +18,7 @@ jobs:
       - uses: ./.github/actions/browser-contract
       - name: Verify harness process handling
         shell: pwsh
-        run: node --test tests/windows/process.test.mjs
+        run: node --test tests/windows/process.test.mjs tests/windows/runtime-packaging.test.mjs
       - name: Build CEF wrapper and Windows release
         shell: pwsh
         run: ./scripts/build-windows.ps1

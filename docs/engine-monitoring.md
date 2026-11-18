@@ -76,6 +76,11 @@ list alongside Kelpie's app assets. It includes newly added upstream files and
 does not require libraries retired by newer CEF versions. Missing staged files
 fail packaging before an existing output bundle is replaced.
 
+Windows also generates `cef-runtime-files.txt` from its staging inputs. The
+packager consumes it instead of a second DLL list, checks every entry, and keeps
+the sandbox bootstrap's version, hash and branding validation separate. Both
+platforms include the runtime inventory in their candidate bundles.
+
 The pipeline does not automatically merge or publish browser binaries. CEF
 major updates can require API changes. Resolve them in the candidate branch,
 rerun qualification, bump each affected app's version, and follow the existing

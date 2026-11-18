@@ -8,6 +8,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'native/windows-runtime.ps1')
 
 $cefVersion = "156.0.31+ge603d97+chromium-156.0.8078.100"
 function Require-File([string]$Path) {
@@ -118,13 +119,7 @@ if ((Get-FileHash -LiteralPath $bootstrap -Algorithm SHA256).Hash -ne $sourceBoo
 if (-not ((& $dumpbin /headers $dll | Out-String) -match "machine \(x64\)")) { throw "kelpie.dll is not x64." }
 if (-not ((& $dumpbin /exports $dll | Out-String) -match "\bRunWinMain\b")) { throw "kelpie.dll does not export RunWinMain." }
 
-$runtimeFiles = @(
-  "chrome_elf.dll", "d3dcompiler_47.dll", "dxcompiler.dll", "dxil.dll",
-  "libcef.dll", "libEGL.dll", "libGLESv2.dll", "v8_context_snapshot.bin",
-  "vk_swiftshader.dll", "vk_swiftshader_icd.json", "vulkan-1.dll"
-)
-$resourceFiles = @("chrome_100_percent.pak", "chrome_200_percent.pak", "icudtl.dat", "resources.pak")
-foreach ($file in $runtimeFiles + $resourceFiles) { Require-File (Join-Path $build $file) }
+Get-CefRuntimeFiles -BuildDir $build | Out-Null
 
 Remove-Item -Recurse -Force -LiteralPath $stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -141,8 +136,7 @@ try {
   if ($customBootstrapHash -eq $originalBootstrapHash) { throw "Package bootstrap branding did not change the verified copy." }
   Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination (Join-Path $stage "LICENSE.txt")
   Copy-Item -LiteralPath (Join-Path $repoRoot "core/native/licenses/llama.cpp-LICENSE.txt") -Destination $stage
-  foreach ($file in $runtimeFiles + $resourceFiles) { Copy-Item -LiteralPath (Join-Path $build $file) -Destination $stage }
-  Copy-Item -LiteralPath (Join-Path $build "locales") -Destination (Join-Path $stage "locales") -Recurse
+  Copy-CefRuntimeFiles -BuildDir $build -Destination $stage
   Copy-Item -LiteralPath (Join-Path $cef "LICENSE.txt") -Destination (Join-Path $stage "CEF-LICENSE.txt")
 
   # Windows PowerShell 5.1 ignores -Include alongside -LiteralPath and would match every file.

@@ -60,7 +60,7 @@ jobs:
       - name: Build and package the sandbox-enabled CEF candidate
         shell: pwsh
         run: |
-          node --test tests/windows/process.test.mjs
+          node --test tests/windows/process.test.mjs tests/windows/runtime-packaging.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Process tests failed' }
           ./scripts/build-windows.ps1
           ./scripts/package-windows.ps1
