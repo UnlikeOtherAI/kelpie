@@ -1,0 +1,62 @@
+name: Chromium update monitor
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report only; do not create a branch, PR, or status issue
+        type: boolean
+        default: true
+      verify_downloads:
+        description: Also verify candidate archive checksums during a dry run
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chromium-update-monitor
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          # Publication always reads trusted main, including manual runs.
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22
+      - name: Test update planner and recovery
+        run: node --test tests/engine-updates/*.test.mjs
+      - name: Check upstream and propose a candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
+          VERIFY_DOWNLOADS: ${{ inputs.verify_downloads }}
+        run: |
+          args=()
+          if [ "$PUBLISH" = true ]; then args+=(--publish); fi
+          if [ "$VERIFY_DOWNLOADS" = true ]; then args+=(--verify-downloads); fi
+          node scripts/engine-updates/scan.mjs "${args[@]}"
+      - name: Retain timestamped evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: chromium-update-report-${{ github.run_id }}
+          path: .cache/engine-updates/report.*
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90
