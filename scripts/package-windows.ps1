@@ -8,7 +8,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-. (Join-Path $PSScriptRoot 'native/windows-runtime.ps1')
+. (Join-Path $PSScriptRoot 'runtime-windows.ps1')
 
 $cefVersion = "156.0.31+ge603d97+chromium-156.0.8078.100"
 function Require-File([string]$Path) {

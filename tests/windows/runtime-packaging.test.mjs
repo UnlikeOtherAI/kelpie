@@ -43,7 +43,7 @@ kelpie_stage_browser_runtime(consumer_two)
   execFileSync('cmake.exe', ['--build', build, '--config', 'Release', '--parallel', '2'], { encoding: 'utf8' });
   const copy = () => powershell(`$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-. ${psQuote(join(repository, 'scripts/native/windows-runtime.ps1'))}
+. ${psQuote(join(repository, 'scripts/runtime-windows.ps1'))}
 Copy-CefRuntimeFiles -BuildDir ${psQuote(build)} -Destination ${psQuote(output)}
 `);
   return { root, build, output, copy };
