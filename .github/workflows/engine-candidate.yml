@@ -7,7 +7,8 @@ on:
       - scripts/download-cef-windows.ps1
       - scripts/package-windows.ps1
       - scripts/test-cef-upstream.sh
-      - apps/linux/Dockerfile
+      - apps/linux/**
+      - tests/packaging/linux-cef-runtime.test.mjs
       - scripts/engine-updates/**
       - tests/engine-updates/**
       - .github/workflows/engine-*.yml
@@ -43,8 +44,11 @@ jobs:
           const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encoding: 'utf8' }).trim();
           const before = readPins(readSources('.', base));
           const after = readPins(readSources());
+          const paths = execFileSync('git', ['diff', '--name-only', base, 'HEAD'], { encoding: 'utf8' }).split('\n');
+          const linuxInputsChanged = paths.some(path => path.startsWith('apps/linux/') ||
+            path === 'tests/packaging/linux-cef-runtime.test.mjs');
           for (const platform of Object.keys(after)) {
-            const changed = after[platform] !== before[platform];
+            const changed = after[platform] !== before[platform] || (platform === 'linux64' && linuxInputsChanged);
             appendFileSync(process.env.GITHUB_OUTPUT, `${platform}=${changed}\n`);
             appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${platform}: ${before[platform]} → ${after[platform]} (${changed ? 'build required' : 'unchanged; native build skipped'})\n\n`);
           }
@@ -89,7 +93,7 @@ jobs:
           sudo apt-get install -y ninja-build cmake g++ pkg-config nlohmann-json3-dev \
             libgtk-3-dev libnss3-dev libnspr4-dev libasound2-dev libxss-dev \
             libgbm-dev libdrm-dev libxcomposite-dev libxdamage-dev libxrandr-dev \
-            libavahi-client-dev libcurl4-openssl-dev libssl-dev libcups2-dev
+            libavahi-client-dev libcurl4-openssl-dev libssl-dev libcups2-dev xvfb xauth
       - name: Build the pinned CEF application and run native tests
         run: |
           node --test tests/packaging/linux-runtime.test.mjs
@@ -97,6 +101,8 @@ jobs:
           make linux
           ctest --test-dir core/native/.build-linux --output-on-failure
           ctest --test-dir apps/linux/build --output-on-failure
+      - name: Verify real CEF navigation and child-process shutdown
+        run: xvfb-run -a env KELPIE_LINUX_BINARY="$PWD/apps/linux/build/kelpie-linux" node --test tests/packaging/linux-cef-runtime.test.mjs
       - name: Package candidate for installed-app verification
         run: |
           bash scripts/build-linux-runtime-bundle.sh --version "candidate-${GITHUB_SHA:0:12}" \

@@ -58,13 +58,14 @@ GitHub notification preferences control failure notifications.
 | Platform | Automated candidate check | Still required before publication |
 | --- | --- | --- |
 | Windows x64 | Existing sandbox-enabled CEF build, native tests and unsigned package | Signing and installed-package browser/automation/passkey flows |
-| Linux x64 | CEF build, native tests and runtime bundle on Ubuntu | Installed-package flows and other supported distro/Wayland checks |
+| Linux x64 | CEF build, native tests, real navigation/child-process shutdown and runtime bundle on Ubuntu | Installed-package GUI flows and other supported distro/Wayland checks |
 | macOS arm64 | Compile the Swift/Objective-C++ browser library with the selected CEF headers/framework | Full containing-app build, signing/notarization and installed-app flows |
 | iOS/iPadOS | Uses the OS WebKit runtime; no CEF pin | Apple platform updates and WebKit/passkey integration checks |
 | Android | Uses the device's Android System WebView; no bundled CEF pin | WebView/provider updates and Android passkey integration checks |
 
-Native jobs run only when that platform's CEF version changes. Updating the
-monitor's code or docs exercises its tests and skips unrelated native builds.
+Native jobs run when that platform's CEF version changes. Linux app or runtime
+test changes also run the Linux job. Updating only the monitor's code or docs
+exercises its tests and skips unrelated native builds.
 The macOS library check is labelled as compilation: the existing standalone
 macOS CI does not provide a complete containing-app CEF build.
 The candidate uses the macOS 26 runner and records the selected Xcode and SDK
@@ -77,6 +78,13 @@ Linux generates `cef-runtime-files.txt` from the selected SDK's `Release` and
 list alongside Kelpie's app assets. It includes newly added upstream files and
 does not require libraries retired by newer CEF versions. Missing staged files
 fail packaging before an existing output bundle is replaced.
+
+The Linux runtime check inspects the compiled entry point, opens real CEF pages,
+clicks observed elements, captures a screenshot, closes tabs and shuts down the process. It rejects stack-guard
+aborts from helper processes. CEF changes the guard after a zygote fork, so the
+Linux entry point uses the upstream `NO_STACK_PROTECTOR` annotation around
+`CefExecuteProcess`; stack protection elsewhere and Chromium's guard rotation
+remain enabled. See [CEF issue 3912](https://github.com/chromiumembedded/cef/issues/3912).
 
 Windows also generates `cef-runtime-files.txt` from its staging inputs. The
 packager consumes it instead of a second DLL list, checks every entry, and keeps
