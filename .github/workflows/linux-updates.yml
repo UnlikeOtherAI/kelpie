@@ -6,6 +6,9 @@ on:
       - 'apps/linux/**'
       - 'apps/updates/**'
       - 'core/native/**'
+      - 'scripts/build-linux-runtime-bundle.sh'
+      - 'packaging/linux/runtime-files.txt'
+      - 'tests/packaging/linux-runtime.test.mjs'
       - '.github/workflows/linux-updates.yml'
   push:
     branches: [main]
@@ -13,6 +16,9 @@ on:
       - 'apps/linux/**'
       - 'apps/updates/**'
       - 'core/native/**'
+      - 'scripts/build-linux-runtime-bundle.sh'
+      - 'packaging/linux/runtime-files.txt'
+      - 'tests/packaging/linux-runtime.test.mjs'
       - '.github/workflows/linux-updates.yml'
   workflow_dispatch:
 
@@ -25,10 +31,15 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6.0.3
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22
       - name: Install native headers
         run: |
           sudo apt-get update
           sudo apt-get install -y g++-12 libgtk-3-dev libcurl4-openssl-dev nlohmann-json3-dev
+      - name: Verify CEF runtime staging and packaging
+        run: node --test tests/packaging/linux-runtime.test.mjs
       - name: Compile production update integration against supported GLib
         run: |
           g++-12 -std=c++20 -fsyntax-only \

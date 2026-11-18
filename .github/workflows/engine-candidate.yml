@@ -91,6 +91,7 @@ jobs:
             libavahi-client-dev libcurl4-openssl-dev libssl-dev libcups2-dev
       - name: Build the pinned CEF application and run native tests
         run: |
+          node --test tests/packaging/linux-runtime.test.mjs
           bash scripts/download-cef.sh linux
           make linux
           ctest --test-dir core/native/.build-linux --output-on-failure

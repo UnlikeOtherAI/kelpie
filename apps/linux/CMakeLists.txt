@@ -191,37 +191,8 @@ add_custom_command(TARGET kelpie-linux POST_BUILD
 )
 
 if(KELPIE_LINUX_HAS_CEF)
-  file(GLOB KELPIE_LINUX_CEF_RELEASE_FILES
-    "${KELPIE_LINUX_CEF_ROOT}/Release/*"
-  )
-  file(GLOB KELPIE_LINUX_CEF_RESOURCE_FILES
-    "${KELPIE_LINUX_CEF_ROOT}/Resources/*"
-  )
-
-  foreach(runtime_file IN LISTS KELPIE_LINUX_CEF_RELEASE_FILES)
-    add_custom_command(TARGET kelpie-linux POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${runtime_file}"
-        "$<TARGET_FILE_DIR:kelpie-linux>"
-    )
-  endforeach()
-
-  foreach(resource_file IN LISTS KELPIE_LINUX_CEF_RESOURCE_FILES)
-    if(IS_DIRECTORY "${resource_file}")
-      get_filename_component(resource_name "${resource_file}" NAME)
-      add_custom_command(TARGET kelpie-linux POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${resource_file}"
-          "$<TARGET_FILE_DIR:kelpie-linux>/${resource_name}"
-      )
-    else()
-      add_custom_command(TARGET kelpie-linux POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          "${resource_file}"
-          "$<TARGET_FILE_DIR:kelpie-linux>"
-      )
-    endif()
-  endforeach()
+  include(cmake/cef_runtime.cmake)
+  kelpie_stage_cef_runtime(kelpie-linux "${KELPIE_LINUX_CEF_ROOT}")
 endif()
 
 # Both variants share the local-control contract: a profile lock and a

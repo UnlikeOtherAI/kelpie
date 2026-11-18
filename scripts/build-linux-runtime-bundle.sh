@@ -3,6 +3,7 @@ set -euo pipefail
 
 BUILD_DIR="apps/linux/build"
 MANIFEST="packaging/linux/runtime-files.txt"
+CEF_MANIFEST="${BUILD_DIR}/cef-runtime-files.txt"
 OUTPUT_DIR=""
 VERSION=""
 BUILD_LABEL=""
@@ -44,20 +45,34 @@ if [ ! -d "${BUILD_DIR}" ]; then
   exit 1
 fi
 
-mkdir -p "${OUTPUT_DIR}"
-rm -rf "${OUTPUT_DIR}/kelpie-linux"
-mkdir -p "${OUTPUT_DIR}/kelpie-linux"
+if [ ! -s "${CEF_MANIFEST}" ]; then
+  echo "Missing CEF runtime manifest: ${CEF_MANIFEST}; configure and build with the selected CEF SDK" >&2
+  exit 1
+fi
 
+# Validate the complete input before replacing an existing output bundle.
+runtime_list="$(cat "${MANIFEST}" "${CEF_MANIFEST}")"
+runtime_files=()
 while IFS= read -r runtime_file; do
   [ -n "${runtime_file}" ] || continue
-
+  if [[ ! "${runtime_file}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+    echo "Invalid runtime file name: ${runtime_file}" >&2
+    exit 1
+  fi
   if [ ! -e "${BUILD_DIR}/${runtime_file}" ]; then
     echo "Missing runtime file: ${BUILD_DIR}/${runtime_file}" >&2
     exit 1
   fi
+  runtime_files+=("${runtime_file}")
+done <<< "${runtime_list}"
 
+mkdir -p "${OUTPUT_DIR}"
+rm -rf "${OUTPUT_DIR}/kelpie-linux"
+mkdir -p "${OUTPUT_DIR}/kelpie-linux"
+for runtime_file in "${runtime_files[@]}"; do
   cp -a "${BUILD_DIR}/${runtime_file}" "${OUTPUT_DIR}/kelpie-linux/"
-done < "${MANIFEST}"
+done
+cp "${CEF_MANIFEST}" "${OUTPUT_DIR}/kelpie-linux/cef-runtime-files.txt"
 
 chmod 755 "${OUTPUT_DIR}/kelpie-linux/kelpie-linux"
 chmod 755 "${OUTPUT_DIR}/kelpie-linux/chrome-sandbox"

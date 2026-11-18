@@ -70,6 +70,12 @@ versions. It requires SDK 26 or newer because the browser's WebKit code uses
 `obscuredContentInsets`; a runtime availability guard cannot make an older SDK
 compile that API.
 
+Linux generates `cef-runtime-files.txt` from the selected SDK's `Release` and
+`Resources` entries while staging the build. Packaging consumes that generated
+list alongside Kelpie's app assets. It includes newly added upstream files and
+does not require libraries retired by newer CEF versions. Missing staged files
+fail packaging before an existing output bundle is replaced.
+
 The pipeline does not automatically merge or publish browser binaries. CEF
 major updates can require API changes. Resolve them in the candidate branch,
 rerun qualification, bump each affected app's version, and follow the existing
