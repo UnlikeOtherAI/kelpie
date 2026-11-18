@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { compareCef, chromiumVersion } from './upstream.mjs';
 
 export const FILES = ['scripts/download-cef.sh', 'scripts/download-cef-windows.ps1',
-  'scripts/package-windows.ps1', 'scripts/test-cef-upstream.sh'];
+  'scripts/package-windows.ps1', 'scripts/test-cef-upstream.sh', 'apps/linux/Dockerfile'];
 
 export function readSources(root = '.', revision) {
   return Object.fromEntries(FILES.map(path => [path, revision
@@ -28,7 +28,9 @@ export function readPins(sources) {
   const packageVersion = exactlyOne(sources[FILES[2]], '\\$cefVersion = "([^"]+)"', 'Windows package pin');
   const packageRoot = exactlyOne(sources[FILES[2]], 'cef_binary_([^"\\s]+)_windows64_minimal', 'Windows package path');
   const testVersion = exactlyOne(sources[FILES[3]], 'CEF_VERSION="\\$\\{1:-([^}]+)\\}"', 'Mac test pin');
-  if (packageVersion !== pins.windows64 || packageRoot !== pins.windows64 || testVersion !== pins.macosarm64) {
+  const dockerVersion = exactlyOne(sources[FILES[4]], 'ARG CEF_VERSION=([^\\s]+)', 'Linux Docker pin');
+  if (packageVersion !== pins.windows64 || packageRoot !== pins.windows64 ||
+      testVersion !== pins.macosarm64 || dockerVersion !== pins.linux64) {
     throw new Error('CEF pins disagree with their package/test consumers');
   }
   return pins;
@@ -67,6 +69,7 @@ export function updateSources(sources, plan) {
       updated[FILES[0]] = updated[FILES[0]].slice(0, start) +
         replaceExactly(section, candidate.current, candidate.cef) + updated[FILES[0]].slice(end);
       if (candidate.platform === 'macosarm64') updated[FILES[3]] = replaceExactly(updated[FILES[3]], candidate.current, candidate.cef);
+      else updated[FILES[4]] = replaceExactly(updated[FILES[4]], candidate.current, candidate.cef);
     }
   }
   readPins(updated);

@@ -7,6 +7,7 @@ on:
       - scripts/download-cef-windows.ps1
       - scripts/package-windows.ps1
       - scripts/test-cef-upstream.sh
+      - apps/linux/Dockerfile
       - scripts/engine-updates/**
       - tests/engine-updates/**
       - .github/workflows/engine-*.yml
@@ -60,7 +61,7 @@ jobs:
       - name: Build and package the sandbox-enabled CEF candidate
         shell: pwsh
         run: |
-          node --test tests/windows/process.test.mjs
+          node --test tests/windows/process.test.mjs tests/windows/runtime-packaging.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Process tests failed' }
           ./scripts/build-windows.ps1
           ./scripts/package-windows.ps1
@@ -91,6 +92,7 @@ jobs:
             libavahi-client-dev libcurl4-openssl-dev libssl-dev libcups2-dev
       - name: Build the pinned CEF application and run native tests
         run: |
+          node --test tests/packaging/linux-runtime.test.mjs
           bash scripts/download-cef.sh linux
           make linux
           ctest --test-dir core/native/.build-linux --output-on-failure

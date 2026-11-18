@@ -23,8 +23,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Download CEF binary distribution (minimal)
-# Using CEF 120 stable for Linux 64-bit
-ARG CEF_VERSION=120.2.7+g4bc6a59+chromium-120.0.6099.234
+# Kept in sync with scripts/download-cef.sh by the Chromium update monitor.
+ARG CEF_VERSION=156.0.31+ge603d97+chromium-156.0.8078.100
 ARG CEF_PLATFORM=linux64_minimal
 RUN arch="$(dpkg --print-architecture)" && \
     mkdir -p /opt/cef && \

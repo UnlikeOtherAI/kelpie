@@ -13,7 +13,7 @@ function(kelpie_stage_browser_runtime target)
   string(SUBSTRING "${directory_hash}" 0 12 directory_hash)
   set(runtime_target "kelpie_browser_runtime_${directory_hash}")
   if(NOT TARGET ${runtime_target})
-    file(GLOB runtime_files LIST_DIRECTORIES false
+    file(GLOB runtime_files CONFIGURE_DEPENDS LIST_DIRECTORIES false
       "${CEF_ROOT}/Release/*.dll"
       "${CEF_ROOT}/Release/*.bin"
       "${CEF_ROOT}/Release/*.dat"
@@ -22,9 +22,20 @@ function(kelpie_stage_browser_runtime target)
       "${CEF_ROOT}/Resources/*.dat"
     )
     set(copy_commands)
+    set(runtime_names locales)
+    set(runtime_manifest "locales\n")
     foreach(runtime_file IN LISTS runtime_files)
+      get_filename_component(runtime_name "${runtime_file}" NAME)
+      if(NOT runtime_name MATCHES "^[A-Za-z0-9_][A-Za-z0-9_.-]*$" OR runtime_name IN_LIST runtime_names)
+        message(FATAL_ERROR "Invalid or duplicate CEF runtime name: ${runtime_name}")
+      endif()
+      list(APPEND runtime_names "${runtime_name}")
+      string(APPEND runtime_manifest "${runtime_name}\n")
       list(APPEND copy_commands COMMAND ${CMAKE_COMMAND} -E copy_if_different "${runtime_file}" "${output_dir}")
     endforeach()
+    # Keep packaging tied to the selected SDK, including retired/new libraries.
+    # The sandbox bootstrap is verified and branded separately by the packager.
+    file(GENERATE OUTPUT "${output_dir}/cef-runtime-files.txt" CONTENT "${runtime_manifest}")
     add_custom_target(${runtime_target}
       COMMAND ${CMAKE_COMMAND} -E make_directory "${output_dir}"
       ${copy_commands}

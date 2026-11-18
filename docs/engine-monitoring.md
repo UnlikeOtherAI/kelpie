@@ -32,7 +32,9 @@ visible and must not be presented as successful qualification.
    availability lag remains visible.
 3. If no candidate PR is open, stream each changed platform's archive, verify
    its published SHA-1 and byte length, and calculate SHA-256. Update the
-   existing source pins and their package/test consumers together. Windows
+   existing source pins and their package/test consumers together, including
+   the Linux Docker build's default CEF version. Drift in any consumer fails
+   the scan instead of allowing different engines to be packaged. Windows
    retains both hashes in its download script. Mac/Linux's existing download
    scripts are unchanged apart from their version pins; the scan's verified
    digests are evidence, not a new checksum-enforcement promise for those scripts.
@@ -69,6 +71,17 @@ The candidate uses the macOS 26 runner and records the selected Xcode and SDK
 versions. It requires SDK 26 or newer because the browser's WebKit code uses
 `obscuredContentInsets`; a runtime availability guard cannot make an older SDK
 compile that API.
+
+Linux generates `cef-runtime-files.txt` from the selected SDK's `Release` and
+`Resources` entries while staging the build. Packaging consumes that generated
+list alongside Kelpie's app assets. It includes newly added upstream files and
+does not require libraries retired by newer CEF versions. Missing staged files
+fail packaging before an existing output bundle is replaced.
+
+Windows also generates `cef-runtime-files.txt` from its staging inputs. The
+packager consumes it instead of a second DLL list, checks every entry, and keeps
+the sandbox bootstrap's version, hash and branding validation separate. Both
+platforms include the runtime inventory in their candidate bundles.
 
 The pipeline does not automatically merge or publish browser binaries. CEF
 major updates can require API changes. Resolve them in the candidate branch,
