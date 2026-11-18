@@ -46,6 +46,12 @@ It verifies GitHub's SHA-256 digests, resumes matching completed uploads and ref
 to overwrite different assets. Publication always reads component versions from
 the release tag, including when the publisher runs from a newer checkout.
 
+Published prereleases can receive the same verified assets for installation and
+qualification. They do not receive automatic-update metadata or trigger APT/RPM
+publication. The publisher reads the release's live state after attachment, so
+holding a release while its build runs also blocks rollout. Package repository
+selection independently excludes drafts and prereleases.
+
 The **Recover release publication** workflow retries attachment after a failed
 release workflow when all selected build artifacts exist. It validates the run,
 workflow, tag and source revision before downloading anything. To retry an earlier

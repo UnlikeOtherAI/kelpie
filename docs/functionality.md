@@ -29,6 +29,10 @@ interrupting browsing. Embedded Kelpie browsers and headless Linux runs do not
 check for standalone updates. See [App update delivery](app-updates.md) for the
 release metadata and packaging contract.
 
+Prerelease downloads can be published for verification without entering automatic
+updates or the stable Linux APT/RPM repositories, including when a running release
+is put on hold before its packages are attached.
+
 Linux profiles from the old Chromium 120 build need the [profile upgrade tool](linux-profile-upgrades.md)
 before replacing the application. It migrates persistent cookies through the old
 and new browser APIs, verifies them after restart, and retains the original profile.

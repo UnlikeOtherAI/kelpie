@@ -405,6 +405,8 @@ jobs:
     if: ${{ !failure() && !cancelled() && contains(needs.*.result, 'success') }}
     name: Attach assets to GitHub release
     runs-on: ubuntu-latest
+    outputs:
+      stable: ${{ steps.advertise.outputs.stable }}
     needs:
       - build-linux
       - build-android
@@ -445,13 +447,14 @@ jobs:
         run: node scripts/attach-release-assets.mjs "$RELEASE_TAG" dist/release
 
       - name: Advertise completed app updates
+        id: advertise
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-built-app-updates.mjs "${{ github.event.release.tag_name }}"
 
   publish-package-repos:
     # Skipped, unchanged components must not suppress a successful Linux release.
-    if: "${{ !cancelled() && needs.attach-to-release.result == 'success' && (!startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: linux -->')) }}"
+    if: "${{ !cancelled() && needs.attach-to-release.result == 'success' && needs.attach-to-release.outputs.stable == 'true' && (!startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: linux -->')) }}"
     needs: attach-to-release
     uses: ./.github/workflows/publish-linux-repositories.yml
     secrets: inherit
