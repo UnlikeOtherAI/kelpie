@@ -19,6 +19,7 @@ function sources() {
     [FILES[1]]: `$version = "${current}"\n$expectedSha1 = "${sha1}"\n$expectedSha256 = "${sha256}"\n`,
     [FILES[2]]: `$CefRoot = "cache/cef_binary_${current}_windows64_minimal"\n$cefVersion = "${current}"\n`,
     [FILES[3]]: `CEF_VERSION="\${1:-${current}}"\n`,
+    [FILES[4]]: `ARG CEF_VERSION=${current}\n`,
   };
 }
 function plan(platforms = PLATFORMS) {
@@ -67,11 +68,23 @@ test('one platform can change when Mac and Linux share the old pin', () => {
   const output = { ...input, ...updateSources(input, plan(['macosarm64'])) };
   assert.deepEqual(readPins(output), { macosarm64: newer, linux64: current, windows64: current });
   assert.equal(output[FILES[1]], input[FILES[1]]);
+  assert.equal(output[FILES[4]], input[FILES[4]]);
+});
+
+test('Linux updates both download and Docker pins without changing Mac or Windows', () => {
+  const input = sources();
+  const output = { ...input, ...updateSources(input, plan(['linux64'])) };
+  assert.deepEqual(readPins(output), { macosarm64: current, linux64: newer, windows64: current });
+  assert.equal(output[FILES[4]], `ARG CEF_VERSION=${newer}\n`);
+  assert.equal(output[FILES[3]], input[FILES[3]]);
+  assert.equal(output[FILES[1]], input[FILES[1]]);
 });
 
 test('pin drift and missing verified hashes stop the update', () => {
   const input = sources();
   assert.throws(() => readPins({ ...input, [FILES[2]]: input[FILES[2]].replace(current, newer) }), /disagree/);
+  assert.throws(() => readPins({ ...input, [FILES[4]]: input[FILES[4]].replace(current, newer) }), /disagree/);
+  assert.throws(() => readPins({ ...input, [FILES[4]]: '' }), /Expected one Linux Docker pin/);
   assert.throws(() => updateSources(input, plan().map(p => ({ ...p, sha256: undefined }))), /SHA-256/);
 });
 

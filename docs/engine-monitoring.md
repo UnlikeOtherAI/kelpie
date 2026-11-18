@@ -32,7 +32,9 @@ visible and must not be presented as successful qualification.
    availability lag remains visible.
 3. If no candidate PR is open, stream each changed platform's archive, verify
    its published SHA-1 and byte length, and calculate SHA-256. Update the
-   existing source pins and their package/test consumers together. Windows
+   existing source pins and their package/test consumers together, including
+   the Linux Docker build's default CEF version. Drift in any consumer fails
+   the scan instead of allowing different engines to be packaged. Windows
    retains both hashes in its download script. Mac/Linux's existing download
    scripts are unchanged apart from their version pins; the scan's verified
    digests are evidence, not a new checksum-enforcement promise for those scripts.

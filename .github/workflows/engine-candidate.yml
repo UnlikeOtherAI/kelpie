@@ -7,6 +7,7 @@ on:
       - scripts/download-cef-windows.ps1
       - scripts/package-windows.ps1
       - scripts/test-cef-upstream.sh
+      - apps/linux/Dockerfile
       - scripts/engine-updates/**
       - tests/engine-updates/**
       - .github/workflows/engine-*.yml
