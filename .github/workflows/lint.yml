@@ -43,5 +43,8 @@ jobs:
       - name: Check engine update automation
         run: node --test tests/engine-updates/*.test.mjs
 
+      - name: Check profile migration contracts
+        run: node --test tests/packaging/profile-migration.test.mjs
+
       - name: Run lint
         run: pnpm lint
