@@ -1,393 +1,112 @@
-# Kelpie Engine Monitoring Service
+# Chromium maintenance and public review evidence
 
-## Overview
+Kelpie checks available stable CEF/Chromium builds in GitHub Actions every six
+hours. It proposes source updates, verifies upstream downloads, and starts
+candidate checks. The repository, workflow source, run summaries, and pull
+requests are public. This is the maintenance pipeline; it is not an Apple
+entitlement approval or proof that a candidate has shipped.
 
-The Engine Monitoring Service is a public-facing dashboard and API that tracks Gecko and Chromium upstream releases, monitors Kelpie's update pipeline, and provides compliance visibility to Apple App Review teams.
+## Links for reviewers
 
-This service is the external proof of "active maintenance" required by Apple's Embedded Browser Engine Entitlement (see [browser-engines.md](browser-engines.md)).
+- [Scheduled monitor and timestamped runs](https://github.com/UnlikeOtherAI/kelpie/actions/workflows/engine-updates.yml)
+- [Candidate builds and results](https://github.com/UnlikeOtherAI/kelpie/actions/workflows/engine-candidate.yml)
+- [Latest public status issue](https://github.com/UnlikeOtherAI/kelpie/issues?q=is%3Aissue%20is%3Aopen%20label%3Aengine-update)
+- [Engine update PRs](https://github.com/UnlikeOtherAI/kelpie/pulls?q=is%3Apr%20head%3Aengine-update%2F)
+- [Published releases](https://github.com/UnlikeOtherAI/kelpie/releases)
+- [Monitor source](../.github/workflows/engine-updates.yml) and [candidate workflow](../.github/workflows/engine-candidate.yml)
 
----
+For an Apple submission, link a specific successful monitor run, its candidate
+PR, the checks at that PR's final commit, and the corresponding signed release
+and installed-app verification. A workflow definition alone proves intent, not
+execution. A merged PR alone does not prove publication. Failed checks stay
+visible and must not be presented as successful qualification.
 
-## Architecture
+## What runs automatically
 
-### Components
+1. At 00:23, 06:23, 12:23 and 18:23 UTC, read the
+   [CEF build index](https://cef-builds.spotifycdn.com/index.json) and the
+   [Chrome VersionHistory API](https://developer.chrome.com/docs/web-platform/versionhistory/reference).
+2. Select the numerically newest **stable minimal** CEF archive for macOS arm64,
+   Windows x64 and Linux x64. A recently published older maintenance branch
+   cannot downgrade an existing pin. Show Chrome stable separately so CEF's
+   availability lag remains visible.
+3. If no candidate PR is open, stream each changed platform's archive, verify
+   its published SHA-1 and byte length, and calculate SHA-256. Update the
+   existing source pins and their package/test consumers together. Windows
+   retains both hashes in its download script. Mac/Linux's existing download
+   scripts are unchanged apart from their version pins; the scan's verified
+   digests are evidence, not a new checksum-enforcement promise for those scripts.
+4. Create a branch and PR without modifying `main`. If a candidate already
+   exists, preserve its commits and report that newer updates are waiting.
+5. Explicitly dispatch candidate, lint, and macOS project checks at the candidate
+   branch. GitHub can require approval for PR events generated with
+   `GITHUB_TOKEN`; dispatch avoids depending on those events. No PAT, signing
+   identity, LLM service or scraper credential is needed by this monitor.
+6. Update one public status issue and retain JSON/Markdown reports for 90 days.
+   The run summary contains the same evidence. Errors produce failed runs and
+   update the status issue when the GitHub API remains reachable.
 
-1. **Monitoring API** — Internal service that polls upstream release feeds
-2. **Dashboard Website** — Public-facing HTML/React dashboard
-3. **GitHub Integration** — Automated PR creation and status tracking
-4. **Status Page** — JSON API for App Review visibility
-5. **Alerting** — Dead man's switch for failed automation
+GitHub Actions schedules are best effort. They can be delayed or disabled after
+repository inactivity. Check the timestamp and workflow state; there is no
+independent watchdog here that can detect GitHub itself stopping the schedule.
+GitHub notification preferences control failure notifications.
 
-### Technology Stack
+## Candidate qualification
 
-- **Dashboard:** Static site + API backend (Node.js + SQLite or PostgreSQL)
-- **Release Monitoring:** Scheduled jobs (cron or Codex-driven)
-- **GitHub Integration:** GitHub API + webhooks
-- **Hosting:** Vercel, Netlify, or self-hosted (simple enough to run on a small VPS)
+| Platform | Automated candidate check | Still required before publication |
+| --- | --- | --- |
+| Windows x64 | Existing sandbox-enabled CEF build, native tests and unsigned package | Signing and installed-package browser/automation/passkey flows |
+| Linux x64 | CEF build, native tests and runtime bundle on Ubuntu | Installed-package flows and other supported distro/Wayland checks |
+| macOS arm64 | Compile the Swift/Objective-C++ browser library with the selected CEF headers/framework | Full containing-app build, signing/notarization and installed-app flows |
+| iOS/iPadOS | Uses the OS WebKit runtime; no CEF pin | Apple platform updates and WebKit/passkey integration checks |
+| Android | Uses the device's Android System WebView; no bundled CEF pin | WebView/provider updates and Android passkey integration checks |
 
----
+Native jobs run only when that platform's CEF version changes. Updating the
+monitor's code or docs exercises its tests and skips unrelated native builds.
+The macOS library check is labelled as compilation: the existing standalone
+macOS CI does not provide a complete containing-app CEF build.
 
-## Public Dashboard
+The pipeline does not automatically merge or publish browser binaries. CEF
+major updates can require API changes. Resolve them in the candidate branch,
+rerun qualification, bump each affected app's version, and follow the existing
+[macOS](macos-release.md), [Windows](windows-release.md) and Linux release
+procedures. Verify navigation, login/passkeys, automation and recovery on the
+installed artifact. Keep the release link and that evidence on the PR.
 
-### URL
+## Running and recovering the monitor
 
-```
-https://monitor.kelpie.dev/
-```
+From **Actions → Chromium update monitor → Run workflow**:
 
-(or subdomain on main website)
+- Leave **dry_run** checked to report available updates without GitHub writes.
+- Check **verify_downloads** to exercise archive verification without creating a PR.
+- Clear **dry_run** to create or resume the candidate and public status issue.
 
-### Display Sections
+The same read-only interface works locally with Node 22 or newer:
 
-#### 1. Engine Status Overview
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   ENGINE STATUS                         │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  Chromium (Blink)                                       │
-│  ├─ Latest Upstream:   v125.0.6422.142 (released 2026-03-28) │
-│  ├─ Current App:       v125.0.6422.138 (shipped)        │
-│  ├─ Status:            ⏳ UPDATE IN PROGRESS             │
-│  ├─ PR:                kelpie#1847 (Testing)          │
-│  └─ Days to Deadline:  7 days remaining                 │
-│                                                           │
-│  Gecko (Firefox)                                        │
-│  ├─ Latest Upstream:   v128.0 (released 2026-04-01)     │
-│  ├─ Current App:       v128.0 (shipped)                 │
-│  ├─ Status:            ✅ UP TO DATE                     │
-│  ├─ PR:                kelpie#1845 (Merged)           │
-│  └─ Days Since Update: 0 days                           │
-│                                                           │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### 2. Update Pipeline Status
-
-```
-┌─────────────────────────────────────────────────────────┐
-│              CHROMIUM UPDATE PIPELINE (v125.0.6422.142)  │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  T+0 (2026-03-28)    Upstream release detected          │
-│  T+4h (2026-03-28)   ✅ PR created by Claude            │
-│  T+8h (2026-03-28)   ✅ Build succeeded (all tests OK) │
-│  T+14h               ⏳ Manual review in progress       │
-│  T+24h (deadline)    Planned submission to App Review  │
-│                                                           │
-│  PR #1847: [build] bump Chromium to v125.0.6422.142    │
-│  └─ Created by: @codex-automation                       │
-│  └─ Status: All checks passed, awaiting review          │
-│                                                           │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### 3. CVE Tracking
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    SECURITY UPDATES                      │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  CHROMIUM v125.0.6422.142 addresses:                   │
-│  ├─ CVE-2024-2996  (Critical) ✅ Shipped in Kelpie   │
-│  ├─ CVE-2024-3156  (High)     ✅ Shipped in Kelpie   │
-│  └─ CVE-2024-3249  (Medium)   ✅ Shipped in Kelpie   │
-│                                                           │
-│  GECKO v128.0 addresses:                                │
-│  └─ [No new CVEs since v127.0]                          │
-│                                                           │
-│  Last security bulletin: Mozilla Advisory (2026-04-01)  │
-│                                                           │
-└─────────────────────────────────────────────────────────┘
+```sh
+node --test tests/engine-updates/*.test.mjs
+node scripts/engine-updates/scan.mjs
+node scripts/engine-updates/scan.mjs --verify-downloads
 ```
 
-#### 4. Automation Health
-
-```
-┌─────────────────────────────────────────────────────────┐
-│              AUTOMATION HEALTH                           │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  Last scan: 2026-04-01 10:43 UTC (20 minutes ago) ✅   │
-│  Upstream feed status:                                  │
-│  ├─ Chromium Dash: ✅ Reachable                        │
-│  ├─ Chrome Releases Blog: ✅ Reachable                 │
-│  ├─ Mozilla Release Calendar: ✅ Reachable             │
-│  └─ Mozilla Security Advisories: ✅ Reachable          │
-│                                                           │
-│  Next scan: 2026-04-01 12:00 UTC (1 hour 20 min)       │
-│  Dead man's switch: If no scan in 48 hours → ALERT     │
-│                                                           │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Interactive Features
-
-- **Filter by Engine:** Show only Chromium updates, only Gecko, or both
-- **Timeline View:** Historical record of all updates, PRs, and app releases
-- **Notifications:** Optional email alerts when a deadline is approaching (day 10 of 15)
-- **GitHub Links:** Direct links to PRs and issues
-- **Download Logs:** Export full audit log for App Review submission
-
----
-
-## Monitoring API
-
-### Endpoints (Internal Use)
-
-#### GET `/api/v1/engines/status`
-
-Returns current status of all monitored engines.
-
-```json
-{
-  "chromium": {
-    "upstreamVersion": "125.0.6422.142",
-    "upstreamReleaseDate": "2026-03-28T00:00:00Z",
-    "appVersion": "125.0.6422.138",
-    "appReleaseDate": "2026-03-25T08:30:00Z",
-    "status": "update_in_progress",
-    "prNumber": 1847,
-    "prStatus": "testing",
-    "cvesAddressed": [
-      "CVE-2024-2996",
-      "CVE-2024-3156",
-      "CVE-2024-3249"
-    ],
-    "daysToDeadline": 7,
-    "lastScanTime": "2026-04-01T10:43:00Z"
-  },
-  "gecko": {
-    "upstreamVersion": "128.0",
-    "upstreamReleaseDate": "2026-04-01T00:00:00Z",
-    "appVersion": "128.0",
-    "appReleaseDate": "2026-04-01T14:22:00Z",
-    "status": "current",
-    "prNumber": 1845,
-    "prStatus": "merged",
-    "cvesAddressed": [],
-    "daysToDeadline": null,
-    "lastScanTime": "2026-04-01T10:43:00Z"
-  }
-}
-```
-
-#### POST `/api/v1/engines/check`
-
-Manually trigger a scan for new releases (idempotent).
-
-```json
-{
-  "engines": ["chromium", "gecko"]
-}
-```
-
-Response:
-
-```json
-{
-  "scanStartedAt": "2026-04-01T10:44:00Z",
-  "updatesFound": [
-    {
-      "engine": "chromium",
-      "newVersion": "125.0.6422.142",
-      "action": "pr_created",
-      "prNumber": 1847,
-      "timestamp": "2026-04-01T10:44:15Z"
-    }
-  ]
-}
-```
-
-#### GET `/api/v1/health`
-
-Simple liveness check (used by dead man's switch).
-
-```json
-{
-  "status": "ok",
-  "lastScanTime": "2026-04-01T10:43:00Z",
-  "uptime": "720 hours",
-  "scanFrequency": "2 hours"
-}
-```
-
----
-
-## GitHub Integration
-
-### Automated PR Creation
-
-When a new upstream release is detected:
-
-1. **Claude/Codex generates PR:**
-   - Updates engine version in build files
-   - Updates CHANGELOG with CVE list
-   - Runs automated tests
-   - Commits with message: `[build] bump {engine} to {version}`
-
-2. **PR template includes:**
-   - Upstream release notes link
-   - CVE tracking table
-   - Test results
-   - Link to monitoring dashboard
-   - "For App Review visibility" note
-
-### Webhook Monitoring
-
-Kelpie's CI/CD listens for GitHub webhook events:
-
-- **PR created:** Auto-starts build
-- **PR merged:** Triggers app release workflow
-- **Deployment:** Dashboard updates with release date
-
-### Example PR Template
-
-```markdown
-## Upstream Release
-
-**Engine:** Chromium
-**Version:** v125.0.6422.142
-**Release Date:** 2026-03-28
-**Release Notes:** https://chromereleases.googleblog.com/...
-
-## Security Updates
-
-| CVE | Severity | Fixed |
-|-----|----------|-------|
-| CVE-2024-2996 | Critical | ✅ |
-| CVE-2024-3156 | High | ✅ |
-
-## Verification
-
-- [x] Automated tests passed
-- [x] Manual spot-check completed
-- [x] WPT score verified (95%+)
-- [x] Test262 score verified (90%+)
-
-## App Review Notes
-
-This PR is part of Kelpie's automated engine maintenance pipeline.
-Dashboard: https://monitor.kelpie.dev/
-Policy: https://kelpie.dev/security/vulnerability-disclosure
-
-**Deadline:** 2026-04-07 (15 days from upstream release)
-```
-
----
-
-## Compliance Checklist for App Review
-
-Before submitting each app update to Apple, verify:
-
-- [ ] Dashboard shows current status (upstream version, app version, deadline)
-- [ ] PR links are visible and accessible
-- [ ] All CVEs from the upstream release are listed
-- [ ] Build test results are shown
-- [ ] No CVEs in the upstream release are unaddressed
-- [ ] Submission date is before the 15-day deadline
-- [ ] CVE-2024-* entries link to official advisories
-
----
-
-## Maintenance & Alerts
-
-### Dead Man's Switch
-
-If no scan occurs in 48 hours:
-
-1. Dashboard shows **⚠️ AUTOMATION FAILURE** in red
-2. Email alert sent to devops team
-3. GitHub issue auto-created: "Monitoring service missed scan"
-4. App Review metadata marks service as "unhealthy"
-
-### Manual Overrides
-
-Dashboard provides admin panel to:
-
-- Mark an update as "manually reviewed and safe" (bypasses failed tests)
-- Adjust deadlines (if production incident delays submission)
-- Log manual CVE tracking (if automation missed one)
-
-### Audit Trail
-
-Every action is logged:
-
-- Who triggered the scan (automation, manual, webhook)
-- When PR was created and by what system
-- When PR was tested and results
-- When PR was merged
-- When release was submitted to App Review
-- When release was approved/rejected
-
----
-
-## Example Workflow (Happy Path)
-
-```
-2026-03-28 00:00 — Chromium v125.0.6422.142 released
-2026-03-28 02:15 — Kelpie monitoring detects release
-2026-03-28 02:30 — Claude/Codex PR #1847 created automatically
-2026-03-28 04:00 — GitHub workflow runs tests; all pass
-2026-03-28 08:30 — Human reviewer approves PR
-2026-03-28 09:00 — PR merged; release build triggered
-2026-03-28 10:00 — App uploaded to Apple TestFlight
-2026-03-28 14:00 — App approved by Apple
-2026-03-29 00:00 — App released to public
-2026-04-01 10:43 — Dashboard shows v125 as current; Chromium section says "✅ UP TO DATE"
-```
-
----
-
-## What This Proves to Apple
-
-1. **Commitment to Security:** Real-time monitoring of upstream CVEs
-2. **Automated Response:** PRs created within hours of release
-3. **Compliance Tracking:** 15-day deadline is tracked and visible
-4. **Transparency:** Public dashboard shows Apple reviewers the status anytime
-5. **Reliability:** Health monitoring catches failures immediately
-
----
-
-## Future Enhancements
-
-- **Integration with GitHub Actions:** Native workflow file for scanning and PR creation
-- **Slack Integration:** Notifications to devops on update detection and failures
-- **Comparison Matrix:** Show which features are supported in each engine version
-- **Performance Metrics:** Track WPT/Test262 scores over time
-- **Region-Specific Releases:** Track which app versions are available in which regions
-
----
-
-## Deployment
-
-### Initial Setup
-
-```bash
-# 1. Create monitoring service repo/folder
-# 2. Set up Node.js + SQLite backend
-# 3. Configure cron job for 2-hour scan interval
-# 4. Create GitHub PAT for PR creation
-# 5. Deploy dashboard to Vercel/Netlify
-# 6. Configure GitHub webhook for PR status updates
-# 7. Set up email alerts for failures
-```
-
-### Minimal Requirements
-
-- **Uptime:** 99.5% (can tolerate brief outages; manual scans can retry)
-- **Latency:** Scan must complete in < 30 minutes (upstream feeds are fast)
-- **Data Retention:** Keep 1 year of history (for App Review audits)
-- **Scalability:** Single instance is sufficient; < 1000 API calls/day
-
----
-
-## Security Considerations
-
-- **No Private Keys in Dashboard:** Only show public metadata
-- **No Credentials in Logs:** GitHub PAT must be masked
-- **HTTPS Only:** All endpoints require HTTPS
-- **Rate Limiting:** GitHub API requests must respect rate limits (60 req/min)
-- **DDoS Protection:** Cloudflare or similar for public dashboard
+Local reports go under ignored `.cache/engine-updates/`. `--publish` additionally
+requires `GH_TOKEN` and `GITHUB_REPOSITORY`, and only accepts the current `main`
+revision when creating a candidate. The workflow grants contents, PR, issue and
+Actions write permissions only to its monitor job. Candidate builds have
+read-only repository access.
+
+A failed upstream scan retries on the next schedule. An interrupted PR creation
+reuses the identical candidate branch; dispatch retries start only missing
+workflow runs. Human commits and closed review decisions are preserved. A
+failing candidate needs a source fix, not deletion or a force-push by the bot.
+After a human fix, the next monitor dispatches checks for the new commit.
+
+## Scope and earlier prototype
+
+`monitoring/` contains an earlier optional LLM-powered issue/dashboard prototype.
+It is not the scheduler, status authority or evidence source for this pipeline.
+No deployed `kelpie.works` or `monitor.kelpie.dev` service is assumed. Gecko's
+experimental downloader is outside this Chromium pipeline. Vulnerability
+triage, response deadlines, Web Platform Tests, regional engine eligibility and
+Apple's entitlement requirements need separate evidence; a green Actions run
+does not certify them.

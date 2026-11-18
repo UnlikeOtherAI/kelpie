@@ -233,34 +233,18 @@ Apple provides special APIs for high-performance JIT:
 
 ---
 
-## Kelpie's Monitoring & Compliance Dashboard
+## Public maintenance evidence
 
-To satisfy Apple's requirement for "active maintenance," Kelpie will have a public dashboard. For the full service architecture and API specification, see [engine-monitoring.md](engine-monitoring.md).
+The [GitHub Actions maintenance pipeline](engine-monitoring.md) checks stable
+desktop CEF releases every six hours, verifies candidate archives, opens update
+PRs and starts platform checks. Its public status issue and run summaries show
+source pins, available upstream versions, timestamps and failures. Reviewers can
+follow a specific run to its PR, checks and published release.
 
-The dashboard will show:
-
-1. **Current Engine Status**
-   - Upstream Gecko latest version
-   - Upstream Chromium latest version
-   - Kelpie's currently shipped version
-
-2. **Update Pipeline Status**
-   - "Scanning for updates..." (automated)
-   - "PR created" with link
-   - "Build testing..." with test results
-   - "Submitted to App Review" with submission date
-   - "Approved and shipped"
-
-3. **CVE Tracking**
-   - List of CVEs addressed in current build
-   - Security bulletin links to upstream advisories
-
-4. **Automation Health**
-   - Last successful scan timestamp
-   - Any failures in Claude/Codex automation (with alert)
-   - Dead man's switch: if no scan happens in 48 hours, alert
-
-This dashboard is **public-facing** (for App Review transparency) and **not behind authentication** (so Apple reviewers can verify compliance without special access).
+This evidence does not itself certify entitlement eligibility or iOS alternative
+engine support. CVE triage, Web Platform Tests, installed-app verification,
+signing and publication remain separate obligations. No deployed external
+dashboard or independent stale-monitor alert is assumed.
 
 ---
 
@@ -273,9 +257,9 @@ This dashboard is **public-facing** (for App Review transparency) and **not behi
 - [ ] Verify region-gating logic in code (check `Locale.region`)
 - [ ] Build and test on iOS device in EU/US (verify engine switch behavior)
 - [ ] Run WPT and Test262 on device; confirm no regressions
-- [ ] Set up automated Chromium/Gecko monitoring (mDNS, release feeds)
-- [ ] Implement Claude/Codex PR generation pipeline (test with a mock release)
-- [ ] Create compliance monitoring dashboard (even if empty initially)
+- [ ] Link a successful Chromium monitor run, candidate PR and platform checks
+- [ ] Link the signed release and installed-app verification for that candidate
+- [ ] Add Gecko monitoring if an actively maintained Gecko renderer is shipped
 - [ ] Prepare video demo showing LLM controlling browser with Gecko/Chromium in EU mode
 - [ ] Write App Review Notes explaining region-gating and automated maintenance
 

@@ -31,6 +31,13 @@ release metadata and packaging contract.
 
 For information about browser engine availability by platform and Apple's regulatory requirements for alternative engines, see [browser-engines.md](browser-engines.md).
 
+Desktop Chromium maintenance uses a public GitHub Actions pipeline: scheduled
+upstream checks verify stable CEF archives, propose version-update PRs, and run
+platform-specific candidate checks. Public run summaries and a timestamped status
+issue distinguish source pins, build candidates and published releases. iOS and
+Android use their system browser engines. See [maintenance and review evidence](engine-monitoring.md)
+for the workflow links, platform coverage and remaining release gates.
+
 ---
 
 ## How It Works

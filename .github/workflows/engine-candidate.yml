@@ -1,0 +1,173 @@
+name: Chromium candidate
+
+on:
+  pull_request:
+    paths:
+      - scripts/download-cef.sh
+      - scripts/download-cef-windows.ps1
+      - scripts/package-windows.ps1
+      - scripts/test-cef-upstream.sh
+      - scripts/engine-updates/**
+      - tests/engine-updates/**
+      - .github/workflows/engine-*.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      macosarm64: ${{ steps.pins.outputs.macosarm64 }}
+      windows64: ${{ steps.pins.outputs.windows64 }}
+      linux64: ${{ steps.pins.outputs.linux64 }}
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22
+      - run: node --test tests/engine-updates/*.test.mjs
+      - name: Compare engine pins with main
+        id: pins
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          import { readSources, readPins } from './scripts/engine-updates/pins.mjs';
+          const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encoding: 'utf8' }).trim();
+          const before = readPins(readSources('.', base));
+          const after = readPins(readSources());
+          for (const platform of Object.keys(after)) {
+            const changed = after[platform] !== before[platform];
+            appendFileSync(process.env.GITHUB_OUTPUT, `${platform}=${changed}\n`);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${platform}: ${before[platform]} → ${after[platform]} (${changed ? 'build required' : 'unchanged; native build skipped'})\n\n`);
+          }
+          NODE
+
+  windows:
+    needs: changes
+    if: needs.changes.outputs.windows64 == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: ./.github/actions/browser-contract
+      - name: Build and package the sandbox-enabled CEF candidate
+        shell: pwsh
+        run: |
+          node --test tests/windows/process.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Process tests failed' }
+          ./scripts/build-windows.ps1
+          ./scripts/package-windows.ps1
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: chromium-windows-candidate
+          path: |
+            dist/release/windows/*.zip
+            dist/release/windows/*.sha256
+            dist/release/windows/*.provenance.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  linux:
+    needs: changes
+    if: needs.changes.outputs.linux64 == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: ./.github/actions/browser-contract
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake g++ pkg-config nlohmann-json3-dev \
+            libgtk-3-dev libnss3-dev libnspr4-dev libasound2-dev libxss-dev \
+            libgbm-dev libdrm-dev libxcomposite-dev libxdamage-dev libxrandr-dev \
+            libavahi-client-dev libcurl4-openssl-dev libssl-dev libcups2-dev
+      - name: Build the pinned CEF application and run native tests
+        run: |
+          bash scripts/download-cef.sh linux
+          make linux
+          ctest --test-dir core/native/.build-linux --output-on-failure
+          ctest --test-dir apps/linux/build --output-on-failure
+      - name: Package candidate for installed-app verification
+        run: |
+          bash scripts/build-linux-runtime-bundle.sh --version "candidate-${GITHUB_SHA:0:12}" \
+            --build-label "GitHub run $GITHUB_RUN_ID; not a published release" --output-dir .cache/engine-candidate
+          tar -C .cache/engine-candidate -czf .cache/engine-candidate/linux-candidate.tar.gz kelpie-linux
+          sha256sum .cache/engine-candidate/linux-candidate.tar.gz > .cache/engine-candidate/SHA256SUMS
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: chromium-linux-candidate
+          include-hidden-files: true
+          path: |
+            .cache/engine-candidate/linux-candidate.tar.gz
+            .cache/engine-candidate/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+  macos:
+    name: macOS CEF browser library compile
+    needs: changes
+    if: needs.changes.outputs.macosarm64 == 'true'
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: ./.github/actions/browser-contract
+      - uses: jdx/mise-action@v4.1.0
+      - name: Prepare the pinned CEF and llama headers
+        run: |
+          test "$(uname -m)" = arm64
+          bash scripts/download-cef.sh macos
+          cmake -S core/native -B .cache/engine-candidate/native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DKELPIE_BUILD_DESKTOP_ENGINES=OFF -DKELPIE_LOCAL_LLM=ON
+          headers="$PWD/.cache/engine-candidate/llama"
+          mkdir -p "$headers"
+          cp .cache/engine-candidate/native/_deps/kelpie_llama-src/include/llama.h "$headers/"
+          cp .cache/engine-candidate/native/_deps/kelpie_llama-src/ggml/include/*.h "$headers/"
+          printf 'module llama [system] { header "llama.h" export * }\n' > "$headers/module.modulemap"
+      - name: Compile the browser library with Chromium enabled
+        run: |
+          set -o pipefail
+          TUIST_KELPIE_WEBKIT_ONLY=false mise exec -- tuist generate --path core/apple --no-open
+          xcodebuild -project core/apple/KelpieBrowser.xcodeproj -scheme KelpieBrowserMac \
+            -configuration Release -sdk macosx -arch arm64 -jobs 2 \
+            -derivedDataPath .cache/engine-candidate/derived CODE_SIGNING_ALLOWED=NO \
+            "SWIFT_INCLUDE_PATHS=$PWD/core/apple/Native $PWD/.cache/engine-candidate/llama" \
+            OTHER_LDFLAGS= build 2>&1 | tee .cache/engine-candidate/macos-build.log
+      - name: Retain compilation evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: chromium-macos-library-build
+          path: .cache/engine-candidate/macos-build.log
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90
+
+  result:
+    if: always()
+    needs: [changes, windows, linux, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Record candidate results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const results = JSON.parse(process.env.RESULTS);
+          for (const [name, job] of Object.entries(results)) {
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${name}: **${job.result}**\n\n`);
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Build evidence only. Signing, installed-app flows, passkeys and release publication are separate gates.\n');
+          if (Object.values(results).some(job => !['success', 'skipped'].includes(job.result))) process.exitCode = 1;
+          NODE
