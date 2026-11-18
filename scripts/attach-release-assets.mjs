@@ -29,7 +29,7 @@ export async function attachReleaseAssets(tag, root, run = args => execFileSync(
   if (new Set(names).size !== names.length) throw new Error('Release artifact names must be unique across components.');
   const getRelease = () => JSON.parse(run(['api', `repos/UnlikeOtherAI/kelpie/releases/tags/${encodeURIComponent(tag)}`]));
   const release = getRelease();
-  if (release.draft || release.prerelease || release.tag_name !== tag) throw new Error('A matching published stable release is required.');
+  if (release.draft || release.tag_name !== tag) throw new Error('A matching published release is required.');
   const planned = [];
   for (const file of files) {
     const name = basename(file), digest = await fileDigest(file);

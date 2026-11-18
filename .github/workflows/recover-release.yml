@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       linux: ${{ steps.source.outputs.linux }}
+      stable: ${{ steps.advertise.outputs.stable }}
     env:
       GH_TOKEN: ${{ github.token }}
       ARTIFACT_RUN_ID: ${{ github.event.workflow_run.id || inputs.artifact_run_id }}
@@ -51,12 +52,13 @@ jobs:
           RELEASE_TAG: ${{ steps.source.outputs.tag }}
         run: node scripts/attach-release-assets.mjs "$RELEASE_TAG" dist/release
       - name: Advertise completed app updates
+        id: advertise
         env:
           RELEASE_TAG: ${{ steps.source.outputs.tag }}
         run: node scripts/publish-built-app-updates.mjs "$RELEASE_TAG"
 
   publish-package-repos:
     needs: recover
-    if: ${{ needs.recover.outputs.linux == 'true' }}
+    if: ${{ needs.recover.outputs.linux == 'true' && needs.recover.outputs.stable == 'true' }}
     uses: ./.github/workflows/publish-linux-repositories.yml
     secrets: inherit

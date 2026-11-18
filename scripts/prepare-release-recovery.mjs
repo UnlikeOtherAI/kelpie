@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 export function validateRecovery(run, workflow, release, commit, artifacts) {
   if (run.event !== 'release' || run.workflow_id !== workflow.id || run.status !== 'completed') throw new Error('Recovery requires a completed run of the release workflow.');
   const tag = run.head_branch;
-  if (!/^release\/\d{4}-\d{2}-\d{2}(\.\d+)?$/.test(tag) || release.tag_name !== tag || release.draft || release.prerelease || commit.sha !== run.head_sha) {
+  if (!/^release\/\d{4}-\d{2}-\d{2}(\.\d+)?$/.test(tag) || release.tag_name !== tag || release.draft || commit.sha !== run.head_sha) {
     throw new Error('Release tag, source revision and completed build must match.');
   }
   const body = release.body ?? '';

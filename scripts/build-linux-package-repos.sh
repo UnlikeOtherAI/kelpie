@@ -67,7 +67,7 @@ while IFS= read -r tag; do
 
   PACKAGE_TAG="${tag}"
   break
-done < <(gh api --paginate "repos/${REPOSITORY}/releases" --jq '.[] | select(.draft == false) | .tag_name')
+done < <(gh api --paginate "repos/${REPOSITORY}/releases" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
 
 if [ -z "${PACKAGE_TAG}" ]; then
   echo "no release with .deb or .rpm assets found" >&2
