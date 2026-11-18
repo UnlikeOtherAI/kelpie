@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { access, chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -44,10 +44,29 @@ test('real CEF 120 cookie survives migration, restart, HTTP delivery and interru
     await waitFor(() => setSeen);
     await delay(200); // Let the response reach the old renderer before shutdown.
     await browser.stop(); browser = null;
+    const appState = {
+      'session.json': JSON.stringify({ tabs: [{ id: 'tab-9', url: 'https://example.org/saved', active: true }], nextTabId: 10 }),
+      'bookmarks.json': '[{"url":"https://example.org/bookmark","title":"Saved bookmark"}]',
+      'migration-account-fixture': 'private app state must never enter an engine verification profile',
+    };
+    for (const [name, contents] of Object.entries(appState)) await writeFile(join(profile, name), contents);
     const originalCookies = await readFile(join(profile, 'cef-cache/Cookies'));
+    const guardedBinary = async (name, binary) => {
+      const path = join(root, name);
+      const quoted = `'${resolve(binary).replaceAll("'", "'\\''")}'`;
+      await writeFile(path, '#!/bin/sh\nprevious=""\nselected=""\n' +
+        'for argument in "$@"; do\n  if [ "$previous" = --profile-dir ]; then selected="$argument"; fi\n' +
+        '  previous="$argument"\ndone\n' +
+        'test ! -e "$selected/migration-account-fixture" || exit 72\n' +
+        `exec ${quoted} "$@"\n`);
+      await chmod(path, 0o700);
+      return path;
+    };
+    const guardedOld = await guardedBinary('old-guard', oldBinary);
+    const guardedNew = await guardedBinary('new-guard', newBinary);
     const digest = createHash('sha256');
-    for await (const chunk of createReadStream(newBinary)) digest.update(chunk);
-    const options = { oldBinary: resolve(oldBinary), newBinary: resolve(newBinary), profile, newSha256: digest.digest('hex') };
+    for await (const chunk of createReadStream(guardedNew)) digest.update(chunk);
+    const options = { oldBinary: guardedOld, newBinary: guardedNew, profile, newSha256: digest.digest('hex') };
     await assert.rejects(migrate({ ...options, newSha256: '0'.repeat(64) }), /SHA-256/);
     assert.deepEqual(await readFile(join(profile, 'cef-cache/Cookies')), originalCookies);
     const unlock = await lockProfile(profile);
@@ -59,6 +78,10 @@ test('real CEF 120 cookie survives migration, restart, HTTP delivery and interru
     assert.equal(result.status, 'migrated');
     assert.equal(result.cookies, 1);
     assert.deepEqual(await readFile(join(result.backup, 'cef-cache/Cookies')), originalCookies);
+    for (const [name, contents] of Object.entries(appState)) {
+      assert.equal(await readFile(join(profile, name), 'utf8'), contents, `${name} must be preserved exactly`);
+      assert.equal(await readFile(join(result.backup, name), 'utf8'), contents);
+    }
     browser = await startBrowser(resolve(newBinary), profile, `${url}/check`);
     await waitFor(() => delivered);
     await browser.stop(); browser = null;

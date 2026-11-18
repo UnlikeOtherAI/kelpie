@@ -7,11 +7,15 @@ Current Chromium uses `cef-cache/Default` instead of the old flat `cef-cache`
 directory, and no longer upgrades its cookie database schema (version 19).
 Copying the database into `Default` silently drops those cookies.
 
-The migration runs both applications against private copies, reads cookies with
+The migration runs both applications against private copies of Chromium data, reads cookies with
 the old application's API, imports them with the new API, and compares their
 values and security attributes after a full restart. Cookie values stay in memory
 and are never logged or saved as a plaintext export. The original profile is
 replaced only after verification, and remains in a private sibling backup.
+Verification profiles exclude native account credentials, device identity, saved
+tabs, bookmarks and other app settings. Those files are copied unchanged into the
+finished profile after verification; the test launches cannot refresh the user's
+native account session, join their cookie-sync peers or replace their saved tabs.
 Existing modern cookies take precedence over old cookies with the same domain,
 path and name. Site-storage directories are copied only when no modern `Default`
 directory exists. Partitioned or transient cookies stop migration rather than

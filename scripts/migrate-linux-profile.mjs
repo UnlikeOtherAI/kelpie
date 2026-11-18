@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { chmod, cp, lstat, mkdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { call, lockProfile, startBrowser } from './profile-migration/linux-browser.mjs';
@@ -22,12 +22,13 @@ async function directory(path) {
   const info = await lstat(path);
   if (!info.isDirectory() || info.uid !== process.getuid()) throw new Error('Profile directories must belong to this user and cannot be symlinks');
 }
-async function copyProfile(from, to) {
+async function copyProfile(from, to, scope) {
   await cp(from, to, { recursive: true, force: false, errorOnExist: true, verbatimSymlinks: true,
     filter: async source => {
       if (['SingletonLock', 'SingletonCookie', 'SingletonSocket'].includes(source.split('/').at(-1))) return false;
       if ((await lstat(source)).isSymbolicLink()) throw new Error('Profile contains a symlink; refusing to open a copy that could write outside staging');
-      return true;
+      const path = relative(from, source);
+      return !path || (path.split(sep)[0] === 'cef-cache') === (scope === 'browser');
     },
   });
   await chmod(to, 0o700);
@@ -67,6 +68,7 @@ export async function migrate({ oldBinary, newBinary, profile, newSha256 }) {
   const original = join(operation, 'original');
   const source = join(operation, 'source');
   const staged = join(operation, 'staged');
+  const completed = join(operation, 'completed');
   const marker = '.kelpie-chromium-upgrade.json';
   // Recover an interrupted final rename automatically, before opening a browser.
   if (!await exists(profile) && await exists(original)) {
@@ -81,13 +83,15 @@ export async function migrate({ oldBinary, newBinary, profile, newSha256 }) {
     if (await exists(operation)) await directory(operation);
     else await mkdir(operation, { mode: 0o700 });
     await chmod(operation, 0o700);
-    for (const path of [source, staged]) await rm(path, { recursive: true, force: true });
-    await copyProfile(profile, source);
+    for (const path of [source, staged, completed]) await rm(path, { recursive: true, force: true });
+    // Verification must not restore the user's native account session, start
+    // cookie sync as their device, or save a temporary tab over their session.
+    await copyProfile(profile, source, 'browser');
     const legacy = await withBrowser(oldBinary, source, readCookies);
     if (legacy.some(cookie => cookie.expires === null)) {
       throw new Error('Transient cookies cannot be verified after restart; original profile is retained');
     }
-    await copyProfile(profile, staged);
+    await copyProfile(profile, staged, 'browser');
     await seedSiteStorage(staged);
     const expected = await withBrowser(newBinary, staged, async browser => {
       const current = await readCookies(browser);
@@ -104,11 +108,14 @@ export async function migrate({ oldBinary, newBinary, profile, newSha256 }) {
       return expected;
     });
     await withBrowser(newBinary, staged, async browser => verifyCookies(expected, await readCookies(browser)));
-    await writeFile(join(staged, marker), JSON.stringify({ version: 1, newSha256, cookieCount: expected.length }) + '\n', { mode: 0o600 });
+    await copyProfile(profile, completed, 'app');
+    await rename(join(staged, 'cef-cache'), join(completed, 'cef-cache'));
+    await writeFile(join(completed, marker), JSON.stringify({ version: 1, newSha256, cookieCount: expected.length }) + '\n', { mode: 0o600 });
     await rename(profile, original);
-    try { await rename(staged, profile); }
+    try { await rename(completed, profile); }
     catch (error) { await rename(original, profile); throw error; }
     await rm(source, { recursive: true, force: true });
+    await rm(staged, { recursive: true, force: true });
     return { status: 'migrated', cookies: expected.length, backup: original };
   } finally { await releaseLock(); }
 }

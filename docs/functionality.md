@@ -36,6 +36,8 @@ is put on hold before its packages are attached.
 Linux profiles from the old Chromium 120 build need the [profile upgrade tool](linux-profile-upgrades.md)
 before replacing the application. It migrates persistent cookies through the old
 and new browser APIs, verifies them after restart, and retains the original profile.
+Verification opens only copied Chromium data; native account state, saved tabs and
+settings stay outside those launches and are preserved unchanged.
 The ordinary update installer does not perform this legacy migration.
 
 For information about browser engine availability by platform and Apple's regulatory requirements for alternative engines, see [browser-engines.md](browser-engines.md).
