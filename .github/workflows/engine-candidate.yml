@@ -115,12 +115,21 @@ jobs:
     name: macOS CEF browser library compile
     needs: changes
     if: needs.changes.outputs.macosarm64 == 'true'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6.0.3
       - uses: ./.github/actions/browser-contract
       - uses: jdx/mise-action@v4.1.0
+      - name: Verify the Apple SDK required by Kelpie
+        run: |
+          xcodebuild -version
+          sdk="$(xcrun --sdk macosx --show-sdk-version)"
+          echo "macOS SDK: $sdk"
+          if [ "${sdk%%.*}" -lt 26 ]; then
+            echo '::error::Kelpie uses WebKit APIs introduced in the macOS 26 SDK.'
+            exit 1
+          fi
       - name: Prepare the pinned CEF and llama headers
         run: |
           test "$(uname -m)" = arm64
