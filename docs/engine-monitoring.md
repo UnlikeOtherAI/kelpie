@@ -65,6 +65,10 @@ Native jobs run only when that platform's CEF version changes. Updating the
 monitor's code or docs exercises its tests and skips unrelated native builds.
 The macOS library check is labelled as compilation: the existing standalone
 macOS CI does not provide a complete containing-app CEF build.
+The candidate uses the macOS 26 runner and records the selected Xcode and SDK
+versions. It requires SDK 26 or newer because the browser's WebKit code uses
+`obscuredContentInsets`; a runtime availability guard cannot make an older SDK
+compile that API.
 
 The pipeline does not automatically merge or publish browser binaries. CEF
 major updates can require API changes. Resolve them in the candidate branch,
