@@ -29,6 +29,11 @@ interrupting browsing. Embedded Kelpie browsers and headless Linux runs do not
 check for standalone updates. See [App update delivery](app-updates.md) for the
 release metadata and packaging contract.
 
+Linux profiles from the old Chromium 120 build need the [profile upgrade tool](linux-profile-upgrades.md)
+before replacing the application. It migrates persistent cookies through the old
+and new browser APIs, verifies them after restart, and retains the original profile.
+The ordinary update installer does not perform this legacy migration.
+
 For information about browser engine availability by platform and Apple's regulatory requirements for alternative engines, see [browser-engines.md](browser-engines.md).
 
 Desktop Chromium maintenance uses a public GitHub Actions pipeline: scheduled
