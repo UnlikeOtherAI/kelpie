@@ -8,6 +8,7 @@
 
 #if KELPIE_LINUX_HAS_CEF
 #include "kelpie/cef_app_factory.h"
+#include "include/base/cef_compiler_specific.h"
 #include "include/cef_app.h"
 #endif
 
@@ -44,6 +45,11 @@ void PrintHelp() {
 
 }  // namespace
 
+#if KELPIE_LINUX_HAS_CEF
+// CEF changes the stack guard in forked children. Every frame enclosing
+// CefExecuteProcess must allow that change, including the application's main.
+NO_STACK_PROTECTOR
+#endif
 int main(int argc, char* argv[]) {
   kelpie::linuxapp::AppConfig config;
   config.restart_arguments = kelpie::linuxapp::CaptureLaunchArguments(argc, argv);
