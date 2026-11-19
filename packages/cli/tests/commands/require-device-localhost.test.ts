@@ -9,7 +9,7 @@ import { clearDevices } from "../../src/discovery/registry.js";
 
 // mDNS browse returns nothing; the localhost probe must self-heal.
 vi.mock("../../src/discovery/scanner.js", () => ({
-  scanForDevices: vi.fn(async () => []),
+  scanForDevices: vi.fn(async () => ({ devices: [], interfaces: [{ address: "127.0.0.1" }] })),
 }));
 
 function programWithoutDevice(): Command {

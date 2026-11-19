@@ -67,7 +67,9 @@ mDNS announcements are racy. If the scan finds no devices, the CLI falls back to
 
 **Alias:** `kelpie devices` is equivalent to `kelpie discover`.
 
-`kelpie discover` and MCP `kelpie_discover` report the mDNS status, service type and timeout. They give a hint on an empty or unavailable scan. Discovery does not start pairing. MCP `kelpie_list_devices` reads its cache.
+`kelpie discover` and MCP `kelpie_discover` send the mDNS query on each local IPv4 interface. The result reports the service type, timeout, interface addresses and any socket errors. If a query runs but gets no usable replies, check the browser's advertisement and UDP 5353 multicast on the network. If you know the browser's address, pass its exact `host:port`. Discovery does not start pairing. MCP `kelpie_list_devices` reads its cache.
+
+Discovery lists separate listeners on the same device by port. If more than one listener matches a device ID or name, use the listed `host:port` to select one.
 
 ### `kelpie describe`
 Describe this Kelpie install in one machine-readable document: which version is

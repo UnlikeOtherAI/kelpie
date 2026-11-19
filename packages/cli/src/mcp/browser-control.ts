@@ -29,7 +29,7 @@ export function registerBrowserControl(server: McpServer, pinned?: DiscoveredDev
     if (help) return { content: [{ type: "text", text: JSON.stringify(help) }] };
     const device = query ? await getDevice(query) : pinned ?? await getDevice("");
     if (!device) {
-      const reason = query ? `No browser device matching "${query}".` : "No browser device selected.";
+      const reason = query ? `No unique browser device matching "${query}".` : "No browser device selected.";
       return { isError: true, content: [{ type: "text", text: `${reason} ${mcpDeviceHint}` }] };
     }
     const key = JSON.stringify([device.id, device.ip, device.port, device.localLaunchId]);

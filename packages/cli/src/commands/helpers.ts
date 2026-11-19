@@ -86,7 +86,7 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
       port: explicitGlobalPort(program, globals),
     });
     if (!device) {
-      print({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${globals.device}"` } }, globals.format);
+      print({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No unique device matching "${globals.device}". Use its exact host:port.` } }, globals.format);
       process.exitCode = 4;
       return null;
     }
@@ -101,8 +101,11 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
     process.exitCode = 1;
     return null;
   }
-  const names = all.map((d) => `  ${d.id}  ${d.name} (${d.platform})`).join("\n");
-  print({ success: false, error: { code: "MULTIPLE_DEVICES", message: `Multiple devices found. Use --device to pick one:\n${names}` } }, globals.format);
+  const names = all.map((device) => {
+    const host = device.ip.includes(":") ? `[${device.ip}]` : device.ip;
+    return `  ${host}:${device.port}  ${device.name} (${device.platform})`;
+  }).join("\n");
+  print({ success: false, error: { code: "MULTIPLE_DEVICES", message: `Multiple devices found. Use --device with a host:port:\n${names}` } }, globals.format);
   process.exitCode = 1;
   return null;
 }

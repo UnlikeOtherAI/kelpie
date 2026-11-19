@@ -18,7 +18,7 @@ import type { DiscoveredDevice } from "../../src/types.js";
 import { setRunningBrowser, upsertBrowserAlias } from "../../src/browser/store.js";
 
 vi.mock("../../src/discovery/scanner.js", () => ({
-  scanForDevices: vi.fn(async () => []),
+  scanForDevices: vi.fn(async () => ({ devices: [], interfaces: [{ address: "127.0.0.1" }] })),
 }));
 
 vi.mock("../../src/discovery/local-probe.js", () => ({
@@ -42,7 +42,6 @@ function makeDevice(overrides: Partial<DiscoveredDevice> = {}): DiscoveredDevice
 }
 
 describe("device registry", () => {
-  const originalHome = process.env.HOME;
   let homeDir = "";
 
   beforeEach(() => {
@@ -53,11 +52,11 @@ describe("device registry", () => {
 
   beforeEach(async () => {
     homeDir = await mkdtemp(path.join(os.tmpdir(), "kelpie-registry-"));
-    process.env.HOME = homeDir;
+    vi.stubEnv("KELPIE_HOME", homeDir);
   });
 
   afterEach(async () => {
-    process.env.HOME = originalHome;
+    vi.unstubAllEnvs();
     await rm(homeDir, { recursive: true, force: true });
   });
 
@@ -113,6 +112,18 @@ describe("device registry", () => {
   it("does not implicitly pick the first of multiple browsers", async () => {
     addDevices([makeDevice(), makeDevice({ id: "other" })]);
     expect(await getDevice("")).toBeUndefined();
+  });
+
+  it("retains both listeners on one device and requires an unambiguous selector", async () => {
+    const first = makeDevice({ port: 8422 });
+    const second = makeDevice({ port: 18476 });
+    addDevices([first, second]);
+
+    expect(getAllDevices()).toEqual([first, second]);
+    for (const selector of ["", first.id, first.name, "iPhone", first.ip]) {
+      expect(await getDevice(selector)).toBeUndefined();
+    }
+    expect(await getDevice(`${first.ip}:18476`)).toEqual({ ...second, explicitAddress: true });
   });
 
   it("shares an in-flight scan and can try again after an empty result", async () => {
