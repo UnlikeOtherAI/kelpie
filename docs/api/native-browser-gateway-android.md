@@ -77,6 +77,12 @@ extensions retain their existing events. Android has no registered native keypre
 handler, so common keypress is omitted. Common screenshots support viewport PNG;
 the rich extension retains its formats and full-page options.
 
+Viewport screenshots draw the requested WebView into a private hardware buffer
+on Android 10 or later when hardware acceleration is available. This includes
+hardware-rendered page content and excludes app or host overlays. A hidden or
+detached WebView, or one that cannot provide a frame, returns a screenshot error.
+Android 9 and software-only hosts use a view-local software capture.
+
 Build on Ubuntu with Java 17, Android SDK, Node 20+ and pnpm in PATH:
 `cd apps/android && ./gradlew build`. CMake generates the common contract from
 shared sources and links `kelpie_core_mcp` into `kelpie_jni`; schema copies are
