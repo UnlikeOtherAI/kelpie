@@ -11,9 +11,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.11</string>
+	<string>0.2.13</string>
 	<key>CFBundleVersion</key>
-	<string>39</string>
+	<string>41</string>
 	<key>CFBundleURLTypes</key>
     <array><dict><key>CFBundleURLSchemes</key><array><string>com.unlikeotherai.kelpie</string></array>
     <key>CFBundleURLName</key><string>UOA sign-in</string></dict></array>
@@ -28,6 +28,7 @@
 	<array>
 		<string>_kelpie._tcp</string>
 		<string>_kelpie-sync._tcp</string>
+		<string>_appreveal._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Kelpie uses the local network to receive browser automation commands from the CLI and to sync cookies with your other signed-in Kelpie devices.</string>

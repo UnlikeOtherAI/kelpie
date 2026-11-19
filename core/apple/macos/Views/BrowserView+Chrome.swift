@@ -63,7 +63,7 @@ extension BrowserView {
     func showStartPage() {
         isChromeCollapsed = false
         guard let blank = URL(string: "about:blank") else { return }
-        serverState.handlerContext.load(url: blank)
+        serverState.handlerContext.load(url: blank, windowId: windowId)
         tabStore.activeTab?.isStartPage = true
         tabStore.activeTab?.title = "Start Page"
         tabStore.activeTab?.favicon = nil

@@ -69,15 +69,15 @@ extension BrowserView {
         // This replaces the store's callback, so it hands the tab's own state,
         // history and screenshot work back to the store before syncing the
         // window.
-        tab.renderer.onStateChange = { [weak tab, weak tabStore, weak browserState, weak serverState] in
-            guard let tab, let tabStore, let browserState, let serverState else { return }
+        tab.renderer.onStateChange = { [weak tab, weak tabStore, weak browserState] in
+            guard let tab, let tabStore, let browserState else { return }
             Task { @MainActor in
                 // Update tab's own stored state (always, for all tabs — tab bar needs these)
                 let wasLoading = tab.isLoading
                 tabStore.rendererStateChanged(tab)
 
-                // Only sync shared browserState for the active tab
-                guard serverState.wkRenderer === tab.renderer else { return }
+                // Each window's chrome follows its own active tab.
+                guard tabStore.activeTab === tab else { return }
                 sync(browserState: browserState, from: tab.renderer)
 
                 // Favicon fetch on load completion (active tab only)
@@ -128,7 +128,7 @@ extension BrowserView {
             pendingInsecureURL = url
             return
         }
-        serverState.handlerContext.load(url: url)
+        serverState.handlerContext.load(url: url, windowId: windowId)
     }
 
     /// Installs this window's tab-mutation callbacks in `WindowRegistry` so

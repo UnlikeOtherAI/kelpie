@@ -14,6 +14,12 @@ struct RendererContainerView: NSViewRepresentable {
     var onHoverURL: (String) -> Void = { _ in }
     var onChromeScroll: (Bool) -> Void = { _ in }
 
+    // The automation target changes independently of this window's tab selection.
+    private var displayedRenderer: (any RendererEngine)? {
+        if rendererState.activeEngine == .webkit { return tabStore.activeTab?.renderer }
+        return serverState.handlerContext.renderer
+    }
+
     @MainActor
     final class Coordinator {
         var attachedEngine: RendererState.Engine?
@@ -108,11 +114,11 @@ struct RendererContainerView: NSViewRepresentable {
 
     private func updateHover(in container: NSView, coordinator: Coordinator) {
         let webView = rendererState.activeEngine == .webkit && tabStore.activeTab?.isStartPage != true
-            ? serverState.handlerContext.renderer?.makeView() as? WKWebView : nil
+            ? displayedRenderer?.makeView() as? WKWebView : nil
         coordinator.chromeSampler.update(webView: webView, onSample: chromeAppearance.setSample)
         coordinator.hoverTracker.update(
             container: container,
-            renderer: serverState.handlerContext.renderer,
+            renderer: displayedRenderer,
             topInset: chromeUnderlap,
             onChange: onHoverURL
         )
@@ -132,7 +138,7 @@ struct RendererContainerView: NSViewRepresentable {
     }
 
     private func attachActiveRenderer(to container: NSView, coordinator: Coordinator) {
-        guard let activeView = serverState.handlerContext.renderer?.makeView() else {
+        guard let activeView = displayedRenderer?.makeView() else {
             container.subviews.forEach { $0.isHidden = true }
             coordinator.attachedEngine = nil
             return

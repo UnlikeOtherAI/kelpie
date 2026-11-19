@@ -5,7 +5,6 @@ import SwiftUI
 @MainActor
 public final class KelpieBrowserSession: ObservableObject {
     public let connectionInstallationID: String
-    let browserState = BrowserState()
     let rendererState = RendererState()
     let serverState: ServerState
     private let localControlEnabled: Bool
@@ -161,6 +160,7 @@ public final class KelpieBrowserSession: ObservableObject {
 public final class KelpieBrowserSurface: ObservableObject {
     let session: KelpieBrowserSession
     let tabs = TabStore()
+    let browserState = BrowserState()
     let windowID = UUID().uuidString
     let ownsWindowChrome: Bool
 
@@ -189,7 +189,7 @@ public struct KelpieBrowserView: View {
 
     public var body: some View {
         BrowserView(
-            browserState: surface.session.browserState,
+            browserState: surface.browserState,
             serverState: surface.session.serverState,
             rendererState: surface.session.rendererState,
             viewportState: surface.session.serverState.viewportState,

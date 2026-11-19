@@ -56,6 +56,44 @@ final class EmbeddedWindowTests: XCTestCase {
         XCTAssertNil(WindowRegistry.shared.entry(for: id)?.ownedWindow)
     }
 
+    func testEachWindowDisplaysItsOwnActiveWebKitTab() async {
+        let server = ServerState()
+        let engine = RendererState()
+        engine.activeEngine = .webkit
+        let first = KelpieBrowser.Tab(spec: TabSpec(persistent: false, dataStore: .nonPersistent()))
+        let second = KelpieBrowser.Tab(spec: TabSpec(persistent: false, dataStore: .nonPersistent()))
+        first.isStartPage = false
+        second.isStartPage = false
+        server.setActiveWebKitRenderer(second.renderer)
+
+        let firstWindow = makeRendererWindow(for: first, server: server, engine: engine)
+        let secondWindow = makeRendererWindow(for: second, server: server, engine: engine)
+        defer {
+            firstWindow.contentViewController = nil
+            secondWindow.contentViewController = nil
+        }
+
+        XCTAssertTrue(first.renderer.makeView().window === firstWindow)
+        XCTAssertTrue(second.renderer.makeView().window === secondWindow)
+        XCTAssertFalse(first.renderer.makeView().isHidden)
+        XCTAssertFalse(second.renderer.makeView().isHidden)
+    }
+
+    private func makeRendererWindow(for tab: KelpieBrowser.Tab, server: ServerState, engine: RendererState) -> NSWindow {
+        let window = NSWindow()
+        window.contentViewController = NSHostingController(rootView:
+            RendererContainerView(
+                chromeAppearance: BrowserChromeAppearance(),
+                serverState: server,
+                rendererState: engine,
+                tabStore: TabStore(isolatedTab: tab)
+            )
+            .frame(width: 320, height: 200)
+        )
+        window.contentView?.layoutSubtreeIfNeeded()
+        return window
+    }
+
     private func awaitRegistration(_ id: String, window: NSWindow) async {
         for _ in 0..<50 {
             if WindowRegistry.shared.entry(for: id)?.window === window { return }
