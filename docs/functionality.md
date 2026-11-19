@@ -732,6 +732,13 @@ and Android write UTC ISO-8601 dates and accept the older Apple numeric format.
 Paired browser automation operates on the currently displayed favourites store,
 including the account store while signed in.
 
+The signed-in account menu on iOS and Android offers **Delete account**. It opens
+UnlikeOtherAI’s deletion request in the system browser without passing an email or
+session token. Verify the account email and the authenticator code when enabled.
+UnlikeOtherAI reviews the request and handles deletion across connected products.
+The same form is accessible from the public [Kelpie privacy policy](https://unlikeotherai.github.io/kelpie/privacy/),
+which is also linked from **Settings → Help**.
+
 ### Shared sign-in profile
 
 On every platform the UOA login screen uses the same cookie and website-data store as

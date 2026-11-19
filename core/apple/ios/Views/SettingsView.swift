@@ -125,6 +125,10 @@ struct SettingsView: View {
                     Button("Open UnlikeOtherAI") {
                         openHelpURL("https://unlikeotherai.com")
                     }
+
+                    Button("Privacy Policy") {
+                        openHelpURL("https://unlikeotherai.github.io/kelpie/privacy/")
+                    }
                 }
 
                 Section("App") {
