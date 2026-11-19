@@ -63,10 +63,9 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 - (void)evaluateJavaScript:(NSString *)script
                 completion:(void (^ _Nonnull)(NSString * _Nullable result, NSError * _Nullable error))completion;
 
-/// Close the browser and pump the CEF message loop until the close
-/// completes. Must be called before releasing the bridge to avoid
-/// leaving CrBrowserMain running against freed state.
-- (void)closeBrowser;
+/// Retire the embedded browser by removing its CEF-owned child. Completion
+/// runs after CEF's on_before_close callback has released the browser handles.
+- (void)retireEmbeddedBrowserWithCompletion:(void (^)(void))completion;
 
 /// Notify CEF that the browser view is hidden or visible.
 /// Call with YES when the view is removed from any window,

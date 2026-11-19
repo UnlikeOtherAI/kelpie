@@ -91,22 +91,25 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
     return self;
 }
 
-- (void)closeBrowser {
-    // Force-close the browser so CEF can tear down CrBrowserMain and all
-    // internal threads cleanly before this bridge is released. Without this,
-    // releasing the browser handle leaves CEF's internal state half-alive,
-    // and creating a new browser (on renderer switch) collides with it.
+- (void)retireEmbeddedBrowserWithCompletion:(void (^)(void))completion {
     cef_browser_host_t *host = CEFBridgeCopyBrowserHost([self activeBrowser]);
-    if (host == nullptr) { return; }
-    if (host->close_browser != nullptr) {
-        host->close_browser(host, 1); // force=1: skip JS unload, close immediately
+    if (host == nullptr) {
+        completion();
+        return;
     }
+    NSView *parent = _parentView;
+    NSView *child = host->get_window_handle ? (__bridge NSView *)host->get_window_handle(host) : nil;
     host->base.release(&host->base);
-    // Drain CEF's message queue so the close events are processed before
-    // the caller releases this object.
-    for (int i = 0; i < 30; i++) {
-        cef_do_message_loop_work();
-    }
+    // The native CefBrowserHostView destructor calls WindowDestroyed. A force
+    // close would instead schedule performClose: on the containing NSWindow.
+    // Retain both the bridge and parent until on_before_close, even if the tab
+    // store has already released the tab.
+    _retirementCompletion = ^{
+        (void)self;
+        (void)parent;
+        completion();
+    };
+    [child removeFromSuperview];
 }
 
 - (void)setHidden:(BOOL)hidden {
@@ -352,6 +355,10 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
             _createdBrowser->base.release(&_createdBrowser->base);
             _createdBrowser = nullptr;
         }
+    }
+    if (_retirementCompletion != nil) {
+        dispatch_async(dispatch_get_main_queue(), _retirementCompletion);
+        _retirementCompletion = nil;
     }
 }
 

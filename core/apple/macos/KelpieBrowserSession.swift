@@ -159,13 +159,14 @@ public final class KelpieBrowserSession: ObservableObject {
 @MainActor
 public final class KelpieBrowserSurface: ObservableObject {
     let session: KelpieBrowserSession
-    let tabs = TabStore()
+    let tabs: TabStore
     let browserState = BrowserState()
     let windowID = UUID().uuidString
     let ownsWindowChrome: Bool
 
     init(session: KelpieBrowserSession, ownsWindowChrome: Bool) {
         self.session = session
+        self.tabs = TabStore(engine: session.rendererState.activeEngine)
         self.ownsWindowChrome = ownsWindowChrome
     }
 

@@ -34,6 +34,7 @@ final class RendererState: ObservableObject {
     init() {
         let saved = KelpieStorage.defaults.string(forKey: "com.kelpie.renderer-engine") ?? ""
         let selected = Engine(rawValue: saved) ?? .webkit
-        self.activeEngine = Engine.allCases.contains(selected) ? selected : .webkit
+        let hasRestorablePartitions = SessionStore.load().contains { $0.partition != nil && $0.persistent }
+        self.activeEngine = Engine.allCases.contains(selected) && !hasRestorablePartitions ? selected : .webkit
     }
 }

@@ -21,6 +21,9 @@ final class Tab: ObservableObject, Identifiable {
     let id = UUID()
     let renderer: WKWebViewRenderer
     let chatSession: AIChatSession
+    #if !KELPIE_WEBKIT_ONLY
+    var chromiumRenderer: CEFRenderer?
+    #endif
 
     /// Storage container this tab is bound to; `nil` means the shared default
     /// store. Immutable: a tab cannot change identity mid-life, and a partition
@@ -105,14 +108,18 @@ final class Tab: ObservableObject, Identifiable {
 final class TabStore: ObservableObject {
     @Published private(set) var tabs: [Tab] = []
     @Published private(set) var activeTabID: UUID?
+    private(set) var engine: RendererState.Engine = .webkit
+    private(set) var isClosed = false
 
     var activeTab: Tab? { tabs.first { $0.id == activeTabID } }
+    var activeRenderer: (any RendererEngine)? { activeTab.flatMap(renderer(for:)) }
 
     // Keyed by tab ID so unbind() can cancel cleanly.
     private var tabSinks: [UUID: AnyCancellable] = [:]
     private var sessionPersistence = true
 
-    init() {
+    init(engine: RendererState.Engine = .webkit) {
+        self.engine = engine
         var restoredTabs: [Tab] = []
         var activeIndex = 0
         // Index against the tabs that actually came back, not against the
@@ -161,14 +168,16 @@ final class TabStore: ObservableObject {
         }
         let tab = Tab(spec: spec)
         tab.isStartPage = false
+        tab.currentURL = url.absoluteString
         bind(tab)
-        tab.renderer.load(url: url)
+        if engine == .webkit { tab.renderer.load(url: url) }
         return tab
     }
 
     @discardableResult
     func addTab(spec: TabSpec = TabSpec()) -> Tab {
         NessieConnection.shared.personChangedTab()
+        activeRenderer?.willDeactivate()
         let tab = Tab(spec: spec)
         bind(tab)
         tabs.append(tab)
@@ -201,8 +210,11 @@ final class TabStore: ObservableObject {
     }
 
     func selectTab(id: UUID) {
-        if id != activeTabID { NessieConnection.shared.personChangedTab() }
         guard tabs.contains(where: { $0.id == id }) else { return }
+        if id != activeTabID {
+            NessieConnection.shared.personChangedTab()
+            activeRenderer?.willDeactivate()
+        }
         activeTabID = id
         persistSession()
     }
@@ -211,8 +223,9 @@ final class TabStore: ObservableObject {
     /// URL, loading, history and the start page screenshot. The renderer has a
     /// single state callback, so whoever installs it (this store, or a window
     /// adopting the tab) must route through here.
-    func rendererStateChanged(_ tab: Tab) {
-        let renderer = tab.renderer
+    func rendererStateChanged(_ tab: Tab, from renderer: any RendererEngine) {
+        guard renderer.engineName == engine.rawValue else { return }
+        if engine == .chromium, tab.isStartPage { return }
         let rawTitle = renderer.currentTitle
         let nextURL = renderer.currentURL?.absoluteString ?? ""
         tab.title = rawTitle.isEmpty ? "Start Page" : rawTitle
@@ -226,7 +239,7 @@ final class TabStore: ObservableObject {
     private func bind(_ tab: Tab) {
         tab.renderer.onStateChange = { [weak self, weak tab] in
             guard let self, let tab else { return }
-            self.rendererStateChanged(tab)
+            self.rendererStateChanged(tab, from: tab.renderer)
         }
         tabSinks[tab.id] = tab.objectWillChange
             .sink { [weak self] _ in
@@ -238,7 +251,7 @@ final class TabStore: ObservableObject {
     /// Start page screenshots come from the person's own session only, never
     /// from an isolated renderer harness.
     private func capturePreviewIfSettled(_ tab: Tab) {
-        guard sessionPersistence else { return }
+        guard sessionPersistence, engine == .webkit else { return }
         SitePreviewCapturer.shared.tabChanged(tab) { [weak self, weak tab] in
             guard let self, let tab else { return false }
             return self.activeTabID == tab.id
@@ -249,10 +262,16 @@ final class TabStore: ObservableObject {
         SitePreviewCapturer.shared.tabClosed(tab.id)
         tab.chatSession.close()
         tab.renderer.onStateChange = nil
+        #if !KELPIE_WEBKIT_ONLY
+        tab.chromiumRenderer?.retire()
+        tab.chromiumRenderer = nil
+        #endif
         tabSinks.removeValue(forKey: tab.id)
     }
 
     func closeAll() {
+        guard !isClosed else { return }
+        isClosed = true
         persistSession()
         sessionPersistence = false
         for tab in tabs {
@@ -266,5 +285,43 @@ final class TabStore: ObservableObject {
     private func persistSession() {
         guard sessionPersistence else { return }
         SessionStore.save(tabs: tabs, activeID: activeTabID)
+    }
+
+    func renderer(for tab: Tab) -> (any RendererEngine)? {
+        if engine == .webkit { return tab.renderer }
+        #if !KELPIE_WEBKIT_ONLY
+        guard tab.partition == nil else { return nil }
+        if let chromium = tab.chromiumRenderer { return chromium }
+        let chromium = CEFRenderer(tabID: tab.id)
+        tab.chromiumRenderer = chromium
+        chromium.onStateChange = { [weak self, weak tab, weak chromium] in
+            guard let self, let tab, let chromium else { return }
+            self.rendererStateChanged(tab, from: chromium)
+        }
+        if !tab.isStartPage, let url = URL(string: tab.currentURL), !tab.currentURL.isEmpty {
+            chromium.load(url: url)
+        }
+        return chromium
+        #else
+        return nil
+        #endif
+    }
+
+    /// Reuse each tab's browser when it already holds the same URL. A Chromium
+    /// tab which has never been shown stays lazy until its surface is selected.
+    func selectEngine(_ engine: RendererState.Engine) {
+        guard engine != self.engine else { return }
+        activeRenderer?.willDeactivate()
+        self.engine = engine
+        for tab in tabs where !tab.isStartPage {
+            guard !tab.currentURL.isEmpty, let url = URL(string: tab.currentURL) else { continue }
+            let target: (any RendererEngine)?
+            #if !KELPIE_WEBKIT_ONLY
+            target = engine == .webkit ? tab.renderer : tab.chromiumRenderer
+            #else
+            target = tab.renderer
+            #endif
+            if let target, target.currentURL != url { target.load(url: url) }
+        }
     }
 }

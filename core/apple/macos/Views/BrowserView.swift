@@ -268,8 +268,6 @@ struct BrowserView: View {
         .onAppear {
             if let activeTab = tabStore.activeTab {
                 activateTab(activeTab)
-            } else {
-                connectNewTab(tabStore.tabs[0])
             }
             // Register this window with the registry and install its
             // tab-mutation callbacks so HTTP handlers can route per-window
@@ -286,7 +284,6 @@ struct BrowserView: View {
                 aiState.onAuthFailureNavigate = { [weak serverState] url in
                     serverState?.handlerContext.load(url: url)
                 }
-                await connectRendererState()
             }
         }
         .onDisappear {
@@ -298,9 +295,7 @@ struct BrowserView: View {
         }
         .onChange(of: rendererState.activeEngine) { _, _ in
             hoveredLinkURL = ""
-            Task { @MainActor in
-                await connectRendererState()
-            }
+            if let tab = tabStore.activeTab { connectNewTab(tab) }
         }
         .onChange(of: viewportState.resolutionLabel) { _, _ in
             notifyRendererViewportChangeIfNeeded()

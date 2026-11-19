@@ -452,9 +452,15 @@ Query elements inside shadow roots, even nested ones. List all shadow DOM hosts 
 
 List open tabs, create new ones, switch between them, close them. Each tab tracks its URL, title, and active state. Each tab owns its own WebView instance so page state, scroll position, and history are preserved across tab switches.
 
+On macOS, WebKit and Chromium both use the native tab strip, keyboard shortcuts,
+and tab API. Each opened Chromium page uses a separate browser in the window's
+tab store, retaining its document and scroll position when another tab is
+selected. Select a Chromium tab before using automation that needs a visible
+renderer, such as JavaScript evaluation.
+
 On macOS, `Cmd+T` focuses the address field immediately after opening a new tab. Windows does the same with `Ctrl+T`, the new-tab plus and **New isolated tab**. Clicking an unfocused address field selects its full contents on both desktops, so typing replaces the existing address; later clicks allow normal caret placement and text selection. On Windows, address text follows the window DPI, including 200% scaling and moves between displays.
 
-On macOS, Windows and Linux, every tab-scoped browser command accepts an optional `tabId` and `generation` lease so multiple agents can control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. `new-tab` returns the tab identifier and generation. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, cookies, storage, and dialogs execute against the resolved lease. iOS and Android always operate on the active tab. Legacy mobile requests capture that tab's WebView at dispatch, so a pending UI refresh cannot redirect navigation or cookie access to the previous tab's store.
+On macOS with WebKit, and on Windows and Linux, tab-scoped browser commands can target a background tab by `tabId`. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. The Windows and Linux lease also accepts the `generation` returned by `new-tab`. Legacy macOS Chromium calls without a tab ID target the active tab. iOS and Android always operate on the active tab. Legacy mobile requests capture that tab's WebView at dispatch, so a pending UI refresh cannot redirect navigation or cookie access to the previous tab's store.
 
 macOS also supports multiple top-level windows. Each window has its own tab list, and tab IDs are scoped per window. Tab-related requests accept an optional `windowId` field, and `get-tabs` returns a `windows` array enumerating every window when more than one is open. iOS and Android only ever expose one window and report `windowId: "main"`.
 

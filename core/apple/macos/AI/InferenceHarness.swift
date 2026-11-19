@@ -38,7 +38,7 @@ struct InferenceHarness {
         var pendingImage: Data?
         let vision = await MainActor.run { engine.capabilities.contains("vision") }
         guard let router else { throw InferenceEngine.InferenceError.inferenceFailed("Browser router is unavailable") }
-        let tabId = await MainActor.run { context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString }
+        let tabId = await MainActor.run { context.selectedBrowserTabID }
         let browser = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true, admission: .localReadOnly(vision: vision))
         let definitions = await browser.toolDefinitions()
         let observation = await browser.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "",
