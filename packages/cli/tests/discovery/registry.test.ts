@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { probeLocalDevices } from "../../src/discovery/local-probe.js";
+import { scanForDevices } from "../../src/discovery/scanner.js";
 import {
   addDevice,
   addDevices,
@@ -46,6 +47,7 @@ describe("device registry", () => {
 
   beforeEach(() => {
     clearDevices();
+    vi.mocked(scanForDevices).mockClear();
     vi.mocked(probeLocalDevices).mockResolvedValue([]);
   });
 
@@ -100,6 +102,24 @@ describe("device registry", () => {
       ip: "192.168.1.42",
       port: 8422,
     });
+  });
+
+  it("routes explicit addresses without waiting for discovery", async () => {
+    expect(await getDevice("test-device.local:8422")).toMatchObject({ ip: "test-device.local", port: 8422, explicitAddress: true });
+    expect(await getDevice("[::1]:8422")).toMatchObject({ ip: "::1", port: 8422, explicitAddress: true });
+    expect(scanForDevices).not.toHaveBeenCalled();
+  });
+
+  it("does not implicitly pick the first of multiple browsers", async () => {
+    addDevices([makeDevice(), makeDevice({ id: "other" })]);
+    expect(await getDevice("")).toBeUndefined();
+  });
+
+  it("shares an in-flight scan and can try again after an empty result", async () => {
+    await Promise.all([getDevice("missing"), getDevice("also missing")]);
+    expect(scanForDevices).toHaveBeenCalledTimes(1);
+    await getDevice("missing");
+    expect(scanForDevices).toHaveBeenCalledTimes(2);
   });
 
   it("returns undefined for unknown device", async () => {

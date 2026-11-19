@@ -18,6 +18,8 @@ export interface HttpResponse<T = unknown> {
 interface SendOptions {
   /** False disables implicit account or computer pairing. */
   autoPair?: boolean;
+  /** Reuse saved approvals, but require an explicit target before starting pairing. */
+  pairingTargetHint?: string;
 }
 
 function toKebabCase(method: string): string {
@@ -52,10 +54,9 @@ function isAbortError(error: unknown): boolean {
     (error instanceof Error && error.name === "AbortError");
 }
 
-function urlFor(device: DiscoveredDevice, method: string): string {
-  const kebabMethod = toKebabCase(method);
+function addressFor(device: DiscoveredDevice): string {
   const host = device.ip.includes(":") ? `[${device.ip}]` : device.ip;
-  return `http://${host}:${device.port}${API_VERSION_PREFIX}${kebabMethod}`;
+  return `${host}:${device.port}`;
 }
 
 /** Pull whichever token (session or persistent) we have for this device. */
@@ -83,11 +84,14 @@ interface RawFetchResult<T> {
 }
 
 async function rawFetch<T>(
-  url: string,
+  device: DiscoveredDevice,
+  method: string,
   body: Record<string, unknown> | undefined,
   token: string | undefined,
   timeout: number,
 ): Promise<RawFetchResult<T>> {
+  const address = addressFor(device);
+  const url = `http://${address}${API_VERSION_PREFIX}${toKebabCase(method)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
@@ -113,10 +117,13 @@ async function rawFetch<T>(
         status: 408,
         data: {
           success: false,
-          error: { code: "TIMEOUT", message: `Request timed out after ${timeout}ms` },
+          error: { code: "TIMEOUT", message: `Request to ${address} timed out after ${timeout}ms. Confirm the browser's host:port.` },
         } as T,
       };
     }
+    const cause = error instanceof Error ? error.cause : undefined;
+    const code = typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "string"
+      && /^[A-Z0-9_]+$/.test(cause.code) ? cause.code : undefined;
     return {
       ok: false,
       status: 0,
@@ -124,7 +131,7 @@ async function rawFetch<T>(
         success: false,
         error: {
           code: "NETWORK_ERROR",
-          message: error instanceof Error ? error.message : "Network error",
+          message: `Request to ${address} failed${code ? ` (${code})` : ""}. Confirm the browser's host:port.`,
         },
       } as T,
     };
@@ -165,6 +172,7 @@ async function attemptAutoPair(device: DiscoveredDevice): Promise<boolean> {
 
 /** Discovered address first, then every other socket this device id approved. */
 async function approvedHosts(device: DiscoveredDevice): Promise<string[]> {
+  if (device.explicitAddress) return [device.ip];
   const pinned = [
     ...getSessionCache().pinnedHosts(device.id, device.port),
     ...await getTokenStore().pinnedHosts(device.id, device.port),
@@ -192,7 +200,7 @@ async function retryWithStoredApprovals<T>(
     const candidate = { ...device, ip: host };
     for (let token = await tokenFor(candidate); token && !tried.has(token); token = await tokenFor(candidate)) {
       tried.add(token);
-      const retry = await rawFetch<T>(urlFor(candidate, method), body, token, timeout);
+      const retry = await rawFetch<T>(candidate, method, body, token, timeout);
       if (retry.status !== 401) {
         if (retry.status === 0 || retry.status === 408) break;
         device.ip = host;
@@ -219,7 +227,7 @@ export async function sendCommand<T = unknown>(
     device.localControlToken = readiness.token;
   }
   const token = await tokenFor(device);
-  const first = await rawFetch<T>(urlFor(device, method), body, token, timeout);
+  const first = await rawFetch<T>(device, method, body, token, timeout);
 
   if (first.status !== 401 || device.localReadinessFile) return first;
   if (options.autoPair === false) return first;
@@ -228,11 +236,18 @@ export async function sendCommand<T = unknown>(
   const reused = await retryWithStoredApprovals<T>(device, method, body, timeout);
   if (reused) return reused;
 
+  if (options.pairingTargetHint) {
+    return {
+      ok: false,
+      status: 401,
+      data: { success: false, error: { code: "PAIR_TARGET_REQUIRED", message: options.pairingTargetHint } } as T,
+    };
+  }
   const paired = await attemptAutoPair(device);
   if (!paired) return first;
 
   const retryToken = await tokenFor(device);
-  return rawFetch<T>(urlFor(device, method), body, retryToken, timeout);
+  return rawFetch<T>(device, method, body, retryToken, timeout);
 }
 
 /**

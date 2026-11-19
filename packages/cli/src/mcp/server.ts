@@ -10,11 +10,11 @@ import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { sendCommand } from "../client/http-client.js";
 import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
-import { scanForDevices } from "../discovery/scanner.js";
+import { discoverDevices, explicitDeviceHint } from "../discovery/discover.js";
 import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
-import { registerBrowserControl } from "./browser-control.js";
+import { mcpDeviceHint, mcpTabPairingHint, registerBrowserControl } from "./browser-control.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import { ToolInputError } from "./ai-endpoint-tools.js";
 import { redactSecrets } from "../ai/endpoint-secrets.js";
@@ -98,6 +98,7 @@ function isCallableOnPinnedDevice(
 ): boolean {
   if (!pinned) return true;
   if (callableTools) return callableTools.has(tool.name as BrowserMcpTool);
+  if (pinned.id.startsWith("direct:")) return true;
   if (!(tool.name in BrowserToolUnsupportedPlatforms)) return true;
   const unsupported = BrowserToolUnsupportedPlatforms[tool.name as keyof typeof BrowserToolUnsupportedPlatforms] as readonly Platform[];
   return !unsupported.includes(pinned.platform);
@@ -117,7 +118,8 @@ function registerBrowserTool(
     const deviceId = args.device as string | undefined;
     const device = await resolveDevice(deviceId, pinned);
     if (!device) {
-      return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
+      const reason = deviceId ? `No device matching "${deviceId}".` : "No browser device selected.";
+      return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `${reason} ${mcpDeviceHint}` } });
     }
     let body: Record<string, unknown>;
     try {
@@ -126,7 +128,9 @@ function registerBrowserTool(
       if (!(error instanceof ToolInputError)) throw error;
       return errorToolResult({ success: false, error: { code: error.code, message: error.message } });
     }
-    const sent = await sendCommand(device, tool.method, body, tool.timeoutMs);
+    const sent = await sendCommand(device, tool.method, body, tool.timeoutMs, {
+      pairingTargetHint: body.tabId && !deviceId && !pinned ? mcpTabPairingHint : undefined,
+    });
     const result = handlesEndpointSecrets(tool.method) ? { ...sent, data: redactSecrets(sent.data, secretsIn(body)) } : sent;
     if (tool.method === "reportIssue" && result.ok && (result.data as { success?: boolean }).success === true) {
       const remote = result.data as {
@@ -369,17 +373,19 @@ async function handleDiscovery(method: string, params: Record<string, unknown>, 
 
   if (method === "discover") {
     const timeout = typeof params.timeout === "number" ? params.timeout : 3000;
-    const found = await enrichDevicesWithCapabilities(await scanForDevices(timeout));
+    const { devices: scanned, ...diagnostics } = await discoverDevices(timeout);
+    const found = await enrichDevicesWithCapabilities(scanned);
     addDevices(found);
     const devices = getAllDevices();
-    return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };
+    return textToolResult({ success: true, devices, count: devices.length, ...diagnostics });
   }
   if (method === "pair") {
     return handlePair(params, pinned);
   }
   // listDevices
   const devices = getAllDevices();
-  return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };
+  const hint = devices.length === 0 ? `No cached devices. Use kelpie_discover to scan. ${explicitDeviceHint}` : undefined;
+  return textToolResult({ success: true, devices, count: devices.length, ...(hint ? { hint } : {}) });
 }
 
 async function handlePair(

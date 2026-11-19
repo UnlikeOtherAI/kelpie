@@ -8,7 +8,7 @@ export async function enrichDevicesWithCapabilities(
   const enriched = await Promise.all(
     devices.map(async (device) => {
       try {
-        const result = await sendCommand(device, "getCapabilities", undefined, timeout);
+        const result = await sendCommand(device, "getCapabilities", undefined, timeout, { autoPair: false });
         if (!result.ok || !(result.data as { success?: boolean }).success) {
           return device;
         }

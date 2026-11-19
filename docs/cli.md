@@ -21,7 +21,7 @@ kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <ur
 
 | Flag | Description |
 |---|---|
-| `--device <id\|name\|ip>` | Target a specific device by ID (most reliable), name, or IP |
+| `--device <id\|name\|ip\|host:port>` | Target a device by ID, name, IP address, or exact socket such as `192.168.1.42:8422` |
 | `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
 | `--timeout <ms>` | HTTP request timeout in milliseconds, usually 10000 ms. See [browser request timeouts](cli/advanced.md#browser-request-timeouts). |
@@ -66,6 +66,8 @@ mDNS announcements are racy. If the scan finds no devices, the CLI falls back to
 ```
 
 **Alias:** `kelpie devices` is equivalent to `kelpie discover`.
+
+`kelpie discover` and MCP `kelpie_discover` report the mDNS status, service type and timeout. They give a hint on an empty or unavailable scan. Discovery does not start pairing. MCP `kelpie_list_devices` reads its cache.
 
 ### `kelpie describe`
 Describe this Kelpie install in one machine-readable document: which version is
@@ -997,6 +999,8 @@ exclusive profile lock. The CLI reads the bearer capability locally and rejects
 `kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It automatically reuses account access or computer-key permission, including after a port or address changes. A new computer receives the same single native approval as an ordinary CLI command. The default catalog advertises four tools: core controls, extension names, extension schemas, and a generic extension caller. Existing rich commands and legacy MCP names remain callable. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.
 
 `kelpie browser-control <request-json>` sends one strict versioned request to the selected device using existing `--device` or `--browser` routing. For example: `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`. Native owns all observed refs. Authentication uses the same automatic account/computer pairing as other CLI commands; a command retries once after a `401` when pairing succeeds.
+
+See [browser control routing](api/browser-control.md#cli-device-selection) for local help and device targeting.
 
 ### Favourites tree through MCP
 
