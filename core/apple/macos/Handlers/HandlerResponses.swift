@@ -34,9 +34,7 @@ func tabErrorResponse(from error: Error) -> [String: Any]? {
     case .rendererHidden:
         return errorResponse(
             code: "RENDERER_HIDDEN",
-            message: "The active renderer is hidden — its view is detached or off-screen, " +
-                "so script evaluation and DOM queries are unavailable. Bring the window " +
-                "to front or switch to a renderer whose view is visible."
+            message: "The target renderer is hidden. Select its tab in a visible browser window and retry."
         )
     default:
         return nil

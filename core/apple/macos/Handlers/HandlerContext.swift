@@ -164,6 +164,12 @@ final class HandlerContext {
     func takeSnapshot(tabId: String?) async throws -> NSImage {
         let target = try resolveRenderer(tabId: tabId)
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        // AppKit may occlude the selected tab without detaching its view.
+        // Snapshot APIs can still return the last painted frame in that state.
+        if try await target.evaluateJS("document.visibilityState") as? String == "hidden" {
+            throw HandlerError.rendererHidden
+        }
+        guard remoteDocumentGuard?() != false else { throw CancellationError() }
         let result = try await target.takeSnapshot()
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
         return result
