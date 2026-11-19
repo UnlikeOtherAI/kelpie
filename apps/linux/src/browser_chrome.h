@@ -12,7 +12,7 @@ class BrowserChrome {
   GtkWidget* title() const { return title_; }
   GtkWidget* favorites() const { return favorites_; }
   GtkWidget* separator() const { return separator_; }
-  void Sync();
+  void Sync(const std::vector<TabSnapshot>& tabs);
   void AccountMenu(GtkWidget* anchor);
  private:
   LinuxApp& app_;
@@ -22,7 +22,7 @@ class BrowserChrome {
   std::string tabs_key_,favorites_key_;
   std::array<double,3> color_{255,255,255},from_=color_,target_=color_;
   gint64 transition_=0,last_sample_=0;
-  void Tabs();
+  void Tabs(const std::vector<TabSnapshot>& tabs);
   void Favorites();
   void Palette();
 };

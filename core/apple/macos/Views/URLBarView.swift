@@ -4,6 +4,7 @@ import SwiftUI
 struct URLBarView: View {
     @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var browserState: BrowserState
+    let progressTabID: UUID?
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
     @ObservedObject var aiState: AIState
@@ -213,6 +214,10 @@ struct URLBarView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(BrowserChromeStyle.separator, lineWidth: 0.5)
         )
+        .overlay {
+            AddressLoadIndicator(isLoading: browserState.isLoading, progress: browserState.progress)
+                .id(progressTabID)
+        }
     }
 
     private func navigate() {

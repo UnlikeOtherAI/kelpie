@@ -260,7 +260,8 @@ void WindowsApp::CreateTabFromShell(bool isolated) {
   // Synchronize the active tab before editing begins, so the next runtime
   // refresh cannot replace the address after the person starts typing.
   const auto& active = result.tab.value_or(tab);
-  OnBrowserStateChanged({active.url, active.title, active.is_loading, active.can_go_back, active.can_go_forward});
+  OnBrowserStateChanged({active.url, active.title, active.is_loading, active.can_go_back, active.can_go_forward,
+                         active.load_progress, active.id});
   SaveSession();
   shell_->FocusAddress();
 }

@@ -57,6 +57,7 @@ struct BrowserView: View {
                     URLBarView(
                         appearance: chromeAppearance,
                         browserState: browserState,
+                        progressTabID: tabStore.activeTabID,
                         rendererState: rendererState,
                         viewportState: viewportState,
                         aiState: aiState,
@@ -125,11 +126,6 @@ struct BrowserView: View {
                     ZStack {
                         rendererSurface
 
-                        if browserState.isLoading {
-                            FloatingProgressPill(progress: browserState.progress)
-                                .zIndex(10)
-                        }
-
                         if let message = serverState.shellToastMessage, !serverState.isScriptRecording {
                             VStack {
                                 Spacer()
@@ -197,6 +193,7 @@ struct BrowserView: View {
         }
         .onChange(of: browserState.isLoading) { _, isLoading in
             guard isLoading else { return }
+            isChromeCollapsed = false
             guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
             serverState.handlerContext.mark3DInspectorInactive(notify: false)
             isIn3DInspector = false

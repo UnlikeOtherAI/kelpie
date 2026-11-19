@@ -154,6 +154,7 @@ void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
                                             bool can_go_back,
                                             bool can_go_forward) {
   if (auto* tab = owner_->FindTab(browser)) {
+    if (is_loading && !tab->loading) tab->load_progress = 0;
     tab->loading = is_loading;
     tab->can_go_back = can_go_back;
     tab->can_go_forward = can_go_forward;
@@ -221,6 +222,10 @@ void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
     if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
   }
   owner_->UpdateActiveState();
+}
+
+void DesktopCefClient::OnLoadingProgressChange(CefRefPtr<CefBrowser> browser, double progress) {
+  if (auto* tab = owner_->FindTab(browser)) tab->load_progress = progress;
 }
 
 void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {

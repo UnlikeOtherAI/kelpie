@@ -5,6 +5,7 @@
 - (void)cefBridgeUpdateLoadingStateWithIsLoading:(BOOL)isLoading
                                        canGoBack:(BOOL)canGoBack
                                     canGoForward:(BOOL)canGoForward {
+    if (isLoading && !_isLoading) _loadingProgress = 0;
     _isLoading = isLoading;
     cef_browser_t *browser = [self activeBrowser];
     if (browser != nullptr) {
@@ -47,5 +48,10 @@
     CEFBridgeNotifyStateChange(self);
 }
 
-- (void)cefBridgeUpdateLoadingProgress:(double)progress { _loadingProgress = progress; }
+- (double)loadingProgress { return _loadingProgress; }
+
+- (void)cefBridgeUpdateLoadingProgress:(double)progress {
+    _loadingProgress = progress;
+    CEFBridgeNotifyStateChange(self);
+}
 @end

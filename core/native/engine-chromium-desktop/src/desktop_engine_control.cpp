@@ -98,6 +98,7 @@ TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
                        tab.favicon_png_base64};
   snapshot.name = tab.name;
   snapshot.document_version = tab.document_version;
+  snapshot.load_progress = tab.load_progress;
   snapshot.partition = tab.partition;
   // `persistent` describes the partition, so a tab in the default shared store
   // reports neither field rather than a misleading default.
@@ -453,6 +454,7 @@ BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease> lease, std:
     ++target->navigation_requested;
     target->navigation_error.clear();
     target->loading = true;
+    target->load_progress = 0;
     target->browser->GetMainFrame()->LoadURL(url);
     target->url = url;
     *navigated = impl->Snapshot(*target);

@@ -59,6 +59,7 @@ fun BottomBar(
     canGoBack: Boolean,
     canGoForward: Boolean,
     isLoading: Boolean,
+    loadOutline: Modifier,
     isCollapsed: Boolean,
     onNavigate: (String) -> Unit,
     onBack: () -> Unit,
@@ -107,6 +108,7 @@ fun BottomBar(
                         Text(
                             domainFromUrl(currentUrl),
                             Modifier
+                                .then(loadOutline)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                                 .clickable(onClick = onExpand)
@@ -123,7 +125,11 @@ fun BottomBar(
                                 editing = false
                                 onNavigate(it)
                             },
-                            Modifier.widthIn(max = 620.dp).fillMaxWidth().height(44.dp),
+                            Modifier
+                                .widthIn(max = 620.dp)
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .then(loadOutline),
                             shape = CircleShape,
                             textStyle = MaterialTheme.typography.bodySmall,
                             onEditingChanged = {

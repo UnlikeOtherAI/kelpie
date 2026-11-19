@@ -1,4 +1,6 @@
 #include "gui_shell.h"
+
+#include <algorithm>
 #include "computer_approval.h"
 #include "browser_chrome.h"
 #include "bookmarks_view.h"
@@ -87,12 +89,16 @@ int GUIShell::Run() {
       const int view_height=gtk_widget_get_allocated_height(view);
       gtk_window_resize(c.window,w+width-view_width,h+height-view_height);
     }
-    c.browser.Sync(); c.chrome.Sync();
+    const auto tabs = c.app.Tabs();
+    const auto active = std::find_if(tabs.begin(), tabs.end(), [](const auto& tab) { return tab.active; });
+    c.browser.Sync();
+    c.chrome.Sync(tabs);
+    c.url.SyncLoadProgress(active == tabs.end() ? nullptr : &*active);
     if(++c.tick%15==0) { c.url.Sync(); const auto title=c.app.CurrentTitle(); gtk_window_set_title(c.window,(title.empty()?"Kelpie":title+" — Kelpie").c_str()); }
     auto message=c.app.ConsumeToast(); if(!message.empty())c.toast.Show(message);
     return G_SOURCE_CONTINUE;
   },&context);
-  gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(); gtk_main();
+  gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(app_.Tabs()); gtk_main();
   g_source_remove(timer); geometry.Save(); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
 #else
   return 1;

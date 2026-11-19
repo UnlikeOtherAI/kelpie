@@ -158,6 +158,11 @@ Apple apps expose the shared versioned `POST /v1/browser-control` and authentica
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
 
+While the active page loads, a three-unit blue stroke starts at the left edge of
+the address field and follows its upper and lower borders to the right, with
+rounded leading tips. The outline fades when loading ends. The indicator is
+part of the address field on iOS, Android, macOS, Windows, and Linux.
+
 On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell matches the Windows title-strip tabs, outlined navigation controls, rounded address field, conditional favorites row and UOA account menu.
 
 On Linux, the desktop shell runs in either GUI or headless mode. Both Chromium modes expose the shared HTTP/MCP surface with implicit localhost trust and persistent signing-key approval, persist profile-backed bookmarks, history, full tab sessions and a home page URL. They do not advertise the listener over mDNS. The no-CEF fallback build keeps its limited legacy runtime but follows the same control contract: it accepts localhost without a token and remote clients with a bearer from an approved computer key, sends no CORS grant and does not advertise over mDNS. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
