@@ -1,8 +1,8 @@
-import os from "node:os";
 import path from "node:path";
 import { mkdir, open, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import type { Platform } from "@unlikeotherai/kelpie-shared";
+import { stateDirectory } from "../state-directory.js";
 
 export interface BrowserAlias {
   platform: Platform;
@@ -29,12 +29,8 @@ const EMPTY_STORE: BrowserStore = {
   running: {},
 };
 
-function storeDir(): string {
-  return process.env.KELPIE_HOME ?? path.join(os.homedir(), ".kelpie");
-}
-
 function storePath(): string {
-  return path.join(storeDir(), "browsers.json");
+  return path.join(stateDirectory(), "browsers.json");
 }
 
 export async function loadBrowserStore(): Promise<BrowserStore> {
@@ -51,7 +47,7 @@ export async function loadBrowserStore(): Promise<BrowserStore> {
 }
 
 async function saveBrowserStore(store: BrowserStore): Promise<void> {
-  await mkdir(storeDir(), { recursive: true });
+  await mkdir(stateDirectory(), { recursive: true });
   await writeFile(storePath(), JSON.stringify(store, null, 2));
 }
 

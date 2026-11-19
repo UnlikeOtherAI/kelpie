@@ -1,8 +1,9 @@
 import { promises as fs } from "node:fs";
 import { existsSync, lstatSync } from "node:fs";
-import { homedir, hostname, userInfo } from "node:os";
+import { hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { stateDirectory } from "../state-directory.js";
 
 /**
  * Persistent token store backing `kelpie pair` and the implicit auth retry.
@@ -64,10 +65,6 @@ function removeTokenAliases(tokens: Record<string, string>, host: string,
   const suffix = `:${host}:${port}`;
   return Object.fromEntries(Object.entries(tokens)
     .filter(([key, value]) => !(key.endsWith(suffix) && value === rejected)));
-}
-
-export function defaultStoreDir(): string {
-  return join(homedir(), ".kelpie");
 }
 
 function defaultStorePath(dir: string): string {
@@ -187,7 +184,7 @@ export class TokenStore {
   /** True once the on-disk file has been written at least once this session. */
   private persistedClientId = false;
 
-  constructor(dir = defaultStoreDir()) {
+  constructor(dir = stateDirectory()) {
     this.dir = dir;
     this.file = defaultStorePath(dir);
   }

@@ -113,6 +113,11 @@ protected profile directory. It never prints or sends the private key. Losing or
 replacing this file creates a new computer identity that needs approval again.
 Copying the private key to another machine also copies its authority.
 
+Set `KELPIE_HOME` to use a separate directory for browser aliases, the CLI
+client ID, pairing tokens and the signing key. A CLI command that names a tab
+can use an existing approval. Starting a new pairing for that command requires
+an explicit browser target, including for screenshots and tab cookie stores.
+
 **Pairing protocol.** `POST /v1/pair` first obtains a random, expiring challenge.
 The CLI signs it together with its public key, then submits the proof. Kelpie
 verifies possession before showing a prompt. One decision resolves concurrent

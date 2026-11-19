@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { getBrowserAlias, loadBrowserStore, readLocalReadiness, readinessPath } from "../browser/store.js";
 import { getDevice, refreshDevicesIfEmpty } from "../discovery/registry.js";
-import { sendCommand } from "../client/http-client.js";
+import { sendCommand, type HttpResponse } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 import type { GlobalOptions, DiscoveredDevice } from "../types.js";
 
@@ -47,6 +47,21 @@ export function withGlobalTabId(
 export function cliPairingTargetHint(globals: GlobalOptions): string | undefined {
   return globals.device || globals.browser ? undefined
     : "The discovered browser requires pairing. Use --device with the ID, name, IP address, or host:port of the browser that owns the tab.";
+}
+
+export function sendDeviceCommand<T = unknown>(
+  globals: GlobalOptions,
+  device: DiscoveredDevice,
+  method: string,
+  body?: Record<string, unknown>,
+  timeout?: number,
+): Promise<HttpResponse<T>> {
+  const requestBody = withGlobalTabId(globals, body);
+  const targetsTab = Boolean(requestBody?.tabId) || (method === "copyCookies" &&
+    [requestBody?.from, requestBody?.to].some((store) => typeof store === "object" && store !== null && "tabId" in store));
+  return sendCommand<T>(device, method, requestBody, timeout, {
+    pairingTargetHint: targetsTab ? cliPairingTargetHint(globals) : undefined,
+  });
 }
 
 export async function localBrowserDevice(aliasName: string): Promise<DiscoveredDevice | null> {
@@ -136,10 +151,7 @@ export async function deviceCommand(
   const timeout = program.getOptionValueSource("timeout") === "cli"
     ? globals.timeout
     : options.defaultTimeoutMs;
-  const requestBody = withGlobalTabId(globals, body);
-  const result = await sendCommand(device, method, requestBody, timeout, {
-    pairingTargetHint: requestBody?.tabId ? cliPairingTargetHint(globals) : undefined,
-  });
+  const result = await sendDeviceCommand(globals, device, method, body, timeout);
   print(result.data, globals.format);
   if (!result.ok) process.exitCode = 1;
 }

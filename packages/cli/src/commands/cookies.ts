@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { SetCookieFailure, SetCookiesResponse } from "@unlikeotherai/kelpie-shared";
-import { commandTimeout, deviceCommand, getGlobals, requireDevice, withGlobalTabId } from "./helpers.js";
+import { commandTimeout, deviceCommand, getGlobals, requireDevice, sendDeviceCommand } from "./helpers.js";
 import {
   CookieInputError,
   cookieBatches,
@@ -9,7 +9,6 @@ import {
   readCookieInput,
   sameCookieStore,
 } from "./cookie-options.js";
-import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 
 interface ListOptions {
@@ -75,7 +74,7 @@ async function importCookies(program: Command, source: string, opts: ImportOptio
   const failed: SetCookieFailure[] = [];
   let offset = 0;
   for (const batch of cookieBatches(cookies)) {
-    const result = await sendCommand(device, "setCookies", withGlobalTabId(globals, { ...target, cookies: batch }), timeout);
+    const result = await sendDeviceCommand(globals, device, "setCookies", { ...target, cookies: batch }, timeout);
     const data = result.data as Partial<SetCookiesResponse> | undefined;
     if (!result.ok || data?.success !== true) {
       const reply = result.data;
