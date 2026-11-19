@@ -17,7 +17,7 @@ ktlint {
 
 android {
     namespace = "com.kelpie.browser"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 28
