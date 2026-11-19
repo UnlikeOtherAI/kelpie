@@ -207,7 +207,7 @@ The feature is exposed through `play-script`, `abort-script`, and `get-script-st
 
 ## Scrolling
 
-Scroll by pixel deltas, scroll a specific element into view (with configurable alignment: top/center/bottom), or jump to the top or bottom of the page. The `scroll2` method is resolution-aware — it adapts its behavior based on the device's viewport size.
+Scroll by pixel deltas, scroll a specific element into view (with configurable alignment: top/center/bottom), or jump to the top or bottom of the page. On iOS and Android, the native scroll-by-delta and page-edge methods report the offsets observed in the renderer and return an error if the renderer cannot evaluate the operation. The `scroll2` method is resolution-aware — it adapts its behavior based on the device's viewport size.
 
 ## Wait and Synchronisation
 

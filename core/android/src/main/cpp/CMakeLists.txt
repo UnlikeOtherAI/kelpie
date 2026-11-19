@@ -47,3 +47,13 @@ target_link_libraries(kelpie_jni
     kelpie_core_mcp
     kelpie_core_sync
 )
+
+# Android 15+ devices can use 16 KiB memory pages. The JNI shared object must
+# have 16 KiB PT_LOAD alignment, including GNU_RELRO placement, even when
+# built with an older NDK (r27 or below). Keep both flags on the final shared
+# target because static project libraries are linked into this target.
+# https://developer.android.com/guide/practices/page-sizes
+target_link_options(kelpie_jni PRIVATE
+  "-Wl,-z,max-page-size=16384"
+  "-Wl,-z,common-page-size=16384"
+)
