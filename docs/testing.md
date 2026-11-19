@@ -144,6 +144,20 @@ consumer as `--cli`; it exercises the normal `browser-control` command, advertis
 Nessie HTTP/stdio tools, sandboxing and profile restoration without installing shared
 as a separate runtime dependency.
 
+## Native macOS window rendering
+
+Build the Kelpie scheme in Debug to start AppReveal on port 8421. Discover
+`AppReveal-com.kelpie.browser.macos` via `_appreveal._tcp` and check its
+`launch_context` before using `screenshot` for the whole window. Kelpie's
+browser screenshot captures only WebKit content, so compare the two when
+diagnosing blank windows. Release builds omit the AppReveal service.
+
+`EmbeddedWindowTests` verifies that each window keeps its own active WebKit view
+when the shared automation target belongs to another window. For native
+verification, open two windows with different pages and switch between their
+tabs. Check the page, address bar, and back and forward controls in both windows
+after changing the automation target.
+
 ## Native iOS browser chrome
 
 Generate `apps/ios` with Tuist and run the Kelpie scheme on both an iPhone and

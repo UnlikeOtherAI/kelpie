@@ -62,9 +62,9 @@ struct BrowserView: View {
                         aiState: aiState,
                         isAIPanelOpen: isAIPanelOpen,
                         onNavigate: navigate,
-                        onBack: { serverState.handlerContext.goBack() },
-                        onForward: { serverState.handlerContext.goForward() },
-                        onReload: { isChromeCollapsed = false; serverState.handlerContext.reloadPage() },
+                        onBack: { serverState.handlerContext.goBack(windowId: windowId) },
+                        onForward: { serverState.handlerContext.goForward(windowId: windowId) },
+                        onReload: { isChromeCollapsed = false; serverState.handlerContext.reloadPage(windowId: windowId) },
                         onHome: showStartPage,
                         isStartPage: tabStore.activeTab?.isStartPage == true,
                         onAIToggle: handleAIPillTap,
@@ -225,7 +225,7 @@ struct BrowserView: View {
         .background(
             BrowserCommandBridge(
                 actions: BrowserCommandActions(
-                    hardReload: { isChromeCollapsed = false; serverState.handlerContext.hardReloadPage() },
+                    hardReload: { isChromeCollapsed = false; serverState.handlerContext.hardReloadPage(windowId: windowId) },
                     newTab: { handleNewTabCommand() },
                     closeTab: { handleCloseTabCommand() },
                     addBookmark: addCurrentBookmark
@@ -259,7 +259,7 @@ struct BrowserView: View {
                     onContinue: {
                         let targetURL = url
                         pendingInsecureURL = nil
-                        serverState.handlerContext.load(url: targetURL)
+                        serverState.handlerContext.load(url: targetURL, windowId: windowId)
                     },
                     onCancel: { pendingInsecureURL = nil }
                 )

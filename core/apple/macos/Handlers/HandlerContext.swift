@@ -398,59 +398,6 @@ final class HandlerContext {
         )
     }
 
-    /// Side-effects every navigation must run regardless of which renderer is
-    /// driven: notify the shell (URL-bar / loading UI) and tear down the 3D
-    /// inspector. Exposed so handlers can drive the resolved renderer directly,
-    /// keeping navigate targeting the same renderer that reads resolve to even
-    /// when no window has rendered to wire `renderer` to the active tab.
-    func prepareForNavigation() {
-        WindowRegistry.shared.defaultEntry()?.callbacks?.onWillLoad()
-        reset3DInspectorForNavigation()
-    }
-
-    func load(url: URL) {
-        prepareForNavigation()
-        renderer?.load(url: url)
-    }
-
-    var currentURL: URL? { renderer?.currentURL }
-    var currentTitle: String { renderer?.currentTitle ?? "" }
-    var isLoadingPage: Bool { renderer?.isLoading ?? false }
-    var pageCanGoBack: Bool { renderer?.canGoBack ?? false }
-    var pageCanGoForward: Bool { renderer?.canGoForward ?? false }
-
-    func goBack() {
-        prepareForNavigation()
-        renderer?.goBack()
-    }
-
-    func goForward() {
-        prepareForNavigation()
-        renderer?.goForward()
-    }
-
-    func reloadPage() {
-        if isIn3DInspector {
-            Task { @MainActor in
-                await exit3DInspectorIfNeeded(notify: true)
-                renderer?.reload()
-            }
-            return
-        }
-        renderer?.reload()
-    }
-
-    func hardReloadPage() {
-        if isIn3DInspector {
-            Task { @MainActor in
-                await exit3DInspectorIfNeeded(notify: true)
-                renderer?.hardReload()
-            }
-            return
-        }
-        renderer?.hardReload()
-    }
-
     func waitForViewportSize(_ size: CGSize) async {
         guard let view = renderer?.makeView() else { return }
         let expectedWidth = size.width
@@ -487,11 +434,6 @@ final class HandlerContext {
         guard isIn3DInspector else { return }
         _ = try? await evaluate3DInspectorJS(Snapshot3DBridge.exitScript)
         mark3DInspectorInactive(notify: notify)
-    }
-
-    private func reset3DInspectorForNavigation() {
-        guard isIn3DInspector else { return }
-        mark3DInspectorInactive(notify: true)
     }
 }
 
