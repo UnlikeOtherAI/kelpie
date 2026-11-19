@@ -1,7 +1,5 @@
 package com.kelpie.browser.handlers
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
@@ -18,13 +16,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
-import java.io.ByteArrayOutputStream
-import java.util.Base64
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
-import kotlin.math.max
-import kotlin.math.roundToInt
 
 private val json =
     Json {
@@ -322,56 +315,12 @@ class HandlerContext(
         quality: Int = 80,
         resolution: ScreenshotResolution = ScreenshotResolution.NATIVE,
     ): Map<String, Any?>? {
-        val wv = webView ?: return null
-        val normalizedFormat = if (format == "jpeg") "jpeg" else "png"
-        val viewport = viewportMetrics()
-        val bitmap =
-            suspendCoroutine<Bitmap?> { cont ->
-                mainHandler.post {
-                    try {
-                        val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(bmp)
-                        wv.draw(canvas)
-                        cont.resume(bmp)
-                    } catch (_: Exception) {
-                        cont.resume(null)
-                    }
-                }
-            } ?: return null
-        val rendered =
-            if (resolution == ScreenshotResolution.VIEWPORT) {
-                val targetWidth = max((bitmap.width / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
-                val targetHeight = max((bitmap.height / max(viewport.devicePixelRatio, 1.0)).roundToInt(), 1)
-                if (targetWidth == bitmap.width && targetHeight == bitmap.height) {
-                    bitmap
-                } else {
-                    Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
-                }
-            } else {
-                bitmap
+        val target = webView ?: return null
+        return withBrowserTarget(target) {
+            captureWebViewViewport(target) { bitmap ->
+                val viewport = viewportMetrics()
+                encodeViewportScreenshot(bitmap, viewport, format, quality, resolution)
             }
-
-        return try {
-            val stream = ByteArrayOutputStream()
-            val compressFormat =
-                if (normalizedFormat == "jpeg") {
-                    Bitmap.CompressFormat.JPEG
-                } else {
-                    Bitmap.CompressFormat.PNG
-                }
-            rendered.compress(compressFormat, quality, stream)
-            mapOf("image" to Base64.getEncoder().encodeToString(stream.toByteArray())) +
-                viewport.metadata(
-                    imageWidth = rendered.width,
-                    imageHeight = rendered.height,
-                    format = normalizedFormat,
-                    resolution = resolution,
-                )
-        } finally {
-            if (rendered !== bitmap) {
-                rendered.recycle()
-            }
-            bitmap.recycle()
         }
     }
 

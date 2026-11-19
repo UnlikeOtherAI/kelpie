@@ -179,6 +179,11 @@ When an iPhone or iPad running Kelpie connects to an Apple TV via AirPlay, the a
 
 Capture viewport or full-page screenshots on demand in PNG or JPEG. Full-page mode now works across iOS, Android, and macOS, each using its renderer's native mechanism: iOS takes an unclipped `WKWebView` snapshot of the full content, Android paints the whole document into a full-height bitmap via `WebView.draw`, and macOS scrolls-and-stitches the page viewport-by-viewport (covering both the WebKit and Chromium renderers). Quality is adjustable for JPEG. Screenshot responses now include explicit viewport-mapping metadata: viewport width and height, device pixel ratio, and computed image-to-viewport scale factors. That makes the coordinate space visible to LLMs instead of forcing them to guess from image size alone.
 
+Android viewport screenshots wait for the tab to render and capture only the
+WebView. With hardware acceleration on Android 10 or later, they include
+hardware-rendered page content such as WebGL. Hidden tabs return a screenshot
+error. Android 9 and software-only hosts use software viewport capture.
+
 On macOS, a fully covered browser window can suspend the selected page's animation frames. Screenshot requests for a hidden page return `RENDERER_HIDDEN`. Bring the window into view and retry after the page resumes.
 
 ### Annotated Screenshots
