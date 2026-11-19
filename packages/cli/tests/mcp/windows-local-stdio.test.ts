@@ -16,12 +16,10 @@ async function listen(server: Server): Promise<number> {
 
 // The CLI runs as a real child process from source (`node --import tsx`), so
 // the test proves the code under test rather than whatever dist was last
-// built. Starting that child and transpiling the CLI is nearly all of its cost:
-// measured 2.3–6.6 s on Windows (6.6 s with a cold tsx cache), against ~0.2 s
-// for the MCP handshake and every tool call together. The 5 s default failed it
-// under the parallel suite; this leaves ~3x the worst measurement and still
-// fails a child that never answers.
-const SPAWNED_CLI_TIMEOUT_MS = 20_000;
+// built. Allow for cold transpilation and process startup on loaded Windows
+// hosts while keeping the normal per-tool request deadline.
+const SPAWNED_CLI_CONNECT_TIMEOUT_MS = 120_000;
+const SPAWNED_CLI_TIMEOUT_MS = SPAWNED_CLI_CONNECT_TIMEOUT_MS + 30_000;
 
 describe("Windows local alias MCP stdio", () => {
   const servers: Server[] = [];
@@ -60,7 +58,7 @@ describe("Windows local alias MCP stdio", () => {
     });
     transports.push(transport);
     const client = new Client({ name: "paired-device-test", version: "test" });
-    await client.connect(transport);
+    await client.connect(transport, { timeout: SPAWNED_CLI_CONNECT_TIMEOUT_MS });
     const result = await client.callTool({ name: "kelpie_browser_control", arguments: {
       request: { version: 1, method: "capabilities", params: {} },
     } });
@@ -118,7 +116,7 @@ describe("Windows local alias MCP stdio", () => {
     const client = new Client({ name: "nessie-local-test", version: "test" });
     let childErrors = "";
     transport.stderr?.on("data", (chunk: Buffer) => { childErrors += chunk.toString(); });
-    try { await client.connect(transport); }
+    try { await client.connect(transport, { timeout: SPAWNED_CLI_CONNECT_TIMEOUT_MS }); }
     catch (error) { throw new Error(`${String(error)}\n${childErrors}`, { cause: error }); }
     const tools = await client.listTools();
     expect(capabilityAuthorized).toBe(true);

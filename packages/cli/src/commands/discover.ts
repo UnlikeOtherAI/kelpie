@@ -1,7 +1,6 @@
 import type { Command } from "commander";
-import { scanForDevices } from "../discovery/scanner.js";
+import { discoverDevices } from "../discovery/discover.js";
 import { enrichDevicesWithCapabilities } from "../discovery/capabilities.js";
-import { probeLocalDevices } from "../discovery/local-probe.js";
 import { addDevices } from "../discovery/registry.js";
 import { print } from "../output/formatter.js";
 import type { GlobalOptions } from "../types.js";
@@ -15,14 +14,9 @@ export function registerDiscover(program: Command): void {
     .action(async (opts: { scanTimeout: string }) => {
       const globals = program.opts<GlobalOptions>();
       const duration = Number(opts.scanTimeout);
-      const devices = await enrichDevicesWithCapabilities(await scanForDevices(duration));
-      // mDNS is racy; if the browse came up empty, probe localhost so a
-      // same-host Kelpie still shows up in `kelpie devices`. probeLocalDevices
-      // already returns one device per port.
-      if (devices.length === 0) {
-        devices.push(...(await probeLocalDevices()));
-      }
+      const result = await discoverDevices(duration);
+      const devices = await enrichDevicesWithCapabilities(result.devices);
       addDevices(devices);
-      print({ devices, count: devices.length }, globals.format);
+      print({ ...result, devices, count: devices.length }, globals.format);
     });
 }

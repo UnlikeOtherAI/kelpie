@@ -13,7 +13,7 @@ class ConsoleHandler {
 
  private:
   nlohmann::json GetConsoleMessages(const nlohmann::json& params) const;
-  nlohmann::json GetJsErrors() const;
+  nlohmann::json GetJsErrors(const nlohmann::json& params) const;
   nlohmann::json ClearConsole() const;
 
   DesktopHandlerRuntime runtime_;

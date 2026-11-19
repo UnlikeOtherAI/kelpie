@@ -11,14 +11,28 @@ For example, `kelpie --device <id> browser-control '{"version":1,"method":"tabs.
 The same versioned JSON works through SDK, HTTP and MCP. Existing rich CLI commands
 remain available.
 
-The tool accepts `{device?, request:{version:1, method, tabId?, params}}`.
-Call `documentation` once for method details, then `capabilities` for the exact
-methods available on the selected device. The CLI transport automatically reuses
+## CLI device selection
+
+The MCP tool accepts `{device?, request:{version:1, method, tabId?, params}}`.
+In CLI MCP, `device` accepts an ID, name, IP address, or `host:port` such as
+`192.168.1.42:8422`. With no device argument or pinned browser, `documentation`
+returns the shared guide and `capabilities` lists only the CLI's two help methods.
+Select a device to get its exact methods and extensions. Use `kelpie_list_devices`
+for cached devices and `kelpie_discover` to scan. The CLI transport automatically reuses
 same-account UOA access or the calling computer's signing-key permission. A new
 computer receives one native approval, shared with ordinary CLI commands. See
 [account pairing](account-pairing.md) and [computer pairing](computer-pairing.md). Device
 capabilities and existing authentication remain authoritative. Read and action
 requests use one queue per exact device socket and local launch identity.
+
+The CLI command also serves local help without `--device` or `--browser`.
+Tab-targeted requests can reuse saved approvals and require an explicit target
+before starting a new pairing. An exact `host:port` is used directly, including
+bracketed IPv6 such as `[::1]:8422`. A bare IP uses a matching discovered port
+if known and defaults to `8420` otherwise. Connection errors and timeouts include
+the socket used.
+
+## Requests
 
 Start with `tabs.list` or `tabs.new {url?}`. Choose `tabId` explicitly for each
 page operation. `tabs.select`, when supported, chooses the active tab.

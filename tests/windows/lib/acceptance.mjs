@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import { control, expectControlError, mcpRequest, rawRequest, resultValue, sameUrl, waitFor } from "./http.mjs";
 import { runCanonicalAcceptance } from "./canonical-browser.mjs";
+import { runBrowserDiagnostics } from "./browser-diagnostics.mjs";
 import { decodePng } from "./png.mjs";
 
 function assertion(condition, message) {
@@ -493,6 +494,7 @@ export async function runCoreAcceptance(readiness, fixtureUrl) {
   await runBrowserActions(readiness, fixtureUrl);
   await runMcp(readiness, fixtureUrl);
   await runCanonicalAcceptance(readiness, fixtureUrl);
+  await runBrowserDiagnostics(readiness);
 }
 
 export async function runLiveAcceptance(readiness, fixtureUrl, nessieRoot) {

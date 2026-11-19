@@ -17,7 +17,7 @@ struct EvaluateHandler {
             return errorResponse(code: "MISSING_PARAM", message: "expression is required")
         }
         do {
-            let result = try await context.evaluateJS(expression, tabId: tabId)
+            let result = try await context.evaluateJS(expression, tabId: tabId, awaitPromise: true)
             return successResponse(["result": result ?? NSNull()])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }

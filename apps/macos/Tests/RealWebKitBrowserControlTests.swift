@@ -53,6 +53,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         #endif
         InteractionHandler(context: context).register(on: router)
         ScreenshotHandler(context: context).register(on: router)
+        EvaluateHandler(context: context).register(on: router)
         router.register("get-tabs") { _ in successResponse(["tabs": [["id": tabId, "active": true, "title": "Isolated fixture", "url": "https://fixture.test"]]]) }
         webView.loadHTMLString(Self.fixture, baseURL: URL(string: "https://fixture.test"))
         for _ in 0..<100 {
@@ -60,6 +61,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTAssertFalse(webView.isLoading, "Fixture navigation must settle before observation")
+        await verifyPublicEvaluation(router, tabId: tabId)
         let observed = try await snapshot(router, tabId: tabId)
         for secret in ["editable-secret", "textarea-secret", "password-secret", "seed-"] {
             XCTAssertFalse(BrowserControlGateway.encode(observed).contains(secret))
@@ -120,6 +122,82 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         XCTAssertTrue(recovered, "The actual late callback releases the lease without restarting")
         let delayedActivations = try await webView.evaluateJavaScript("window.delayedActivations")
         XCTAssertEqual(delayedActivations as? Int, 1)
+        try await verifyPublicTapMarker(router, webView: webView, tabId: tabId)
+    }
+
+    private func verifyPublicTapMarker(_ router: Router, webView: WKWebView, tabId: String) async throws {
+        webView.loadHTMLString("""
+        <!doctype html><meta name="viewport" content="width=device-width">
+        <title>Tap marker fixture</title>
+        <body style="height:950px">
+        <button id="tap-target" style="position:absolute;left:60px;top:210px;width:100px;height:60px">Tap target</button>
+        <script>window.markerHits = 0</script>
+        """, baseURL: URL(string: "https://fixture.test/tap-marker"))
+        for _ in 0..<100 {
+            if (try? await webView.evaluateJavaScript("document.title")) as? String == "Tap marker fixture" { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        _ = try await webView.evaluateJavaScript("window.scrollTo(0, 100)")
+        let scroll = try await webView.evaluateJavaScript("window.scrollY")
+        XCTAssertEqual(scroll as? Int, 100)
+
+        let center = try await webView.evaluateJavaScript("""
+            (() => {
+                const target = document.getElementById('tap-target');
+                target.addEventListener('click', () => window.markerHits++);
+                const r = target.getBoundingClientRect();
+                return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)];
+            })()
+            """)
+        let coordinates = try XCTUnwrap(center as? [Int])
+        let (x, y) = (coordinates[0], coordinates[1])
+        let element = try await webView.evaluateJavaScript("document.elementFromPoint(\(x), \(y))?.id")
+        XCTAssertEqual(element as? String, "tap-target", "The fixture button must be at the requested point")
+        let point: [String: Any] = ["x": x, "y": y, "tabId": tabId]
+        let invalid = await router.handle(method: "tap", body: point.merging(["marker": ["durationMs": -1]]) { _, value in value }).json
+        XCTAssertEqual((invalid["error"] as? [String: Any])?["code"] as? String, "INVALID_PARAMS")
+        let crosshair: [String: Any] = ["marker": ["style": "crosshair-coordinates", "durationMs": 1200]]
+        let tapped = await router.handle(method: "tap", body: point.merging(crosshair) { _, value in value }).json
+        XCTAssertEqual(tapped["success"] as? Bool, true)
+        let hits = try await webView.evaluateJavaScript("window.markerHits")
+        XCTAssertEqual(hits as? Int, 1, "Tap response: \(tapped)")
+        let markerVisible = "document.body.textContent.includes('Viewport: \(x), \(y)\\nPage: \(x), \(y + 100)')"
+        let visible = try await webView.evaluateJavaScript(markerVisible)
+        XCTAssertEqual(visible as? Bool, true)
+        for _ in 0..<80 {
+            if (try await webView.evaluateJavaScript(markerVisible)) as? Bool == false { return }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTFail("The marker remained visible after the hold and fade")
+    }
+
+    private func verifyPublicEvaluation(_ router: Router, tabId: String) async {
+        func eval(_ expression: String) async -> [String: Any] {
+            await router.handle(method: "evaluate", body: ["tabId": tabId, "expression": expression]).json
+        }
+
+        let delayed = await eval("""
+            (async () => {
+                await new Promise(resolve => setTimeout(resolve, 75));
+                window.evalFixtureRuns = (window.evalFixtureRuns || 0) + 1;
+                return 5;
+            })()
+            """)
+        XCTAssertEqual(delayed["result"] as? Int, 5)
+        let count = await eval("window.evalFixtureRuns")
+        XCTAssertEqual(count["result"] as? Int, 1)
+        let rejected = await eval("Promise.reject(new Error('fixture rejection'))")
+        let error = rejected["error"] as? [String: Any]
+        XCTAssertEqual(error?["code"] as? String, "EVAL_ERROR")
+        XCTAssertTrue((error?["message"] as? String)?.contains("fixture rejection") == true)
+        let sync = await eval("var evalFixtureNumber = 4; evalFixtureNumber + 2")
+        XCTAssertEqual(sync["result"] as? Int, 6)
+        let string = await eval("'false'")
+        XCTAssertEqual(string["result"] as? String, "false")
+        let boolean = await eval("Promise.resolve(false)")
+        XCTAssertEqual(boolean["result"] as? Bool, false)
+        let empty = await eval("Promise.resolve(undefined)")
+        XCTAssertTrue(empty["result"] is NSNull)
     }
 
     #if os(iOS)

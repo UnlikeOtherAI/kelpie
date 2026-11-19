@@ -6,6 +6,8 @@
 #include <limits>
 #include <chrono>
 #include <functional>
+#include <iomanip>
+#include <sstream>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -39,6 +41,7 @@ struct DesktopHandlerRuntime {
 
   HandlerContext* handler_context = nullptr;
   DesktopBrowserControl* browser_control = nullptr;
+  std::filesystem::path tap_calibration_path;
   BookmarkStore* bookmark_store = nullptr;
   HistoryStore* history_store = nullptr;
   ConsoleStore* console_store = nullptr;
@@ -258,6 +261,52 @@ inline BrowserControlResult ResolveTabForRequest(DesktopBrowserControl& control,
   }
   *lease = *scoped;
   return result;
+}
+
+inline std::optional<std::int64_t> ParseDiagnosticTimestamp(const std::string& timestamp) {
+  using namespace std::chrono;
+  std::istringstream input(timestamp);
+  std::tm parts{};
+  input >> std::get_time(&parts, "%Y-%m-%dT%H:%M:%S");
+  if (input.fail()) return std::nullopt;
+  int millis = 0;
+  if (input.peek() == '.') {
+    input.get();
+    int scale = 100;
+    while (input.peek() >= '0' && input.peek() <= '9') {
+      millis += (input.get() - '0') * scale;
+      scale /= 10;
+    }
+  }
+  if (input.get() != 'Z' || input.peek() != std::char_traits<char>::eof()) return std::nullopt;
+  const year_month_day day{year{parts.tm_year + 1900}, month{static_cast<unsigned>(parts.tm_mon + 1)},
+                           std::chrono::day{static_cast<unsigned>(parts.tm_mday)}};
+  if (!day.ok()) return std::nullopt;
+  return duration_cast<milliseconds>((sys_days{day} + hours{parts.tm_hour} +
+                                      minutes{parts.tm_min} + seconds{parts.tm_sec}).time_since_epoch()).count() + millis;
+}
+
+inline std::optional<std::int64_t> DiagnosticSince(const nlohmann::json& params) {
+  const auto since = params.find("since");
+  if (since == params.end()) return std::nullopt;
+  if (since->is_number_integer()) return WideInteger(*since);
+  return since->is_string() ? ParseDiagnosticTimestamp(since->get<std::string>()) : std::nullopt;
+}
+
+// Untargeted desktop diagnostics retain their browser-wide view. An explicit
+// tab or an account lease is always resolved before reading any buffered rows.
+inline std::optional<nlohmann::json> DiagnosticScope(const DesktopHandlerRuntime& runtime,
+                                                     const nlohmann::json& params,
+                                                     std::optional<std::string>* tab_id) {
+  if (!params.contains("tabId") && !ScopedBrowserControlLease::Current()) {
+    if (params.contains("generation")) return RejectBrowserWideTab(params);
+    return std::nullopt;
+  }
+  TabLease lease;
+  auto result = ResolveTabForRequest(RequireBrowserControl(runtime), params, &lease, ControlTimeout(params));
+  if (!result.ok) return ControlError(result);
+  *tab_id = lease.id;
+  return std::nullopt;
 }
 
 inline BrowserControlResult EvaluateForTab(const DesktopHandlerRuntime& runtime,

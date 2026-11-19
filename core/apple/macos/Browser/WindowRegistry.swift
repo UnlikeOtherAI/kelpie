@@ -155,6 +155,10 @@ final class WindowRegistry {
     func allEntriesIncludingDetached() -> [Entry] {
         registrationOrder.compactMap { entries[$0] }
     }
+
+    func openPartitionNames() -> Set<String> {
+        Set(allEntriesIncludingDetached().flatMap { $0.tabStore.tabs.compactMap(\.partition) })
+    }
 }
 
 /// Keeps the registry attached to the current native window when a host reparents the browser.
@@ -179,7 +183,14 @@ struct WindowRegistrationBridge: NSViewRepresentable {
         let store = tabStore
         let ownsWindow = ownsWindowChrome
         view.didMove = { [weak view] in
+            guard !store.isClosed else { return }
             WindowRegistry.shared.register(id: id, window: view?.window, tabStore: store, ownsWindowChrome: ownsWindow)
+            if ownsWindow {
+                view?.observeWindowClose {
+                    store.closeAll()
+                    WindowRegistry.shared.unregister(id: id)
+                }
+            }
         }
         DispatchQueue.main.async { view.didMove?() }
     }
@@ -187,6 +198,23 @@ struct WindowRegistrationBridge: NSViewRepresentable {
 
 private final class RegistrationView: NSView {
     var didMove: (() -> Void)?
+    private weak var observedWindow: NSWindow?
+    private var closeObserver: NSObjectProtocol?
+
+    deinit {
+        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+    }
+
+    func observeWindowClose(_ close: @escaping @MainActor () -> Void) {
+        guard window !== observedWindow else { return }
+        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+        observedWindow = window
+        closeObserver = window.map { window in
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+                MainActor.assumeIsolated { close() }
+            }
+        }
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

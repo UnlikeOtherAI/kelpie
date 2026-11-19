@@ -8,44 +8,55 @@ struct ConsoleHandler {
     func register(on router: Router) {
         router.register("get-console-messages") { body in await getConsoleMessages(body) }
         router.register("get-js-errors") { body in await getJSErrors(body) }
-        router.register("clear-console") { _ in await clearConsole() }
+        router.register("clear-console") { body in await clearConsole(body) }
     }
 
     @MainActor
     private func getConsoleMessages(_ body: [String: Any]) async -> [String: Any] {
-        let level = body["level"] as? String
-        let limit = body["limit"] as? Int ?? 100
-
-        var messages = context.consoleMessages
-        if let level {
-            messages = messages.filter { ($0["level"] as? String) == level }
+        do {
+            let target = try context.diagnosticTarget(body)
+            let level = body["level"] as? String
+            let since = NetworkHandler.parseSinceMillis(body["since"])
+            let limit = max(0, body["limit"] as? Int ?? 100)
+            let messages = target.buffer.console.filter { message in
+                if let level, message["level"] as? String != level { return false }
+                if let since {
+                    guard let timestamp = message["timestamp"] as? String,
+                          let millis = NetworkHandler.parseISO8601Millis(timestamp) else { return false }
+                    return millis >= since
+                }
+                return true
+            }
+            let limited = Array(messages.suffix(limit))
+            return successResponse(["messages": limited, "count": limited.count, "hasMore": messages.count > limit])
+        } catch {
+            return diagnosticErrorResponse(error)
         }
-        let limited = Array(messages.suffix(limit))
-        return successResponse([
-            "messages": limited,
-            "count": limited.count,
-            "hasMore": messages.count > limit
-        ])
     }
 
     @MainActor
     private func getJSErrors(_ body: [String: Any]) async -> [String: Any] {
-        let errors = context.consoleMessages.filter { ($0["level"] as? String) == "error" }
-        return successResponse([
-            "errors": errors.map { msg -> [String: Any] in
-                var error = msg
-                error["type"] = "console-error"
-                return error
-            },
-            "count": errors.count
-        ])
+        do {
+            let target = try context.diagnosticTarget(body)
+            let errors = target.buffer.console.filter { $0["level"] as? String == "error" }.map {
+                $0.merging(["type": "console-error"]) { existing, _ in existing }
+            }
+            return successResponse(["errors": errors, "count": errors.count])
+        } catch {
+            return diagnosticErrorResponse(error)
+        }
     }
 
     @MainActor
-    private func clearConsole() async -> [String: Any] {
-        let count = context.consoleMessages.count
-        context.consoleMessages.removeAll()
-        return successResponse(["cleared": count])
+    private func clearConsole(_ body: [String: Any]) async -> [String: Any] {
+        do {
+            let buffer = try context.diagnosticTarget(body).buffer
+            let count = buffer.console.count
+            buffer.console.removeAll()
+            return successResponse(["cleared": count])
+        } catch {
+            return diagnosticErrorResponse(error)
+        }
     }
 
     /// Returns the user script to inject at document start for console capture.
@@ -54,7 +65,7 @@ struct ConsoleHandler {
     static var bridgeScript: WKUserScript {
         let js = """
         (function() {
-            // Save private reference before masking — Google OAuth detects messageHandlers
+            // Save private reference before masking â€” Google OAuth detects messageHandlers
             var _post = window.webkit.messageHandlers.kelpieConsole.postMessage.bind(
                 window.webkit.messageHandlers.kelpieConsole
             );
@@ -105,6 +116,7 @@ struct ConsoleHandler {
             window.addEventListener('error', function(e) {
                 _post({
                     level: 'error',
+                    type: 'uncaught-exception',
                     text: e.message || String(e),
                     source: e.filename || '',
                     line: e.lineno || 0,
@@ -116,6 +128,7 @@ struct ConsoleHandler {
             window.addEventListener('unhandledrejection', function(e) {
                 _post({
                     level: 'error',
+                    type: 'unhandled-rejection',
                     text: 'Unhandled Promise rejection: ' + (e.reason ? (e.reason.message || String(e.reason)) : 'unknown'),
                     source: '',
                     line: 0,

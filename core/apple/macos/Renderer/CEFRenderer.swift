@@ -9,9 +9,7 @@ import AppKit
 @MainActor
 final class CEFRenderer: RendererEngine {
     final class CEFHostView: NSView {
-        var onWindowReady: (() -> Void)?
         var onBoundsReady: (() -> Void)?
-        var onWindowLost: (() -> Void)?
         var onBecomeVisible: (() -> Void)?
         var onBecomeHidden: (() -> Void)?
 
@@ -24,11 +22,7 @@ final class CEFRenderer: RendererEngine {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if window == nil {
-                onWindowLost?()
-            } else {
-                notifyIfReady()
-            }
+            notifyIfReady()
         }
 
         override func layout() {
@@ -39,13 +33,12 @@ final class CEFRenderer: RendererEngine {
         private func notifyIfReady() {
             guard window != nil else { return }
             guard bounds.width > 0, bounds.height > 0 else { return }
-            onWindowReady?()
             onBoundsReady?()
         }
     }
 
     let engineName = "chromium"
-    let connectionTabID = UUID().uuidString
+    let connectionTabID: String
 
     private static var cefInitialized = false
     private static var messageLoopTimer: Timer?
@@ -53,15 +46,15 @@ final class CEFRenderer: RendererEngine {
     var bridge: CEFBridge?
     let containerView: CEFHostView
     private var pendingURL: URL?
-    /// Navigation deferred because the view was hidden when load(url:) was called.
-    /// Executed by onBoundsReady when the view becomes visible.
-    private var pendingNavigation: URL?
+    private var isActive = false
+    private var isRetired = false
     private var documentNavigationStart = Date()
     private var capturedDocumentResponseURL: String?
     private var surfaceRefreshTask: Task<Void, Never>?
     private(set) var currentURL: URL?
     private(set) var currentTitle: String = ""
-    private(set) var isLoading: Bool = false
+    var isLoading: Bool { pendingURL != nil || documentLoading }
+    private var documentLoading = false
     private(set) var canGoBack: Bool = false
     private(set) var canGoForward: Bool = false
     private(set) var estimatedProgress: Double = 0.0
@@ -87,66 +80,66 @@ final class CEFRenderer: RendererEngine {
     }
 
     deinit {
-        surfaceRefreshTask?.cancel()
-        bridge?.closeBrowser()
+        MainActor.assumeIsolated { retire() }
     }
 
-    init() {
+    init(tabID: UUID = UUID()) {
+        connectionTabID = tabID.uuidString
         Self.ensureCEFInitialized()
 
         containerView = CEFHostView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800))
         containerView.wantsLayer = true
-        containerView.onWindowReady = { [weak self] in
-            Task { @MainActor in
-                self?.ensureBridge()
-            }
-        }
+        containerView.isHidden = true
         containerView.onBoundsReady = { [weak self] in
             Task { @MainActor in
-                guard let self, let bridge = self.bridge else { return }
-                bridge.resize(to: self.containerView.bounds.size)
+                self?.prepareAttachedSurface()
             }
-        }
-        containerView.onBecomeHidden = { [weak self] in
-            self?.bridge?.setHidden(true)
         }
         containerView.onBecomeVisible = { [weak self] in
             Task { @MainActor in
-                self?.bridge?.setHidden(false)
-                self?.scheduleSurfaceRefresh()
-                await self?.flushDeferredStateIfPossible()
+                guard let self, self.surfaceReady else { return }
+                self.bridge?.setHidden(false)
+                self.scheduleSurfaceRefresh()
+                self.prepareAttachedSurface()
             }
         }
+        containerView.onBecomeHidden = { [weak self] in self?.bridge?.setHidden(true) }
     }
 
-    private func ensureBridge() {
-        guard Self.cefInitialized else { return }
-        guard bridge == nil else { return }
-        guard containerView.window != nil else { return }
-        guard containerView.bounds.width > 0, containerView.bounds.height > 0 else { return }
+    private var surfaceReady: Bool {
+        isActive && !isRetired && containerView.window != nil &&
+            !containerView.isHiddenOrHasHiddenAncestor && !containerView.bounds.isEmpty
+    }
 
-        NSLog(
-            "[CEFRenderer] ensureBridge window=%@ frame=%@ bounds=%@ pendingURL=%@",
-            String(describing: containerView.window),
-            NSStringFromRect(containerView.frame),
-            NSStringFromRect(containerView.bounds),
-            pendingURL?.absoluteString ?? "nil"
-        )
-
-        let bridge = CEFBridge(
-            parentView: containerView,
-            url: "about:blank",
-            identifier: "main"
-        )
-        configureBridge(bridge)
-        self.bridge = bridge
-        bridge.resize(to: containerView.bounds.size)
-
-        let urlToLoad = pendingURL
-        pendingURL = nil
-        if let urlToLoad {
-            bridge.loadURL(urlToLoad.absoluteString)
+    private func prepareAttachedSurface() {
+        guard Self.cefInitialized, surfaceReady else { return }
+        if bridge == nil {
+            let bridge = CEFBridge(parentView: containerView, url: "about:blank", identifier: connectionTabID)
+            configureBridge(bridge)
+            self.bridge = bridge
+            scheduleSurfaceRefresh()
         }
+        bridge?.resize(to: containerView.bounds.size)
+        guard let url = pendingURL else { return }
+        pendingURL = nil
+        bridge?.loadURL(url.absoluteString)
+    }
+
+    func retire() {
+        guard !isRetired else { return }
+        isRetired = true
+        willDeactivate()
+        pendingURL = nil
+        onStateChange = nil
+        onScriptMessage = nil
+        let view = containerView
+        view.isHidden = true
+        guard let bridge else {
+            view.removeFromSuperview()
+            return
+        }
+        self.bridge = nil
+        bridge.retireEmbeddedBrowser { view.removeFromSuperview() }
     }
 
     private func configureBridge(_ bridge: CEFBridge) {
@@ -158,7 +151,10 @@ final class CEFRenderer: RendererEngine {
 
         bridge.onConsoleMessage = { [weak self] message in
             Task { @MainActor in
-                self?.onScriptMessage?("kelpieConsole", message as? [String: Any] ?? [:])
+                guard let self else { return }
+                let body = message as? [String: Any] ?? [:]
+                BrowserDiagnostics.forTarget(self).recordConsole(body)
+                self.onScriptMessage?("kelpieConsole", body)
             }
         }
 
@@ -194,18 +190,19 @@ final class CEFRenderer: RendererEngine {
     }
 
     private func syncState() {
-        let previousLoading = isLoading
+        let previousLoading = documentLoading
         guard let bridge else { return }
         currentURL = URL(string: bridge.currentURL())
         currentTitle = bridge.currentTitle()
-        isLoading = bridge.isLoading()
+        documentLoading = bridge.isLoading()
         canGoBack = bridge.canGoBack()
         canGoForward = bridge.canGoForward()
-        if isLoading, !previousLoading {
+        if documentLoading, !previousLoading {
             NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
-        } else if !isLoading, previousLoading {
+            BrowserDiagnostics.forTarget(self).documentResponse = nil
+        } else if !documentLoading, previousLoading {
             recordCompletedDocumentNavigation()
             NotificationCenter.default.post(name: .kelpieChromiumDocumentLoaded, object: nil)
         }
@@ -215,42 +212,31 @@ final class CEFRenderer: RendererEngine {
     // MARK: - RendererEngine
 
     func makeView() -> NSView {
-        ensureBridge()
-        return containerView
+        containerView
     }
 
     func load(url: URL) {
-        NSLog("[CEFRenderer] load url=%@", url.absoluteString)
-        let hadBridge = bridge != nil
+        guard !isRetired else { return }
         pendingURL = url
         currentURL = url
         documentNavigationStart = Date()
         capturedDocumentResponseURL = nil
-        ensureBridge()
-        if hadBridge {
-            if containerView.isHidden {
-                // View is hidden (renderer switch in progress). Defer the navigation
-                // until the view is shown — CEF crashes if navigated while hidden and
-                // then immediately made visible (GPU surface transition).
-                pendingNavigation = url
-                NSLog("[CEFRenderer] view hidden, deferring navigation to %@", url.absoluteString)
-            } else {
-                bridge?.loadURL(url.absoluteString)
-            }
-            pendingURL = nil
-        }
+        BrowserDiagnostics.forTarget(self).documentResponse = nil
+        prepareAttachedSurface()
     }
 
     func willDeactivate() {
+        isActive = false
+        surfaceRefreshTask?.cancel()
         bridge?.setHidden(true)
     }
 
     func didActivate() {
+        guard !isRetired, !isActive else { return }
+        isActive = true
         bridge?.setHidden(false)
         scheduleSurfaceRefresh()
-        Task { @MainActor in
-            await flushDeferredStateIfPossible()
-        }
+        Task { @MainActor [weak self] in self?.prepareAttachedSurface() }
     }
 
     func viewportDidChange() {
@@ -324,20 +310,12 @@ final class CEFRenderer: RendererEngine {
                 try? await Task.sleep(nanoseconds: 120_000_000)
                 guard !Task.isCancelled else { return }
                 guard let bridge else { return }
-                guard !containerView.isHidden else { continue }
+                guard surfaceReady else { continue }
                 containerView.layoutSubtreeIfNeeded()
                 bridge.setHidden(false)
                 bridge.resize(to: containerView.bounds.size)
             }
         }
-    }
-
-    private func flushDeferredStateIfPossible() async {
-        guard let bridge else { return }
-        guard !containerView.isHidden else { return }
-        guard let deferredNavigation = pendingNavigation else { return }
-        pendingNavigation = nil
-        bridge.loadURL(deferredNavigation.absoluteString)
     }
 
     private func recordCompletedDocumentNavigation() {
@@ -353,6 +331,7 @@ final class CEFRenderer: RendererEngine {
             contentType: "",
             startedAt: documentNavigationStart
         )
+        BrowserDiagnostics.forTarget(self).documentResponse = (url, bridge?.mainFrameHTTPStatusCode() ?? 0, "")
         capturedDocumentResponseURL = url
     }
 }

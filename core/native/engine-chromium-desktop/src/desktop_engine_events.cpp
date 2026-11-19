@@ -80,11 +80,15 @@ void DesktopEngine::SetNetworkSink(JsonEventSink sink) {
   impl_->network_sink = std::move(sink);
 }
 
-CefRefPtr<DesktopDevToolsSession> DesktopEngine::Impl::NewDevToolsSession(CefRefPtr<CefBrowser> browser) {
+CefRefPtr<DesktopDevToolsSession> DesktopEngine::Impl::NewDevToolsSession(CefRefPtr<CefBrowser> browser, std::string tab_id) {
   CefRefPtr<DesktopDevToolsSession> session = new DesktopDevToolsSession(unknown_operations);
   // Forward through the engine so a sink installed later still receives events.
-  session->Attach(browser, [this](const nlohmann::json& event) {
-    if (network_sink) network_sink(event);
+  session->Attach(browser, [this, tab_id = std::move(tab_id)](const nlohmann::json& event) {
+    if (network_sink) {
+      auto scoped_event = event;
+      scoped_event["tabId"] = tab_id;
+      network_sink(scoped_event);
+    }
   });
   return session;
 }

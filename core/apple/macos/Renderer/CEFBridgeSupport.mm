@@ -449,11 +449,17 @@ static void OnMainFrameChanged(cef_frame_handler_t *, cef_browser_t *browser, ce
     LogFrameEvent("main_changed_new", browser, newFrame, 0);
 }
 
-static int OnConsoleMessage(cef_display_handler_t *self, cef_browser_t *, cef_log_severity_t, const cef_string_t *message, const cef_string_t *source, int line) {
+static int OnConsoleMessage(cef_display_handler_t *self, cef_browser_t *, cef_log_severity_t severity, const cef_string_t *message, const cef_string_t *source, int line) {
+    NSString *level = @"log";
+    if (severity == LOGSEVERITY_WARNING) level = @"warn";
+    else if (severity == LOGSEVERITY_ERROR || severity == LOGSEVERITY_FATAL) level = @"error";
+    else if (severity == LOGSEVERITY_INFO) level = @"info";
+    else if (severity == LOGSEVERITY_VERBOSE) level = @"debug";
     [StructFromBase<DisplayHandler>(&self->base, offsetof(DisplayHandler, handler))->owner
         cefBridgeHandleConsoleMessage:StringFromCEFString(message)
                                    source:StringFromCEFString(source)
-                                     line:line];
+                                     line:line
+                                    level:level];
     return 0;
 }
 

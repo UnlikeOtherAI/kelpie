@@ -36,6 +36,20 @@ Start the MCP server with HTTP transport, on `--port` (default 8421) when one is
 kelpie mcp --http --port 8421
 ```
 
+### Browser request timeouts
+
+`kelpie navigate <url>` and its `kelpie <url>` shorthand allow 15000 ms for
+the HTTP reply. For `kelpie wait` and `kelpie wait-nav`, `--wait-timeout`
+controls how long the browser waits for the selector or load. The CLI allows
+that duration plus 5000 ms for the reply, with a minimum of 10000 ms. An
+explicit `--timeout` sets the CLI's HTTP deadline.
+
+The CLI MCP server similarly allows 15000 ms for `kelpie_navigate`. For
+`kelpie_wait_for_element` and `kelpie_wait_for_navigation`, it allows the
+operation's `timeout` plus 5000 ms, with a minimum of 10000 ms. When a wait
+omits `timeout`, the HTTP deadline is 15000 ms and the browser uses its own
+wait default.
+
 ---
 
 ## AI Commands

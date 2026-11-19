@@ -74,7 +74,7 @@ final class StartPageTests: XCTestCase {
             if tab.renderer.currentURL?.absoluteString == url, !tab.renderer.isLoading { break }
             try await Task.sleep(for: .milliseconds(20))
         }
-        store.rendererStateChanged(tab)
+        store.rendererStateChanged(tab, from: tab.renderer)
         let entry = try XCTUnwrap(HistoryStore.shared.entries.first { $0.url == url })
         XCTAssertEqual(tab.currentURL, url)
         HistoryStore.shared.remove(id: entry.id)

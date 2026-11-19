@@ -66,8 +66,8 @@ final class EmbeddedWindowTests: XCTestCase {
         second.isStartPage = false
         server.setActiveWebKitRenderer(second.renderer)
 
-        let firstWindow = makeRendererWindow(for: first, server: server, engine: engine)
-        let secondWindow = makeRendererWindow(for: second, server: server, engine: engine)
+        let firstWindow = makeRendererWindow(for: first, engine: engine)
+        let secondWindow = makeRendererWindow(for: second, engine: engine)
         defer {
             firstWindow.contentViewController = nil
             secondWindow.contentViewController = nil
@@ -79,12 +79,46 @@ final class EmbeddedWindowTests: XCTestCase {
         XCTAssertFalse(second.renderer.makeView().isHidden)
     }
 
-    private func makeRendererWindow(for tab: KelpieBrowser.Tab, server: ServerState, engine: RendererState) -> NSWindow {
+    func testClosingAnOwnedWindowRetiresOnlyItsTabs() async {
+        let firstID = UUID().uuidString
+        let secondID = UUID().uuidString
+        let firstStore = TabStore(isolatedTab: KelpieBrowser.Tab(spec: TabSpec(dataStore: .nonPersistent())))
+        let secondStore = TabStore(isolatedTab: KelpieBrowser.Tab(spec: TabSpec(dataStore: .nonPersistent())))
+        let first = makeRegisteredWindow(id: firstID, store: firstStore)
+        let second = makeRegisteredWindow(id: secondID, store: secondStore)
+        defer {
+            second.close()
+            WindowRegistry.shared.unregister(id: firstID)
+            WindowRegistry.shared.unregister(id: secondID)
+        }
+        await awaitRegistration(firstID, window: first)
+        await awaitRegistration(secondID, window: second)
+
+        first.close()
+
+        XCTAssertTrue(firstStore.isClosed)
+        XCTAssertTrue(firstStore.tabs.isEmpty)
+        XCTAssertNil(WindowRegistry.shared.entry(for: firstID))
+        XCTAssertFalse(secondStore.isClosed)
+        XCTAssertEqual(secondStore.tabs.count, 1)
+        XCTAssertTrue(WindowRegistry.shared.entry(for: secondID)?.window === second)
+    }
+
+    private func makeRegisteredWindow(id: String, store: TabStore) -> NSWindow {
+        let window = NSWindow()
+        window.isReleasedWhenClosed = false
+        window.contentViewController = NSHostingController(rootView:
+            WindowRegistrationBridge(windowId: id, tabStore: store, ownsWindowChrome: true)
+                .frame(width: 20, height: 20)
+        )
+        return window
+    }
+
+    private func makeRendererWindow(for tab: KelpieBrowser.Tab, engine: RendererState) -> NSWindow {
         let window = NSWindow()
         window.contentViewController = NSHostingController(rootView:
             RendererContainerView(
                 chromeAppearance: BrowserChromeAppearance(),
-                serverState: server,
                 rendererState: engine,
                 tabStore: TabStore(isolatedTab: tab)
             )

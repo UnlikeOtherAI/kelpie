@@ -289,6 +289,8 @@ Capture a screenshot of the current viewport. When `fullPage: true`, captures th
 
 All three platforms now use scroll-and-stitch and may show minor seam artifacts on pages with sticky/animated elements; the full-page response adds a `contentHeight` field and a page-relative `imageScaleY` so image pixels map back to CSS coordinates across the whole page.
 
+On macOS, screenshot capture returns `RENDERER_HIDDEN` if the page reports that it is hidden, even if the tab is selected. Bring the window into view, select the tab and retry the capture.
+
 > **CLI/MCP note:** The HTTP API always returns base64. The CLI wraps this — it auto-saves to a file and returns the file path instead, so LLMs never handle raw base64 in conversation. The CLI MCP server also saves `resolution: "native"` screenshots to a temp file and returns compact metadata plus a file resource link, preventing large native images from being streamed as tool text. See [cli.md](../cli.md) for `--output` and `--base64` flags.
 
 ```json
@@ -472,6 +474,10 @@ Tap at specific coordinates as a last resort. Prefer `click` or `click-annotatio
 | `x` | number | **required** | X coordinate |
 | `y` | number | **required** | Y coordinate |
 | `coordinateSpace` | string | `"viewport"` | `"viewport"` for CSS viewport pixels, `"screenshot"` for screenshot image pixels (auto-converted via devicePixelRatio) |
+| `marker.style` | string | `"circle"` | `"circle"` shows the blue dot and ripple. `"crosshair-coordinates"` shows a crosshair and two labeled coordinate pairs. |
+| `marker.durationMs` | integer | `550` | Time before the marker starts to fade, from 0 through 2,147,483,647 milliseconds. |
+
+The optional `marker` object is supported on iOS, Android, macOS with WebKit or Chromium, and Windows and Linux with Chromium. The circle's ripple starts immediately, and the hold time applies to the center dot. The crosshair labels show the applied tap point after calibration and clamping. Both pairs use CSS pixels. The page pair includes the document's horizontal and vertical scroll offsets at the time of the tap.
 
 When using coordinates read from a screenshot image, pass `"coordinateSpace": "screenshot"` so Kelpie converts from image pixels to viewport CSS pixels automatically. Without this, taps will miss on Retina/high-DPI displays because screenshot images have more pixels than the CSS viewport.
 
@@ -480,7 +486,8 @@ POST /v1/tap
 {
   "x": 195,
   "y": 420,
-  "coordinateSpace": "screenshot"
+  "coordinateSpace": "screenshot",
+  "marker": { "style": "crosshair-coordinates", "durationMs": 1500 }
 }
 
 Response:
@@ -495,7 +502,9 @@ Response:
 }
 ```
 
-Kelpie now dispatches coordinate-bearing pointer and mouse events at the calibrated point, then performs a compatible element activation. That keeps the event location observable on the page while preserving the previous "activate the hit element" behavior.
+The Windows and Linux Chromium builds dispatch one native Chromium click at the applied point. Include `tabId` when the instance has more than one tab. These builds scope automation to the instance's window and reject explicit `windowId` values. Linux Chromium honors offsets saved in the selected profile.
+
+iOS, Android, and macOS dispatch coordinate-bearing pointer and mouse events at the applied point, then activate the hit element.
 
 ### `coordinate-diagnostics`
 Run a coordinate debugging oracle in one structured call. The endpoint samples `elementFromPoint()` / `elementsFromPoint()`, optionally evaluates setup/export JavaScript, executes page-synthesized `tap`, `swipe`, and `scroll` actions, records delivered pointer/mouse/touch/scroll events, and can attach a screenshot with the same viewport-mapping metadata as `screenshot`.
@@ -926,6 +935,10 @@ Response:
 ---
 
 ## Wait / Sync
+
+The JSON `timeout` is the browser's operation budget in milliseconds. The
+CLI and CLI MCP proxy use a separate HTTP request deadline so they can receive
+the browser's reply after the wait elapses.
 
 ### `waitForElement`
 Wait for an element to appear in the DOM.

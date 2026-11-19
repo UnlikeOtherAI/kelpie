@@ -20,6 +20,13 @@ kelpie_embed_resources(
     "kStartJs=${KELPIE_START_PAGE_DIR}/start.js"
     "kAppIconPng=${KELPIE_START_PAGE_DIR}/app-icon.png")
 
+set(KELPIE_TAP_MARKER_CPP "${CMAKE_CURRENT_BINARY_DIR}/generated/tap_marker.cpp")
+kelpie_embed_resources(
+  OUTPUT "${KELPIE_TAP_MARKER_CPP}"
+  HEADER "tap_marker_resource.h"
+  NAMESPACE "kelpie"
+  RESOURCES "kTapMarkerScript=${CMAKE_CURRENT_SOURCE_DIR}/../../../assets/tap-marker.js")
+
 find_path(CPP_HTTPLIB_INCLUDE_DIR
   NAMES httplib.h
 )
@@ -48,6 +55,8 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/navigation_handler.cpp
   src/handlers/navigation_wait.cpp
   src/handlers/interaction_handler.cpp
+  src/handlers/interaction_tap.cpp
+  "${KELPIE_TAP_MARKER_CPP}"
   src/handlers/dom_handler.cpp
   src/handlers/evaluate_handler.cpp
   src/handlers/screenshot_handler.cpp

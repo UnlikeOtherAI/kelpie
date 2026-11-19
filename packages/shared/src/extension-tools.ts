@@ -27,7 +27,8 @@ const unavailablePlatforms = [] as const;
 
 // --- Shared schema fragments ---
 
-const device = z.string().describe("Device ID, name, or IP address");
+export const deviceSelector = z.string().describe("Device ID, name, IP address, or host:port (for example 192.168.1.42:8422).");
+const device = deviceSelector;
 const selector = z.string().describe("CSS selector");
 const url = z.string().describe("URL");
 const timeout = z.number().optional().describe("Timeout in milliseconds");
@@ -56,6 +57,10 @@ export const cookieInfoSchema = z.object({
 const point = z.object({
   x: z.number().describe("Viewport X coordinate"),
   y: z.number().describe("Viewport Y coordinate"),
+});
+export const tapMarkerSchema = z.strictObject({
+  style: z.enum(["circle", "crosshair-coordinates"]).optional().describe("Circle (default) or crosshair labeled with viewport and document coordinates in CSS pixels"),
+  durationMs: z.number().int().min(0).max(2147483647).optional().describe("Milliseconds before the marker fades, default 550"),
 });
 const coordinateDiagnosticsPoint = point.extend({
   label: z.string().optional().describe("Optional label for this sampled point"),
@@ -172,7 +177,7 @@ export const sharedBrowserTools: BrowserToolDef[] = [
 
   // Interaction
   { name: "kelpie_click", description: "Click an element by CSS selector. Prefer this over coordinate taps whenever you can identify the target semantically or via find-element/get-accessibility-tree. The selectors returned by semantic and annotation tools are meant to be fed back here directly. Shows a blue touch indicator at the element location.", method: "click", schema: { device, selector, timeout, tabId, message }, bodyFromArgs: passthrough },
-  { name: "kelpie_tap", description: "Tap at specific viewport coordinates as a last resort. Prefer click, fill, or click-annotation first. Saved tap calibration offsets are applied automatically before dispatch. Shows a blue touch indicator at the applied tap point.", method: "tap", schema: { device, x: z.number().describe("X coordinate"), y: z.number().describe("Y coordinate"), tabId, message }, bodyFromArgs: passthrough },
+  { name: "kelpie_tap", description: "Tap at specific viewport coordinates as a last resort. Prefer click, fill, or click-annotation first. Saved tap calibration offsets are applied automatically before dispatch. Shows a marker at the applied tap point.", method: "tap", schema: { device, x: z.number().describe("X coordinate"), y: z.number().describe("Y coordinate"), coordinateSpace: z.enum(["viewport", "screenshot"]).optional().describe("Viewport CSS pixels or screenshot image pixels"), marker: tapMarkerSchema.optional().describe("Options for the tap marker"), tabId, message }, bodyFromArgs: passthrough },
   { name: "kelpie_fill", description: "Fill a form field with a value. Shows a touch indicator at the field.", method: "fill", schema: { device, selector, value: z.string().describe("Value to fill"), mode: z.enum(["instant", "typing"]).optional().describe("Fill mode: instant (default) sets value immediately, typing types character by character"), delay: z.number().optional().describe("Delay between keystrokes in ms when mode is typing (default 50)"), timeout, tabId, message }, bodyFromArgs: passthrough },
   { name: "kelpie_type", description: "Type text character by character", method: "type", schema: { device, selector: selector.optional(), text: z.string().describe("Text to type"), delay: z.number().optional().describe("Delay between keystrokes in ms"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_press_key", description: "Send a trusted native key press to the focused browser element", method: "pressKey", platforms: ["windows", "linux"] as const, schema: { device, key: z.string().describe("Key value"), code: z.string().optional().describe("Physical key code"), modifiers: z.array(z.enum(["Alt", "Control", "Meta", "Shift"])).optional().describe("Modifier keys"), tabId }, bodyFromArgs: passthrough },
@@ -226,11 +231,11 @@ export const sharedBrowserTools: BrowserToolDef[] = [
   { name: "kelpie_toast", description: "Show a toast message overlay on the device screen. Use this to narrate actions, explain what you are doing, or communicate status to anyone watching the device. The message appears in a semi-transparent card at the bottom of the viewport for 3 seconds.", method: "toast", schema: { device, message: z.string().describe("Message to display on the device screen") }, bodyFromArgs: passthrough },
 
   // Console
-  { name: "kelpie_get_console_messages", description: "Get browser console messages", method: "getConsoleMessages", schema: { device, level: z.enum(["log", "warn", "error", "info", "debug"]).optional().describe("Filter by level"), since: z.string().optional().describe("ISO timestamp cutoff"), limit: z.number().optional().describe("Max messages"), tabId }, bodyFromArgs: passthrough },
-  { name: "kelpie_get_js_errors", description: "Get JavaScript errors from the page", method: "getJSErrors", schema: { device, tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_console_messages", description: "Get console messages for the requested browser tab", method: "getConsoleMessages", schema: { device, level: z.enum(["log", "warn", "error", "info", "debug"]).optional().describe("Filter by level"), since: z.string().optional().describe("ISO timestamp cutoff"), limit: z.number().optional().describe("Max messages"), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_js_errors", description: "Get JavaScript errors for the requested browser tab", method: "getJSErrors", schema: { device, tabId }, bodyFromArgs: passthrough },
 
   // Network
-  { name: "kelpie_get_network_log", description: "Get network request log", method: "getNetworkLog", schema: { device, type: z.string().optional().describe("Filter by resource type"), status: z.enum(["success", "error", "pending"]).optional(), since: z.string().optional(), limit: z.number().optional(), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_network_log", description: "Get network request log for the requested tab, including HTTP and transport errors", method: "getNetworkLog", schema: { device, type: z.string().optional().describe("Filter by resource type"), status: z.enum(["success", "error", "pending"]).optional(), since: z.string().optional(), limit: z.number().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_clear_network_log", description: "Clear the network request log", method: "clearNetworkLog", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_get_resource_timeline", description: "Get resource loading timeline", method: "getResourceTimeline", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_get_websockets", description: "List active WebSocket connections", method: "getWebSockets", schema: { device, tabId }, bodyFromArgs: passthrough },
@@ -350,8 +355,8 @@ export const sharedBrowserTools: BrowserToolDef[] = [
 
 export const cliTools: CliToolDef[] = [
   // Discovery
-  { name: "kelpie_discover", description: "Discover devices on the local network via mDNS", method: "discover", kind: "discovery", schema: { timeout: z.number().optional().describe("Discovery timeout in ms (default 3000)") }, bodyFromArgs: filterBody },
-  { name: "kelpie_list_devices", description: "List all discovered devices", method: "listDevices", kind: "discovery", schema: {}, bodyFromArgs: filterBody },
+  { name: "kelpie_discover", description: "Discover devices via mDNS or a loopback probe. Returns scan diagnostics without starting pairing.", method: "discover", kind: "discovery", schema: { timeout: z.number().optional().describe("Discovery timeout in ms (default 3000)") }, bodyFromArgs: filterBody },
+  { name: "kelpie_list_devices", description: "List cached devices. Use kelpie_discover to run a fresh scan.", method: "listDevices", kind: "discovery", schema: {}, bodyFromArgs: filterBody },
   { name: "kelpie_pair", description: "Pair the CLI with a device. The end-user must explicitly approve on the device — this tool blocks until approval, denial, or timeout. Resulting tokens are scoped 'session' (process-memory) or 'persistent' (~/.kelpie/tokens.json, 0600).", method: "pair", kind: "discovery", schema: { device, clientName: z.string().optional().describe("Self-reported name displayed on the device prompt"), timeoutMs: z.number().optional().describe("How long to wait for approval before giving up (default 300000)") }, bodyFromArgs: passthrough },
   { name: "kelpie_feedback_summary", description: "Summarize locally stored automation feedback reports", method: "feedbackSummary", kind: "discovery", schema: { limit: z.number().optional().describe("How many recent reports to include (default 10)") }, bodyFromArgs: filterBody },
 

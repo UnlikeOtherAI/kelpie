@@ -225,7 +225,7 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const NewTabRequest& req
   Tab tab;
   tab.id = id;
   tab.browser = created;
-  tab.devtools = NewDevToolsSession(created);
+  tab.devtools = NewDevToolsSession(created, tab.id);
   tab.url = url;
   tab.name = request.name;
   if (partition != nullptr) tab.partition = partition->id;

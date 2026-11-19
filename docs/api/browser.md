@@ -226,19 +226,12 @@ On Windows and Linux, a trusted input call (`click`, `press-key`, `type`, …) w
 
 ## Tabs
 
-Tab management is **WebKit-only**. In Chromium (CEF) mode, all tab endpoints return:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "WEBKIT_ONLY",
-    "message": "Tab management is not available in Chromium (CEF) mode. ..."
-  }
-}
-```
-
-Switch to WebKit first: `kelpie_set_renderer({"engine": "webkit"})`
+Both macOS engines support listing, opening, selecting, and closing tabs.
+Chromium tabs share the default Chromium request context. A Chromium
+`new-tab` request with a `partition` returns `PARTITION_UNSUPPORTED`.
+Chromium loads a tab's initial URL once the tab has a visible, sized native
+surface. Select that tab before using an operation that requires a visible
+renderer, such as evaluating JavaScript.
 
 ### Per-window tab routing (macOS)
 
@@ -813,7 +806,9 @@ Response:
 ## Page Evaluation
 
 ### `evaluate`
-Evaluate a JavaScript expression and return the result. Executed via native WebView bridge (iOS) or CDP `Runtime.evaluate` (Android).
+Evaluate JavaScript in the page and return the result. If the evaluation returns a Promise,
+`/v1/evaluate` and the `kelpie_evaluate` MCP extension wait for it to settle.
+A rejection returns an evaluation error with the rejection reason.
 
 ```json
 POST /v1/evaluate
@@ -828,11 +823,11 @@ Response:
 }
 ```
 
-On macOS with the Chromium (CEF) renderer, each evaluation is bounded by a 30s
-safety timeout. If the result never arrives (e.g. the expression returns a
-never-resolving promise, the frame is torn down mid-evaluation, or the page has
-replaced `console.log`), the call resolves with `JavaScript evaluation timed
-out` instead of hanging the request.
+On iOS, Android and macOS, Promise evaluation has a 30-second safety limit.
+When a page's Content Security Policy blocks JavaScript string compilation,
+the WebKit and Android WebView renderers use their synchronous evaluator.
+An asynchronous script on those pages can still change the page after the
+request returns, so check the page state before retrying it.
 
 ---
 

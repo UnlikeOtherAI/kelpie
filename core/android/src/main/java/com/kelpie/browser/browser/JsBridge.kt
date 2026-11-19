@@ -17,7 +17,8 @@ import org.json.JSONObject
  *   - Inputs are size-capped to protect against renderer-driven OOM.
  */
 class JsBridge(
-    private val handlerContext: com.kelpie.browser.handlers.HandlerContext?,
+    private val handlerContext: com.kelpie.browser.handlers.HandlerContext,
+    private val diagnostics: BrowserDiagnostics,
 ) {
     @JavascriptInterface
     fun onConsoleMessage(jsonString: String) {
@@ -26,7 +27,7 @@ class JsBridge(
             val obj = JSONObject(jsonString)
             val message = obj.optString("message", obj.optString("text", ""))
             if (message == "__kelpie_3d_exit__") {
-                handlerContext?.mark3DInspectorInactive()
+                handlerContext.mark3DInspectorInactive()
                 return
             }
             val map = mutableMapOf<String, Any?>()
@@ -37,7 +38,7 @@ class JsBridge(
                         else -> obj.get(key)
                     }
             }
-            handlerContext?.appendConsoleMessage(map)
+            diagnostics.recordConsole(map)
         } catch (_: Exception) {
         }
     }
@@ -48,7 +49,7 @@ class JsBridge(
         try {
             val obj = JSONObject(jsonString)
             if (obj.optString("action") == "exit") {
-                handlerContext?.mark3DInspectorInactive()
+                handlerContext.mark3DInspectorInactive()
             }
         } catch (_: Exception) {
         }
@@ -59,6 +60,8 @@ class JsBridge(
         if (jsonString.length > MAX_NETWORK_EVENT_BYTES) return
         try {
             val obj = JSONObject(jsonString)
+            diagnostics.recordNetwork(obj)
+            if (!obj.isNull("failure")) return
             val reqHeaders = mutableMapOf<String, String>()
             obj.optJSONObject("requestHeaders")?.let { h ->
                 for (k in h.keys()) reqHeaders[k] = h.optString(k, "")
@@ -102,93 +105,148 @@ class JsBridge(
 
         /** Network traffic capture script. Intercepts XHR and fetch, posts via KelpieBridge. */
         const val NETWORK_BRIDGE_SCRIPT = """
-(function() {
-    if (!window.KelpieBridge) return;
-    var _post = function(data) {
-        try { window.KelpieBridge.onNetworkEvent(JSON.stringify(data)); } catch(e) {}
-    };
+        (function() {
+            if (window.fetch.__kelpieInstrumented || !window.KelpieBridge) return;
+            var _post = function(data) {
+                try { window.KelpieBridge.onNetworkEvent(JSON.stringify(data)); } catch(e) {}
+            };
 
-    var origOpen = XMLHttpRequest.prototype.open;
-    var origSend = XMLHttpRequest.prototype.send;
-    var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
-
-    XMLHttpRequest.prototype.open = function(method, url) {
-        this._mltv = { method: method, url: String(url), headers: {}, startTime: 0 };
-        return origOpen.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
-        if (this._mltv) this._mltv.headers[name] = value;
-        return origSetHeader.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.send = function(body) {
-        if (this._mltv) {
-            this._mltv.body = typeof body === 'string' ? body.substring(0, 10000) : null;
-            this._mltv.startTime = Date.now();
-        }
-        var self = this;
-        this.addEventListener('loadend', function() {
-            if (!self._mltv) return;
-            var m = self._mltv;
-            var rh = {};
-            (self.getAllResponseHeaders() || '').split('\r\n').forEach(function(l) {
-                var i = l.indexOf(': ');
-                if (i > 0) rh[l.substring(0, i).toLowerCase()] = l.substring(i + 2);
-            });
-            _post({
-                method: m.method || 'GET', url: m.url || '', statusCode: self.status,
-                contentType: self.getResponseHeader('Content-Type') || '',
-                requestHeaders: m.headers, responseHeaders: rh, requestBody: m.body,
-                responseBody: (self.responseType === '' || self.responseType === 'text')
-                    ? (self.responseText || '').substring(0, 10000) : null,
-                duration: Date.now() - m.startTime,
-                size: parseInt(self.getResponseHeader('Content-Length') || '0', 10)
-                    || (self.responseText || '').length
-            });
-        });
-        return origSend.apply(this, arguments);
-    };
-
-    var origFetch = window.fetch;
-    window.fetch = function(input, init) {
-        var startTime = Date.now();
-        var method = (init && init.method) || 'GET';
-        var url = typeof input === 'string' ? input : (input && input.url) || '';
-        var reqHeaders = {};
-        if (init && init.headers) {
-            if (init.headers instanceof Headers) {
-                init.headers.forEach(function(v, k) { reqHeaders[k] = v; });
-            } else if (typeof init.headers === 'object') {
-                Object.keys(init.headers).forEach(function(k) { reqHeaders[k] = init.headers[k]; });
+            function requestUrl(input) {
+                try {
+                    var url = new URL(input instanceof Request ? input.url : input, document.baseURI);
+                    url.hash = '';
+                    return url.href;
+                } catch(e) { return ''; }
             }
-        }
-        var reqBody = (init && typeof init.body === 'string') ? init.body.substring(0, 10000) : null;
-        return origFetch.apply(this, arguments).then(function(response) {
-            var duration = Date.now() - startTime;
-            var respHeaders = {};
-            response.headers.forEach(function(v, k) { respHeaders[k] = v; });
-            var ct = response.headers.get('content-type') || '';
-            var clone = response.clone();
-            clone.text().then(function(text) {
-                _post({
-                    method: method, url: url, statusCode: response.status,
-                    contentType: ct, requestHeaders: reqHeaders,
-                    responseHeaders: respHeaders, requestBody: reqBody,
-                    responseBody: text.substring(0, 10000), duration: duration,
-                    size: parseInt(response.headers.get('content-length') || '0', 10) || text.length
+
+            function requestMethod(method) {
+                var upper = String(method).toUpperCase();
+                return ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT'].includes(upper) ? upper : String(method);
+            }
+
+            // --- XMLHttpRequest interception ---
+            var origOpen = XMLHttpRequest.prototype.open;
+            var origSend = XMLHttpRequest.prototype.send;
+            var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+            XMLHttpRequest.prototype.open = function(method, url) {
+                this._mltv = { method: requestMethod(method), url: requestUrl(url), headers: {}, startTime: 0 };
+                return origOpen.apply(this, arguments);
+            };
+
+            XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+                if (this._mltv) this._mltv.headers[name] = value;
+                return origSetHeader.apply(this, arguments);
+            };
+
+            XMLHttpRequest.prototype.send = function(body) {
+                if (this._mltv) {
+                    this._mltv.body = typeof body === 'string' ? body.substring(0, 10000) : null;
+                    this._mltv.startTime = performance.timeOrigin + performance.now();
+                }
+                var self = this;
+                var m = this._mltv;
+                this.addEventListener('loadend', function() {
+                    if (!m) return;
+                    var duration = Math.round(performance.timeOrigin + performance.now() - m.startTime);
+                    var rh = {};
+                    (self.getAllResponseHeaders() || '').split('\r\n').forEach(function(l) {
+                        var i = l.indexOf(': ');
+                        if (i > 0) rh[l.substring(0, i).toLowerCase()] = l.substring(i + 2);
+                    });
+                    try {
+                        _post({
+                            method: m.method,
+                            url: m.url,
+                            type: 'xhr',
+                            started: m.startTime,
+                            statusCode: self.status,
+                            statusText: self.statusText,
+                            failure: self.status === 0 ? 'XHR failed or was aborted' : null,
+                            contentType: self.getResponseHeader('Content-Type') || '',
+                            requestHeaders: m.headers,
+                            responseHeaders: rh,
+                            requestBody: m.body,
+                            responseBody: (self.responseType === '' || self.responseType === 'text')
+                                ? (self.responseText || '').substring(0, 10000) : null,
+                            duration: duration,
+                            size: parseInt(self.getResponseHeader('Content-Length') || '0', 10)
+                                || ((self.responseType === '' || self.responseType === 'text')
+                                    ? (self.responseText || '').length : 0)
+                        });
+                    } catch(e) {}
+                }, {once: true});
+                return origSend.apply(this, arguments);
+            };
+
+            // --- fetch interception ---
+            var origFetch = window.fetch;
+            var _pendingFetches = 0;
+            var _maxPendingFetches = 100;
+            window.fetch = function(input, init) {
+                if (_pendingFetches >= _maxPendingFetches) return origFetch.apply(this, arguments);
+                _pendingFetches++;
+                var startTime = performance.timeOrigin + performance.now();
+                var method = requestMethod((init && init.method) || (input instanceof Request && input.method) || 'GET');
+                var url = requestUrl(input);
+                var reqHeaders = {};
+                if (init && init.headers) {
+                    if (init.headers instanceof Headers) {
+                        init.headers.forEach(function(v, k) { reqHeaders[k] = v; });
+                    } else if (typeof init.headers === 'object') {
+                        Object.keys(init.headers).forEach(function(k) { reqHeaders[k] = init.headers[k]; });
+                    }
+                }
+                var reqBody = (init && typeof init.body === 'string')
+                    ? init.body.substring(0, 10000) : null;
+
+                return origFetch.apply(this, arguments).then(function(response) {
+                    _pendingFetches--;
+                    var duration = Math.round(performance.timeOrigin + performance.now() - startTime);
+                    var respHeaders = {};
+                    response.headers.forEach(function(v, k) { respHeaders[k] = v; });
+                    var ct = response.headers.get('content-type') || '';
+                    var clone = response.clone();
+                    clone.text().then(function(text) {
+                        try {
+                            _post({
+                                method: method, url: url, statusCode: response.status,
+                                type: 'fetch', started: startTime, statusText: response.statusText,
+                                contentType: ct, requestHeaders: reqHeaders,
+                                responseHeaders: respHeaders, requestBody: reqBody,
+                                responseBody: text.substring(0, 10000),
+                                duration: duration,
+                                size: parseInt(response.headers.get('content-length') || '0', 10)
+                                    || text.length
+                            });
+                        } catch(e) {}
+                    }).catch(function() {
+                        try {
+                            _post({
+                                method: method, url: url, statusCode: response.status,
+                                type: 'fetch', started: startTime, statusText: response.statusText,
+                                contentType: ct, requestHeaders: reqHeaders,
+                                responseHeaders: respHeaders, requestBody: reqBody,
+                                responseBody: null, duration: duration,
+                                size: parseInt(response.headers.get('content-length') || '0', 10) || 0
+                            });
+                        } catch(e) {}
+                    });
+                    return response;
+                }, function(err) {
+                    _pendingFetches--;
+                    try {
+                        _post({
+                            method: method, url: url, type: 'fetch', started: startTime, statusCode: 0,
+                            failure: err && err.message || 'Fetch failed',
+                            duration: Math.round(performance.timeOrigin + performance.now() - startTime)
+                        });
+                    } catch(e) {}
+                    throw err;
                 });
-            }).catch(function() {
-                _post({
-                    method: method, url: url, statusCode: response.status,
-                    contentType: ct, requestHeaders: reqHeaders,
-                    responseHeaders: respHeaders, requestBody: reqBody,
-                    responseBody: null, duration: duration,
-                    size: parseInt(response.headers.get('content-length') || '0', 10) || 0
-                });
-            });
-            return response;
-        });
-    };
-})();
-"""
+            };
+            window.fetch.__kelpieInstrumented = true;
+        })();
+        """
     }
 }

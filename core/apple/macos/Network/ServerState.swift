@@ -39,14 +39,12 @@ final class ServerState: ObservableObject {
         renderer.onScriptMessage = { [weak self] name, body in
             self?.handlerContext.handleScriptMessage(name: name, body: body)
         }
-        wkRenderer = renderer
-        handlerContext.renderer = renderer
-        handlerContext.activeEngineIsChromium = false
+        if !handlerContext.targetsRegisteredTabs {
+            wkRenderer = renderer
+            handlerContext.renderer = renderer
+            handlerContext.activeEngineIsChromium = false
+        }
     }
-    #if !KELPIE_WEBKIT_ONLY
-    private(set) var cefRenderer: CEFRenderer?
-    #endif
-
     private var httpServer: HTTPServer?
     private var toastDismissTask: Task<Void, Never>?
     private weak var scriptRecordingWindow: NSWindow?
@@ -79,6 +77,8 @@ final class ServerState: ObservableObject {
         let startEngine = rendererState.activeEngine
         let activeRenderer = renderer(for: startEngine)
         handlerContext.renderer = activeRenderer
+        handlerContext.targetsRegisteredTabs = true
+        handlerContext.rendererSwitchInProgress = { [weak rendererState] in rendererState?.isSwitching == true }
         handlerContext.activeEngineIsChromium = (startEngine == .chromium)
         handlerContext.defaultCookies.adoptInitialEngine(startEngine == .chromium ? .chromium : .webkit)
         DefaultCookieStore.removeRetiredJar()
@@ -233,38 +233,31 @@ final class ServerState: ObservableObject {
     func switchRenderer(to engine: RendererState.Engine) async {
         guard RendererState.Engine.allCases.contains(engine) else { return }
         guard let rendererState else { return }
-        guard engine != rendererState.activeEngine else { return }
+        guard engine != rendererState.activeEngine, !rendererState.isSwitching else { return }
+        if engine == .chromium, !WindowRegistry.shared.openPartitionNames().isEmpty { return }
 
         rendererState.isSwitching = true
-
-        // swiftlint:disable:next force_unwrapping
-        let source = handlerContext.renderer!
-        let target = renderer(for: engine)
+        defer { rendererState.isSwitching = false }
 
         // Stop any background activity on the outgoing renderer before async work
         // so its tasks don't interleave with CEF's main-thread RunLoop source.
-        source.willDeactivate()
+        handlerContext.renderer?.willDeactivate()
 
         // The incoming engine's store takes over the outgoing one's cookies, then
         // becomes the live default store; sync rebases onto it without stamping.
         await handlerContext.cookieSync?.rendererWillSwitch()
         await handlerContext.defaultCookies.switchEngine(to: engine == .chromium ? .chromium : .webkit)
-        handlerContext.renderer = target
+        let entries = WindowRegistry.shared.allEntriesIncludingDetached()
+        for entry in entries { entry.tabStore.selectEngine(engine) }
+        handlerContext.renderer = renderer(for: engine)
         handlerContext.activeEngineIsChromium = (engine == .chromium)
         await handlerContext.cookieSync?.rendererDidSwitch()
 
-        // Load the same URL in the target renderer
-        if let url = source.currentURL, url.absoluteString != "about:blank" {
-            target.load(url: url)
-        }
-
         rendererState.activeEngine = engine
-        await waitForRendererAttachment(target)
-        target.didActivate()
-        if engine == .webkit {
-            try? await Task.sleep(nanoseconds: 250_000_000)
+        if let tab = WindowRegistry.shared.defaultEntry()?.tabStore.activeTab, !tab.isStartPage,
+           let target = handlerContext.renderer {
+            await waitForRendererAttachment(target)
         }
-        rendererState.isSwitching = false
 
         if engine == .chromium {
             Task { @MainActor [weak self] in
@@ -319,14 +312,10 @@ final class ServerState: ObservableObject {
             #if KELPIE_WEBKIT_ONLY
             preconditionFailure("Chromium is unavailable in this build")
             #else
-            if let cefRenderer {
-                return cefRenderer
-            }
             let renderer = CEFRenderer()
             renderer.onScriptMessage = { [weak self] name, body in
                 self?.handlerContext.handleScriptMessage(name: name, body: body)
             }
-            cefRenderer = renderer
             return renderer
             #endif
         }

@@ -7,10 +7,73 @@ import {
 } from "../src/browser-control/index.js";
 import type { BrowserControlBackend, BrowserTabClient } from "../src/browser-control/index.js";
 import { actOnNativeReference, rememberNativeSnapshot } from "../src/browser-control/native-reference.js";
+import { readFile } from "node:fs/promises";
 
 let engine: Browser;
 beforeAll(async () => { engine = await chromium.launch({ headless: true }); });
 afterAll(async () => { await engine?.close(); });
+
+it("renders the calibrated viewport point and scrolled page coordinates without intercepting input", async () => {
+  const page = await engine.newPage({ viewport: { width: 320, height: 240 } });
+  try {
+    const source = await readFile(new URL("../../../assets/tap-marker.js", import.meta.url), "utf8");
+    await page.clock.install({ time: new Date(0) });
+    await page.clock.pauseAt(new Date(1000));
+    await page.setContent('<main style="width:1000px;height:1000px"></main><button style="position:fixed;right:0;bottom:0" onclick="this.dataset.clicked = 1">Tap</button>');
+    await page.evaluate(() => window.scrollTo(80, 150));
+
+    await page.evaluate(`(${source})(300, 230, '59,130,246', 'crosshair-coordinates', 1500)`);
+    const marker = page.locator('body > div[aria-hidden="true"]');
+    expect(await marker.textContent()).toBe("Viewport: 300, 230\nPage: 380, 380");
+    const label = await marker.getByText(/Viewport:/).boundingBox();
+    expect(label!.x + label!.width).toBeLessThanOrEqual(320);
+    expect(label!.y + label!.height).toBeLessThanOrEqual(240);
+    await page.mouse.click(300, 230);
+    expect(await page.getByRole("button").getAttribute("data-clicked")).toBe("1");
+    await page.clock.runFor(1499);
+    expect(await marker.evaluate((element) => element.style.opacity)).toBe("1");
+    await page.clock.runFor(1);
+    expect(await marker.evaluate((element) => element.style.opacity)).toBe("0");
+    await page.clock.runFor(550);
+    expect(await marker.count()).toBe(0);
+
+    await page.evaluate(`(${source})(300, 230, '59,130,246', 'circle', 550)`);
+    const circle = page.locator("body > div").first();
+    expect(await page.locator("body > div").count()).toBe(2);
+    expect(await circle.evaluate((element) => element.style.backgroundColor)).toBe("rgba(59, 130, 246, 0.7)");
+    await page.clock.runFor(549);
+    expect(await circle.evaluate((element) => element.style.opacity)).toBe("1");
+    await page.clock.runFor(551);
+    expect(await page.locator("body > div").count()).toBe(0);
+  } finally {
+    await page.close();
+  }
+}, 15000);
+
+it("activates the tap target when the native script is wrapped as a JSON expression", async () => {
+  const page = await engine.newPage();
+  try {
+    const handlers = [
+      "android/src/main/java/com/kelpie/browser/handlers/InteractionHandler.kt",
+      "apple/ios/Handlers/InteractionHandler.swift",
+      "apple/macos/Handlers/InteractionHandler.swift",
+    ];
+    for (const handler of handlers) {
+      const source = await readFile(new URL("../../../core/" + handler, import.meta.url), "utf8");
+      const template = /private (?:fun|func) tapScript\([\s\S]*?"""([\s\S]*?)"""/.exec(source)?.[1];
+      if (!template) throw new Error("Missing tap script in " + handler);
+      const script = template
+        .replace(/^\s*(?:\\\(\w+\(\)\)|\$\{\w+\(\)\})\s*$/gm, "")
+        .replace(/\\\(execution\.\w+\)|\$\{execution\.\w+\}/g, "30");
+      await page.setContent('<button id="target" style="width:80px;height:60px" onclick="this.dataset.clicked = 1">Tap</button>');
+      await page.evaluate("window.kelpieTapDiagnostics = (target) => target?.id");
+      expect(await page.evaluate("JSON.stringify((" + script + "))"), handler).toBe('"target"');
+      expect(await page.locator("#target").getAttribute("data-clicked"), handler).toBe("1");
+    }
+  } finally {
+    await page.close();
+  }
+}, 15000);
 describe("fixed native atomic DOM actions", () => {
   it("appends through a native setter and refuses replaced or non-text targets", async () => {
     const page = await engine.newPage();

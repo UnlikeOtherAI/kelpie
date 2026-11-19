@@ -2,8 +2,8 @@ import Foundation
 
 /// Storage-partition endpoints and the shared partition error shapes.
 ///
-/// Partitions are WebKit-only: CEF is a single-browser engine with no
-/// equivalent of `WKWebsiteDataStore(forIdentifier:)`, so every endpoint here
+/// Partitions are WebKit-only: the macOS CEF browser uses the shared request
+/// context, so every endpoint here
 /// refuses while Chromium is active — with the discriminating `reason` field
 /// rather than a generic failure, so a caller can recover by switching engines.
 extension BrowserManagementHandler {
@@ -81,7 +81,7 @@ extension BrowserManagementHandler {
     /// `PARTITION_UNSUPPORTED` when Chromium is the active engine, else `nil`.
     @MainActor
     func chromiumUnsupportedIfActive() -> [String: Any]? {
-        guard context.renderer?.engineName == "chromium" else { return nil }
+        guard context.activeEngineIsChromium else { return nil }
         return Self.partitionUnsupportedError(
             reason: "chromium-engine",
             activeEngine: "chromium",

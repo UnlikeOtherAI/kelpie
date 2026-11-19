@@ -7,8 +7,14 @@ extension HandlerContext {
     /// inspector. Exposed so handlers can drive the resolved renderer directly,
     /// keeping navigate targeting the same renderer that reads resolve to even
     /// when no window has rendered to wire `renderer` to the active tab.
-    func prepareForNavigation(windowId: String? = nil) {
-        resolveWindow(windowId: windowId, tabId: nil)?.callbacks?.onWillLoad()
+    func prepareForNavigation(windowId: String? = nil, tabId: String? = nil) {
+        if let entry = resolveWindow(windowId: windowId, tabId: tabId) {
+            if let tabId, let uuid = UUID(uuidString: tabId), uuid != entry.tabStore.activeTabID {
+                entry.tabStore.tabs.first { $0.id == uuid }?.isStartPage = false
+            } else {
+                entry.callbacks?.onWillLoad()
+            }
+        }
         if isIn3DInspector { mark3DInspectorInactive(notify: true) }
     }
 
@@ -58,7 +64,7 @@ extension HandlerContext {
     }
 
     private func chromeRenderer(windowId: String?) -> (any RendererEngine)? {
-        guard let windowId, !activeEngineIsChromium else { return renderer }
-        return resolveWindow(windowId: windowId, tabId: nil)?.tabStore.activeTab?.renderer
+        guard let windowId else { return renderer }
+        return resolveWindow(windowId: windowId, tabId: nil)?.tabStore.activeRenderer
     }
 }
