@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.16)
 
 project(kelpie_windows_browser LANGUAGES CXX RC)
 
+# Standalone SDK builds use the same version as the app that embeds this library.
+if(NOT DEFINED KELPIE_WINDOWS_VERSION)
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../apps/windows/CMakeLists.txt" KELPIE_WINDOWS_PROJECT
+    REGEX "^project\\(kelpie_windows VERSION ")
+  string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" KELPIE_WINDOWS_VERSION "${KELPIE_WINDOWS_PROJECT}")
+endif()
+if(NOT KELPIE_WINDOWS_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+  message(FATAL_ERROR "Could not resolve the Kelpie Windows version")
+endif()
+
 include(CTest)
 
 # C++20 for both configurations: the shell uses std::wstring::starts_with, so
@@ -180,6 +190,7 @@ add_library(kelpie_windows_browser STATIC ${WINDOWS_APP_SOURCES} ${WINDOWS_APP_H
 add_library(Kelpie::Browser ALIAS kelpie_windows_browser)
 
 target_compile_definitions(kelpie_windows_browser
+  PRIVATE KELPIE_WINDOWS_VERSION="${KELPIE_WINDOWS_VERSION}"
   PUBLIC
     WIN32_LEAN_AND_MEAN
     NOMINMAX

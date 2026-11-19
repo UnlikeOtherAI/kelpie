@@ -108,7 +108,11 @@ Require-File (Join-Path $cef "LICENSE.txt")
 $dumpbin = Get-DumpbinPath
 
 $dllVersion = (Get-Item -LiteralPath $dll).VersionInfo.FileVersion
-if ([string]::IsNullOrWhiteSpace($Version)) { $Version = $dllVersion }
+if ([string]::IsNullOrWhiteSpace($Version)) {
+  $project = Select-String -LiteralPath (Join-Path $repoRoot "apps\windows\CMakeLists.txt") -Pattern '^project\(kelpie_windows VERSION ([0-9]+\.[0-9]+\.[0-9]+) '
+  if (-not $project) { throw "Could not resolve the Windows release version from CMakeLists.txt." }
+  $Version = $project.Matches[0].Groups[1].Value
+}
 if ($dllVersion -ne $Version) { throw "kelpie.dll FileVersion '$dllVersion' does not equal '$Version'." }
 $bootstrapVersion = (Get-Item -LiteralPath $bootstrap).VersionInfo.FileVersion
 if ($bootstrapVersion -ne $cefVersion) { throw "kelpie.exe must retain CEF bootstrap version '$cefVersion'; got '$bootstrapVersion'." }

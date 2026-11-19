@@ -18,8 +18,10 @@ the browser starts. Keep this bootstrap validation and the Chromium sandbox.
 ## Build and sign
 
 Build and package through `scripts/build-windows.ps1` and
-`scripts/package-windows.ps1`. Verify the compiled source revision and unsigned
-archive SHA-256. Obtain the existing profile-specific `WINDOWS_SIGNER_EKU` from
+`scripts/package-windows.ps1`. The Windows app manifest sets the version used in
+PE resources, the browser runtime and release package validation. Verify the
+compiled source revision and unsigned archive SHA-256. Obtain the existing
+profile-specific `WINDOWS_SIGNER_EKU` from
 the Nessie repository's Actions variables; it is configuration, not a credential.
 
 The CMake staging step writes `cef-runtime-files.txt` for the selected CEF SDK.
