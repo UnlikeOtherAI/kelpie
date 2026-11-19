@@ -1,5 +1,7 @@
 package com.kelpie.browser.ai.openai
 
+import com.kelpie.browser.network.isLoopbackHost as isLocalHost
+
 /**
  * A normalised OpenAI-compatible base URL (`scheme://host[:port]/path`, no trailing slash).
  * See "URL handling" in docs/api/ai-endpoints.md.
@@ -62,13 +64,7 @@ data class OpenAIEndpointURL(
                 null
             }
 
-        fun isLoopbackHost(rawHost: String): Boolean {
-            val host = rawHost.lowercase().removePrefix("[").removeSuffix("]")
-            if (host == "localhost" || host.endsWith(".localhost")) return true
-            if (host == "::1" || host == "0:0:0:0:0:0:0:1") return true
-            val octets = host.split('.')
-            return octets.size == 4 && octets[0] == "127" && octets.all { it.toIntOrNull() in 0..255 }
-        }
+        fun isLoopbackHost(rawHost: String): Boolean = isLocalHost(rawHost)
 
         private fun parseAuthority(authority: String): Pair<String, Int?> {
             if (authority.startsWith("[")) {

@@ -1,7 +1,6 @@
 package com.kelpie.browser.browser
 
 import android.graphics.Bitmap
-import android.os.Build
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -11,6 +10,7 @@ import android.webkit.WebViewClient
 import com.kelpie.browser.handlers.ConsoleHandler
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.WebSocketHandler
+import com.kelpie.browser.network.isLoopbackHost
 
 /**
  * Installs the WebViewClient and WebChromeClient for a tab's WebView. Per-tab state (URL, title,
@@ -57,7 +57,7 @@ private fun tabWebViewClient(
             if (isActive()) {
                 handlerContext.dialogState.dismissPending()
             }
-            handlerContext.lastNavigationError = null
+            tab.diagnostics.navigationError = null
             tab.currentUrl = url
             tab.recordHistoryIfNeeded(url)
             tab.isLoading = true
@@ -79,13 +79,16 @@ private fun tabWebViewClient(
             error: WebResourceError?,
         ) {
             if (request?.isForMainFrame != true) return
-            val description =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    error?.description?.toString()
+            val description = error?.description?.toString() ?: "Navigation failed"
+            val host = request.url.host
+            val cannotReachHost = error?.errorCode == WebViewClient.ERROR_CONNECT || error?.errorCode == WebViewClient.ERROR_HOST_LOOKUP
+            tab.diagnostics.navigationError =
+                if (cannotReachHost && host != null && isLoopbackHost(host)) {
+                    "$description. Loopback addresses refer to the device running Kelpie. " +
+                        "Check that the server is listening there, or use the server's LAN address if it runs on another machine."
                 } else {
-                    null
+                    description
                 }
-            handlerContext.lastNavigationError = description ?: "Navigation failed"
         }
 
         override fun onReceivedHttpError(
@@ -97,7 +100,7 @@ private fun tabWebViewClient(
             val code = errorResponse?.statusCode ?: return
             tab.diagnostics.documentResponse = DocumentResponse(request.url.toString(), code, errorResponse.mimeType)
             if (code >= 400) {
-                handlerContext.lastNavigationError = "HTTP $code"
+                tab.diagnostics.navigationError = "HTTP $code"
             }
         }
 
