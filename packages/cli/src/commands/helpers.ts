@@ -136,7 +136,9 @@ export async function deviceCommand(
   const globals = getGlobals(program);
   const device = await requireDevice(program);
   if (!device) return;
-  const timeout = commandTimeout(program, options.defaultTimeoutMs);
+  const timeout = program.getOptionValueSource("timeout") === "cli"
+    ? globals.timeout
+    : options.defaultTimeoutMs;
   const result = await sendCommand(device, method, withGlobalTabId(globals, body), timeout);
   print(result.data, globals.format);
   if (!result.ok) process.exitCode = 1;
