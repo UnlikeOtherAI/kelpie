@@ -64,6 +64,7 @@ private fun tabWebViewClient(
             tabStore.persistSession()
             if (isActive()) {
                 browserState.updateUrl(url)
+                browserState.updateProgress(view.progress)
                 browserState.updateLoading(true)
                 handlerContext.mark3DInspectorInactive()
             }

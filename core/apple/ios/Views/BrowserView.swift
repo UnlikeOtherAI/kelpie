@@ -72,11 +72,6 @@ struct BrowserView: View {
                     TabletTabStrip(tabStore: tabStore, appearance: chromeAppearance)
                 }
 
-                if browserState.isLoading && !serverState.isScriptRecording {
-                    ProgressView(value: browserState.progress)
-                        .progressViewStyle(.linear)
-                }
-
                 browserViewport
                     .ignoresSafeArea(.container, edges: .bottom)
 

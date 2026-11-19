@@ -77,6 +77,7 @@ struct TabSnapshot {
   // the first tab to resolve a partition fixes its persistence for the rest.
   std::optional<bool> persistent;
   std::string document_version;
+  double load_progress = 0;
 };
 
 // Everything `new-tab` can ask for. `persistent` only means anything with a

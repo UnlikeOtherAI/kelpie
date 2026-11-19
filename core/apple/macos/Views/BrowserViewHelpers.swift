@@ -157,38 +157,6 @@ private final class PassThroughNSView: NSView {
     }
 }
 
-struct FloatingProgressPill: View {
-    let progress: Double
-
-    var body: some View {
-        VStack {
-            Spacer()
-            GeometryReader { geometry in
-                let pillWidth = geometry.size.width * 0.7
-
-                Capsule(style: .continuous)
-                    .fill(Color.black.opacity(0.45))
-                    .frame(width: pillWidth, height: 6)
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .fill(Color.accentColor)
-                            .frame(
-                                width: pillWidth * max(progress, 0.02),
-                                height: 6
-                            ),
-                        alignment: .leading
-                    )
-                    .clipShape(Capsule(style: .continuous))
-                    .frame(width: geometry.size.width)
-            }
-            .frame(height: 6)
-            .padding(.bottom, 44)
-        }
-        .allowsHitTesting(false)
-        .animation(.easeOut(duration: 0.15), value: progress)
-    }
-}
-
 // MARK: - AppKit-backed resize handle (bypasses WebView first-responder hit-test issue)
 
 struct AppKitResizeHandle: NSViewRepresentable {

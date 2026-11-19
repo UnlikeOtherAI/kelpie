@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <mutex>
 
+#include "../../../native/desktop-ui/address_load_progress.h"
+
 // GDI+ headers need IStream and PROPID, which WIN32_LEAN_AND_MEAN excludes,
 // and they reference Gdiplus::min/max, which NOMINMAX removes. Supply both
 // before including them rather than relaxing either project-wide define.
@@ -105,6 +107,30 @@ void PaintRounded(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius,
     Gdiplus::Pen pen(ToGdiPlus(border), static_cast<float>(border_width));
     graphics.DrawPath(&pen, &path);
   }
+}
+
+void PaintAddressLoadOutline(HDC dc, RECT rect, int width, COLORREF color,
+                             double extent, double opacity) {
+  EnsureGdiPlus();
+  Gdiplus::GraphicsPath path;
+  Gdiplus::PointF previous;
+  bool first = true;
+  TraceAddressLoadOutline(rect.right - rect.left, rect.bottom - rect.top, width, extent,
+                          [&](double x, double y) {
+    const Gdiplus::PointF point(static_cast<float>(rect.left + x), static_cast<float>(rect.top + y));
+    if (!first) path.AddLine(previous, point);
+    previous = point;
+    first = false;
+  });
+  Gdiplus::Graphics graphics(dc);
+  graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+  graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+  Gdiplus::Pen pen(Gdiplus::Color(static_cast<BYTE>(opacity * 255), GetRValue(color),
+                                   GetGValue(color), GetBValue(color)), static_cast<float>(width));
+  pen.SetStartCap(Gdiplus::LineCapRound);
+  pen.SetEndCap(Gdiplus::LineCapRound);
+  pen.SetLineJoin(Gdiplus::LineJoinRound);
+  graphics.DrawPath(&pen, &path);
 }
 
 void PaintFocusRing(HDC dc, RECT rect, COLORREF color, int radius, int width) {

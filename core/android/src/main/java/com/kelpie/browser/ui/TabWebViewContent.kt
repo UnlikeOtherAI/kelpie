@@ -84,6 +84,8 @@ fun TabWebViewContent(
             }
 
             syncBrowserStateFromWebView(wv, browserState)
+            browserState.updateProgress(wv.progress)
+            browserState.updateLoading(tab.isLoading)
             installedWebViewRef.value = wv
             onWebViewReady(wv)
         },

@@ -46,6 +46,7 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 
 /// Whether the browser is loading.
 - (BOOL)isLoading;
+- (double)loadingProgress;
 
 /// Whether the browser can go back.
 - (BOOL)canGoBack;

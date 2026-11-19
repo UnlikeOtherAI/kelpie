@@ -2,11 +2,15 @@
 #include <functional>
 #include <string>
 
+#include "../../../core/native/desktop-ui/address_load_progress.h"
+
 #if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #else
 typedef struct _GtkWidget GtkWidget;
 #endif
+
+namespace kelpie { struct TabSnapshot; }
 
 namespace kelpie::linuxapp {
 
@@ -18,6 +22,7 @@ class UrlBar {
 
   GtkWidget* widget() const;
   void Sync();
+  void SyncLoadProgress(const TabSnapshot* tab);
   void Focus();
   std::function<void(int)> tool_action;
 
@@ -31,6 +36,9 @@ class UrlBar {
   GtkWidget* entry_shell_ = nullptr;
   GtkWidget* entry_ = nullptr;
   bool editing_ = false;
+  AddressLoadProgress load_progress_;
+  AddressLoadFrame load_frame_;
+  std::string load_tab_;
   GtkWidget* account_button_ = nullptr;
   std::string avatar_;
 #if KELPIE_LINUX_HAS_GTK

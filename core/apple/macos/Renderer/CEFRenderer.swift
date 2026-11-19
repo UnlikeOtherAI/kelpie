@@ -195,6 +195,7 @@ final class CEFRenderer: RendererEngine {
         currentURL = URL(string: bridge.currentURL())
         currentTitle = bridge.currentTitle()
         documentLoading = bridge.isLoading()
+        estimatedProgress = bridge.loadingProgress()
         canGoBack = bridge.canGoBack()
         canGoForward = bridge.canGoForward()
         if documentLoading, !previousLoading {
@@ -218,6 +219,7 @@ final class CEFRenderer: RendererEngine {
     func load(url: URL) {
         guard !isRetired else { return }
         pendingURL = url
+        estimatedProgress = 0
         currentURL = url
         documentNavigationStart = Date()
         capturedDocumentResponseURL = nil

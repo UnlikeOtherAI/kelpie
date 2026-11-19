@@ -13,6 +13,7 @@
 #endif
 #include <windows.h>
 #include "theme/chrome_palette.h"
+#include "../../native/desktop-ui/address_load_progress.h"
 
 namespace kelpie::windows {
 
@@ -43,6 +44,7 @@ class UrlBar {
   void SetAccount(const std::string& avatar, const std::wstring& label, bool error, bool busy);
   void SetUrl(const std::wstring& url, bool force = false);
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
+  void UpdateLoadProgress(bool loading, double progress, bool tab_changed);
   void Focus();
   bool HandleCommand(WORD control_id, WORD notification_code);
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
@@ -68,6 +70,8 @@ class UrlBar {
   ui::ChromePalette palette_ = ui::ChromeColors(ui::DefaultChromeColor());
   mutable COLORREF brush_color_ = CLR_INVALID;
   RECT surface_{};
+  AddressLoadProgress load_progress_;
+  AddressLoadFrame load_frame_;
   HWND account_button_ = nullptr;
   HBITMAP account_avatar_ = nullptr;
   std::string account_avatar_source_;

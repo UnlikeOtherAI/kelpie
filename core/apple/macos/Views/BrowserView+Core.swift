@@ -185,7 +185,8 @@ extension BrowserView {
                     chromeUnderlap: chromeUnderlap,
                     onHoverURL: { hoveredLinkURL = $0 },
                     onChromeScroll: { collapsed in
-                        guard !serverState.isScriptRecording, tabStore.activeTab?.isStartPage != true else { return }
+                        guard !serverState.isScriptRecording, !browserState.isLoading,
+                              tabStore.activeTab?.isStartPage != true else { return }
                         withAnimation(.easeOut(duration: 0.18)) { isChromeCollapsed = collapsed }
                     }
                 )

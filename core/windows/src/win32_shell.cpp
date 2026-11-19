@@ -57,6 +57,8 @@ void Win32Shell::Show(int show_command) {
 
 void Win32Shell::UpdateBrowserState(const BrowserState& state) {
   if (hwnd_ == nullptr) return;
+  url_bar_.UpdateLoadProgress(state.is_loading, state.load_progress, state.tab_id != browser_state_.tab_id);
+  browser_state_.tab_id = state.tab_id;
   const std::string bookmarks = delegate_->GetBookmarksJson();
   const bool favorites_changed = favorites_bar_.Update(bookmarks);
   if (favorites_changed) { RECT r{}; GetClientRect(hwnd_, &r); LayoutChildren(r.right, r.bottom); }

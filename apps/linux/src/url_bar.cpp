@@ -1,4 +1,6 @@
 #include "url_bar.h"
+
+#include <string_view>
 #include "linux_app.h"
 #include "ui_theme.h"
 #if KELPIE_LINUX_HAS_GTK
@@ -33,6 +35,25 @@ UrlBar::UrlBar(LinuxApp& app):app_(app) {
   gtk_style_context_add_class(gtk_widget_get_style_context(star),"chrome-button");
   gtk_box_pack_start(GTK_BOX(entry_shell_),star,FALSE,FALSE,0);
   gtk_box_pack_start(GTK_BOX(root_),entry_shell_,TRUE,TRUE,0);
+  g_signal_connect_after(entry_shell_, "draw", G_CALLBACK(+[](GtkWidget* widget, cairo_t* cr, gpointer raw) -> gboolean {
+    const auto frame = static_cast<UrlBar*>(raw)->load_frame_;
+    if (frame.opacity <= 0) return FALSE;
+    cairo_new_path(cr);
+    const int width = gtk_widget_get_allocated_width(widget);
+    const int height = gtk_widget_get_allocated_height(widget);
+    bool first = true;
+    TraceAddressLoadOutline(width, height, 3, frame.extent, [&](double x, double y) {
+      if (first) cairo_move_to(cr, x, y);
+      else cairo_line_to(cr, x, y);
+      first = false;
+    });
+    cairo_set_source_rgba(cr, 0, 122.0 / 255, 1, frame.opacity);
+    cairo_set_line_width(cr, 3);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+    cairo_stroke(cr);
+    return FALSE;
+  }), this);
   for(auto [icon,title,index]:{std::tuple{"view-grid-symbolic","Bookmarks",0},
       {"network-workgroup-symbolic","Network inspector",1},{"document-open-recent-symbolic","History",2},
       {"avatar-default-symbolic","Login/register",3},{"view-more-symbolic","Settings",4}}) {
@@ -68,6 +89,26 @@ void UrlBar::Focus() {
   gtk_widget_grab_focus(entry_); gtk_editable_select_region(GTK_EDITABLE(entry_),0,-1);
 #endif
 }
+void UrlBar::SyncLoadProgress(const TabSnapshot* tab) {
+#if KELPIE_LINUX_HAS_GTK
+  const auto now = AddressLoadProgress::Clock::now();
+  const std::string_view id = tab ? std::string_view(tab->id) : std::string_view{};
+  gboolean animate = TRUE;
+  g_object_get(gtk_widget_get_settings(entry_shell_), "gtk-enable-animations", &animate, nullptr);
+  const bool tab_changed = id != load_tab_;
+  load_progress_.Update(tab && tab->is_loading, tab ? tab->load_progress : 0,
+                        tab_changed, animate, now);
+  if (tab_changed) load_tab_ = id;
+  const auto frame = load_progress_.Frame(now);
+  if (!(frame == load_frame_)) {
+    load_frame_ = frame;
+    gtk_widget_queue_draw(entry_shell_);
+  }
+#else
+  (void)tab;
+#endif
+}
+
 void UrlBar::Sync() {
 #if KELPIE_LINUX_HAS_GTK
   const auto url=app_.CurrentUrl();
