@@ -5,22 +5,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kelpie Browser Privacy Policy</title>
   <meta name="description" content="How Kelpie Browser handles browsing, paired devices, optional accounts and AI.">
-  <style>
-    :root { color-scheme: light dark; font: 1rem/1.65 system-ui, sans-serif; }
-    body { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem; }
-    h1, h2 { line-height: 1.2; }
-    h2 { margin-top: 2rem; }
-    a { text-underline-offset: .16em; }
-    footer { margin-top: 3rem; border-top: 1px solid; padding: 1rem 0; }
-  </style>
+  <link rel="canonical" href="https://kelpie.rocks/privacy/">
+  <meta name="theme-color" content="#000c30">
+  <link rel="icon" type="image/png" href="../assets/brand/favicon-64.png">
+  <link rel="apple-touch-icon" href="../assets/brand/apple-touch-icon.png">
+  <link rel="preload" href="../assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/chrome.css">
+  <link rel="stylesheet" href="../css/prose.css">
 </head>
 <body>
-  <header>
-    <a href="../">Kelpie Browser</a>
-    <h1>Privacy Policy</h1>
-    <p>Kelpie Browser is published by UnlikeOtherAI s.r.o. This policy explains what happens to your data when you browse, pair a device, or opt in to account and AI features.</p>
-  </header>
-  <main>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="header">
+  <div class="header-inner">
+    <a class="brand" href="../" aria-label="Kelpie home">
+      <img src="../assets/brand/kelpie-mark-192.png" alt="" width="52" height="52">kelpie
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false">
+      <svg aria-hidden="true"><use href="../assets/icons.svg#menu"/></svg>
+    </button>
+    <nav class="nav" aria-label="Main">
+      <a href="../#use-cases">Use cases</a>
+      <a href="../#agents">For agents</a>
+      <a href="../#connect">Get started</a>
+      <a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs">Docs</a>
+    </nav>
+    <div class="header-actions">
+      <a class="header-link" href="https://github.com/UnlikeOtherAI/kelpie">
+        <svg aria-hidden="true"><use href="../assets/icons.svg#github"/></svg>GitHub
+      </a>
+      <a class="btn btn--small" href="../#download">Download</a>
+    </div>
+  </div>
+  <div class="wave-hang" aria-hidden="true"><svg><use href="../assets/icons.svg#wave-rise"/></svg></div>
+</header>
+
+<main id="main">
+  <div class="prose-head">
+    <div class="container">
+      <span class="kicker">Kelpie Browser</span>
+      <h1 class="h1">Privacy Policy</h1>
+      <p class="lede">Kelpie Browser is published by UnlikeOtherAI s.r.o. This policy explains what happens to your data when you browse, pair a device, or opt in to account and AI features.</p>
+    </div>
+  </div>
+
+  <div class="container">
+  <div class="prose">
     <h2>Browsing and local storage</h2>
     <p>You can browse without an UnlikeOtherAI account. Kelpie stores browsing data such as open tabs, history, cookies, website storage, local bookmarks and browser settings on your device. Websites and search providers receive requests you make to them, along with any information you enter or submit. They handle that data under their own policies. Use Kelpie’s browser controls to manage history and website data on the device.</p>
 
@@ -37,7 +68,22 @@
     <h2 id="retention-and-deletion">Retention, deletion and contact</h2>
     <p>Data stored locally remains on the device until you clear it, remove the relevant item, or remove the app and its data. To delete your UnlikeOtherAI account and its associated Kelpie account data, choose <strong>Delete account</strong> in Kelpie’s signed-in account menu or <a href="https://authentication.unlikeotherai.com/auth/delete-account">request account deletion online</a>. Verify your account email and, if enabled, your authenticator code. UnlikeOtherAI reviews the request and contacts you if it needs anything else. Its <a href="https://unlikeotherai.com/privacy/#storage">account privacy policy</a> explains retention and when it may need to keep records. Deleting local browser data does not remove copies already held by websites, connected clients or AI providers.</p>
     <p>To ask about this policy or make a privacy request, email <a href="mailto:hello@unlikeotherai.com">hello@unlikeotherai.com</a>. Please do not send us passwords or verification codes.</p>
-  </main>
-  <footer><a href="../">Kelpie Browser</a> · <a href="https://github.com/UnlikeOtherAI/kelpie">Open-source project</a></footer>
+  </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-legal">
+      <span>© 2026 UnlikeOtherAI s.r.o.</span>
+      <nav aria-label="Legal">
+        <a href="../">Kelpie Browser</a>
+        <a href="https://github.com/UnlikeOtherAI/kelpie">Open-source project</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/site.js" defer></script>
 </body>
 </html>

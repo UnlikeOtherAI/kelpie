@@ -1,0 +1,300 @@
+/* Phone outlines for the hero's device wall, and the small page each one
+   shows. The states that animate them live in wall.css.
+
+   Each screen is a size container and the page inside is measured in cqw
+   (hundredths of the screen's width), so it keeps its proportions on a
+   120-pixel phone and on a 70-pixel one. */
+
+.phone {
+  --i: 0;
+  position: relative;
+  padding: 5px;
+  border-radius: 20px;
+  background: #10131c;
+  box-shadow: 0 24px 44px -24px rgba(0, 12, 48, 0.55), 0 2px 5px rgba(0, 12, 48, 0.18);
+}
+
+.phone:nth-child(2) {
+  --i: 1;
+}
+
+.phone:nth-child(3) {
+  --i: 2;
+}
+
+.phone:nth-child(4) {
+  --i: 3;
+}
+
+.phone-screen {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 9 / 19;
+  border-radius: 15px;
+  background: #fff;
+  container-type: inline-size;
+}
+
+/* A 2017 phone: forehead, chin and a home button. */
+.phone--home {
+  padding: 20px 5px 24px;
+  border-radius: 18px;
+  background: #d9dce3;
+}
+
+.phone--home .phone-screen {
+  aspect-ratio: 9 / 16;
+  border-radius: 2px;
+}
+
+.phone--home::before,
+.phone--home::after {
+  position: absolute;
+  left: 50%;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.phone--home::before {
+  top: 9px;
+  width: 22%;
+  height: 3px;
+  border-radius: 3px;
+  background: #b4b8c2;
+}
+
+.phone--home::after {
+  bottom: 5px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #b4b8c2;
+  border-radius: 50%;
+}
+
+/* Cut-outs at the top of the newer screens. */
+.phone--notch .phone-screen::before,
+.phone--island .phone-screen::before,
+.phone--hole .phone-screen::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 4;
+  background: #10131c;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.phone--notch .phone-screen::before {
+  width: 40%;
+  height: 8cqw;
+  border-radius: 0 0 7cqw 7cqw;
+}
+
+.phone--island .phone-screen::before {
+  top: 4.5cqw;
+  width: 30%;
+  height: 7cqw;
+  border-radius: 7cqw;
+}
+
+.phone--hole .phone-screen::before {
+  top: 4.5cqw;
+  width: 6.5cqw;
+  height: 6.5cqw;
+  border-radius: 50%;
+}
+
+/* The page each phone shows: a landing view, then a sign-up form. */
+.mini {
+  --top: 18cqw;
+  position: absolute;
+  inset: 0;
+  padding: var(--top) 9cqw 0;
+}
+
+.phone--home .mini {
+  --top: 9cqw;
+}
+
+.mini-view {
+  display: grid;
+  gap: 5cqw;
+  align-content: start;
+  opacity: 0;
+  transition: opacity 360ms ease calc(var(--i) * 110ms);
+}
+
+.mini-view--form {
+  position: absolute;
+  inset: var(--top) 9cqw auto;
+  transition-delay: calc(var(--i) * 80ms);
+}
+
+.mini i,
+.mini b {
+  display: block;
+  border-radius: 2.5cqw;
+}
+
+.mini-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5cqw;
+}
+
+.mini-nav i:first-child {
+  width: 12cqw;
+  height: 12cqw;
+  border-radius: 3.5cqw;
+  background: var(--k-ink);
+}
+
+.mini-nav i:last-child {
+  width: 30%;
+  height: 4.5cqw;
+  background: #dfe2ea;
+}
+
+.mini b {
+  height: 8cqw;
+  background: #1d2233;
+}
+
+.mini b.s {
+  width: 62%;
+}
+
+.mini .mini-art {
+  height: 46cqw;
+  margin: 3cqw 0;
+  border-radius: 7cqw 52cqw 7cqw 7cqw;
+  background: linear-gradient(135deg, var(--k-pink), #ff7ab8);
+}
+
+.mini-text {
+  height: 3.6cqw;
+  background: #dfe2ea;
+}
+
+.mini-text.s {
+  width: 70%;
+}
+
+/* The short screen has room for a smaller picture and one line of text. */
+.phone--home .mini-art {
+  height: 22cqw;
+}
+
+.phone--home .mini-text.s {
+  display: none;
+}
+
+.mini-cta,
+.mini-field {
+  position: relative;
+  display: grid;
+  height: 17.5cqw;
+  margin-top: 3.5cqw;
+  border-radius: 9cqw;
+  place-items: center;
+  font-size: 7.2cqw;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mini-cta {
+  background: var(--k-ink);
+  color: #fff;
+  transition: transform 160ms ease;
+}
+
+/* Highlight ring and tap ripple on the button. */
+.mini-cta::before,
+.mini-cta::after {
+  position: absolute;
+  content: "";
+  opacity: 0;
+}
+
+.mini-cta::before {
+  inset: -3.5cqw;
+  border: 2px solid var(--k-pink);
+  border-radius: 12.5cqw;
+  transition: opacity 240ms ease calc(var(--i) * 90ms);
+}
+
+.mini-cta::after {
+  width: 24cqw;
+  height: 24cqw;
+  border-radius: 50%;
+  background: rgba(249, 67, 154, 0.45);
+}
+
+.mini-field {
+  justify-items: start;
+  padding: 0 4.5cqw;
+  border: 1.5px solid #cfd3de;
+  border-radius: 5cqw;
+  background: #fff;
+  color: #1d2233;
+  font-size: 6.2cqw;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.mini-field span {
+  overflow: hidden;
+  max-width: 0;
+  white-space: nowrap;
+}
+
+/* Kelpie's bottom address bar. */
+.mini-bar {
+  position: absolute;
+  right: 6%;
+  bottom: 4.5cqw;
+  left: 6%;
+  z-index: 3;
+  display: flex;
+  gap: 3.5cqw;
+  align-items: center;
+  height: 13.5cqw;
+  padding: 0 4.5cqw;
+  border-radius: 7cqw;
+  background: #eceef4;
+}
+
+.mini-bar i {
+  height: 4.5cqw;
+  border-radius: 2.5cqw;
+  background: #c9cdd9;
+}
+
+.mini-bar i:first-child {
+  flex: 1;
+}
+
+.mini-bar i:last-child {
+  width: 4.5cqw;
+  border-radius: 50%;
+}
+
+.mini-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 0;
+  height: 3px;
+  background: var(--k-pink);
+}
+
+.mini-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}

@@ -14,7 +14,7 @@
   <a href="#quick-start">Quick start</a> &middot;
   <a href="docs/ui/3d-inspector.md">3D inspector</a> &middot;
   <a href="docs/api/">API reference</a> &middot;
-  <a href="https://unlikeotherai.github.io/kelpie">Website</a>
+  <a href="https://kelpie.rocks">Website</a>
 </p>
 
 Kelpie is an open-source browser for macOS, Windows, Linux, iOS and Android. Use its native interface yourself, or give an AI agent access to real browser tabs: navigate, read pages, click, fill forms, take screenshots and inspect network traffic.
@@ -54,7 +54,7 @@ The inspector is experimental and available on **macOS, iOS and Android**. On ma
 | --- | --- |
 | macOS | [Apple Silicon ZIP](https://github.com/UnlikeOtherAI/kelpie/releases), Developer ID signed and notarized |
 | Windows | [x64 ZIP](https://github.com/UnlikeOtherAI/kelpie/releases), with signed executables and the Chromium sandbox |
-| Linux | [`.deb`, `.rpm`, `.AppImage` and `.tar.gz` packages](https://github.com/UnlikeOtherAI/kelpie/releases); `apt` and `dnf` repositories are available through the [website](https://unlikeotherai.github.io/kelpie) |
+| Linux | [`.deb`, `.rpm`, `.AppImage` and `.tar.gz` packages](https://github.com/UnlikeOtherAI/kelpie/releases); `apt` and `dnf` [repositories](https://unlikeotherai.github.io/kelpie/packages/) |
 | Android | [Signed APK and AAB preview](https://github.com/UnlikeOtherAI/kelpie/releases/tag/release/2026-11-09.1) |
 | iOS / iPadOS | [Simulator preview](https://github.com/UnlikeOtherAI/kelpie/releases/tag/release/2026-11-09.1), or [build from source](docs/tech-stack.md#build--run) for a physical device |
 

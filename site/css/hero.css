@@ -1,0 +1,228 @@
+/* Hero: headline, download and store buttons, install command and the platform strip. */
+
+.hero {
+  position: relative;
+  padding: clamp(72px, 9vw, 116px) 0 clamp(28px, 3vw, 40px);
+  background:
+    radial-gradient(46% 60% at 0% 18%, rgba(66, 244, 188, 0.16), transparent 72%),
+    radial-gradient(42% 56% at 100% 8%, rgba(249, 67, 154, 0.12), transparent 70%),
+    #fff;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+
+.pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 6px 14px 6px 8px;
+  border: 1px solid var(--k-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--k-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pill:hover {
+  border-color: var(--k-rose);
+}
+
+.pill svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pill span {
+  color: var(--k-muted);
+  font-weight: 500;
+}
+
+.hero .lede {
+  max-width: 540px;
+}
+
+.hero-actions,
+.store-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.store-row {
+  margin-top: 14px;
+}
+
+/* App Store and Google Play buttons. Without an href they read
+   "coming soon"; js/links.js gives them an href once a listing is live. */
+.store {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 18px 8px 14px;
+  border: 1px solid var(--k-line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--k-text);
+  line-height: 1.15;
+  text-decoration: none;
+}
+
+.store svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--k-muted);
+}
+
+.store small {
+  display: block;
+  color: var(--k-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.store b {
+  display: block;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.store .live,
+.store[href] .soon {
+  display: none;
+}
+
+.store[href] .live {
+  display: block;
+}
+
+.store[href] {
+  border-color: var(--k-ink);
+  background: var(--k-ink);
+  color: #fff;
+}
+
+.store[href] small,
+.store[href] svg {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.store[href]:hover {
+  background: var(--k-deep);
+}
+
+.install {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin-top: 26px;
+  border: 1px solid var(--k-line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+}
+
+.install code {
+  overflow: hidden;
+  padding: 10px 6px 10px 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.install code::before {
+  margin-right: 8px;
+  color: var(--k-rose);
+  content: "$";
+}
+
+.copy {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--k-muted);
+  cursor: pointer;
+  place-items: center;
+}
+
+.copy:hover {
+  color: var(--k-rose);
+}
+
+.copy svg {
+  width: 18px;
+  height: 18px;
+}
+
+.copy .done,
+.copy.is-done .idle {
+  display: none;
+}
+
+.copy.is-done .done {
+  display: block;
+  color: var(--k-teal);
+}
+
+/* Platform strip */
+.platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  align-items: center;
+  margin-top: clamp(48px, 6vw, 72px);
+  padding-top: 26px;
+  border-top: 1px solid var(--k-line);
+  color: var(--k-muted);
+  font-size: 15px;
+}
+
+.platforms b {
+  color: var(--k-text);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.platforms span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.platforms svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 960px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .install {
+    font-size: 13px;
+  }
+}
