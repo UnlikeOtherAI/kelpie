@@ -31,6 +31,8 @@ Direct Mac artifacts use the inside-out signer and notarization checks in [Mac r
 
 iOS and Android must be kept as absolute mirrors with full feature parity. Every feature, UI element, and behavior implemented on one platform must be implemented identically on the other in the same commit or PR.
 
+Shared browser behavior must have equivalent user-visible outcomes on iOS, Android, macOS, Windows, and Linux. Check all five platforms in each browser-behavior PR and identify which need a change, which already match, and which are outside the scope of a platform-specific fix. Use the native API that preserves the shared behavior on each platform.
+
 ## Code Rules
 
 - 500-line file limit — split along responsibility seams, not arbitrarily. Never trim comments or blank lines to fit.
