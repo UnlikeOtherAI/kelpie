@@ -53,6 +53,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         #endif
         InteractionHandler(context: context).register(on: router)
         ScreenshotHandler(context: context).register(on: router)
+        EvaluateHandler(context: context).register(on: router)
         router.register("get-tabs") { _ in successResponse(["tabs": [["id": tabId, "active": true, "title": "Isolated fixture", "url": "https://fixture.test"]]]) }
         webView.loadHTMLString(Self.fixture, baseURL: URL(string: "https://fixture.test"))
         for _ in 0..<100 {
@@ -60,6 +61,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTAssertFalse(webView.isLoading, "Fixture navigation must settle before observation")
+        await verifyPublicEvaluation(router, tabId: tabId)
         let observed = try await snapshot(router, tabId: tabId)
         for secret in ["editable-secret", "textarea-secret", "password-secret", "seed-"] {
             XCTAssertFalse(BrowserControlGateway.encode(observed).contains(secret))
@@ -120,6 +122,35 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         XCTAssertTrue(recovered, "The actual late callback releases the lease without restarting")
         let delayedActivations = try await webView.evaluateJavaScript("window.delayedActivations")
         XCTAssertEqual(delayedActivations as? Int, 1)
+    }
+
+    private func verifyPublicEvaluation(_ router: Router, tabId: String) async {
+        func eval(_ expression: String) async -> [String: Any] {
+            await router.handle(method: "evaluate", body: ["tabId": tabId, "expression": expression]).json
+        }
+
+        let delayed = await eval("""
+            (async () => {
+                await new Promise(resolve => setTimeout(resolve, 75));
+                window.evalFixtureRuns = (window.evalFixtureRuns || 0) + 1;
+                return 5;
+            })()
+            """)
+        XCTAssertEqual(delayed["result"] as? Int, 5)
+        let count = await eval("window.evalFixtureRuns")
+        XCTAssertEqual(count["result"] as? Int, 1)
+        let rejected = await eval("Promise.reject(new Error('fixture rejection'))")
+        let error = rejected["error"] as? [String: Any]
+        XCTAssertEqual(error?["code"] as? String, "EVAL_ERROR")
+        XCTAssertTrue((error?["message"] as? String)?.contains("fixture rejection") == true)
+        let sync = await eval("var evalFixtureNumber = 4; evalFixtureNumber + 2")
+        XCTAssertEqual(sync["result"] as? Int, 6)
+        let string = await eval("'false'")
+        XCTAssertEqual(string["result"] as? String, "false")
+        let boolean = await eval("Promise.resolve(false)")
+        XCTAssertEqual(boolean["result"] as? Bool, false)
+        let empty = await eval("Promise.resolve(undefined)")
+        XCTAssertTrue(empty["result"] is NSNull)
     }
 
     #if os(iOS)

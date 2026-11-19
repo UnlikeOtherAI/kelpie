@@ -881,9 +881,14 @@ kelpie wait-nav --device "My iPhone" --wait-timeout 15000
 
 ### `kelpie eval <expression>`
 
+If the expression returns a Promise, `kelpie eval` waits for the resolved result
+and reports a rejected Promise as an error. The browser's evaluation limits
+apply. See [the evaluate endpoint](api/browser.md#evaluate).
+
 ```bash
 kelpie eval "document.title" --device "My iPhone"
 kelpie eval "window.innerHeight" --device "My iPhone"
+kelpie eval '(async () => 5)()' --device "My iPhone"
 ```
 
 ---

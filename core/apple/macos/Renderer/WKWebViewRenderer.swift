@@ -159,6 +159,10 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         }
     }
 
+    func evaluatePageJS(_ script: String) async throws -> Any? {
+        try await PageJavaScript.evaluate(script, in: webView)
+    }
+
     func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
         // The gateway bounds its response while retaining the real renderer lease.
         try await BrowserControlWebKit.evaluate(script, in: webView)
