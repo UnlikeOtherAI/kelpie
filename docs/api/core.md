@@ -475,7 +475,7 @@ Tap at specific coordinates as a last resort. Prefer `click` or `click-annotatio
 | `marker.style` | string | `"circle"` | `"circle"` shows the blue dot and ripple. `"crosshair-coordinates"` shows a crosshair and two labeled coordinate pairs. |
 | `marker.durationMs` | integer | `550` | Time before the marker starts to fade, from 0 through 2,147,483,647 milliseconds. |
 
-The optional `marker` object is supported on iOS, Android, and macOS with WebKit or Chromium. The circle's ripple starts immediately, and the hold time applies to the center dot. The crosshair labels show the applied tap point after calibration and clamping. Both pairs use CSS pixels. The page pair includes the document's horizontal and vertical scroll offsets at the time of the tap.
+The optional `marker` object is supported on iOS, Android, macOS with WebKit or Chromium, and Windows and Linux with Chromium. The circle's ripple starts immediately, and the hold time applies to the center dot. The crosshair labels show the applied tap point after calibration and clamping. Both pairs use CSS pixels. The page pair includes the document's horizontal and vertical scroll offsets at the time of the tap.
 
 When using coordinates read from a screenshot image, pass `"coordinateSpace": "screenshot"` so Kelpie converts from image pixels to viewport CSS pixels automatically. Without this, taps will miss on Retina/high-DPI displays because screenshot images have more pixels than the CSS viewport.
 
@@ -500,7 +500,9 @@ Response:
 }
 ```
 
-Kelpie now dispatches coordinate-bearing pointer and mouse events at the calibrated point, then performs a compatible element activation. That keeps the event location observable on the page while preserving the previous "activate the hit element" behavior.
+The Windows and Linux Chromium builds dispatch one native Chromium click at the applied point. Include `tabId` when the instance has more than one tab. These builds scope automation to the instance's window and reject explicit `windowId` values. Linux Chromium honors offsets saved in the selected profile.
+
+iOS, Android, and macOS dispatch coordinate-bearing pointer and mouse events at the applied point, then activate the hit element.
 
 ### `coordinate-diagnostics`
 Run a coordinate debugging oracle in one structured call. The endpoint samples `elementFromPoint()` / `elementsFromPoint()`, optionally evaluates setup/export JavaScript, executes page-synthesized `tap`, `swipe`, and `scroll` actions, records delivered pointer/mouse/touch/scroll events, and can attach a screenshot with the same viewport-mapping metadata as `screenshot`.

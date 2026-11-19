@@ -26,8 +26,8 @@ void AddKeyPair(std::vector<Json>* commands, const char* key, const char* code, 
   commands->push_back(KeyEvent("keyUp", key, code, virtual_key, modifiers));
 }
 
-void AddMouseClick(std::vector<Json>* commands, const Target& target) {
-  Json pressed = {{"type", "mousePressed"}, {"x", target.x}, {"y", target.y},
+void AddMouseClick(std::vector<Json>* commands, double x, double y) {
+  Json pressed = {{"type", "mousePressed"}, {"x", x}, {"y", y},
                   {"button", "left"}, {"clickCount", 1}};
   Json released = pressed;
   released["type"] = "mouseReleased";
@@ -156,6 +156,18 @@ std::optional<Target> ParseTarget(const Json& value, std::string* error) {
 Plan PlanTrustedInput(const Json& request, const std::optional<Target>& target) {
   if (!request.is_object() || !request.contains("type") || !request["type"].is_string()) return Failure("INVALID_PARAMS", "Input type is required");
   const std::string type = request["type"].get<std::string>();
+  if (type == "tap") {
+    for (const char* axis : {"x", "y"}) {
+      const auto value = request.find(axis);
+      if (value == request.end() || !value->is_number() || !std::isfinite(value->get<double>())) {
+        return Failure("INVALID_PARAMS", "Tap coordinates must be finite numbers");
+      }
+    }
+    Plan plan;
+    plan.ok = true;
+    AddMouseClick(&plan.commands, request["x"].get<double>(), request["y"].get<double>());
+    return plan;
+  }
   if (type == "key") {
     const auto key = request.find("key");
     if (key == request.end() || !key->is_string() || key->get<std::string>().empty()) return Failure("INVALID_PARAMS", "key is required");
@@ -174,12 +186,12 @@ Plan PlanTrustedInput(const Json& request, const std::optional<Target>& target) 
   if (!target || !target->found) return Failure("ELEMENT_NOT_FOUND", "No matching element exists");
   if (!Interactable(*target)) return Failure("ELEMENT_NOT_INTERACTABLE", "Element is hidden, disabled, or covered");
   Plan plan; plan.ok = true;
-  if (type == "click") { AddMouseClick(&plan.commands, *target); return plan; }
+  if (type == "click") { AddMouseClick(&plan.commands, target->x, target->y); return plan; }
   if (type == "setChecked") {
     const auto checked = request.find("checked");
     if (checked == request.end() || !checked->is_boolean()) return Failure("INVALID_PARAMS", "checked must be a boolean");
     if (target->kind != "checkbox") return Failure("UNSUPPORTED", "setChecked requires a checkbox");
-    if (target->checked != checked->get<bool>()) AddMouseClick(&plan.commands, *target);
+    if (target->checked != checked->get<bool>()) AddMouseClick(&plan.commands, target->x, target->y);
     plan.expected = {{"kind", "checked"}, {"value", checked->get<bool>()}}; return plan;
   }
   if (type == "selectOption") {
@@ -190,7 +202,7 @@ Plan PlanTrustedInput(const Json& request, const std::optional<Target>& target) 
     if (option == target->options.end()) return Failure("ELEMENT_NOT_FOUND", "The requested option does not exist");
     if (option->disabled) return Failure("ELEMENT_NOT_INTERACTABLE", "The requested option is disabled");
     if (target->value != option->value) {
-      AddMouseClick(&plan.commands, *target); AddKeyPair(&plan.commands, "Home", "Home", 36);
+      AddMouseClick(&plan.commands, target->x, target->y); AddKeyPair(&plan.commands, "Home", "Home", 36);
       for (auto current = target->options.begin(); current != option; ++current) if (!current->disabled) AddKeyPair(&plan.commands, "ArrowDown", "ArrowDown", 40);
       AddKeyPair(&plan.commands, "Enter", "Enter", 13);
     }
@@ -204,7 +216,7 @@ Plan PlanTrustedInput(const Json& request, const std::optional<Target>& target) 
   if (has_selector && (!request["selector"].is_string() || request["selector"].get<std::string>().empty())) {
     return Failure("INVALID_PARAMS", "selector must be a non-empty string");
   }
-  if (has_selector) AddMouseClick(&plan.commands, *target);
+  if (has_selector) AddMouseClick(&plan.commands, target->x, target->y);
   if (type == "fill") {
     AddControlA(&plan.commands);
     AddKeyPair(&plan.commands, "Backspace", "Backspace", 8);

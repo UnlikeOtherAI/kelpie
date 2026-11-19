@@ -39,6 +39,7 @@ struct DesktopHandlerRuntime {
 
   HandlerContext* handler_context = nullptr;
   DesktopBrowserControl* browser_control = nullptr;
+  std::filesystem::path tap_calibration_path;
   BookmarkStore* bookmark_store = nullptr;
   HistoryStore* history_store = nullptr;
   ConsoleStore* console_store = nullptr;

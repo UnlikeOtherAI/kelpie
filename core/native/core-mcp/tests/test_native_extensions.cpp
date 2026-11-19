@@ -25,7 +25,8 @@ int main() {
     }
   }
   Accept("tap", {{"x", 12.5}, {"y", 22}, {"tabId", "a"}});
-  Accept("tap", {{"x", 12.5}, {"y", 22}, {"marker", {{"style", "crosshair-coordinates"}, {"durationMs", 0}}}});
+  Accept("tap", {{"x", 12.5}, {"y", 22}, {"coordinateSpace", "screenshot"},
+                 {"marker", {{"style", "crosshair-coordinates"}, {"durationMs", 0}}}});
   Accept("highlight", {{"selector", "button"}, {"color", "red"}, {"durationMs", 0}});
   Accept("scroll2", {{"selector", "button"}, {"position", "center"}, {"maxScrolls", 4}});
   Accept("screenshot", {{"format", "jpeg"}, {"quality", 75}, {"fullPage", true}, {"resolution", "native"}});
