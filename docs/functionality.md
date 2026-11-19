@@ -78,10 +78,11 @@ prohibit simultaneous app instances, and the CLI no longer requests a new one.
 
 ## Device Discovery
 
-CLI and MCP discovery report the mDNS service, timeout, and whether the scan
-could run. An empty result gives a direct-address hint. Discovery never starts
-pairing. An exact `host:port` works independently of mDNS, and connection errors
-name the socket tried.
+CLI and MCP discovery send mDNS queries on each local IPv4 interface and report
+the service, timeout, interface addresses and any socket errors. An empty result
+gives a direct-address hint. Discovery never starts pairing. An exact `host:port`
+works independently of mDNS, and connection errors name the socket tried.
+Listeners that share a device ID remain visible at their respective ports.
 
 Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension. On Android, a foreground-service notification ("Kelpie is reachable") keeps the server alive in the background; tapping it brings the running browser back without restarting it, so open tabs, pending pairing prompts and just-approved tokens survive.
 
@@ -111,6 +112,11 @@ and owner-only file permissions on POSIX systems; Windows uses the current user'
 protected profile directory. It never prints or sends the private key. Losing or
 replacing this file creates a new computer identity that needs approval again.
 Copying the private key to another machine also copies its authority.
+
+Set `KELPIE_HOME` to use a separate directory for browser aliases, the CLI
+client ID, pairing tokens and the signing key. A CLI command that names a tab
+can use an existing approval. Starting a new pairing for that command requires
+an explicit browser target, including for screenshots and tab cookie stores.
 
 **Pairing protocol.** `POST /v1/pair` first obtains a random, expiring challenge.
 The CLI signs it together with its public key, then submits the proof. Kelpie

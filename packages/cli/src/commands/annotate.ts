@@ -1,8 +1,7 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { Command } from "commander";
-import { requireDevice, getGlobals, deviceCommand, withGlobalTabId } from "./helpers.js";
-import { sendCommand } from "../client/http-client.js";
+import { requireDevice, getGlobals, deviceCommand, sendDeviceCommand } from "./helpers.js";
 import { print } from "../output/formatter.js";
 
 export function registerAnnotate(program: Command): void {
@@ -28,13 +27,13 @@ export function registerAnnotate(program: Command): void {
         interactableOnly: opts.interactableOnly ?? true,
       };
 
-      const result = await sendCommand<{
+      const result = await sendDeviceCommand<{
         success: boolean;
         image?: string;
         annotations?: unknown[];
         width?: number;
         height?: number;
-      }>(device, "screenshotAnnotated", withGlobalTabId(globals, body), globals.timeout);
+      }>(globals, device, "screenshotAnnotated", body, globals.timeout);
 
       if (!result.ok || !result.data.image) {
         print(result.data, globals.format);

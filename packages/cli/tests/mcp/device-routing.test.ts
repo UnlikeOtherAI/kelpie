@@ -22,7 +22,7 @@ let client: Client;
 beforeEach(async () => {
   vi.resetAllMocks();
   clearDevices();
-  vi.mocked(scanForDevices).mockResolvedValue([]);
+  vi.mocked(scanForDevices).mockResolvedValue({ devices: [], interfaces: [{ address: "192.0.2.1" }] });
   vi.mocked(probeLocalDevices).mockResolvedValue([]);
   vi.mocked(sendCommand).mockResolvedValue({ ok: false, status: 401, data: { success: false } });
   local.lastSeen = Date.now();
@@ -68,13 +68,28 @@ it("provides empty-list guidance, scan diagnostics, and a loopback fallback with
   expect(sendCommand).not.toHaveBeenCalled();
 
   expect(JSON.parse((await call("kelpie_discover", { timeout: 600 })).text)).toMatchObject({
-    count: 0, discovery: { mdns: "ok", serviceType: "_kelpie._tcp", timeoutMs: 600 }, hint: expect.stringContaining("No usable replies"),
+    count: 0, discovery: { mdns: "ok", serviceType: "_kelpie._tcp", timeoutMs: 600, interfaces: [{ address: "192.0.2.1" }] }, hint: expect.stringContaining("No usable replies"),
   });
-  vi.mocked(scanForDevices).mockRejectedValue(Object.assign(new Error("bind failed"), { code: "EADDRINUSE" }));
+  vi.mocked(scanForDevices).mockResolvedValue({ devices: [], interfaces: [{ address: "192.0.2.1", error: "EADDRINUSE" }] });
   vi.mocked(probeLocalDevices).mockResolvedValue([local]);
   expect(JSON.parse((await call("kelpie_discover")).text)).toMatchObject({
     count: 1, discovery: { mdns: "unavailable" }, hint: expect.stringContaining("EADDRINUSE"),
   });
   expect(sendCommand).toHaveBeenCalledWith(local, "getCapabilities", undefined, 1500, { autoPair: false });
   expect(JSON.parse((await call("kelpie_list_devices")).text)).toMatchObject({ count: 1, devices: [{ id: local.id }] });
+});
+
+it("lists both same-ID listeners and refuses to route a tab to an ambiguous device", async () => {
+  vi.mocked(scanForDevices).mockResolvedValue({
+    devices: [local, { ...local, port: local.port + 1 }],
+    interfaces: [{ address: "192.0.2.1" }],
+  });
+  expect(JSON.parse((await call("kelpie_discover")).text).count).toBe(2);
+  expect(JSON.parse((await call("kelpie_list_devices")).text).count).toBe(2);
+  vi.mocked(sendCommand).mockClear();
+
+  const request = { version: 1, method: "tab.snapshot", tabId: "owned-tab", params: {} };
+  const response = await call("kelpie_browser_control", { device: local.id, request });
+  expect(response).toMatchObject({ isError: true, text: expect.stringContaining("No unique browser device") });
+  expect(sendCommand).not.toHaveBeenCalled();
 });

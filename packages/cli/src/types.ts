@@ -23,6 +23,11 @@ export interface DiscoveredDevice {
   localLaunchId?: string;
 }
 
+/** One device can advertise several listeners, and one listener can answer on several IPs. */
+export function discoveredDeviceKey(device: DiscoveredDevice): string {
+  return `${device.id}:${device.port}`;
+}
+
 export interface GlobalOptions {
   device?: string;
   format: "json" | "table" | "text";

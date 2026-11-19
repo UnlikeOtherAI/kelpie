@@ -1,8 +1,7 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { Command } from "commander";
-import { requireDevice, getGlobals, withGlobalTabId } from "./helpers.js";
-import { sendCommand } from "../client/http-client.js";
+import { requireDevice, getGlobals, sendDeviceCommand } from "./helpers.js";
 import { print } from "../output/formatter.js";
 
 export function registerScreenshot(program: Command): void {
@@ -31,13 +30,13 @@ export function registerScreenshot(program: Command): void {
       };
       if (opts.quality) body.quality = Number(opts.quality);
 
-      const result = await sendCommand<{
+      const result = await sendDeviceCommand<{
         success: boolean;
         image?: string;
         width?: number;
         height?: number;
         format?: string;
-      }>(device, "screenshot", withGlobalTabId(globals, body), globals.timeout);
+      }>(globals, device, "screenshot", body, globals.timeout);
 
       if (!result.ok || !result.data.image) {
         print(result.data, globals.format);

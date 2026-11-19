@@ -118,7 +118,7 @@ function registerBrowserTool(
     const deviceId = args.device as string | undefined;
     const device = await resolveDevice(deviceId, pinned);
     if (!device) {
-      const reason = deviceId ? `No device matching "${deviceId}".` : "No browser device selected.";
+      const reason = deviceId ? `No unique device matching "${deviceId}".` : "No browser device selected.";
       return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `${reason} ${mcpDeviceHint}` } });
     }
     let body: Record<string, unknown>;
@@ -395,7 +395,7 @@ async function handlePair(
   const deviceId = typeof params.device === "string" ? params.device : "";
   const device = await resolveDevice(deviceId, pinned);
   if (!device) {
-    return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
+    return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No unique device matching "${deviceId}". ${mcpDeviceHint}` } });
   }
   const store = getTokenStore();
   const clientId = await store.clientId();
