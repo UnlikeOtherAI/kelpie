@@ -119,6 +119,55 @@
   border-radius: 0;
 }
 
+/* The apps showcase: one page in a desktop window, on a tablet and on two
+   phones. The window sits behind; the devices line up along the bottom. */
+.showcase {
+  position: relative;
+  display: flex;
+  gap: clamp(8px, 1.6vw, 20px);
+  align-items: flex-end;
+  justify-content: flex-end;
+  margin-top: 48px;
+  padding-top: 19%;
+}
+
+.showcase .shot {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}
+
+.showcase .shot--window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 74%;
+  padding: 0;
+  border: 1px solid #c9cdd9;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.shot--window img {
+  border-radius: 0;
+}
+
+.shot--tablet {
+  width: 25%;
+  padding: 8px;
+  border-radius: 5.4% / 4.2%;
+}
+
+.shot--tablet img {
+  border-radius: 3.4% / 2.6%;
+}
+
+.shot--phone {
+  width: 14%;
+  padding: 6px;
+}
+
 .call {
   position: absolute;
   right: 0;
@@ -166,6 +215,28 @@
 }
 
 @media (max-width: 640px) {
+  .showcase {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-top: 0;
+  }
+
+  .showcase .shot--window {
+    position: static;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .shot--tablet {
+    width: 44%;
+    padding: 6px;
+  }
+
+  .shot--phone {
+    width: 24%;
+    padding: 4px;
+  }
+
   .call {
     position: static;
     max-width: none;
