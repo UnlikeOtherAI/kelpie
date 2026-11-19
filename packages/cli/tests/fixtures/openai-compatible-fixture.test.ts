@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { chunkBytes } from "../../../../tests/fixtures/openai-compatible/chunk-bytes.mjs";
 
 /**
  * Conformance test for tests/fixtures/openai-compatible/server.mjs — the
@@ -39,7 +40,7 @@ function startFixture(args: string[]): Promise<Fixture> {
 // --- A small byte-oriented SSE reader (test-only) ---
 
 interface SseEvent { data: string }
-interface SseRead { reads: Uint8Array[]; comments: string[]; events: SseEvent[]; done: boolean }
+interface SseRead { comments: string[]; events: SseEvent[]; done: boolean }
 
 function* splitLines(buffer: Buffer, final: boolean): Generator<{ line: Buffer; rest: Buffer }> {
   let start = 0;
@@ -57,7 +58,7 @@ function* splitLines(buffer: Buffer, final: boolean): Generator<{ line: Buffer; 
 async function readSse(response: Response): Promise<SseRead> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
-  const result: SseRead = { reads: [], comments: [], events: [], done: false };
+  const result: SseRead = { comments: [], events: [], done: false };
   let pending = Buffer.alloc(0);
   let data: string[] = [];
   const consume = (final: boolean) => {
@@ -81,31 +82,11 @@ async function readSse(response: Response): Promise<SseRead> {
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
-    result.reads.push(value);
     pending = Buffer.concat([pending, Buffer.from(value)]);
     consume(false);
   }
   consume(true);
   return result;
-}
-
-function isPartialUtf8Tail(bytes: Uint8Array): boolean {
-  for (let back = 1; back <= Math.min(3, bytes.length); back += 1) {
-    const byte = bytes[bytes.length - back];
-    if (byte >= 0xc0) {
-      const length = byte >= 0xf0 ? 4 : byte >= 0xe0 ? 3 : 2;
-      return back < length;
-    }
-    if (byte < 0x80) return false;
-  }
-  return false;
-}
-
-function splitsInsideDataField(reads: Uint8Array[]): boolean {
-  return reads.some((read, index) => {
-    const next = reads[index + 1];
-    return next !== undefined && Buffer.from(read).toString("latin1").endsWith("da") && Buffer.from(next).toString("latin1").startsWith("ta:");
-  });
 }
 
 // --- Helpers ---
@@ -130,6 +111,17 @@ type Delta = Record<string, unknown> & { tool_calls?: { index: number; id?: stri
 const deltas = (events: SseEvent[]): Delta[] => events
   .map((event) => JSON.parse(event.data) as { choices: { delta: Delta }[] })
   .flatMap((chunk) => chunk.choices.map((choice) => choice.delta));
+
+it("cuts SSE fields and UTF-8 sequences before writing to the socket", () => {
+  const emoji = Buffer.from("🤔");
+  const bytes = Buffer.concat([Buffer.from("data: "), emoji, Buffer.from("\n\n")]);
+  const chunks = chunkBytes(bytes, 32, () => 0.99);
+  expect(chunks).toEqual([
+    Buffer.from("da"),
+    Buffer.concat([Buffer.from("ta: "), emoji.subarray(0, 1)]),
+    Buffer.concat([emoji.subarray(1), Buffer.from("\n\n")]),
+  ]);
+});
 
 describe("OpenAI-compatible protocol fixture", { timeout: 20_000 }, () => {
   let keyed: Fixture;
@@ -208,14 +200,9 @@ describe("OpenAI-compatible protocol fixture", { timeout: 20_000 }, () => {
     expect(response.status).toBe(200);
   });
 
-  it("streams a plain answer fragmented, with comments, usage and [DONE]", async () => {
+  it("streams a plain answer with comments, usage and [DONE]", async () => {
     const stream = await readSse(await chat(keyed, { model: MODEL, stream: true, messages: [{ role: "user", content: "hi" }] }));
     expect(stream.done).toBe(true);
-    expect(stream.reads.length).toBeGreaterThan(20);
-    // Reads may coalesce in transit, but the fixture forces cuts inside every
-    // multibyte character and every "data:", so some must survive.
-    expect(stream.reads.some((read) => isPartialUtf8Tail(read))).toBe(true);
-    expect(splitsInsideDataField(stream.reads)).toBe(true);
     expect(stream.comments).toContain(": keep-alive");
     const all = deltas(stream.events);
     expect(all[0]).toEqual({ role: "assistant" });
