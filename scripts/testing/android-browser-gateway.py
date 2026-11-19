@@ -24,6 +24,7 @@ FIXTURE = b'''<!doctype html><meta name="viewport" content="width=device-width">
 <label>Query<input id="query" aria-label="Query" value="seed"></label>
 <button id="count" onclick="window.activationCount=(window.activationCount||0)+1;document.title='Count:'+window.activationCount">Count</button>
 <button id="slow" onclick="window.slowActivations=(window.slowActivations||0)+1;let end=Date.now()+35000;while(Date.now()<end){};document.title='Slow:'+window.slowActivations">Slow</button>
+<div style="height:20000px"></div>
 <script>setInterval(async()=>{let cmd=await(await fetch('/command'+location.search)).json();
 if(cmd.replace){let el=document.querySelector('#count');el.replaceWith(el.cloneNode(true));document.title='Replaced'}
 if(cmd.spoof){let el=document.createElement('button');el.textContent='Spoof';el.setAttribute('data-sn-ref',cmd.spoof);
@@ -249,6 +250,17 @@ def main():
     subprocess.run([os.environ.get('NODE', 'node'), str(Path(__file__).with_name('android-browser-gateway-mcp.mjs'))],
         input=json.dumps({'base': args.base, 'token': token, 'tab': tab}).encode(), check=True)
     assert 'page.press' not in core('capabilities')['methods']
+    core('page.scroll', tab, {'deltaY': 12_000})
+    offset = native('evaluate', {'expression': 'window.scrollY'})['result']
+    assert abs(offset - 12_000) < 1, f'Expected 12,000 CSS px scroll, observed {offset}'
+    core('page.scroll', tab, {'deltaY': -200})
+    offset = native('evaluate', {'expression': 'window.scrollY'})['result']
+    assert abs(offset - 11_800) < 1, f'Expected reverse scroll, observed {offset}'
+    assert core('page.scroll', tab, {'deltaY': 100_001}, False)['code'] == 'INVALID_ARGUMENTS'
+    assert native('scroll-to-top')['scrollY'] == 0
+    assert native('scroll-to-bottom')['scrollY'] > 12_000
+    assert native('scroll-to-top')['scrollY'] == 0
+    print('PASS canonical delta scroll, shared bounds and native page edges', flush=True)
     first = core('tab.snapshot', tab)
     assert 'seed' not in json.dumps(first)
     query = next(el['ref'] for el in first['elements'] if el['name'] == 'Query')

@@ -18,13 +18,10 @@ struct ScrollHandler {
     private func scroll(_ body: [String: Any]) async -> [String: Any] {
         let dx = body["deltaX"] as? Double ?? 0
         let dy = body["deltaY"] as? Double ?? 0
-        let js = "window.scrollBy(\(dx), \(dy)); ({scrollX: window.scrollX, scrollY: window.scrollY})"
-        do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            return successResponse(result)
-        } catch {
-            return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+        guard dx.isFinite, dy.isFinite else {
+            return errorResponse(code: "INVALID_PARAMS", message: "Scroll deltas must be finite")
         }
+        return await evaluateScroll("window.scrollBy(\(dx), \(dy))")
     }
 
     @MainActor
@@ -54,12 +51,25 @@ struct ScrollHandler {
 
     @MainActor
     private func scrollTo(top: Bool) async -> [String: Any] {
-        let js = top
-            ? "window.scrollTo(0, 0); ({scrollY: 0})"
-            : "window.scrollTo(0, document.documentElement.scrollHeight); ({scrollY: window.scrollY})"
+        let y = top ? "0" : "document.documentElement.scrollHeight"
+        return await evaluateScroll("window.scrollTo(0, \(y))")
+    }
+
+    @MainActor
+    private func evaluateScroll(_ operation: String) async -> [String: Any] {
+        // The context wraps the script as an expression inside JSON.stringify.
+        let script = """
+        (function() {
+            \(operation);
+            return {scrollX: window.scrollX, scrollY: window.scrollY};
+        })()
+        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            return successResponse(result)
+            let observed = try await context.evaluateJSReturningJSON(script)
+            guard !observed.isEmpty else {
+                return errorResponse(code: "EVAL_ERROR", message: "Scroll was not evaluated by the renderer")
+            }
+            return successResponse(observed)
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }

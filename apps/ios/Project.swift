@@ -21,10 +21,11 @@ let kelpieApp = Target.target(
     ],
     settings: .settings(
         base: KelpieBrowserBuild.ios(core: "$(PROJECT_DIR)/../../core", additional: [
-            "MARKETING_VERSION": "0.2.4",
-            "CURRENT_PROJECT_VERSION": "25",
+            "MARKETING_VERSION": "0.2.5",
+            "CURRENT_PROJECT_VERSION": "27",
+            "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "",
             "TARGETED_DEVICE_FAMILY": "1,2",
-            "DEVELOPMENT_TEAM": "59S95D279D"
+            "DEVELOPMENT_TEAM": "23B7GTLBN7"
         ])
     )
 )

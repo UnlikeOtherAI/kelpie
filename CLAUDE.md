@@ -20,6 +20,10 @@ Android JNI/HTTP/MCP and inference follow [docs/api/native-browser-gateway-andro
 
 npm package metadata and provenance follow AGENTS.md → Versioning.
 
+## Platform Parity
+
+Check iOS, Android, macOS, Windows, and Linux for shared browser-behavior changes. Record which platforms the PR changes, which already match, and which are outside a platform-specific fix. See AGENTS.md for the parity rules.
+
 ## Claude-Specific Notes
 
 - Keep instructions modular and prefer progressive disclosure.
