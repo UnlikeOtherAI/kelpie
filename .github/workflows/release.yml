@@ -290,6 +290,9 @@ jobs:
             sha256sum ./*.apk ./*.aab > checksums.txt
           )
 
+      - name: Verify 16 KiB alignment of the signed APK
+        run: python3 scripts/testing/check_android_16kb_apk.py dist/release/android/*-release.apk
+
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: android-release

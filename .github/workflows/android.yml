@@ -9,6 +9,8 @@ on:
       - '.editorconfig'
       - 'packages/shared/**'
       - 'scripts/native/**'
+      - 'scripts/testing/check_android_16kb_apk.py'
+      - '.github/workflows/android.yml'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -23,6 +25,8 @@ on:
       - '.editorconfig'
       - 'packages/shared/**'
       - 'scripts/native/**'
+      - 'scripts/testing/check_android_16kb_apk.py'
+      - '.github/workflows/android.yml'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
@@ -65,3 +69,6 @@ jobs:
       - name: Lint, ktlint, build
         working-directory: apps/android
         run: ./gradlew --no-daemon lint ktlintCheck build
+
+      - name: Verify 16 KiB ELF and APK ZIP alignment
+        run: python3 scripts/testing/check_android_16kb_apk.py apps/android/app/build/outputs/apk/debug/app-debug.apk
