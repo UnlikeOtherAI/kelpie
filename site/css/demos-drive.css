@@ -1,0 +1,285 @@
+/* Demos for tools that drive a device: record, sessions and viewports. */
+
+/* 4. Record: a highlight ring walks through the steps under a caption. */
+.demo--rec .d-sheet {
+  inset: 12% 9% 30%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8%;
+  align-items: center;
+  padding: 0 8%;
+}
+
+.demo--rec .d-sheet i {
+  height: 46%;
+  border-radius: 6px;
+  background: #e6e9f1;
+}
+
+.demo--rec .d-sheet u {
+  position: absolute;
+  top: 19%;
+  left: 5%;
+  width: 28%;
+  height: 62%;
+  border: 2.5px solid var(--k-pink);
+  border-radius: 9px;
+  animation: demo-walk var(--t) ease-in-out infinite;
+}
+
+.d-rec {
+  position: absolute;
+  top: 5%;
+  right: 5%;
+  z-index: 2;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(0, 12, 48, 0.8);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.d-rec::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4d6d;
+  content: "";
+  animation: demo-blink 1.2s steps(2) infinite;
+}
+
+.d-caption {
+  position: absolute;
+  bottom: 9%;
+  left: 50%;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--k-ink);
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+@keyframes demo-walk {
+  0%,
+  22% {
+    left: 5%;
+  }
+
+  33%,
+  55% {
+    left: 36%;
+  }
+
+  66%,
+  90% {
+    left: 67%;
+  }
+
+  100% {
+    left: 5%;
+  }
+}
+
+@keyframes demo-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* 5. Sessions: a cookie travels from one device to the next. */
+.d-dev {
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 14%;
+  width: 20%;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  border-radius: 11px;
+}
+
+.d-dev--b {
+  right: 14%;
+  left: auto;
+}
+
+.d-dev::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 9px;
+  border-bottom: 3px solid var(--k-mint);
+  border-left: 3px solid var(--k-mint);
+  content: "";
+  transform: translate(-50%, -70%) rotate(-45deg);
+}
+
+.d-dev--b::after {
+  animation: demo-arrive var(--t) ease infinite;
+}
+
+.d-link {
+  position: absolute;
+  top: 50%;
+  right: 37%;
+  left: 37%;
+  border-top: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.d-link u {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--k-sun);
+  box-shadow: 0 0 0 4px rgba(250, 200, 1, 0.24);
+  animation: demo-travel var(--t) ease-in-out infinite;
+}
+
+@keyframes demo-travel {
+  0%,
+  10% {
+    left: 0;
+    opacity: 0;
+  }
+
+  16% {
+    opacity: 1;
+  }
+
+  44% {
+    left: calc(100% - 14px);
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    left: calc(100% - 14px);
+    opacity: 0;
+  }
+}
+
+@keyframes demo-arrive {
+  0%,
+  46% {
+    opacity: 0;
+  }
+
+  54%,
+  92% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 6. Viewports: one screen turns from portrait to landscape to tablet. */
+.d-frame {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  width: 46px;
+  height: 84px;
+  padding: 8px 6px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 9px;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  animation: demo-frame 9s ease-in-out infinite;
+}
+
+.d-frame i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: #dfe2ea;
+}
+
+.d-frame i:first-child {
+  width: 66%;
+  background: var(--k-pink);
+}
+
+.d-sizes {
+  position: absolute;
+  right: 0;
+  bottom: 8%;
+  left: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: var(--k-mono);
+  text-align: center;
+}
+
+.d-sizes em {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  animation: demo-size 9s linear infinite;
+}
+
+.d-sizes em:first-child {
+  position: static;
+  display: block;
+  opacity: 1;
+}
+
+.d-sizes em:nth-child(2) {
+  animation-delay: 3s;
+}
+
+.d-sizes em:nth-child(3) {
+  animation-delay: 6s;
+}
+
+@keyframes demo-frame {
+  0%,
+  26% {
+    width: 46px;
+    height: 84px;
+  }
+
+  33%,
+  59% {
+    width: 96px;
+    height: 46px;
+  }
+
+  66%,
+  92% {
+    width: 84px;
+    height: 104px;
+  }
+
+  100% {
+    width: 46px;
+    height: 84px;
+  }
+}
+
+@keyframes demo-size {
+  0%,
+  30% {
+    opacity: 1;
+  }
+
+  33.4%,
+  100% {
+    opacity: 0;
+  }
+}

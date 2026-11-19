@@ -14,7 +14,7 @@
   <a href="#quick-start">Quick start</a> &middot;
   <a href="docs/ui/3d-inspector.md">3D inspector</a> &middot;
   <a href="docs/api/">API reference</a> &middot;
-  <a href="https://unlikeotherai.github.io/kelpie">Website</a>
+  <a href="https://kelpie.rocks">Website</a>
 </p>
 
 Kelpie is an open-source browser for macOS, Windows, Linux, iOS and Android. Use its native interface yourself, or give an AI agent access to real browser tabs: navigate, read pages, click, fill forms, take screenshots and inspect network traffic.

@@ -1,419 +1,482 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kelpie — LLM-First Mobile Browser</title>
-<meta name="description" content="Control real browsers with language models and record support walkthrough videos. Native iOS, Android, and macOS apps with mDNS discovery, HTTP API, and MCP.">
-<style>
-  :root {
-    --orange: #f4b078;
-    --orange-dark: #e8944a;
-    --bg: #faf8f5;
-    --text: #1a1a1a;
-    --muted: #666;
-    --code-bg: #f0ede8;
-    --card-bg: #fff;
-    --border: #e0dcd6;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1816;
-      --text: #e8e4df;
-      --muted: #999;
-      --code-bg: #2a2622;
-      --card-bg: #242120;
-      --border: #3a3632;
-    }
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: var(--orange-dark); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  code {
-    background: var(--code-bg);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.9em;
-    font-family: "SF Mono", "Fira Code", monospace;
-  }
-
-  /* Hero */
-  .hero {
-    text-align: center;
-    padding: 80px 24px 60px;
-    max-width: 720px;
-    margin: 0 auto;
-  }
-  .hero img {
-    width: 120px;
-    height: 120px;
-    border-radius: 28px;
-    margin-bottom: 24px;
-  }
-  .hero h1 {
-    font-size: 2.8em;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    margin-bottom: 12px;
-  }
-  .hero .tagline {
-    font-size: 1.25em;
-    color: var(--muted);
-    max-width: 520px;
-    margin: 0 auto 32px;
-  }
-  .hero-buttons {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .btn {
-    display: inline-block;
-    padding: 12px 28px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1em;
-    transition: transform 0.15s, box-shadow 0.15s;
-  }
-  .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    text-decoration: none;
-  }
-  .btn-primary {
-    background: var(--orange-dark);
-    color: #fff;
-  }
-  .btn-secondary {
-    background: var(--card-bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
-
-  /* Install */
-  .install {
-    text-align: center;
-    padding: 0 24px 60px;
-  }
-  .install pre {
-    display: inline-block;
-    background: var(--code-bg);
-    padding: 14px 28px;
-    border-radius: 8px;
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 1em;
-    border: 1px solid var(--border);
-  }
-
-  /* Sections */
-  section {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 60px 24px;
-  }
-  section h2 {
-    font-size: 1.8em;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin-bottom: 32px;
-    text-align: center;
-  }
-
-  /* Feature grid */
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-  }
-  .feature {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 24px;
-  }
-  .feature h3 {
-    font-size: 1.1em;
-    margin-bottom: 8px;
-  }
-  .feature p {
-    color: var(--muted);
-    font-size: 0.95em;
-  }
-
-  /* Install copy button */
-  .install-wrap {
-    display: inline-flex;
-    align-items: center;
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .install-wrap code {
-    padding: 14px 16px 14px 28px;
-    background: none;
-    border: none;
-    border-radius: 0;
-    font-size: 1em;
-  }
-  .copy-btn {
-    background: none;
-    border: none;
-    border-left: 1px solid var(--border);
-    padding: 14px 16px;
-    cursor: pointer;
-    color: var(--muted);
-    font-size: 1.1em;
-    transition: color 0.15s;
-    display: flex;
-    align-items: center;
-  }
-  .copy-btn:hover { color: var(--text); }
-  .copy-btn svg { width: 18px; height: 18px; }
-
-  /* Mermaid chart */
-  .mermaid-container {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 32px;
-    overflow-x: auto;
-    display: flex;
-    justify-content: center;
-  }
-
-  /* Sister projects */
-  .projects {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-  }
-  .project-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 24px;
-  }
-  .project-card h3 { margin-bottom: 8px; }
-  .project-card p {
-    color: var(--muted);
-    font-size: 0.95em;
-    margin-bottom: 12px;
-  }
-
-  /* Footer */
-  footer {
-    text-align: center;
-    padding: 40px 24px;
-    color: var(--muted);
-    font-size: 0.9em;
-    border-top: 1px solid var(--border);
-  }
-
-  @media (max-width: 600px) {
-    .hero h1 { font-size: 2em; }
-    .hero .tagline { font-size: 1.05em; }
-    .features { grid-template-columns: 1fr; }
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kelpie — a real browser for your agents</title>
+  <meta name="description" content="Kelpie is an open-source browser for iPhone, iPad, Android, Mac, Windows and Linux. Connect an agent through MCP, HTTP or the command line and test, research and inspect websites on real devices.">
+  <link rel="canonical" href="https://kelpie.rocks/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kelpie.rocks/">
+  <meta property="og:title" content="Kelpie — a real browser for your agents">
+  <meta property="og:description" content="An open-source browser for developers and AI agents. One site, many devices, driven over MCP.">
+  <meta property="og:image" content="https://kelpie.rocks/assets/og.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#000c30">
+  <link rel="icon" type="image/png" href="assets/brand/favicon-64.png">
+  <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/chrome.css">
+  <link rel="stylesheet" href="css/hero.css">
+  <link rel="stylesheet" href="css/phones.css">
+  <link rel="stylesheet" href="css/wall.css">
+  <link rel="stylesheet" href="css/stories.css">
+  <link rel="stylesheet" href="css/agents.css">
+  <link rel="stylesheet" href="css/demos.css">
+  <link rel="stylesheet" href="css/demos-inspect.css">
+  <link rel="stylesheet" href="css/demos-drive.css">
+  <link rel="stylesheet" href="css/sections.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<div class="hero">
-  <img src="icon-1024.png" alt="Kelpie icon" width="120" height="120">
-  <h1>Kelpie</h1>
-  <p class="tagline">The browser for agents, support teams, and demos. Drive real devices with LLMs, record a few clean clicks, and send clients a walkthrough that shows exactly where to go.</p>
-  <div class="hero-buttons">
-    <a href="https://github.com/UnlikeOtherAI/kelpie" class="btn btn-primary">GitHub</a>
-    <a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs" class="btn btn-secondary">Documentation</a>
-  </div>
-</div>
-
-<div class="install">
-  <div class="install-wrap">
-    <code id="install-cmd">npm install -g @unlikeotherai/kelpie</code>
-    <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard" aria-label="Copy to clipboard">
-      <svg id="copy-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-      <svg id="check-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none;color:#4ade80"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+<header class="header">
+  <div class="header-inner">
+    <a class="brand" href="./" aria-label="Kelpie home">
+      <img src="assets/brand/kelpie-mark-192.png" alt="" width="52" height="52">kelpie
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false">
+      <svg aria-hidden="true"><use href="assets/icons.svg#menu"/></svg>
     </button>
-  </div>
-</div>
-
-<section>
-  <h2>What it does</h2>
-  <div class="features">
-    <div class="feature">
-      <h3>Real browsers, every platform</h3>
-      <p>Native iOS, Android, and macOS apps built on WKWebView, Android WebView, and CEF. No emulators, no desktop wrappers, no Electron.</p>
-    </div>
-    <div class="feature">
-      <h3>mDNS discovery</h3>
-      <p>Every running instance advertises <code>_kelpie._tcp</code> on the local network. The CLI auto-discovers all devices with metadata: name, platform, resolution, version.</p>
-    </div>
-    <div class="feature">
-      <h3>HTTP + MCP API</h3>
-      <p>Every device runs an HTTP and MCP server. Navigate, screenshot, read DOM, click, fill forms, scroll, evaluate JS — all via structured API calls.</p>
-    </div>
-    <div class="feature">
-      <h3>Support walkthrough videos</h3>
-      <p>Record a scripted browser session for support and presentation work. A support team can do a few clean clicks, show a client the exact path to a page, setting, or flow, then send the walkthrough instead of typing instructions.</p>
-    </div>
-    <div class="feature">
-      <h3>Group commands</h3>
-      <p>Send the same command to all devices simultaneously. Fill a form across 6 phones at once, or take screenshots of every device in one call.</p>
-    </div>
-    <div class="feature">
-      <h3>Annotated screenshots</h3>
-      <p>Capture screenshots with numbered labels on every interactive element. The LLM sees the image and a list of what each number is — visual-first automation.</p>
-    </div>
-    <div class="feature">
-      <h3>Smart queries</h3>
-      <p><code>findButton("Submit")</code> across all devices returns which ones found it. The LLM makes the decision about what to do next.</p>
-    </div>
-    <div class="feature">
-      <h3>Safari / Chrome auth</h3>
-      <p>One-tap login using the device's saved passwords. Opens Safari or Chrome Custom Tabs, syncs cookies back into the browser automatically.</p>
-    </div>
-    <div class="feature">
-      <h3>Network inspector</h3>
-      <p>Capture all XHR and fetch traffic from loaded pages. See method, URL, status, headers, request/response bodies, timing, and size.</p>
-    </div>
-    <div class="feature">
-      <h3>Console capture</h3>
-      <p>Read console output (log, warn, error) and JS errors with stack traces. Buffers up to 5,000 entries, clearable on demand.</p>
-    </div>
-    <div class="feature">
-      <h3>Apple TV support</h3>
-      <p>AirPlay from an iPhone or iPad to an Apple TV and it appears as a separate controllable device on the network. Fullscreen browser on the big screen, driven entirely from the CLI.</p>
+    <nav class="nav" aria-label="Main">
+      <a href="#use-cases">Use cases</a>
+      <a href="#agents">For agents</a>
+      <a href="#connect">Get started</a>
+      <a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs">Docs</a>
+    </nav>
+    <div class="header-actions">
+      <a class="header-link" href="https://github.com/UnlikeOtherAI/kelpie">
+        <svg aria-hidden="true"><use href="assets/icons.svg#github"/></svg>GitHub
+      </a>
+      <a class="btn btn--small" href="#download">Download</a>
     </div>
   </div>
-</section>
+  <div class="wave-hang" aria-hidden="true"><svg><use href="assets/icons.svg#wave-rise"/></svg></div>
+</header>
 
-<section>
-  <h2>Architecture</h2>
-  <div class="mermaid-container">
-    <pre class="mermaid">
-graph TD
-    subgraph net["Local Network"]
-        subgraph iphone["iPhone"]
-            ib["Kelpie Browser"]
-            is["HTTP + MCP Server"]
-            im["mDNS _kelpie._tcp"]
-        end
-        subgraph ipad["iPad"]
-            pb["Kelpie Browser"]
-            ps["HTTP + MCP Server"]
-            pm["mDNS _kelpie._tcp"]
-        end
-        subgraph android["Android"]
-            ab["Kelpie Browser"]
-            as["HTTP + MCP Server"]
-            am["mDNS _kelpie._tcp"]
-        end
-        subgraph tv["Apple TV (AirPlay)"]
-            tb["Fullscreen Browser"]
-            ts["HTTP + MCP Server"]
-            tm["mDNS _kelpie._tcp"]
-        end
-    end
+<main id="main">
+  <section class="hero">
+    <div class="container">
+      <div class="hero-grid">
+        <div>
+          <a class="pill" href="https://github.com/UnlikeOtherAI/kelpie">
+            <svg aria-hidden="true"><use href="assets/icons.svg#github"/></svg>
+            Open source <span>UnlikeOtherAI/kelpie</span>
+          </a>
+          <h1 class="h1">Give your agents a real browser.</h1>
+          <p class="lede">Kelpie is an open-source browser for iPhone, iPad, Android, Mac, Windows and Linux. Browse with it yourself, or connect an agent through MCP, HTTP or the command line and let it navigate, read, click and take screenshots on real devices.</p>
+          <div class="hero-actions">
+            <a class="btn" href="#download"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>Download</a>
+            <a class="btn btn--ghost" href="https://github.com/UnlikeOtherAI/kelpie"><svg aria-hidden="true"><use href="assets/icons.svg#github"/></svg>View on GitHub</a>
+          </div>
+          <div class="store-row">
+            <a class="store" data-store="appStore">
+              <svg aria-hidden="true"><use href="assets/icons.svg#phone"/></svg>
+              <span><small class="soon">Coming soon</small><small class="live">Download on the</small><b>App Store</b></span>
+            </a>
+            <a class="store" data-store="googlePlay">
+              <svg aria-hidden="true"><use href="assets/icons.svg#phone"/></svg>
+              <span><small class="soon">Coming soon</small><small class="live">Get it on</small><b>Google Play</b></span>
+            </a>
+          </div>
+          <div class="install">
+            <code>npm install -g @unlikeotherai/kelpie</code>
+            <button class="copy" type="button" data-copy="npm install -g @unlikeotherai/kelpie" aria-label="Copy the install command">
+              <svg class="idle" aria-hidden="true"><use href="assets/icons.svg#copy"/></svg>
+              <svg class="done" aria-hidden="true"><use href="assets/icons.svg#check"/></svg>
+            </button>
+          </div>
+        </div>
 
-    subgraph cli["Kelpie CLI (Node.js)"]
-        disc["mDNS Discovery"]
-        ind["Individual Commands"]
-        grp["Group Commands"]
-        help["LLM Help System"]
-        mcp["MCP Server"]
-    end
+        <div>
+          <div class="wall is-loaded is-found" role="img" aria-label="Animation: one agent navigates four phones to the same page, finds the Sign up button, fills in the form and takes a screenshot on each phone.">
+            <div class="wall-shelf" data-phones="home notch island hole"></div>
+            <template>
+              <div class="phone">
+                <div class="phone-screen">
+                  <i class="mini-progress"></i>
+                  <div class="mini">
+                    <div class="mini-view mini-view--home">
+                      <div class="mini-nav"><i></i><i></i></div>
+                      <b></b><b class="s"></b>
+                      <i class="mini-art"></i>
+                      <i class="mini-text"></i><i class="mini-text s"></i>
+                      <span class="mini-cta">Sign up</span>
+                    </div>
+                    <div class="mini-view mini-view--form">
+                      <div class="mini-nav"><i></i><i></i></div>
+                      <b class="s"></b>
+                      <i class="mini-text"></i>
+                      <span class="mini-field"><span>ada@example.com</span></span>
+                      <span class="mini-cta">Continue</span>
+                    </div>
+                  </div>
+                  <div class="mini-bar"><i></i><i></i></div>
+                  <i class="mini-flash"></i>
+                </div>
+              </div>
+            </template>
+            <div class="console">
+              <div class="console-bar"><i></i>Agent session<span>kelpie mcp</span></div>
+              <ol class="console-log">
+                <li class="log-call"><b>kelpie_group_navigate</b> { url: "https://staging.example.com" }</li>
+                <li class="log-ok">loaded on 4 devices</li>
+                <li class="log-call"><b>kelpie_group_find_button</b> { text: "Sign up" }</li>
+                <li class="log-ok">found on 4 of 4</li>
+              </ol>
+            </div>
+          </div>
+          <p class="wall-caption">Runs on iOS 16 and Android 9 or later, so the old phones in your drawer count.</p>
+        </div>
+      </div>
 
-    is --> cli
-    ps --> cli
-    as --> cli
-    ts --> cli
-    cli --> llm["LLM Agent"]
+      <div class="platforms">
+        <b>Runs on</b>
+        <span><svg aria-hidden="true"><use href="assets/icons.svg#phone"/></svg>iPhone</span>
+        <span><svg aria-hidden="true"><use href="assets/icons.svg#tablet"/></svg>iPad</span>
+        <span><svg aria-hidden="true"><use href="assets/icons.svg#phone"/></svg>Android</span>
+        <span><svg aria-hidden="true"><use href="assets/icons.svg#laptop"/></svg>macOS</span>
+        <span><svg aria-hidden="true"><use href="assets/icons.svg#monitor"/></svg>Windows</span>
+        <span><svg aria-hidden="true"><use href="assets/icons.svg#terminal"/></svg>Linux</span>
+      </div>
+    </div>
+  </section>
 
-    style net fill:transparent,stroke:#e0dcd6,stroke-width:1px
-    style iphone fill:transparent,stroke:#f4b078,stroke-width:2px
-    style ipad fill:transparent,stroke:#f4b078,stroke-width:2px
-    style android fill:transparent,stroke:#f4b078,stroke-width:2px
-    style tv fill:transparent,stroke:#f4b078,stroke-width:2px
-    style cli fill:transparent,stroke:#e8944a,stroke-width:2px
-    style llm fill:#e8944a,color:#fff,stroke:#e8944a
-    </pre>
+  <section class="section" id="use-cases">
+    <div class="container">
+      <span class="kicker">Use cases</span>
+      <h2 class="h2">A test lab from the phones you already own.</h2>
+
+      <div class="photo-card">
+        <img src="assets/screens/device-wall-crop.webp" alt="Eight phones mounted on a wall beside a monitor, all showing the same page." width="900" height="706" loading="lazy">
+        <div class="photo-card-body on-dark">
+          <span class="kicker">Device testing</span>
+          <h3 class="h2">One site. Many devices.</h3>
+          <p>Pair the phones and tablets you have, including the old ones in the drawer. Send one command and every screen navigates, fills the same form and returns its own screenshot, so you see what each device really renders.</p>
+        </div>
+      </div>
+
+      <div class="story">
+        <div>
+          <span class="kicker">Research</span>
+          <h3 class="h2">Give a research agent a phone browser.</h3>
+          <p>A trusted agent opens a tab, reads the page and follows links in a mobile browser, where sites serve their mobile layout.</p>
+          <ul class="ticks">
+            <li>A snapshot returns the page as compact text and a list of elements. It never includes form values.</li>
+            <li>The agent clicks and types only on elements it has just observed.</li>
+            <li>You approve each computer once and can revoke it in Settings.</li>
+          </ul>
+        </div>
+        <div class="story-media">
+          <figure class="shot"><img src="assets/screens/iphone-nessie.webp" alt="Kelpie on an iPhone showing nessie.works, with the address bar at the bottom." width="660" height="1434" loading="lazy"></figure>
+          <div class="call"><b>kelpie_browser_control</b><br>{ method: "tab.snapshot", tabId }<span>Returns the URL, title, compact text and each element's ref, role and name.</span></div>
+        </div>
+      </div>
+
+      <div class="story story--flip">
+        <div>
+          <span class="kicker">Page AI</span>
+          <h3 class="h2">Ask the page a question.</h3>
+          <p>On supported devices Kelpie reads the page with a model running on the device and returns a short answer. Your agent gets a few lines back instead of the whole page.</p>
+          <ul class="ticks">
+            <li>On-device models on iPhone, iPad, Android, Mac and Windows.</li>
+            <li>Or use any OpenAI-compatible endpoint, such as Ollama or LM Studio.</li>
+            <li>Agents call <code>kelpie_ai_ask</code> with a prompt and the page as context.</li>
+          </ul>
+        </div>
+        <div class="story-media">
+          <figure class="shot shot--small"><img src="assets/screens/iphone-ai.webp" alt="Kelpie's menu on an iPhone with Settings, Network inspector, AI, History, Bookmarks and Tabs." width="660" height="1434" loading="lazy"></figure>
+          <figure class="shot shot--small"><img src="assets/screens/android-ai.webp" alt="The same menu in Kelpie on Android." width="600" height="1333" loading="lazy"></figure>
+        </div>
+      </div>
+
+      <div class="story">
+        <div>
+          <span class="kicker">Inspect</span>
+          <h3 class="h2">See how a page is built.</h3>
+          <p>The 3D inspector pulls a page apart by DOM depth. Rotate it, pick single elements and find the invisible overlay that is swallowing your taps.</p>
+          <ul class="ticks">
+            <li>Rotate, pan, scroll and inspect without losing your zoom level.</li>
+            <li>Browse the element tree, including open shadow roots.</li>
+            <li>Experimental, on phones, tablets and desktops.</li>
+          </ul>
+          <a class="text-link" href="https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/ui/3d-inspector.md">Inspector guide</a>
+        </div>
+        <div class="story-media">
+          <figure class="shot shot--wide"><img src="assets/screens/inspector-3d.webp" alt="Kelpie's 3D inspector showing a rotated page with its layers separated, a tool column on the left and orientation, zoom and layer controls on the right." width="1280" height="900" loading="lazy"></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wave" aria-hidden="true"><svg><use href="assets/icons.svg#wave-rise"/></svg></div>
+  <section class="band on-dark" id="agents">
+    <div class="container band-inner">
+      <span class="kicker center">For agents</span>
+      <h2 class="h2 center">Four tools in context. 170 more on demand.</h2>
+      <p class="lede center">Kelpie's MCP server starts with one browser interface and three discovery tools, so your agent's context is not filled with schemas it never uses. The rest load when the agent asks for them.</p>
+
+      <div class="catalog">
+        <div class="panel">
+          <h3>Default catalog</h3>
+          <ul class="tool-list">
+            <li><code>kelpie_browser_control</code><span>Tabs, navigation, snapshots, screenshots, clicks and typing through one versioned interface.</span></li>
+            <li><code>kelpie_extensions</code><span>Lists the name of every extension.</span></li>
+            <li><code>kelpie_extension_tools</code><span>Returns the schemas for up to 20 extensions at a time.</span></li>
+            <li><code>kelpie_extension</code><span>Calls an extension with its documented arguments.</span></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Browser control methods</h3>
+          <ul class="chips">
+            <li>tabs.list</li><li>tabs.new</li><li>tabs.select</li><li>tabs.close</li>
+            <li>tab.goto</li><li>tab.back</li><li>tab.forward</li><li>tab.reload</li>
+            <li>tab.url</li><li>tab.title</li><li>tab.snapshot</li><li>tab.screenshot</li>
+            <li>tab.click</li><li>tab.type</li><li>page.press</li><li>page.scroll</li>
+          </ul>
+          <p>Every reply is <code>{ version: 1, ok, value }</code>. A change that may already have happened is never retried automatically.</p>
+        </div>
+      </div>
+
+      <div class="cards">
+        <article class="card">
+          <div class="demo demo--read" aria-hidden="true">
+            <div class="d-sheet"><i></i><i></i><i></i><i></i><i></i><i></i><u></u></div>
+            <ul class="d-rows"><li><b>heading</b>Pricing</li><li><b>button</b>Start free trial</li><li><b>textbox</b>Email</li></ul>
+          </div>
+          <h3 class="h3">Read a page the way a model does</h3>
+          <p>Reader-mode text, the accessibility tree, visible elements and form state instead of raw HTML.</p>
+          <code>kelpie_get_page_text<br>kelpie_get_accessibility_tree<br>kelpie_get_form_state</code>
+        </article>
+        <article class="card">
+          <div class="demo demo--see" aria-hidden="true">
+            <div class="d-sheet"><span class="d-el d-el--a"><em>1</em></span><span class="d-el d-el--b"><em>2</em></span><span class="d-el d-el--c"><em>3</em></span></div>
+            <div class="d-chip">kelpie_click_annotation { index: 3 }</div>
+          </div>
+          <h3 class="h3">Act on what it sees</h3>
+          <p>An annotated screenshot numbers every control. The agent clicks or fills by number, with no selectors.</p>
+          <code>kelpie_screenshot_annotated<br>kelpie_click_annotation<br>kelpie_fill_annotation</code>
+        </article>
+        <article class="card">
+          <div class="demo demo--diag" aria-hidden="true">
+            <ul class="d-net"><li><b>GET</b>/api/cart<span>200</span></li><li><b>GET</b>/api/prices<span>200</span></li><li class="bad"><b>POST</b>/api/checkout<span>500</span></li><li class="bad">TypeError: total is undefined</li></ul>
+          </div>
+          <h3 class="h3">Find out what broke</h3>
+          <p>Network requests with status and timing, console output and JavaScript errors with stack traces.</p>
+          <code>kelpie_get_network_log<br>kelpie_get_console_messages<br>kelpie_get_js_errors</code>
+        </article>
+        <article class="card">
+          <div class="demo demo--rec" aria-hidden="true">
+            <span class="d-rec">REC</span>
+            <div class="d-sheet"><i></i><i></i><i></i><u></u></div>
+            <span class="d-caption">Open Billing, then Invoices</span>
+          </div>
+          <h3 class="h3">Record a walkthrough</h3>
+          <p>Run a timed script of taps, typing, captions and highlights on a phone to show someone exactly where to click.</p>
+          <code>kelpie_play_script<br>kelpie_show_commentary<br>kelpie_highlight</code>
+        </article>
+        <article class="card">
+          <div class="demo demo--sync" aria-hidden="true">
+            <span class="d-dev"></span><span class="d-link"><u></u></span><span class="d-dev d-dev--b"></span>
+          </div>
+          <h3 class="h3">Stay signed in on every device</h3>
+          <p>Devices on one account share website cookies directly over your network. Isolated tabs keep theirs apart.</p>
+          <code>kelpie_get_cookie_sync_status<br>kelpie_copy_cookies<br>kelpie_get_partitions</code>
+        </article>
+        <article class="card">
+          <div class="demo demo--view" aria-hidden="true">
+            <span class="d-frame"><i></i><i></i><i></i></span>
+            <span class="d-sizes"><em>390 × 844</em><em>844 × 390</em><em>820 × 1180</em></span>
+          </div>
+          <h3 class="h3">Rotate and resize</h3>
+          <p>Switch orientation, apply a viewport preset or set an exact size, then check the layout again.</p>
+          <code>kelpie_set_orientation<br>kelpie_set_viewport_preset<br>kelpie_resize_viewport</code>
+        </article>
+      </div>
+      <p class="band-note">What a device supports depends on its platform. An agent calls <code>capabilities</code> to find out. See the <a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs/api">API reference</a>.</p>
+    </div>
+  </section>
+  <div class="wave wave--to-white" aria-hidden="true"><svg><use href="assets/icons.svg#wave-fall"/></svg></div>
+
+  <section class="section" id="connect">
+    <div class="container">
+      <span class="kicker">Get started</span>
+      <h2 class="h2">Connected in a minute.</h2>
+      <p class="lede">Open Kelpie on a device and install the CLI on your computer. They find each other on your network.</p>
+      <div class="connect">
+        <div class="term">
+          <div class="term-bar"><i></i><i></i><i></i><span>Terminal</span></div>
+<pre><span class="c"># Install the CLI. It needs Node.js 20 or later.</span>
+<span class="p">$</span> npm install -g @unlikeotherai/kelpie
+
+<span class="c"># Find the browsers on your network.</span>
+<span class="p">$</span> kelpie discover
+
+<span class="c"># Approve this computer once, on the device.</span>
+<span class="p">$</span> kelpie --device <span class="s">"DEVICE_ID"</span> pair
+
+<span class="p">$</span> kelpie --device <span class="s">"DEVICE_ID"</span> navigate https://example.com
+<span class="p">$</span> kelpie --device <span class="s">"DEVICE_ID"</span> screenshot</pre>
+        </div>
+        <ul class="ways">
+          <li><code>.mcp</code><h3 class="h3">MCP server</h3><p>Add <code>{ "command": "kelpie", "args": ["mcp"] }</code> to Claude, Cursor or any other MCP client.</p></li>
+          <li><code>.http</code><h3 class="h3">HTTP API</h3><p>Every method is a <code>POST /v1/{method}</code> on the device, port 8420 by default.</p></li>
+          <li><code>.cli</code><h3 class="h3">Command line</h3><p>Navigate, click, fill and capture from a shell. <code>kelpie --llm-help</code> prints structured help for a model.</p></li>
+          <li><code>.lan</code><h3 class="h3">Discovery</h3><p>Each browser advertises <code>_kelpie._tcp</code> over mDNS. <code>kelpie discover</code> lists them.</p></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="control">
+    <div class="container">
+      <span class="kicker">Control</span>
+      <h2 class="h2">You decide who drives.</h2>
+      <div class="tiles">
+        <div class="tile">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#key"/></svg></span>
+          <h3 class="h3">Trust a computer once</h3>
+          <p>Programs on the same machine connect without a prompt. Another computer needs one approval on the device. The approval belongs to that computer's signing key, so a new IP address changes nothing, and you can revoke it in Settings.</p>
+        </div>
+        <div class="tile">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#home"/></svg></span>
+          <h3 class="h3">Local by default</h3>
+          <p>No account and no cloud relay. Devices find each other over mDNS and talk directly on your network. Sign in only if you want synced favourites and cookie sync.</p>
+        </div>
+        <div class="tile">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#code"/></svg></span>
+          <h3 class="h3">Open source</h3>
+          <p>Apache-2.0 on GitHub. Read the code, open an issue, or embed the browser core in your own app.</p>
+          <a class="text-link" href="https://github.com/UnlikeOtherAI/kelpie">UnlikeOtherAI/kelpie</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--blush" id="download">
+    <div class="container">
+      <span class="kicker">Download</span>
+      <h2 class="h2">Get Kelpie.</h2>
+      <p class="lede">Free and open source. Each platform is versioned on its own.</p>
+      <div class="tiles">
+        <div class="tile tile--get">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#phone"/></svg></span>
+          <h3 class="h3">iPhone and iPad</h3>
+          <p>iOS 16 or later.</p>
+          <a class="store" data-store="appStore">
+            <svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>
+            <span><small class="soon">Coming soon</small><small class="live">Download on the</small><b>App Store</b></span>
+          </a>
+          <span class="tile-meta">Until then, <a href="https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/tech-stack.md#build--run">build it from source</a>.</span>
+        </div>
+        <div class="tile tile--get">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#phone"/></svg></span>
+          <h3 class="h3">Android</h3>
+          <p>Android 9 or later.</p>
+          <a class="store" data-store="googlePlay">
+            <svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>
+            <span><small class="soon">Coming soon</small><small class="live">Get it on</small><b>Google Play</b></span>
+          </a>
+          <span class="tile-meta">Available now as a <a href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="^kelpie-android-release-.*\.apk$">signed APK</a>.</span>
+        </div>
+        <div class="tile tile--get">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#laptop"/></svg></span>
+          <h3 class="h3">Mac</h3>
+          <p>Apple Silicon, macOS 14 or later. Signed and notarized.</p>
+          <a class="btn" href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="^Kelpie-macos-.*-arm64\.zip$"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>Download<span data-version></span></a>
+        </div>
+        <div class="tile tile--get">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#monitor"/></svg></span>
+          <h3 class="h3">Windows</h3>
+          <p>64-bit Windows. Signed, with the Chromium sandbox.</p>
+          <a class="btn" href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="^kelpie-windows-x64-.*\.zip$"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>Download<span data-version></span></a>
+        </div>
+        <div class="tile tile--get">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#terminal"/></svg></span>
+          <h3 class="h3">Linux</h3>
+          <p>Packages for x86-64, with <code>apt</code> and <code>dnf</code> repositories.</p>
+          <a class="btn" href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="\.AppImage$"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>AppImage</a>
+          <span class="tile-meta">Also as <a href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="\.deb$">.deb</a>, <a href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="\.rpm$">.rpm</a> and <a href="https://github.com/UnlikeOtherAI/kelpie/releases">tar.gz</a>.</span>
+        </div>
+        <div class="tile tile--get">
+          <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#code"/></svg></span>
+          <h3 class="h3">CLI and MCP server</h3>
+          <p>Node.js 20 or later, on any desktop.</p>
+          <div class="install">
+            <code>npm i -g @unlikeotherai/kelpie</code>
+            <button class="copy" type="button" data-copy="npm install -g @unlikeotherai/kelpie" aria-label="Copy the install command">
+              <svg class="idle" aria-hidden="true"><use href="assets/icons.svg#copy"/></svg>
+              <svg class="done" aria-hidden="true"><use href="assets/icons.svg#check"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wave wave--from-blush" aria-hidden="true"><svg><use href="assets/icons.svg#wave-rise"/></svg></div>
+  <section class="band on-dark closing">
+    <div class="container">
+      <img src="assets/brand/kelpie-mark-640.webp" alt="" width="112" height="112" loading="lazy">
+      <h2 class="h2 center">Put a real browser in your agent's hands.</h2>
+      <div class="hero-actions">
+        <a class="btn btn--light" href="#download"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>Download</a>
+        <a class="btn btn--outline-light" href="https://github.com/UnlikeOtherAI/kelpie"><svg aria-hidden="true"><use href="assets/icons.svg#github"/></svg>View on GitHub</a>
+      </div>
+    </div>
+  </section>
+  <div class="wave wave--to-white" aria-hidden="true"><svg><use href="assets/icons.svg#wave-fall"/></svg></div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="./"><img src="assets/brand/kelpie-mark-192.png" alt="" width="52" height="52" loading="lazy">kelpie</a>
+        <p class="footer-note">An open-source browser for people and AI agents, made by UnlikeOtherAI.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#use-cases">Use cases</a></li>
+          <li><a href="#agents">For agents</a></li>
+          <li><a href="#connect">Get started</a></li>
+          <li><a href="#download">Download</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="https://github.com/UnlikeOtherAI/kelpie">GitHub</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs/api">API reference</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/cli.md">CLI reference</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/functionality.md">Feature catalogue</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/kelpie/issues">Report an issue</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>UnlikeOtherAI</h4>
+        <ul>
+          <li><a href="https://unlikeotherai.com/">unlikeotherai.com</a></li>
+          <li><a href="https://nessie.works/">Nessie</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/selkie">Selkie</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/AppReveal">AppReveal</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-legal">
+      <span>© 2026 UnlikeOtherAI s.r.o.</span>
+      <nav aria-label="Legal">
+        <a href="privacy/">Privacy</a>
+        <a href="https://github.com/UnlikeOtherAI/kelpie/blob/main/LICENSE">Apache-2.0 licence</a>
+      </nav>
+    </div>
   </div>
-</section>
-
-<section>
-  <h2>Quick start</h2>
-  <div class="features" style="grid-template-columns: 1fr;">
-    <div class="feature">
-      <h3>1. Install the CLI</h3>
-      <p><code>npm install -g @unlikeotherai/kelpie</code></p>
-    </div>
-    <div class="feature">
-      <h3>2. Run the app</h3>
-      <p>Build and run the iOS or Android app on a device, simulator, or emulator. It starts advertising on the network automatically.</p>
-    </div>
-    <div class="feature">
-      <h3>3. Discover devices</h3>
-      <p><code>kelpie discover</code> — lists all Kelpie instances on your network with name, platform, IP, and resolution.</p>
-    </div>
-    <div class="feature">
-      <h3>4. Control</h3>
-      <p><code>kelpie navigate --url https://example.com</code> — or connect your LLM via MCP and let it drive.</p>
-    </div>
-  </div>
-</section>
-
-<section>
-  <h2>Sister projects</h2>
-  <div class="projects">
-    <div class="project-card">
-      <h3><a href="https://github.com/UnlikeOtherAI/AppReveal">AppReveal</a></h3>
-      <p>Drop-in Swift package that turns any iOS app into an MCP-controllable agent. Exposes 44 tools: screenshot, tap, get DOM, fill forms, navigate, inspect view hierarchy. Discovered via mDNS, accessed over streamable HTTP. Used by Kelpie for debug integration and automated testing.</p>
-      <a href="https://github.com/UnlikeOtherAI/AppReveal" class="btn btn-secondary">View on GitHub</a>
-    </div>
-    <div class="project-card">
-      <h3><a href="https://github.com/UnlikeOtherAI/selkie">Selkie</a></h3>
-      <p>Zero-trust network layer for device enrollment, session brokering, NAT traversal, and self-hosted infrastructure around the wider UnlikeOtherAI ecosystem.</p>
-      <a href="https://github.com/UnlikeOtherAI/selkie" class="btn btn-secondary">View on GitHub</a>
-    </div>
-    <div class="project-card">
-      <h3><a href="https://github.com/UnlikeOtherAI/Nessie">Nessie</a></h3>
-      <p>Voice-first personal AI agent for macOS with a local orchestrator, MCP surface, native app shell, and sub-agent workflow for research and file work.</p>
-      <a href="https://github.com/UnlikeOtherAI/Nessie" class="btn btn-secondary">View on GitHub</a>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <p>Built by <a href="https://github.com/UnlikeOtherAI">UnlikeOtherAI</a></p>
 </footer>
 
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'default' });
-</script>
-<script>
-  function copyInstall() {
-    const text = document.getElementById('install-cmd').textContent;
-    navigator.clipboard.writeText(text).then(function() {
-      document.getElementById('copy-icon').style.display = 'none';
-      document.getElementById('check-icon').style.display = 'block';
-      setTimeout(function() {
-        document.getElementById('copy-icon').style.display = 'block';
-        document.getElementById('check-icon').style.display = 'none';
-      }, 2000);
-    });
-  }
-</script>
+<script src="js/links.js"></script>
+<script src="js/site.js" defer></script>
+<script src="js/wall.js" defer></script>
 </body>
 </html>
