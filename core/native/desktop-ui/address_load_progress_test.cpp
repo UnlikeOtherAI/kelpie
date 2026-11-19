@@ -13,11 +13,15 @@ int main() {
   assert(progress.Frame(start).opacity == 0);
   progress.Update(true, 0.6, false, true, start);
   assert(progress.Frame(start).extent < 0.01);
+  assert(progress.IsAnimating(start));
+  assert(!progress.IsAnimating(start + 120ms));
   assert(progress.Frame(start + 120ms).extent == 0.6);
   progress.Update(false, 1, false, true, start + 120ms);
   assert(progress.Frame(start + 240ms).extent == 1);
   assert(progress.Frame(start + 340ms).opacity == 0.5);
+  assert(progress.IsAnimating(start + 340ms));
   assert(progress.Frame(start + 440ms).opacity == 0);
+  assert(!progress.IsAnimating(start + 440ms));
 
   progress.Update(true, 0.4, true, true, start + 500ms);
   progress.Update(false, 0.4, false, true, start + 620ms);

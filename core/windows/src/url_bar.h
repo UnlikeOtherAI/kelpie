@@ -19,6 +19,7 @@ namespace kelpie::windows {
 
 // Width reserved at the left of the address surface for the lock glyph.
 inline constexpr int kLockGutterDip = 22;
+inline constexpr UINT_PTR kAddressLoadTimerId = 4;
 
 class UrlBarDelegate {
  public:
@@ -45,6 +46,7 @@ class UrlBar {
   void SetUrl(const std::wstring& url, bool force = false);
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
   void UpdateLoadProgress(bool loading, double progress, bool tab_changed);
+  void TickLoadProgress();
   void Focus();
   bool HandleCommand(WORD control_id, WORD notification_code);
   bool DrawControl(const DRAWITEMSTRUCT& item) const;

@@ -325,6 +325,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       if (GetFocus() == hwnd_) browser_view_->Focus();
       return 0;
     case WM_TIMER:
+      if (wparam == kAddressLoadTimerId) { url_bar_.TickLoadProgress(); return 0; }
       if (wparam == 2) { UpdateChromePalette(); if (!chrome_transition_.Active(GetTickCount64())) KillTimer(hwnd_, 2); return 0; }
       if (wparam == kToastTimerId) { KillTimer(hwnd_, kToastTimerId); toast_.Hide(); return 0; }
       break;

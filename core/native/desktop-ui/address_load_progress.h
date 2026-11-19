@@ -38,6 +38,12 @@ class AddressLoadProgress {
     changed_ = now;
   }
 
+  bool IsAnimating(Clock::time_point now) const {
+    if (!animate_) return false;
+    return loading_ ? from_ != target_ && now - changed_ < std::chrono::milliseconds(120)
+                    : Frame(now).opacity > 0;
+  }
+
   AddressLoadFrame Frame(Clock::time_point now) const {
     if (!animate_) return loading_ ? AddressLoadFrame{target_, 1} : AddressLoadFrame{};
     const auto elapsed = std::chrono::duration<double, std::milli>(now - changed_).count();

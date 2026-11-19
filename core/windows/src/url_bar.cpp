@@ -209,6 +209,13 @@ void UrlBar::UpdateLoadProgress(bool loading, double progress, bool tab_changed)
   BOOL animations = TRUE;
   SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations, 0);
   load_progress_.Update(loading, progress, tab_changed, animations != FALSE, now);
+  if (load_progress_.IsAnimating(now)) SetTimer(parent_, kAddressLoadTimerId, 16, nullptr);
+  TickLoadProgress();
+}
+
+void UrlBar::TickLoadProgress() {
+  const auto now = AddressLoadProgress::Clock::now();
+  if (!load_progress_.IsAnimating(now)) KillTimer(parent_, kAddressLoadTimerId);
   const auto frame = load_progress_.Frame(now);
   if (!(frame == load_frame_)) {
     load_frame_ = frame;
