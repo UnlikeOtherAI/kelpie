@@ -15,6 +15,8 @@ import { createServer } from "node:http";
 import { parseArgs } from "node:util";
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { chunkBytes } from "./chunk-bytes.mjs";
+export { chunkBytes };
 
 export const FIXTURE_MODEL = "fixture-protocol-1";
 export const STATES = ["ready", "loading", "auth", "busy", "malformed", "empty", "nodiscovery", "hang"];
@@ -91,30 +93,6 @@ function prng(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-/**
- * Cut `bytes` into pieces of 1…chunkMax bytes, always cutting inside every
- * "data:" field name and after the first byte of every multibyte UTF-8
- * sequence, so a client that decodes per chunk or matches "data:" per chunk
- * is guaranteed to break.
- */
-export function chunkBytes(bytes, chunkMax, random) {
-  const forced = new Set();
-  const marker = Buffer.from("data:");
-  for (let at = bytes.indexOf(marker); at !== -1; at = bytes.indexOf(marker, at + 1)) forced.add(at + 2);
-  for (let i = 0; i < bytes.length; i += 1) if (bytes[i] >= 0xc0) forced.add(i + 1);
-  const chunks = [];
-  let start = 0;
-  while (start < bytes.length) {
-    let end = Math.min(bytes.length, start + 1 + Math.floor(random() * chunkMax));
-    for (let i = start + 1; i < end; i += 1) {
-      if (forced.has(i)) { end = i; break; }
-    }
-    chunks.push(bytes.subarray(start, end));
-    start = end;
-  }
-  return chunks;
 }
 
 function splitText(text, size) {
