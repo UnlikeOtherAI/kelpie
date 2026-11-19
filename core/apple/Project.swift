@@ -55,7 +55,10 @@ let macResources = Target.target(
     deploymentTargets: .macOS("14.0"),
     infoPlist: .default,
     resources: [.glob(pattern: "shared/BrowserAssets.xcassets"), .glob(pattern: "shared/Resources/**"), .glob(pattern: "../native/licenses/*.txt"), .glob(pattern: "../native/resources/*")],
-    settings: .settings(base: ["PRODUCT_NAME": "KelpieBrowserResources"])
+    settings: .settings(base: [
+        "PRODUCT_NAME": "KelpieBrowserResources",
+        "OTHER_CODE_SIGN_FLAGS": .array(["$(inherited)", "--identifier", "$(PRODUCT_BUNDLE_IDENTIFIER)"])
+    ])
 )
 
 let iosResources = Target.target(

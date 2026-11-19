@@ -114,7 +114,7 @@ let kelpieApp = Target.target(
     name: "Kelpie",
     destinations: .macOS,
     product: .app,
-    bundleId: "com.kelpie.browser.macos",
+    bundleId: KelpieBrowserBuild.webKitOnly ? "com.unlikeotherai.kelpie" : "com.kelpie.browser.macos",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
     sources: [.glob("Kelpie/**/*.swift"), .glob("../updates/apple/**/*.swift")],
