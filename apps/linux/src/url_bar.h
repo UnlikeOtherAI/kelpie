@@ -32,6 +32,8 @@ class UrlBar {
   GtkWidget* entry_ = nullptr;
   bool editing_ = false;
   GtkWidget* account_button_ = nullptr;
+  GtkWidget* inspector_3d_button_ = nullptr;
+  unsigned long inspector_toggle_handler_ = 0;
   std::string avatar_;
 #if KELPIE_LINUX_HAS_GTK
   GtkListStore* completion_ = nullptr;

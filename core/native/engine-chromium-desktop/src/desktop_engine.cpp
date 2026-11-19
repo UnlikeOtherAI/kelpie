@@ -352,6 +352,7 @@ bool DesktopEngine::Shutdown() {
 
 void DesktopEngine::DoMessageLoopWork() {
   impl_->DoMessageLoopWork();
+  impl_->Update3DInspectors();
 }
 
 const std::string& DesktopEngine::last_error() const {

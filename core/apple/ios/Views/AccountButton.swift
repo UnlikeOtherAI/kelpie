@@ -23,19 +23,53 @@ struct AccountButton: View {
         .accessibilityLabel(account.profile == nil ? "Login/register" : "Account")
         .accessibilityIdentifier("browser.account")
         .confirmationDialog("Account", isPresented: $showMenu, titleVisibility: .visible) {
-            if account.signingIn {
-                Button("Cancel login", action: account.cancelSignIn)
-            } else {
-                Button("Refresh favourites", action: bookmarks.refreshAccountBookmarks)
-                Button("Sign out", role: .destructive, action: account.signOut)
-            }
+            AccountMenuActions()
         } message: {
             Text(bookmarks.syncError ?? account.profile?.name ?? account.profile?.email ?? "")
         }
-        .alert("Login", isPresented: Binding(get: { account.error != nil }, set: { if !$0 { account.error = nil } })) {
-            Button("OK") { account.error = nil }
-        } message: {
-            Text(account.error ?? "")
+    }
+}
+
+struct AccountMenuItems: View {
+    @ObservedObject private var account = UOAAccount.shared
+    @ObservedObject private var bookmarks = BookmarkStore.shared
+
+    var body: some View {
+        if account.signingIn {
+            AccountMenuActions()
+        } else if let profile = account.profile {
+            Menu {
+                if let error = bookmarks.syncError { Text(error) }
+                AccountMenuActions()
+            } label: {
+                Label {
+                    Text(profile.name ?? profile.email)
+                } icon: {
+                    if let avatar = account.avatar {
+                        Image(uiImage: avatar)
+                    } else {
+                        Image(systemName: "person.crop.circle")
+                    }
+                }
+            }
+            .accessibilityIdentifier("browser.account.menu")
+        } else {
+            Button(action: account.signIn) { Label("Login/register", systemImage: "person.crop.circle") }
+                .accessibilityIdentifier("browser.account.menu")
+        }
+    }
+}
+
+private struct AccountMenuActions: View {
+    @ObservedObject private var account = UOAAccount.shared
+    @ObservedObject private var bookmarks = BookmarkStore.shared
+
+    var body: some View {
+        if account.signingIn {
+            Button("Cancel login", action: account.cancelSignIn)
+        } else {
+            Button("Refresh favourites", action: bookmarks.refreshAccountBookmarks)
+            Button("Sign out", role: .destructive, action: account.signOut)
         }
     }
 }

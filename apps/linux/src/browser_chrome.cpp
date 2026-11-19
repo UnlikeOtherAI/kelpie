@@ -179,6 +179,7 @@ void BrowserChrome::Palette() {
 .chrome-title { background:#e5eaf3; color:#0d1731; padding:0; }
 .chrome-button { background:transparent; background-image:none; border:0; box-shadow:none; padding:0 8px; border-radius:6px; min-height:24px; min-width:0; color:inherit; }
 .chrome-button:hover { background:rgba(128,128,128,.13); }
+.chrome-button:checked { background:rgba(128,128,128,.28); }
 .chrome-button:disabled { opacity:.35; }
 .chrome-caption { color:#0d1731; border-radius:0; }
 .chrome-close:hover { background:#e81123; color:white; }

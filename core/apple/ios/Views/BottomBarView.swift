@@ -22,34 +22,42 @@ struct BottomBarView<MoreContent: View>: View {
     let onForward: () -> Void
     let onReload: () -> Void
     let onBookmarks: () -> Void
+    let is3DInspectorActive: Bool
+    let onSnapshot3D: () -> Void
     let onShowTabs: () -> Void
     @Binding var isCollapsed: Bool
     @Binding var isEditing: Bool
     @ViewBuilder let moreContent: () -> MoreContent
 
     @State private var urlText = ""
+    @ObservedObject private var account = UOAAccount.shared
+    @AppStorage("enable3DInspector", store: KelpieStorage.defaults)
+    private var is3DInspectorEnabled = FeatureFlags.is3DInspectorEnabled
     @FocusState private var addressFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var show3DInspector: Bool { is3DInspectorEnabled || is3DInspectorActive }
+
     var body: some View {
         GeometryReader { geometry in
-            let wide = geometry.size.width > 600
+            let wide = geometry.size.width >= 600
+            let toolsInToolbar = wide && UIDevice.current.userInterfaceIdiom == .pad
             let compact = isCollapsed && !isEditing
-            let showShare = geometry.size.width >= 600
             let spacing: CGFloat = wide ? 14 : 5
             let padding: CGFloat = wide ? 20 : 8
             let left = addressFocused ? padding : padding + 88 + spacing * 2
-            let right = padding + trailingWidth(wide: wide, showShare: showShare, spacing: spacing) + spacing
-            let available = max(100, geometry.size.width - left - right)
+            let right = padding + trailingWidth(wide: wide, toolsInToolbar: toolsInToolbar, spacing: spacing) + spacing
+            let available = max(0, geometry.size.width - left - right)
+            let compactWidth = min(180, max(100, available + (toolsInToolbar && show3DInspector ? 44 + spacing : 0)) * 0.85)
             ZStack {
-                expandedControls(wide: wide, showShare: showShare)
+                expandedControls(wide: wide, toolsInToolbar: toolsInToolbar)
                     .opacity(compact ? 0 : 1)
                     .allowsHitTesting(!compact)
                     .accessibilityHidden(compact)
                 // This is the same address surface in both states. Only its bounds
                 // and center move; no insertion, removal or matched-view crossfade.
-                addressField(compact: compact)
-                    .frame(width: compact ? min(180, available * 0.85) : min(available, wide ? 620 : available))
+                addressField(compact: compact, narrow: available < 105)
+                    .frame(width: compact ? compactWidth : min(available, wide ? 620 : available))
                     .position(
                         x: compact ? geometry.size.width / 2 : left + available / 2,
                         y: compact ? 17 : 31
@@ -64,6 +72,11 @@ struct BottomBarView<MoreContent: View>: View {
                 .allowsHitTesting(false)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: isCollapsed)
+        .alert("Login", isPresented: Binding(get: { account.error != nil }, set: { if !$0 { account.error = nil } })) {
+            Button("OK") { account.error = nil }
+        } message: {
+            Text(account.error ?? "")
+        }
         .onAppear { urlText = browserState.currentURL }
         .onChange(of: browserState.currentURL) { value in
             if !addressFocused { urlText = value }
@@ -81,7 +94,7 @@ struct BottomBarView<MoreContent: View>: View {
         }
     }
 
-    private func expandedControls(wide: Bool, showShare: Bool) -> some View {
+    private func expandedControls(wide: Bool, toolsInToolbar: Bool) -> some View {
         HStack(spacing: wide ? 14 : 5) {
             if !addressFocused {
                 BrowserChromeButton(symbol: "chevron.left", label: "Back", identifier: "browser.nav.back", enabled: browserState.canGoBack, action: onBack)
@@ -95,8 +108,8 @@ struct BottomBarView<MoreContent: View>: View {
                 }
                 .frame(width: 64, height: 44)
             } else {
-                AccountButton()
-                if showShare, let url = URL(string: browserState.currentURL), url.scheme != nil {
+                if toolsInToolbar { AccountButton() }
+                if wide, let url = URL(string: browserState.currentURL), url.scheme != nil {
                     ShareLink(item: url) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 19))
@@ -105,10 +118,33 @@ struct BottomBarView<MoreContent: View>: View {
                     }
                     .accessibilityLabel("Share page")
                 }
-                if wide || showShare {
+                if wide {
                     BrowserChromeButton(symbol: "book", label: "Bookmarks", identifier: "browser.bookmarks", action: onBookmarks)
                 }
+                if toolsInToolbar && show3DInspector {
+                    BrowserChromeButton(
+                        symbol: is3DInspectorActive ? "cube.fill" : "cube.transparent",
+                        label: "3D inspector",
+                        identifier: "browser.snapshot-3d.button",
+                        action: onSnapshot3D
+                    )
+                    .accessibilityValue(is3DInspectorActive ? "On" : "Off")
+                }
                 Menu {
+                    if !toolsInToolbar {
+                        AccountMenuItems()
+                        if show3DInspector {
+                            ControlGroup {
+                                Button(action: onSnapshot3D) {
+                                    Label("3D inspector", systemImage: is3DInspectorActive ? "cube.fill" : "cube.transparent")
+                                        .labelStyle(.iconOnly)
+                                }
+                                .accessibilityIdentifier("browser.snapshot-3d.menu")
+                                .accessibilityValue(is3DInspectorActive ? "On" : "Off")
+                            }
+                        }
+                        Divider()
+                    }
                     Button("Tabs (\(tabStore.tabs.count))", systemImage: "square.on.square", action: onShowTabs)
                         .accessibilityIdentifier("browser.tabs.count")
                     Button("New tab", systemImage: "plus") { tabStore.addBrowserTab() }
@@ -132,16 +168,17 @@ struct BottomBarView<MoreContent: View>: View {
         .tint(.accentColor)
     }
 
-    private func trailingWidth(wide: Bool, showShare: Bool, spacing: CGFloat) -> CGFloat {
+    private func trailingWidth(wide: Bool, toolsInToolbar: Bool, spacing: CGFloat) -> CGFloat {
         if addressFocused { return 64 }
-        let share = showShare && URL(string: browserState.currentURL)?.scheme != nil
-        let count = 2 + (wide || showShare ? 1 : 0) + (share ? 1 : 0)
+        let share = wide && URL(string: browserState.currentURL)?.scheme != nil
+        let count = 1 + (wide ? 1 : 0) + (share ? 1 : 0)
+            + (toolsInToolbar ? 1 : 0) + (toolsInToolbar && show3DInspector ? 1 : 0)
         return CGFloat(count) * 44 + CGFloat(count - 1) * spacing
     }
 
-    private func addressField(compact: Bool) -> some View {
+    private func addressField(compact: Bool, narrow: Bool) -> some View {
         HStack(spacing: compact ? 0 : 5) {
-            if !addressFocused {
+            if !addressFocused && !narrow {
                 Image(systemName: browserState.currentURL.hasPrefix("https:") ? "lock.fill" : "globe")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -174,19 +211,19 @@ struct BottomBarView<MoreContent: View>: View {
                 Button(action: onReload) {
                     Image(systemName: browserState.isLoading ? "xmark" : "arrow.clockwise")
                         .font(.system(size: 17))
-                        .frame(width: 36, height: 44)
+                        .frame(width: narrow ? 28 : 36, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(browserState.isLoading ? "Stop loading" : "Reload")
                 .accessibilityIdentifier("browser.nav.reload")
-                .frame(width: compact ? 0 : 36)
+                .frame(width: compact ? 0 : (narrow ? 28 : 36))
                 .opacity(compact ? 0 : 1)
                 .allowsHitTesting(!compact)
                 .accessibilityHidden(compact)
             }
         }
-        .padding(.leading, 12)
+        .padding(.leading, narrow && !compact ? 6 : 12)
         .padding(.trailing, compact || addressFocused ? 12 : 0)
         .frame(height: compact ? 28 : 44)
         .modifier(BrowserGlass())

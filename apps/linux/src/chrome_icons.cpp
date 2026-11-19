@@ -40,6 +40,11 @@ GtkWidget* CreateChromeIcon(const char* name) {
       circle(12,12,10);circle(12,9,3);cairo_new_sub_path(cr);cairo_arc(cr,12,20,6,3.4,6.02);
     } else if(icon=="view-more-symbolic") {
       for(int y:{5,12,19})circle(12,y,1);cairo_fill(cr);
+    } else if (icon == "inspector-cube") {
+      cairo_move_to(cr, 12, 2); cairo_line_to(cr, 21, 7); cairo_line_to(cr, 21, 17);
+      cairo_line_to(cr, 12, 22); cairo_line_to(cr, 3, 17); cairo_line_to(cr, 3, 7); cairo_close_path(cr);
+      cairo_move_to(cr, 3, 7); cairo_line_to(cr, 12, 12); cairo_line_to(cr, 21, 7);
+      line(12, 12, 12, 22);
     } else if(icon=="window-close-symbolic") {
       line(7,7,17,17);line(17,7,7,17);
     } else if(icon=="window-minimize-symbolic") {

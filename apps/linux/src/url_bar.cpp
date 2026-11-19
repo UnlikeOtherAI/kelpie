@@ -36,6 +36,22 @@ UrlBar::UrlBar(LinuxApp& app):app_(app) {
   for(auto [icon,title,index]:{std::tuple{"view-grid-symbolic","Bookmarks",0},
       {"network-workgroup-symbolic","Network inspector",1},{"document-open-recent-symbolic","History",2},
       {"avatar-default-symbolic","Login/register",3},{"view-more-symbolic","Settings",4}}) {
+    if (index == 4) {
+      inspector_3d_button_ = gtk_toggle_button_new();
+      gtk_button_set_image(GTK_BUTTON(inspector_3d_button_), ui::CreateChromeIcon("inspector-cube"));
+      gtk_widget_set_tooltip_text(inspector_3d_button_, "3D inspector");
+      atk_object_set_name(gtk_widget_get_accessible(inspector_3d_button_), "3D inspector");
+      gtk_style_context_add_class(gtk_widget_get_style_context(inspector_3d_button_), "chrome-button");
+      gtk_widget_set_valign(inspector_3d_button_, GTK_ALIGN_CENTER);
+      gtk_widget_set_size_request(inspector_3d_button_, 40, 40);
+      gtk_widget_set_sensitive(inspector_3d_button_, FALSE);
+      gtk_box_pack_start(GTK_BOX(root_), inspector_3d_button_, FALSE, FALSE, 0);
+      inspector_toggle_handler_ = g_signal_connect(inspector_3d_button_, "toggled", G_CALLBACK(+[](GtkToggleButton*, gpointer raw) {
+        auto* self = static_cast<UrlBar*>(raw);
+        self->app_.Toggle3DInspector();
+        self->Sync();
+      }), this);
+    }
     auto* item=button(icon,title); if(index==3) account_button_=item;
     g_object_set_data(G_OBJECT(item),"tool",GINT_TO_POINTER(index));
     g_signal_connect(item,"clicked",G_CALLBACK(+[](GtkButton* item,gpointer raw) {
@@ -74,6 +90,11 @@ void UrlBar::Sync() {
   if(!editing_ && url!=gtk_entry_get_text(GTK_ENTRY(entry_))) gtk_entry_set_text(GTK_ENTRY(entry_),url.c_str());
   gtk_widget_set_opacity(brand_badge_,url.starts_with("https:")?1:0);
   gtk_widget_set_sensitive(back_button_,app_.CanGoBack()); gtk_widget_set_sensitive(forward_button_,app_.CanGoForward());
+  const auto inspector = app_.Active3DInspector();
+  gtk_widget_set_sensitive(inspector_3d_button_, inspector.enabled);
+  g_signal_handler_block(inspector_3d_button_, inspector_toggle_handler_);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(inspector_3d_button_), inspector.active);
+  g_signal_handler_unblock(inspector_3d_button_, inspector_toggle_handler_);
   if(!editing_) {
     gtk_list_store_clear(completion_);
     auto history=nlohmann::json::parse(app_.HistoryJson(),nullptr,false);

@@ -168,7 +168,8 @@ On iPad specifically:
 - The settings help section can reopen the welcome card even when automatic launch presentation was previously disabled.
 - The app menu also exposes `Show Welcome Screen`, `Open Kelpie Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI` directly under `Settings`.
 - The `View` menu lists `Full Width` plus every staged phone, tablet, and laptop viewport preset that currently fits the tablet geometry.
-- More exposes the 3D inspector alongside the other browser tools.
+- At 600 points or dp and above on tablets, the icon-only 3D inspector sits immediately left of More on the expanded bottom toolbar. The account control also stays on the toolbar.
+- On phones and narrower tablet windows, the More menu holds the account control and the icon-only 3D inspector. The account entry shows the signed-in user's profile or offers login and registration.
 - More → Viewport opens the fitting device-class presets.
 - The Viewport submenu uses the shared fitting preset list, sorted by screen size, with labels such as `6.1" Compact`, `11" iPad Pro`, and `13" Laptop`.
 - When a preset is enabled, the browser renders inside a centered phone-sized stage instead of taking the full tablet width.
@@ -180,7 +181,7 @@ On iPad specifically:
 - Pinch still zooms the 3D camera on iPad in either mode.
 - Android tablets mirror the same staged viewport picker, colors, close button, summary pill, and larger navigation targets.
 - Android mirrors the same settings help actions and welcome-screen trigger behavior as iPad.
-- Android mirrors the same AI entry points, 3D inspector More-menu entry, and native 3D control strip behavior as iPad.
+- Android mirrors the same AI entry points, 3D inspector toolbar placement, and native 3D control strip behavior as iPad.
 
 ---
 

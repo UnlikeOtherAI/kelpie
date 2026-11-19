@@ -421,6 +421,13 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::ParseProtocolResult(bool 
   return {true, {}, {}, parsed, false};
 }
 
+std::optional<DesktopDevToolsSession::Result> DesktopDevToolsSession::ReadCompleted(
+    const std::shared_ptr<Operation>& operation) {
+  std::lock_guard<std::mutex> lock(operation->mutex_);
+  if (!operation->done_) return std::nullopt;
+  return operation->result_;
+}
+
 void DesktopDevToolsSession::Complete(const std::shared_ptr<Operation>& operation, Result result) {
   std::lock_guard<std::mutex> lock(operation->mutex_);
   if (operation->done_) return;
