@@ -27,6 +27,26 @@ function toKebabCase(method: string): string {
     .toLowerCase();
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
+const BROWSER_REPLY_MARGIN_MS = 5_000;
+const MAX_TIMER_MS = 2_147_483_647;
+
+function defaultRequestTimeout(method: string, body?: Record<string, unknown>): number {
+  const endpoint = toKebabCase(method);
+  if (endpoint !== "navigate" && endpoint !== "wait-for-element" && endpoint !== "wait-for-navigation") {
+    return DEFAULT_REQUEST_TIMEOUT_MS;
+  }
+  // Leave room for the device to finish polling and return its own result.
+  // Omitted timeouts can use a 10-second operation budget on the device.
+  const requested = body?.timeout;
+  const operationTimeout = typeof requested === "number" && Number.isFinite(requested)
+    ? requested
+    : DEFAULT_REQUEST_TIMEOUT_MS;
+  return Math.min(MAX_TIMER_MS, Math.max(
+    DEFAULT_REQUEST_TIMEOUT_MS, operationTimeout + BROWSER_REPLY_MARGIN_MS,
+  ));
+}
+
 function isAbortError(error: unknown): boolean {
   return (error instanceof DOMException && error.name === "AbortError") ||
     (error instanceof Error && error.name === "AbortError");
@@ -188,7 +208,7 @@ export async function sendCommand<T = unknown>(
   device: DiscoveredDevice,
   method: string,
   body?: Record<string, unknown>,
-  timeout = 10000,
+  timeout = defaultRequestTimeout(method, body),
   options: SendOptions = {},
 ): Promise<HttpResponse<T>> {
   if (device.localReadinessFile) {

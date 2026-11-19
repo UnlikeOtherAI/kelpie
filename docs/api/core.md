@@ -927,6 +927,10 @@ Response:
 
 ## Wait / Sync
 
+The JSON `timeout` is the browser's operation budget in milliseconds. The
+CLI and CLI MCP proxy use a separate HTTP request deadline so they can receive
+the browser's reply after the wait elapses.
+
 ### `waitForElement`
 Wait for an element to appear in the DOM.
 

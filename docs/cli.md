@@ -24,7 +24,7 @@ kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <ur
 | `--device <id\|name\|ip>` | Target a specific device by ID (most reliable), name, or IP |
 | `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
-| `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
+| `--timeout <ms>` | HTTP request timeout in milliseconds, usually 10000 ms. See [browser request timeouts](cli/advanced.md#browser-request-timeouts). |
 | `--port <port>` | Override default port 8420. With `--device <ip>`, targets the matching `<ip>:<port>` device before any stale same-IP entry. It is one flag wherever it sits on the line, so the commands that give it their own meaning read this same value: `browser launch` starts the app on it and `mcp --http` serves on it. |
 | `--help` | Show help for any command |
 | `--version` | Show CLI version |
@@ -250,6 +250,8 @@ kelpie browser remove claude-a
 kelpie navigate "https://example.com" --device "My iPhone"
 kelpie "https://example.com" --device "My iPhone"          # shorthand
 ```
+
+`localhost` refers to the host running the target browser.
 
 ### `kelpie back` / `kelpie forward` / `kelpie reload`
 
@@ -861,7 +863,7 @@ kelpie feedback-summary --limit 25
 
 ```bash
 kelpie wait ".results-loaded" --device "My iPhone"
-kelpie wait ".results-loaded" --device "My iPhone" --timeout 15000
+kelpie wait ".results-loaded" --device "My iPhone" --wait-timeout 15000
 kelpie wait ".spinner" --device "My iPhone" --state hidden
 ```
 
@@ -870,7 +872,7 @@ Wait for a navigation event to complete.
 
 ```bash
 kelpie wait-nav --device "My iPhone"
-kelpie wait-nav --device "My iPhone" --timeout 15000
+kelpie wait-nav --device "My iPhone" --wait-timeout 15000
 ```
 
 ---

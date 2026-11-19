@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { readFile, rm } from "node:fs/promises";
 import { createMcpServer, formatBrowserToolResult } from "../../src/mcp/server.js";
 import { addDevice, clearDevices, getDevice, getAllDevices } from "../../src/discovery/registry.js";
@@ -32,6 +34,41 @@ describe("createMcpServer", () => {
   it("registers exactly the shared browser and CLI catalogues", () => {
     expect(browserTools.map((tool) => tool.name)).toEqual([...BrowserMcpTools]);
     expect(cliTools.map((tool) => tool.name)).toEqual([...CliMcpTools]);
+  });
+
+  it("lets the device report a selector wait timeout beyond the usual HTTP deadline", async () => {
+    const deviceTimeout = { success: false, error: { code: "TIMEOUT", message: "Element did not appear" } };
+    vi.useFakeTimers();
+    const fetchStarted = new Promise<void>((started) => {
+      vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+        started();
+        await new Promise<void>((resolve) => setTimeout(resolve, 20_100));
+        init.signal?.throwIfAborted();
+        return Response.json(deviceTimeout);
+      }));
+    });
+    const server = createMcpServer(makeDevice({ localControlToken: "fixture-token" }));
+    const client = new Client({ name: "wait-timeout-test", version: "1" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      const result = client.callTool({
+        name: "kelpie_extension",
+        arguments: { name: "kelpie_wait_for_element", arguments: { selector: "#late", timeout: 20_000 } },
+      });
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(20_100);
+      expect(await result).toMatchObject({
+        isError: true,
+        content: [{ type: "text", text: JSON.stringify(deviceTimeout) }],
+      });
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+      await client.close();
+      await server.close();
+    }
   });
 });
 
