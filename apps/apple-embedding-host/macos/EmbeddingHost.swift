@@ -16,7 +16,8 @@ struct EmbeddingHost: App {
 /// control service on that port, so a development build can be driven beside
 /// an installed Kelpie on 8420. `--downloads-directory <path>` saves its
 /// downloads there instead of the Downloads folder, which macOS guards with a
-/// one-time consent prompt. Without the flags, local control stays off.
+/// one-time consent prompt. `--control-second-window` opens a second browser
+/// window for cross-window routing checks. Without a port, local control stays off.
 @MainActor
 private final class ControlledLaunch: NSObject, NSApplicationDelegate {
     private var session: KelpieBrowserSession?
@@ -39,6 +40,7 @@ private final class ControlledLaunch: NSObject, NSApplicationDelegate {
         )
         session.start()
         session.openWindow()
+        if arguments.contains("--control-second-window") { session.openWindow() }
         self.session = session
     }
 }

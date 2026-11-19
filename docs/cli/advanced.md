@@ -44,6 +44,12 @@ controls how long the browser waits for the selector or load. The CLI allows
 that duration plus 5000 ms for the reply, with a minimum of 10000 ms. An
 explicit `--timeout` sets the CLI's HTTP deadline.
 
+Loopback page URLs such as `http://localhost:5455/` resolve where the browser
+runs. If the server runs on a different computer, have it listen on a network
+interface and use that computer's LAN address in the URL. Apple WebKit
+reports a captured connection failure as `NAVIGATION_ERROR`, including when
+you check the failed load with `kelpie wait-nav`.
+
 The CLI MCP server similarly allows 15000 ms for `kelpie_navigate`. For
 `kelpie_wait_for_element` and `kelpie_wait_for_navigation`, it allows the
 operation's `timeout` plus 5000 ms, with a minimum of 10000 ms. When a wait

@@ -27,7 +27,7 @@ Response:
 }
 ```
 
-`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, macOS, and Windows. When the wait elapses without the load completing, iOS and Windows return a `TIMEOUT` error; a captured navigation failure (e.g. DNS error) returns `NAVIGATION_ERROR`.
+`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, macOS, and Windows. An unfinished load can return `TIMEOUT`. A captured navigation failure (e.g. a DNS error) returns `NAVIGATION_ERROR`. Apple WebKit and Android add loopback guidance for connection failures to a server on the browser device. Apple WebKit also reports when it requires HTTPS.
 
 ### `back`
 Go back in browser history.
@@ -289,7 +289,10 @@ Capture a screenshot of the current viewport. When `fullPage: true`, captures th
 
 All three platforms now use scroll-and-stitch and may show minor seam artifacts on pages with sticky/animated elements; the full-page response adds a `contentHeight` field and a page-relative `imageScaleY` so image pixels map back to CSS coordinates across the whole page.
 
-On macOS, screenshot capture returns `RENDERER_HIDDEN` if the page reports that it is hidden, even if the tab is selected. Bring the window into view, select the tab and retry the capture.
+On macOS, screenshot capture returns `RENDERER_HIDDEN` if AppKit reports
+that the renderer surface is hidden or the page reports hidden visibility.
+The error also applies to selected tabs in fully covered windows. The response
+contains no image. Bring the window into view, select the tab and retry.
 
 > **CLI/MCP note:** The HTTP API always returns base64. The CLI wraps this — it auto-saves to a file and returns the file path instead, so LLMs never handle raw base64 in conversation. The CLI MCP server also saves `resolution: "native"` screenshots to a temp file and returns compact metadata plus a file resource link, preventing large native images from being streamed as tool text. See [cli.md](../cli.md) for `--output` and `--base64` flags.
 
@@ -964,11 +967,9 @@ Response:
 ```
 
 ### `waitForNavigation`
-Wait for an already-started navigation to complete. `navigate` reports that
-the request was accepted; it does not claim the destination has loaded. This
-method returns a navigation error when the selected tab is not loading, which
-prevents an old `document.readyState === "complete"` from being reported as a
-new navigation.
+Wait for an already-started navigation to complete. On Apple WebKit and
+Android, a load with a recorded failure returns `NAVIGATION_ERROR`. The next
+navigation clears the failure for that tab.
 
 ```json
 POST /v1/wait-for-navigation

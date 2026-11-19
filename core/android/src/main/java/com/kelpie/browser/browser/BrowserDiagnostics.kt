@@ -14,6 +14,9 @@ class BrowserDiagnostics {
 
     internal var documentResponse: DocumentResponse? = null
 
+    @Volatile
+    internal var navigationError: String? = null
+
     @Synchronized
     fun recordConsole(message: Map<String, Any?>) {
         console.addLast(message)

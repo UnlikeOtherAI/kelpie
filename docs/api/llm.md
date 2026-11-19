@@ -138,7 +138,9 @@ These methods are designed for multi-device scenarios. On a single device they w
 ### `findElement`
 Search for an element and return detailed info about whether and where it was found.
 
-The returned `element.selector` is intended to be reusable as-is with the core interaction endpoints.
+Pass the returned selector as-is to `click` or `fill` with the same `tabId` and document.
+When an ID is shared by several elements in that document, Kelpie uses a more specific CSS path.
+An unsuccessful search returns `found: false` as a successful query.
 
 ```json
 POST /v1/find-element
@@ -150,6 +152,7 @@ POST /v1/find-element
 
 Response:
 {
+  "success": true,
   "found": true,
   "element": {
     "tag": "button",

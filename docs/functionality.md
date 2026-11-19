@@ -78,10 +78,11 @@ prohibit simultaneous app instances, and the CLI no longer requests a new one.
 
 ## Device Discovery
 
-CLI and MCP discovery report the mDNS service, timeout, and whether the scan
-could run. An empty result gives a direct-address hint. Discovery never starts
-pairing. An exact `host:port` works independently of mDNS, and connection errors
-name the socket tried.
+CLI and MCP discovery send mDNS queries on each local IPv4 interface and report
+the service, timeout, interface addresses and any socket errors. An empty result
+gives a direct-address hint. Discovery never starts pairing. An exact `host:port`
+works independently of mDNS, and connection errors name the socket tried.
+Listeners that share a device ID remain visible at their respective ports.
 
 Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension. On Android, a foreground-service notification ("Kelpie is reachable") keeps the server alive in the background; tapping it brings the running browser back without restarting it, so open tabs, pending pairing prompts and just-approved tokens survive.
 
@@ -111,6 +112,11 @@ and owner-only file permissions on POSIX systems; Windows uses the current user'
 protected profile directory. It never prints or sends the private key. Losing or
 replacing this file creates a new computer identity that needs approval again.
 Copying the private key to another machine also copies its authority.
+
+Set `KELPIE_HOME` to use a separate directory for browser aliases, the CLI
+client ID, pairing tokens and the signing key. A CLI command that names a tab
+can use an existing approval. Starting a new pairing for that command requires
+an explicit browser target, including for screenshots and tab cookie stores.
 
 **Pairing protocol.** `POST /v1/pair` first obtains a random, expiring challenge.
 The CLI signs it together with its public key, then submits the proof. Kelpie
@@ -189,6 +195,12 @@ When an iPhone or iPad running Kelpie connects to an Apple TV via AirPlay, the a
 
 Capture viewport or full-page screenshots on demand in PNG or JPEG. Full-page mode now works across iOS, Android, and macOS, each using its renderer's native mechanism: iOS takes an unclipped `WKWebView` snapshot of the full content, Android paints the whole document into a full-height bitmap via `WebView.draw`, and macOS scrolls-and-stitches the page viewport-by-viewport (covering both the WebKit and Chromium renderers). Quality is adjustable for JPEG. Screenshot responses now include explicit viewport-mapping metadata: viewport width and height, device pixel ratio, and computed image-to-viewport scale factors. That makes the coordinate space visible to LLMs instead of forcing them to guess from image size alone.
 
+On macOS, WebKit and Chromium can pause animation frames and WebGL painting
+while the selected tab's window is fully covered. Tab listings report native
+`rendererVisibility` alongside selection. HTTP and direct MCP screenshots
+return `RENDERER_HIDDEN` without an image while rendering is hidden. Bring
+the browser window into view to resume rendering and capture a new frame.
+
 Android viewport screenshots wait for the tab to render and capture only the
 WebView. With hardware acceleration on Android 10 or later, they include
 hardware-rendered page content such as WebGL. Hidden tabs return a screenshot
@@ -205,6 +217,10 @@ Take a screenshot with numbered labels overlaid on every interactive element (bu
 Full read access to the page DOM. Query elements by CSS selector, get their text, attributes, bounding boxes, and visibility. Retrieve the full DOM tree from any root element with configurable depth. All queries return structured data, not raw HTML.
 
 ## Element Interaction
+
+Semantic find commands return CSS selectors for the observed tab's current document.
+Reuse the same `tabId` for the follow-up action. When several elements share an ID,
+Kelpie resolves the selector against the observed element before returning it.
 
 Click elements by selector or tap at specific coordinates. Fill form inputs, type text character-by-character (simulating human typing with per-character delays), select dropdown options, check/uncheck checkboxes. Every interaction shows a blue touch indicator animation on the device so you can see what happened.
 
@@ -232,7 +248,7 @@ Scroll by pixel deltas, scroll a specific element into view (with configurable a
 
 ## Wait and Synchronisation
 
-Wait for an element to appear, become visible, or disappear, or for page navigation to complete. The CLI and its MCP server allow extra time for the browser to report the outcome of a wait.
+Wait for an element to appear, become visible, or disappear, or for page navigation to complete. The CLI and its MCP server allow extra time for the browser to report the outcome of a wait. On Apple WebKit and Android, waiting for a failed navigation returns the load error. Loopback connection failures explain that the address belongs to the device running the browser.
 
 ## JavaScript Evaluation
 

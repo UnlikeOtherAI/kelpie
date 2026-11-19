@@ -31,21 +31,27 @@ class NavigationHandler(
             return errorResponse("INVALID_URL", "Missing or invalid URL")
         }
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        ctx.lastNavigationError = null
+        val diagnostics = ctx.diagnosticsFor(wv)
         // A same-URL reload must replace the document before a subsequent snapshot can be trusted.
         val marker = "__kelpie_navigation_${UUID.randomUUID().toString().replace("-", "")}"
         val previousUrl = ctx.evaluateJSReturningJSON("(window['$marker'] = true, {url: location.href})")["url"] as? String
         val stateScript = "({url: location.href, title: document.title, readyState: document.readyState, sameDocument: window['$marker'] === true})"
-        mainHandler.post { if (mayNavigate()) wv.loadUrl(url) }
+        mainHandler.post {
+            if (mayNavigate()) {
+                diagnostics?.navigationError = null
+                wv.loadUrl(url)
+            }
+        }
         // Wait for page to start loading then finish
         delay(100)
         val timeout = (body["timeout"] as? Int) ?: 10000
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeout) {
-            ctx.lastNavigationError?.let { err ->
+            diagnostics?.navigationError?.let { err ->
                 return errorResponse("NAVIGATION_ERROR", err)
             }
             val result = navigationState(stateScript)
+            diagnostics?.navigationError?.let { return errorResponse("NAVIGATION_ERROR", it) }
             if (hasLoaded(result, url, previousUrl)) {
                 return successResponse(
                     mapOf(
@@ -60,6 +66,7 @@ class NavigationHandler(
         // Timeout reached. If the requested page is actually fully loaded, allow
         // success; otherwise return the last captured navigation error.
         val finalState = navigationState(stateScript)
+        diagnostics?.navigationError?.let { return errorResponse("NAVIGATION_ERROR", it) }
         val finalUrl = finalState["url"] as? String
         if (hasLoaded(finalState, url, previousUrl)) {
             return successResponse(
@@ -69,10 +76,6 @@ class NavigationHandler(
                     "loadTime" to timeout,
                 ),
             )
-        }
-        val captured = ctx.lastNavigationError
-        if (captured != null) {
-            return errorResponse("NAVIGATION_ERROR", captured)
         }
         return errorResponse("TIMEOUT", "Navigation did not complete within ${timeout}ms")
     }

@@ -170,7 +170,7 @@ class LLMHandler(
                 "selector:kelpieBuildSelector(best)," +
                 "rect:{x:b.x,y:b.y,width:b.width,height:b.height}}};})()"
         return try {
-            ctx.evaluateJSReturningJSON(js)
+            successResponse(ctx.evaluateJSReturningJSON(js))
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
@@ -190,7 +190,7 @@ class LLMHandler(
                 "selector:kelpieBuildSelector(el)," +
                 "rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()"
         return try {
-            ctx.evaluateJSReturningJSON(js)
+            successResponse(ctx.evaluateJSReturningJSON(js))
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }

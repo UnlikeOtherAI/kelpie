@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "inspection_scripts.h"
+#include "kelpie/element_selector_script.h"
 
 namespace kelpie {
 namespace {
@@ -54,7 +55,7 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
         return InvalidParams("find-input requires label, placeholder, or name");
       }
       selector = selector.empty() ? std::string(default_selector) : selector;
-      const std::string script = R"JS((() => {
+      const std::string script = "(() => {" + ElementSelectorBuilderScript() + R"JS(
         const label = )JS" + JsStringLiteral(input_label) + R"JS(;
         const placeholder = )JS" + JsStringLiteral(placeholder) + R"JS(;
         const name = )JS" + JsStringLiteral(name) + R"JS(;
@@ -64,9 +65,7 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
           (!label || (node.labels && Array.from(node.labels).some((item) => (item.innerText || "").includes(label)))) &&
           (!placeholder || node.getAttribute("placeholder") === placeholder) &&
           (!name || node.getAttribute("name") === name));
-      const selectorFor = (node) => node.id ? `#${CSS.escape(node.id)}` :
-          (() => { const segments=[]; for(let current=node; current && current.nodeType===Node.ELEMENT_NODE && current!==document.body; current=current.parentElement) { const tag=current.tagName.toLowerCase(); const siblings=Array.from(current.parentElement?.children || []).filter((sibling) => sibling.tagName===current.tagName); segments.unshift(siblings.length>1 ? `${tag}:nth-of-type(${siblings.indexOf(current)+1})` : tag); } return segments.length ? `body > ${segments.join(" > ")}` : "body"; })();
-        return element ? {found: true, selector: selectorFor(element), tag: element.tagName.toLowerCase(),
+        return element ? {found: true, selector: kelpieBuildSelector(element), tag: element.tagName.toLowerCase(),
           text: element.getAttribute("aria-label") || element.getAttribute("placeholder") || ""} : {found: false};
       })())JS";
       nlohmann::json value;
@@ -75,24 +74,10 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
     }
     text = RequireString(params, "text");
     selector = selector.empty() ? std::string(default_selector) : selector;
-    const std::string script = R"JS((() => {
+    const std::string script = "(() => {" + ElementSelectorBuilderScript() + R"JS(
       const text = )JS" + JsStringLiteral(text) + R"JS(;
       const selector = )JS" + JsStringLiteral(selector) + R"JS(;
       const role = )JS" + JsStringLiteral(role) + R"JS(;
-      const selectorFor = (element) => {
-        if (element === document.documentElement) return "html";
-        if (element === document.body) return "body";
-        if (element.id) return `#${CSS.escape(element.id)}`;
-        const segments = [];
-        for (let node = element; node && node.nodeType === Node.ELEMENT_NODE && node !== document.body;
-             node = node.parentElement) {
-          const tag = node.tagName.toLowerCase();
-          const siblings = Array.from(node.parentElement?.children || [])
-            .filter((sibling) => sibling.tagName === node.tagName);
-          segments.unshift(siblings.length > 1 ? `${tag}:nth-of-type(${siblings.indexOf(node) + 1})` : tag);
-        }
-        return segments.length ? `body > ${segments.join(" > ")}` : "body";
-      };
       const element = Array.from(document.querySelectorAll(selector)).find((node) => {
         const inferredRole = node.getAttribute("role") || ({button:"button", a:"link", input:"textbox", textarea:"textbox", select:"combobox"}[node.tagName.toLowerCase()] || "");
         const ownText = Array.from(node.childNodes).filter((child) => child.nodeType === Node.TEXT_NODE)
@@ -100,7 +85,7 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
         const content = ownText || node.getAttribute("aria-label") || node.value || "";
         return (!role || inferredRole === role) && content.includes(text);
       });
-      return element ? {found: true, selector: selectorFor(element), tag: element.tagName.toLowerCase(),
+      return element ? {found: true, selector: kelpieBuildSelector(element), tag: element.tagName.toLowerCase(),
         text: (element.innerText || element.value || "").trim()} : {found: false};
     })())JS";
     nlohmann::json value;

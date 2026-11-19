@@ -153,17 +153,25 @@ final class HandlerContext {
     }
 
     func takeSnapshot(tabId: String?) async throws -> NSImage {
-        let target = try resolveRenderer(tabId: tabId)
+        let target = try resolveVisibleRenderer(tabId: tabId)
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
-        // AppKit may occlude the selected tab without detaching its view.
-        // Snapshot APIs can still return the last painted frame in that state.
+        // Check AppKit as well as the page because engine visibility changes
+        // arrive asynchronously. The capture API can return the last painted frame.
         if try await target.evaluateJS("document.visibilityState") as? String == "hidden" {
             throw HandlerError.rendererHidden
         }
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        guard target.isSurfaceVisible else { throw HandlerError.rendererHidden }
         let result = try await target.takeSnapshot()
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        guard target.isSurfaceVisible else { throw HandlerError.rendererHidden }
         return result
+    }
+
+    func resolveVisibleRenderer(tabId: String?) throws -> any RendererEngine {
+        let renderer = try resolveRenderer(tabId: tabId)
+        guard renderer.isSurfaceVisible else { throw HandlerError.rendererHidden }
+        return renderer
     }
 
     func showTouchIndicator(

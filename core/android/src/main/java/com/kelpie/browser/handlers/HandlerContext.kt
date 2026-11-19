@@ -3,6 +3,7 @@ package com.kelpie.browser.handlers
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
+import com.kelpie.browser.browser.BrowserDiagnostics
 import com.kelpie.browser.browser.DialogState
 import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.TabStore
@@ -62,9 +63,12 @@ class HandlerContext(
     var aiManager: AiManager? = null
     val dialogState = DialogState()
 
-    /** Most recent WebView navigation error (cleared on each new navigation). */
-    @Volatile
-    var lastNavigationError: String? = null
+    internal fun diagnosticsFor(view: WebView): BrowserDiagnostics? =
+        tabStore
+            ?.tabs
+            ?.value
+            ?.firstOrNull { it.webView === view }
+            ?.diagnostics
 
     private val _activePanel = MutableStateFlow<String?>(null)
     private val _isIn3DInspector = MutableStateFlow(false)

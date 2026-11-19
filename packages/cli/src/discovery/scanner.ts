@@ -1,11 +1,12 @@
 import bonjourService from "bonjour-service";
+import { networkInterfaces } from "node:os";
 import {
   MDNS_SERVICE_TYPE,
   type MdnsTxtRecord,
   type Platform,
   type RuntimeMode,
 } from "@unlikeotherai/kelpie-shared";
-import type { DiscoveredDevice } from "../types.js";
+import { discoveredDeviceKey, type DiscoveredDevice } from "../types.js";
 
 const platforms: readonly Platform[] = ["ios", "android", "macos", "linux", "windows"];
 interface BonjourServiceRecord {
@@ -17,11 +18,11 @@ interface BonjourServiceRecord {
 }
 
 interface BonjourBrowser {
-  on(event: "up", listener: (service: BonjourServiceRecord) => void): void;
+  on(event: "up" | "txt-update", listener: (service: BonjourServiceRecord) => void): void;
   stop(): void;
   /** Bonjour's browse transport; the public callback only covers replies sent by publishers. */
   mdns: {
-    on(event: "error", listener: (error: Error) => void): void;
+    on(event: "error" | "warning", listener: (error: NodeJS.ErrnoException) => void): void;
     query(name: string, type: "PTR", callback: (error?: Error) => void): void;
   };
 }
@@ -31,7 +32,7 @@ interface BonjourClient {
   destroy(): void;
 }
 
-type BonjourConstructor = new () => BonjourClient;
+type BonjourConstructor = new (options: { interface: string; bind: string }) => BonjourClient;
 type BonjourModule = BonjourConstructor | { Bonjour?: BonjourConstructor; default?: BonjourConstructor };
 
 function parsePlatform(value: string | undefined): Platform {
@@ -47,23 +48,52 @@ function parseRuntimeMode(value: string | undefined): RuntimeMode | undefined {
   return undefined;
 }
 
-export async function scanForDevices(
-  duration = 3000,
-): Promise<DiscoveredDevice[]> {
-  const bonjour = createBonjour();
-  const devices: DiscoveredDevice[] = [];
-  const seen = new Set<string>();
+export interface MdnsInterface {
+  address: string;
+  error?: string;
+}
 
-  return new Promise((resolve, reject) => {
+export async function scanForDevices(duration = 3000): Promise<{
+  devices: DiscoveredDevice[];
+  interfaces: MdnsInterface[];
+}> {
+  // Joining every interface does not select the outgoing route. A wildcard
+  // send can follow a VPN or virtual adapter even when the LAN is reachable.
+  const addresses = new Set(Object.values(networkInterfaces()).flatMap((entries) =>
+    (entries ?? []).filter((entry) => entry.family === "IPv4" && !entry.internal).map((entry) => entry.address),
+  ));
+  if (!addresses.size) addresses.add("127.0.0.1");
+
+  const devices = new Map<string, DiscoveredDevice>();
+  const interfaces = await Promise.all([...addresses].map(async (address): Promise<MdnsInterface> => {
+    try {
+      await browseInterface(address, duration, (device) => {
+        const key = discoveredDeviceKey(device);
+        if (!devices.has(key)) devices.set(key, device);
+      });
+      return { address };
+    } catch (error) {
+      const failure = error as NodeJS.ErrnoException | undefined;
+      return { address, error: failure?.code ?? failure?.message ?? "Unknown mDNS error" };
+    }
+  }));
+  return { devices: [...devices.values()], interfaces };
+}
+
+function browseInterface(address: string, duration: number, onDevice: (device: DiscoveredDevice) => void): Promise<void> {
+  const bonjour = createBonjour(address);
+  return new Promise<void>((resolve, reject) => {
     const browser = bonjour.find({ type: MDNS_SERVICE_TYPE.slice(1, -5) });
-
-    browser.on("up", (service) => {
+    let answered = false;
+    const onService = (service: BonjourServiceRecord): void => {
       const device = parseService(service);
-      if (device && !seen.has(device.id)) {
-        seen.add(device.id);
-        devices.push(device);
+      if (device) {
+        answered = true;
+        onDevice(device);
       }
-    });
+    };
+    browser.on("up", onService);
+    browser.on("txt-update", onService);
 
     let finished = false;
     const finish = (error?: Error): void => {
@@ -73,11 +103,11 @@ export async function scanForDevices(
       clearTimeout(deadline);
       browser.stop();
       bonjour.destroy();
-      if (error && devices.length === 0) reject(error);
-      else resolve(devices);
+      if (error) reject(error);
+      else resolve();
     };
     const retry = setTimeout(() => {
-      if (devices.length === 0) {
+      if (!answered) {
         browser.mdns.query(`${MDNS_SERVICE_TYPE}.local`, "PTR", (error) => {
           if (error) finish(error);
         });
@@ -85,20 +115,31 @@ export async function scanForDevices(
     }, duration / 2);
     const deadline = setTimeout(finish, duration);
     browser.mdns.on("error", finish);
+    browser.mdns.on("warning", (error) => {
+      if (error.syscall === "addMembership" || error.syscall === "setMulticastInterface") {
+        // The transport is still configuring the socket in its listening callback.
+        queueMicrotask(() => { finish(error); });
+      }
+    });
   });
 }
 
-function createBonjour(): BonjourClient {
+function createBonjour(address: string): BonjourClient {
   const module = bonjourService as unknown as BonjourModule;
   const Bonjour = typeof module === "function" ? module : module.Bonjour ?? module.default;
   if (!Bonjour) {
     throw new TypeError("bonjour-service did not expose a Bonjour constructor");
   }
-  return new Bonjour();
+  // Bind to all local addresses to receive multicast, but join and send on
+  // this interface only. Binding to its unicast address can discard replies.
+  return new Bonjour({ interface: address, bind: "0.0.0.0" });
 }
 
 /** Prefer IPv4, then global IPv6, then link-local IPv6 as last resort. */
 function pickAddress(addresses: string[], fallback?: string): string | undefined {
+  // When the sender is one of the advertised addresses, use the interface
+  // that answered. Bonjour can include addresses from other links too.
+  if (fallback && !fallback.includes(":") && addresses.includes(fallback)) return fallback;
   const all = fallback ? [...addresses, fallback] : addresses;
   const ipv4 = all.find((a) => !a.includes(":"));
   if (ipv4) return ipv4;

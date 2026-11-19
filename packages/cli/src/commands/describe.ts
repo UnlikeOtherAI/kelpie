@@ -64,7 +64,7 @@ export function defaultDescribeDeps(cliVersion: string): DescribeDeps {
   return {
     cliVersion,
     cliPath: answeringBinaryPath(),
-    scan: (timeoutMs) => scanForDevices(timeoutMs),
+    scan: async (timeoutMs) => (await scanForDevices(timeoutMs)).devices,
     probeLocal: () => probeLocalDevices(),
     isPaired: defaultIsPaired,
     listTools: () => listWireCatalog(),

@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
-import type { DiscoveredDevice } from "../types.js";
+import { discoveredDeviceKey, type DiscoveredDevice } from "../types.js";
 import { loadBrowserStore } from "../browser/store.js";
 import { discoverDevices } from "./discover.js";
 
@@ -27,15 +27,15 @@ function isExpired(device: DiscoveredDevice, now: number): boolean {
 }
 
 function evictExpired(now: number = Date.now()): void {
-  for (const [id, device] of devices) {
+  for (const [key, device] of devices) {
     if (isExpired(device, now)) {
-      devices.delete(id);
+      devices.delete(key);
     }
   }
 }
 
 export function addDevice(device: DiscoveredDevice): void {
-  devices.set(device.id, device);
+  devices.set(discoveredDeviceKey(device), device);
 }
 
 export function addDevices(list: DiscoveredDevice[]): void {
@@ -43,7 +43,9 @@ export function addDevices(list: DiscoveredDevice[]): void {
 }
 
 export function removeDevice(id: string): void {
-  devices.delete(id);
+  for (const [key, device] of devices) {
+    if (device.id === id) devices.delete(key);
+  }
 }
 
 export function getAllDevices(): DiscoveredDevice[] {
@@ -76,25 +78,23 @@ export async function getDevice(
 
   const all = await refreshDevicesIfEmpty();
   if (address) return resolveAddress(address, all);
-  if (!query) return all.length === 1 ? all[0] : undefined;
+  if (!query) return onlyDevice(all);
 
-  const byId = devices.get(query);
-  if (byId) return byId;
+  const byId = all.filter((device) => device.id === query);
+  if (byId.length > 0) return onlyDevice(byId);
 
   const browserAlias = await getBrowserAliasDevice(query);
   if (browserAlias) return browserAlias;
 
   const lowerQuery = query.toLowerCase();
 
-  const byNameExact = all.find((d) => d.name.toLowerCase() === lowerQuery);
-  if (byNameExact) return byNameExact;
+  const byNameExact = all.filter((d) => d.name.toLowerCase() === lowerQuery);
+  if (byNameExact.length > 0) return onlyDevice(byNameExact);
+  return onlyDevice(all.filter((d) => d.name.toLowerCase().includes(lowerQuery)));
+}
 
-  const byNameFuzzy = all.find((d) =>
-    d.name.toLowerCase().includes(lowerQuery),
-  );
-  if (byNameFuzzy) return byNameFuzzy;
-
-  return undefined;
+function onlyDevice(matches: DiscoveredDevice[]): DiscoveredDevice | undefined {
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | undefined> {
@@ -136,11 +136,12 @@ function parseAddressQuery(query: string, preferredPort?: number): AddressQuery 
   return { host, port, explicitPort: typedPort !== undefined || preferredPort !== undefined };
 }
 
-function resolveAddress(address: AddressQuery, known: DiscoveredDevice[]): DiscoveredDevice {
+function resolveAddress(address: AddressQuery, known: DiscoveredDevice[]): DiscoveredDevice | undefined {
   const { host, port, explicitPort } = address;
   const matches = known.filter((device) => device.ip.toLowerCase() === host);
-  const match = matches.find((device) => device.port === port) ?? (explicitPort ? undefined : matches[0]);
+  const match = matches.find((device) => device.port === port) ?? (explicitPort ? undefined : onlyDevice(matches));
   if (match) return { ...match, explicitAddress: true };
+  if (!explicitPort && matches.length > 1) return undefined;
   const label = `${host.includes(":") ? `[${host}]` : host}:${port}`;
   return {
     id: `direct:${host}:${port}`,

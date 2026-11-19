@@ -52,6 +52,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         defer { window.isHidden = true }
         #endif
         InteractionHandler(context: context).register(on: router)
+        LLMHandler(context: context).register(on: router)
         ScreenshotHandler(context: context).register(on: router)
         EvaluateHandler(context: context).register(on: router)
         router.register("get-tabs") { _ in successResponse(["tabs": [["id": tabId, "active": true, "title": "Isolated fixture", "url": "https://fixture.test"]]]) }
@@ -122,7 +123,37 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         XCTAssertTrue(recovered, "The actual late callback releases the lease without restarting")
         let delayedActivations = try await webView.evaluateJavaScript("window.delayedActivations")
         XCTAssertEqual(delayedActivations as? Int, 1)
+        try await verifySemanticSelectorRoundTrip(router, webView: webView, tabId: tabId)
         try await verifyPublicTapMarker(router, webView: webView, tabId: tabId)
+    }
+
+    private func verifySemanticSelectorRoundTrip(_ router: Router, webView: WKWebView, tabId: String) async throws {
+        _ = try await webView.evaluateJavaScript("""
+        document.body.innerHTML = `
+            <section id="panel"><button id="2:entry" onclick="window.decoyHits++">Other action</button></section>
+            <section id="panel"><button id="2:entry" onclick="window.targetHits++">Sign in</button></section>
+        `;
+        window.targetHits = window.decoyHits = 0;
+        """)
+
+        func call(_ name: String, arguments: [String: Any]) async throws -> [String: Any] {
+            let response = await router.browserMCP([
+                "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": ["name": name, "arguments": arguments]
+            ])
+            let result = try XCTUnwrap(response["result"] as? [String: Any])
+            let content = try XCTUnwrap(result["content"] as? [[String: Any]])
+            let text = try XCTUnwrap(content.first?["text"] as? String)
+            let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+            XCTAssertEqual(envelope["ok"] as? Bool, true, text)
+            return try XCTUnwrap(envelope["value"] as? [String: Any])
+        }
+
+        let found = try await call("kelpie_find_element", arguments: ["text": "Sign in", "tabId": tabId])
+        let element = try XCTUnwrap(found["element"] as? [String: Any])
+        let selector = try XCTUnwrap(element["selector"] as? String)
+        _ = try await call("kelpie_click", arguments: ["selector": selector, "tabId": tabId])
+        let hits = try await webView.evaluateJavaScript("[window.targetHits, window.decoyHits]")
+        XCTAssertEqual(hits as? [Int], [1, 0])
     }
 
     private func verifyPublicTapMarker(_ router: Router, webView: WKWebView, tabId: String) async throws {

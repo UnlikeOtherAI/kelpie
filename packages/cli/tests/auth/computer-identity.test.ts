@@ -5,10 +5,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { computerIdentity } from "../../src/auth/computer-identity.js";
 import { pair } from "../../src/auth/pairing.js";
+import { TokenStore } from "../../src/auth/token-store.js";
 
 const directories: string[] = [];
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   await Promise.all(directories.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
@@ -19,6 +21,24 @@ async function directory() {
 }
 
 describe("computer identity", () => {
+  it("isolates default signing keys, client IDs, and approvals under KELPIE_HOME", async () => {
+    const trusted = await directory();
+    vi.stubEnv("KELPIE_HOME", trusted);
+    const firstKey = (await computerIdentity()).publicKey;
+    const trustedStore = new TokenStore();
+    const firstClient = await trustedStore.clientId();
+    await trustedStore.set("test", "192.0.2.2", 8420, "fixture-token");
+
+    const fresh = await directory();
+    vi.stubEnv("KELPIE_HOME", fresh);
+    const freshStore = new TokenStore();
+    expect((await computerIdentity()).publicKey).not.toBe(firstKey);
+    expect(await freshStore.clientId()).not.toBe(firstClient);
+    expect(await freshStore.get("test", "192.0.2.2", 8420)).toBeUndefined();
+    expect(await trustedStore.get("test", "192.0.2.2", 8420)).toBe("fixture-token");
+    await expect(fs.access(join(fresh, "computer-key.pem"))).resolves.toBeUndefined();
+  });
+
   it("shares one complete key across concurrent writers and subsequent loads", async () => {
     const dir = await directory();
     const identities = await Promise.all(Array.from({ length: 16 }, () => computerIdentity(dir)));

@@ -12,9 +12,10 @@
 namespace kelpie {
 namespace {
 using json = nlohmann::json;
-json Failure(const std::string& code, bool uncertain = false) {
+json Failure(const std::string& code, bool uncertain = false,
+             const std::string& message = "Browser request refused or failed. Observe the page before continuing.") {
   return {{"version", 1}, {"ok", false}, {"error", {{"code", code},
-    {"message", "Browser request refused or failed. Observe the page before continuing."}, {"mayHaveCompleted", uncertain}}}};
+    {"message", message}, {"mayHaveCompleted", uncertain}}}};
 }
 json Success(json value) { return {{"version", 1}, {"ok", true}, {"value", std::move(value)}}; }
 std::string Identity() {
@@ -156,12 +157,24 @@ json BrowserGateway::Advance(json result) {
   const auto fail = [&] { impl_->Finish(Failure("COMMAND_FAILED", impl_->uncertain)); };
   try {
     if (!result.is_object() || !result.value("success", false) || result.contains("error")) {
-      if (impl_->stage == "authorize" || impl_->stage == "authorize-select") impl_->Finish(Failure("ACCESS_DENIED"));
-      // A read whose image cannot fit its caller's result budget is a definite refusal, not an unknown failure.
-      else if (impl_->request["method"] == "tab.screenshot" && result.is_object() && result.contains("error") &&
-               result["error"].is_object() && result["error"].value("code", std::string()) == "SCREENSHOT_TOO_LARGE")
-        impl_->Finish(Failure("SCREENSHOT_TOO_LARGE"));
-      else fail();
+      if (impl_->stage == "authorize" || impl_->stage == "authorize-select") {
+        impl_->Finish(Failure("ACCESS_DENIED"));
+        return Next();
+      }
+      const std::string method = impl_->request["method"];
+      const bool screenshot = method == "tab.screenshot" || method == "screenshot" || method == "screenshot-annotated";
+      if (impl_->stage == "execute" && screenshot && result.is_object() && result.contains("error") && result["error"].is_object()) {
+        const auto code = result["error"].value("code", std::string());
+        if (code == "RENDERER_HIDDEN") {
+          impl_->Finish(Failure(code, false, "The target renderer is hidden. Select its tab in a visible browser window and retry."));
+          return Next();
+        }
+        if (method == "tab.screenshot" && code == "SCREENSHOT_TOO_LARGE") {
+          impl_->Finish(Failure(code));
+          return Next();
+        }
+      }
+      fail();
       return Next();
     }
     const std::string method = impl_->request["method"];

@@ -113,6 +113,14 @@ final class TabStore: ObservableObject {
 
     var activeTab: Tab? { tabs.first { $0.id == activeTabID } }
     var activeRenderer: (any RendererEngine)? { activeTab.flatMap(renderer(for:)) }
+    var isActiveSurfaceVisible: Bool {
+        guard let tab = activeTab, !tab.isStartPage else { return false }
+        #if !KELPIE_WEBKIT_ONLY
+        // A listing must not create a renderer just to check its visibility.
+        if engine == .chromium { return tab.chromiumRenderer?.isSurfaceVisible == true }
+        #endif
+        return tab.renderer.isSurfaceVisible
+    }
 
     // Keyed by tab ID so unbind() can cancel cleanly.
     private var tabSinks: [UUID: AnyCancellable] = [:]

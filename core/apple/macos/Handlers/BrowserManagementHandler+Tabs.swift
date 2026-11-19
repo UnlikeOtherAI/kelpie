@@ -15,9 +15,7 @@ extension BrowserManagementHandler {
             let entries = WindowRegistry.shared.allEntries()
             if entries.count > 1 {
                 let windows = entries.map { entry -> [String: Any] in
-                    let tabs = entry.tabStore.tabs.map { tab in
-                        tabInfoPayload(for: tab, activeID: entry.tabStore.activeTabID, windowId: entry.id)
-                    }
+                    let tabs = listedTabs(in: entry)
                     return [
                         "windowId": entry.id,
                         "tabs": tabs,
@@ -35,16 +33,25 @@ extension BrowserManagementHandler {
                 message: "No window with id \"\(requestedWindowId ?? "")\""
             )
         }
-        let store = entry.tabStore
-        let tabs: [[String: Any]] = store.tabs.map { tab in
-            tabInfoPayload(for: tab, activeID: store.activeTabID, windowId: entry.id)
-        }
+        let tabs = listedTabs(in: entry)
         return successResponse([
             "windowId": entry.id,
             "tabs": tabs,
             "count": tabs.count,
-            "activeTab": store.activeTabID?.uuidString ?? ""
+            "activeTab": entry.tabStore.activeTabID?.uuidString ?? ""
         ])
+    }
+
+    @MainActor
+    private func listedTabs(in entry: WindowRegistry.Entry) -> [[String: Any]] {
+        let store = entry.tabStore
+        let activeID = store.activeTabID
+        let activeSurfaceVisible = store.isActiveSurfaceVisible
+        return store.tabs.map { tab in
+            var payload = tabInfoPayload(for: tab, activeID: activeID, windowId: entry.id)
+            payload["rendererVisibility"] = tab.id == activeID && activeSurfaceVisible ? "visible" : "hidden"
+            return payload
+        }
     }
 
     @MainActor

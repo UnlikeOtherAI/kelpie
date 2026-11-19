@@ -58,11 +58,18 @@ class EvaluateHandler(
     }
 
     private suspend fun waitForNavigation(body: Map<String, Any?>): Map<String, Any?> {
+        val view = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
+        val diagnostics = ctx.diagnosticsFor(view)
         val timeout = (body["timeout"] as? Int) ?: 10000
         val start = System.currentTimeMillis()
 
         while (System.currentTimeMillis() - start < timeout) {
-            val result = ctx.evaluateJSReturningJSON("({readyState: document.readyState, url: location.href, title: document.title})")
+            diagnostics?.navigationError?.let { return errorResponse("NAVIGATION_ERROR", it) }
+            val result =
+                ctx.withBrowserTarget(view) {
+                    ctx.evaluateJSReturningJSON("({readyState: document.readyState, url: location.href, title: document.title})")
+                }
+            diagnostics?.navigationError?.let { return errorResponse("NAVIGATION_ERROR", it) }
             if (result["readyState"] == "complete") {
                 return successResponse(
                     mapOf(

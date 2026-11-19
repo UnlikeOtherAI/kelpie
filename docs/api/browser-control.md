@@ -36,6 +36,11 @@ the socket used.
 
 Start with `tabs.list` or `tabs.new {url?}`. Choose `tabId` explicitly for each
 page operation. `tabs.select`, when supported, chooses the active tab.
+On macOS, `tabs.list` and the `kelpie_get_tabs` extension report
+`rendererVisibility` per tab. `tab.screenshot` and the native screenshot
+extensions return `RENDERER_HIDDEN` without an image when the renderer is
+hidden, including for a selected tab in a fully covered window.
+
 `tab.snapshot {maxElements?,maxChars?}` returns bounded URL/title, compact text,
 and `{ref,role,name}` elements; it never reads form-control values. Input values,
 textarea defaults and contenteditable text are excluded. Page content remains

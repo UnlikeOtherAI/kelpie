@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { getBrowserAlias, loadBrowserStore, readLocalReadiness, readinessPath } from "../browser/store.js";
 import { getDevice, refreshDevicesIfEmpty } from "../discovery/registry.js";
-import { sendCommand } from "../client/http-client.js";
+import { sendCommand, type HttpResponse } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 import type { GlobalOptions, DiscoveredDevice } from "../types.js";
 
@@ -49,6 +49,21 @@ export function cliPairingTargetHint(globals: GlobalOptions): string | undefined
     : "The discovered browser requires pairing. Use --device with the ID, name, IP address, or host:port of the browser that owns the tab.";
 }
 
+export function sendDeviceCommand<T = unknown>(
+  globals: GlobalOptions,
+  device: DiscoveredDevice,
+  method: string,
+  body?: Record<string, unknown>,
+  timeout?: number,
+): Promise<HttpResponse<T>> {
+  const requestBody = withGlobalTabId(globals, body);
+  const targetsTab = Boolean(requestBody?.tabId) || (method === "copyCookies" &&
+    [requestBody?.from, requestBody?.to].some((store) => typeof store === "object" && store !== null && "tabId" in store));
+  return sendCommand<T>(device, method, requestBody, timeout, {
+    pairingTargetHint: targetsTab ? cliPairingTargetHint(globals) : undefined,
+  });
+}
+
 export async function localBrowserDevice(aliasName: string): Promise<DiscoveredDevice | null> {
   const alias = await getBrowserAlias(aliasName);
   const running = (await loadBrowserStore()).running[aliasName];
@@ -86,7 +101,7 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
       port: explicitGlobalPort(program, globals),
     });
     if (!device) {
-      print({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${globals.device}"` } }, globals.format);
+      print({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No unique device matching "${globals.device}". Use its exact host:port.` } }, globals.format);
       process.exitCode = 4;
       return null;
     }
@@ -101,8 +116,11 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
     process.exitCode = 1;
     return null;
   }
-  const names = all.map((d) => `  ${d.id}  ${d.name} (${d.platform})`).join("\n");
-  print({ success: false, error: { code: "MULTIPLE_DEVICES", message: `Multiple devices found. Use --device to pick one:\n${names}` } }, globals.format);
+  const names = all.map((device) => {
+    const host = device.ip.includes(":") ? `[${device.ip}]` : device.ip;
+    return `  ${host}:${device.port}  ${device.name} (${device.platform})`;
+  }).join("\n");
+  print({ success: false, error: { code: "MULTIPLE_DEVICES", message: `Multiple devices found. Use --device with a host:port:\n${names}` } }, globals.format);
   process.exitCode = 1;
   return null;
 }
@@ -133,10 +151,7 @@ export async function deviceCommand(
   const timeout = program.getOptionValueSource("timeout") === "cli"
     ? globals.timeout
     : options.defaultTimeoutMs;
-  const requestBody = withGlobalTabId(globals, body);
-  const result = await sendCommand(device, method, requestBody, timeout, {
-    pairingTargetHint: requestBody?.tabId ? cliPairingTargetHint(globals) : undefined,
-  });
+  const result = await sendDeviceCommand(globals, device, method, body, timeout);
   print(result.data, globals.format);
   if (!result.ok) process.exitCode = 1;
 }

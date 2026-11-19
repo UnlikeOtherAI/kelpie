@@ -115,11 +115,12 @@ struct WebViewContainer: UIViewRepresentable {
             observe(webView)
             // Each new provisional navigation starts clean — clear any error captured
             // by a superseded load so a cancelled-then-successful sequence is not fatal.
-            handlerContext?.lastNavigationError = nil
+            let diagnostics = BrowserDiagnostics.forTarget(webView)
+            diagnostics.navigationError = nil
             handlerContext?.mark3DInspectorInactive(notify: false)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
-            BrowserDiagnostics.forTarget(webView).documentResponse = nil
+            diagnostics.documentResponse = nil
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -131,7 +132,7 @@ struct WebViewContainer: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            recordNavigationError(error)
+            recordNavigationError(error, in: webView)
             syncBrowserState(from: webView)
         }
 
@@ -140,19 +141,19 @@ struct WebViewContainer: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
-            recordNavigationError(error)
+            recordNavigationError(error, in: webView)
             syncBrowserState(from: webView)
         }
 
         /// Records a navigation error, ignoring benign cancellations. WKWebView reports
         /// `NSURLErrorCancelled` (-999) on superseded or duplicate loads, http→https
         /// upgrades, and interrupting redirects — none of which are real load failures.
-        private func recordNavigationError(_ error: Error) {
+        private func recordNavigationError(_ error: Error, in webView: WKWebView) {
             let ns = error as NSError
             if ns.code == NSURLErrorCancelled {
                 return
             }
-            handlerContext?.lastNavigationError = error.localizedDescription
+            BrowserDiagnostics.forTarget(webView).navigationError = NavigationFailure.message(for: ns)
         }
 
         func webView(

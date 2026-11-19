@@ -275,6 +275,12 @@ Response (single window or `windowId` supplied):
 `name`, `partition`, and `persistent` are present only on tabs created with
 those fields; they are omitted otherwise.
 
+On macOS, each listed tab has a `rendererVisibility` of `visible` or `hidden`
+from the native renderer view and window. An unselected tab or a Start Page has
+no visible page renderer. A selected tab can remain `active: true` with
+`rendererVisibility: "hidden"` when its window is fully covered, minimized,
+or hidden.
+
 Response (macOS only, multiple windows open, no `windowId`):
 {
   "success": true,

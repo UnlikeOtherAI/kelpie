@@ -74,6 +74,9 @@ struct EvaluateHandler {
             for _ in 0..<(timeout / 100) {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 if !renderer.isLoading {
+                    if let error = (renderer as? WKWebViewRenderer)?.lastNavigationError {
+                        return errorResponse(code: "NAVIGATION_ERROR", message: error)
+                    }
                     let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
                     let snapshot = await NavigationPageSnapshot.read(from: renderer)
                     return successResponse([

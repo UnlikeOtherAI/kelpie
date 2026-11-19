@@ -115,9 +115,6 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     let dialogState = DialogState()
     let keyboardObserver = KeyboardObserver()
 
-    /// Most recent WebView navigation error (cleared on each new navigation).
-    var lastNavigationError: String?
-
     override nonisolated init() { super.init() }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {

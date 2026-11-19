@@ -1,7 +1,7 @@
 import { generateKeyPairSync, createPrivateKey, createPublicKey, sign, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { defaultStoreDir } from "./token-store.js";
+import { stateDirectory } from "../state-directory.js";
 
 export interface ComputerIdentity {
   publicKey: string;
@@ -9,7 +9,7 @@ export interface ComputerIdentity {
 }
 
 /** One protected signing key for all CLI/MCP processes of this computer user. */
-export async function computerIdentity(dir = defaultStoreDir()): Promise<ComputerIdentity> {
+export async function computerIdentity(dir = stateDirectory()): Promise<ComputerIdentity> {
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   const directory = await fs.lstat(dir);
   if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("Computer signing directory must be a regular directory");
