@@ -250,7 +250,7 @@
             <li>tab.url</li><li>tab.title</li><li>tab.snapshot</li><li>tab.screenshot</li>
             <li>tab.click</li><li>tab.type</li><li>page.press</li><li>page.scroll</li>
           </ul>
-          <p>Every reply is <code>{ version: 1, ok, value }</code>. A change that may already have happened is never retried automatically.</p>
+          <p>Every reply carries <code>version</code> and <code>ok</code>. An error says whether the change may have completed, and such a change is never retried automatically.</p>
         </div>
       </div>
 
@@ -410,7 +410,7 @@
         <div class="tile tile--get">
           <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#terminal"/></svg></span>
           <h3 class="h3">Linux</h3>
-          <p>Packages for x86-64, with <code>apt</code> and <code>dnf</code> repositories.</p>
+          <p>Packages for x86-64, with <a href="https://unlikeotherai.github.io/kelpie/packages/"><code>apt</code> and <code>dnf</code> repositories</a>.</p>
           <a class="btn" href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="\.AppImage$"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>AppImage</a>
           <span class="tile-meta">Also as <a href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="\.deb$">.deb</a>, <a href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="\.rpm$">.rpm</a> and <a href="https://github.com/UnlikeOtherAI/kelpie/releases">tar.gz</a>.</span>
         </div>
