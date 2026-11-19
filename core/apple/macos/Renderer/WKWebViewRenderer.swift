@@ -352,7 +352,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         let ns = error as NSError
         if ns.code == NSURLErrorCancelled { return }
         if ns.domain == "WebKitErrorDomain", ns.code == Self.frameLoadInterruptedByPolicyChange { return }
-        self.lastNavigationError = error.localizedDescription
+        self.lastNavigationError = NavigationFailure.message(for: ns)
     }
 
     nonisolated static let frameLoadInterruptedByPolicyChange = 102

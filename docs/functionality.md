@@ -238,7 +238,7 @@ Scroll by pixel deltas, scroll a specific element into view (with configurable a
 
 ## Wait and Synchronisation
 
-Wait for an element to appear, become visible, or disappear, or for page navigation to complete. The CLI and its MCP server allow extra time for the browser to report the outcome of a wait.
+Wait for an element to appear, become visible, or disappear, or for page navigation to complete. The CLI and its MCP server allow extra time for the browser to report the outcome of a wait. On Apple WebKit, waiting for a failed navigation returns the load error. Loopback connection failures explain that the address belongs to the device running the browser.
 
 ## JavaScript Evaluation
 

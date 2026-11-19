@@ -17,6 +17,7 @@ final class BrowserDiagnostics {
     var console: [[String: Any]] = []
     private(set) var network: [[String: Any]] = []
     var documentResponse: (url: String, status: Int, mimeType: String)?
+    var navigationError: String?
 
     func recordConsole(_ message: [String: Any]) {
         if message["text"] as? String == "__kelpie_3d_exit__" ||

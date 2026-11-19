@@ -65,6 +65,9 @@ struct EvaluateHandler {
         for _ in 0..<(timeout / 100) {
             try? await Task.sleep(nanoseconds: 100_000_000)
             if !webView.isLoading {
+                if let error = BrowserDiagnostics.forTarget(webView).navigationError {
+                    return errorResponse(code: "NAVIGATION_ERROR", message: error)
+                }
                 let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
                 return successResponse(["url": webView.url?.absoluteString ?? "", "title": webView.title ?? "", "loadTime": loadTime])
             }
