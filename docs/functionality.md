@@ -212,6 +212,10 @@ Full read access to the page DOM. Query elements by CSS selector, get their text
 
 ## Element Interaction
 
+Semantic find commands return CSS selectors for the observed tab's current document.
+Reuse the same `tabId` for the follow-up action. When several elements share an ID,
+Kelpie resolves the selector against the observed element before returning it.
+
 Click elements by selector or tap at specific coordinates. Fill form inputs, type text character-by-character (simulating human typing with per-character delays), select dropdown options, check/uncheck checkboxes. Every interaction shows a blue touch indicator animation on the device so you can see what happened.
 
 For LLM-driven automation, the intended order is semantic first: read the accessibility tree or use the smart find endpoints, then interact by selector. If the model needs to reason over an image after it already knows the selector, Kelpie can draw a visible highlight box/ring around that exact DOM element and then capture a screenshot, which keeps the visual target and the selector aligned. Annotated screenshots are the broader visual fallback when semantic targeting fails. Raw coordinate taps exist for edge cases and are intentionally the least-preferred option because they drift with viewport changes, scrolling, and overlays. Selector clicks and annotation clicks now dispatch coordinate-bearing pointer and mouse events at the rendered hit target instead of shortcutting through `el.click()`, so DOM-targeted automation exercises the same observable interaction path as raw taps and fails with a visibility error when the target center is obscured. When raw taps do drift, every shipped app build now includes a bundled local calibration page at `/debug/coordinate-calibration` that shows manual tap coordinates, previews requested versus applied automation taps, and persists additive X/Y offsets used by the raw `tap` endpoint.

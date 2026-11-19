@@ -16,6 +16,16 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   const tab = created.value.id;
   const evaluate = async (expression) => resultValue(await control(readiness, "evaluate", { tabId: tab, expression }));
   await waitFor(() => evaluate('document.querySelector("#text-input") !== null'), "new native fixture document");
+  await evaluate(`document.body.insertAdjacentHTML("afterbegin",
+    '<div data-selector-fixture><button id="2:entry">Decoy selector action</button><button id="2:entry">Exact selector action</button></div>');
+    const selectorFixture = document.querySelector("[data-selector-fixture]");
+    selectorFixture.onclick = event => selectorFixture.dataset.clicked = event.target.textContent;
+    true`);
+  const semantic = resultValue(await control(readiness, "find-element", { tabId: tab, text: "Exact selector action", role: "button" }));
+  assert.equal(semantic.found, true);
+  await control(readiness, "click", { tabId: tab, selector: semantic.selector });
+  assert.equal(await evaluate('document.querySelector("[data-selector-fixture]").dataset.clicked'), "Exact selector action");
+  await evaluate('document.querySelector("[data-selector-fixture]").remove(); true');
   await evaluate('document.querySelector("#text-input").value="INITIAL_SECRET"; document.body.insertAdjacentHTML("beforeend", \'<input type="password" value="PASSWORD_SECRET"><textarea>TEXTAREA_SECRET</textarea><div contenteditable="true"><p>EDITOR_SECRET</p></div>\'); true');
   const snapshot = await call("tab.snapshot", { maxChars: 12000 }, tab);
   assert.equal(snapshot.ok, true);
