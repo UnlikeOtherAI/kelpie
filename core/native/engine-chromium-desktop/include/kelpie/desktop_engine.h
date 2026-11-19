@@ -102,6 +102,13 @@ class DesktopEngine final : public DesktopBrowserControl {
   bool Shutdown();
   bool HasPendingBrowserControl() const;
   void DoMessageLoopWork();
+  // Local chrome on the CEF UI thread. The inspector belongs to the active page.
+  struct Inspector3DState {
+    bool enabled = false;
+    bool active = false;
+  };
+  Inspector3DState Active3DInspector() const;
+  void Toggle3DInspector();
   const std::string& last_error() const;
   bool IsActiveNativeBrowserAttached(void* parent_window, Timeout timeout);
 

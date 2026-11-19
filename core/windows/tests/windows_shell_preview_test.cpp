@@ -50,9 +50,11 @@ class PreviewDelegate final : public kelpie::windows::ShellDelegate {
   void OnBackRequested() override {}
   void OnForwardRequested() override {}
   void OnReloadRequested() override {}
+  void OnToggle3DInspectorRequested() override { ++inspector_clicks; }
   void OnOpenSettingsRequested() override {}
   std::optional<std::wstring> BestUrlCompletion(std::wstring_view) const override { return std::nullopt; }
   int tab_count = 2;
+  int inspector_clicks = 0;
   bool background_title_changed = false;
 };
 
@@ -160,6 +162,19 @@ int main() {
   const auto plus = rect(GetDlgItem(shell.hwnd(), IDC_NEW_TAB_BUTTON));
   const auto tabs = rect(GetDlgItem(shell.hwnd(), IDC_TAB_STRIP));
   const auto address = rect(GetDlgItem(shell.hwnd(), IDC_URL_EDIT));
+  const auto inspector = GetDlgItem(shell.hwnd(), IDC_INSPECTOR_3D_BUTTON);
+  const auto settings = GetDlgItem(shell.hwnd(), IDC_SETTINGS_BUTTON);
+  passed &= Expect(inspector && rect(inspector).right <= rect(settings).left,
+                   "3D inspector must sit immediately before Settings");
+  passed &= Expect(!IsWindowEnabled(inspector), "3D inspector must begin disabled without a renderer");
+  shell.Set3DInspectorState(true, true);
+  SendMessageW(shell.hwnd(), WM_COMMAND, MAKEWPARAM(IDC_INSPECTOR_3D_BUTTON, BN_CLICKED),
+               reinterpret_cast<LPARAM>(inspector));
+  wchar_t inspector_name[32]{};
+  GetWindowTextW(inspector, inspector_name, 32);
+  passed &= Expect(delegate.inspector_clicks == 1 && std::wstring(inspector_name) == L"3D inspector, On",
+                   "3D inspector must forward clicks and expose its active state");
+  shell.Set3DInspectorState(false, false);
   passed &= Expect(plus.right <= tabs.left && tabs.right < caption.left, "caption row overlaps controls");
   passed &= Expect(tabs.bottom < address.top, "tabs must be above navigation");
   const auto empty_page = rect(browser.hwnd());

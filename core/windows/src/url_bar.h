@@ -31,6 +31,7 @@ class UrlBarDelegate {
   virtual void OnAccountRequested() {}
   virtual void OnHomeRequested() {}
   virtual void OnAddFavoriteRequested() {}
+  virtual void OnToggle3DInspectorRequested() {}
   virtual void OnOpenSettingsRequested() = 0;
   virtual std::optional<std::wstring> BestUrlCompletion(std::wstring_view typed) const = 0;
 };
@@ -47,6 +48,7 @@ class UrlBar {
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
   void UpdateLoadProgress(bool loading, double progress, bool tab_changed);
   void TickLoadProgress();
+  void Set3DInspectorState(bool enabled, bool active);
   void Focus();
   bool HandleCommand(WORD control_id, WORD notification_code);
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
@@ -75,6 +77,8 @@ class UrlBar {
   AddressLoadProgress load_progress_;
   AddressLoadFrame load_frame_;
   HWND account_button_ = nullptr;
+  HWND inspector_3d_button_ = nullptr;
+  bool inspector_3d_active_ = false;
   HBITMAP account_avatar_ = nullptr;
   std::string account_avatar_source_;
   std::wstring account_label_;

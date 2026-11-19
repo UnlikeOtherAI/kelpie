@@ -75,16 +75,10 @@ struct BrowserView: View {
                             }
                         },
                         is3DActive: isIn3DInspector,
-                        show3DControls: isIn3DInspector,
                         inspectorMode: inspectorMode,
                         onSetInspectorMode: { mode in
                             Task { @MainActor in
                                 await set3DInspectorMode(mode)
-                            }
-                        },
-                        onInspectorExit: {
-                            Task { @MainActor in
-                                await exit3DInspector()
                             }
                         },
                         onInspectorZoomIn: {
@@ -104,6 +98,11 @@ struct BrowserView: View {
                         },
                         onSwitchRenderer: { engine in
                             Task {
+                                guard engine != rendererState.activeEngine, !rendererState.isSwitching else { return }
+                                if isIn3DInspector {
+                                    await exit3DInspector()
+                                }
+                                guard !rendererState.isSwitching else { return }
                                 await serverState.switchRenderer(to: engine)
                             }
                         },

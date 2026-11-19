@@ -45,6 +45,11 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     std::string document_version=NextDocumentVersion();
     CefRefPtr<CefBrowser> browser;
     CefRefPtr<DesktopDevToolsSession> devtools;
+    struct Inspector {
+      bool active = false;
+      bool capturing = false;
+      std::shared_ptr<DesktopDevToolsSession::Operation> pending;
+    } inspector;
     DesktopDialogAdapter dialogs;
     std::string url = "about:blank";
     std::string title;
@@ -114,6 +119,8 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   // A tab's DevTools session, attached so its Network events reach network_sink.
   CefRefPtr<DesktopDevToolsSession> NewDevToolsSession(CefRefPtr<CefBrowser> browser, std::string tab_id);
   Tab* ActiveTab();
+  void Update3DInspectors();
+  void Exit3DInspector(Tab& tab);
   // Records a downloaded favicon against `page_host` in the registry, and on
   // the tab when it is still showing that site.
   void StoreFavicon(CefRefPtr<CefBrowser> browser, const std::string& page_host, std::string png_base64);

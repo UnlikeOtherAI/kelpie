@@ -4,7 +4,7 @@ extension URLBarView {
     @ViewBuilder
     var selectorsRow: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if show3DControls {
+            if is3DActive {
                 inspectorControlsRow
             }
 
@@ -13,9 +13,6 @@ extension URLBarView {
             if viewportState.supportsOrientationSelection {
                 orientationToggle
             }
-
-            rendererSwitch
-                .disabled(rendererState.isSwitching)
 
             if viewportState.mode != .full {
                 scaleControl
@@ -73,12 +70,6 @@ extension URLBarView {
                 action: onInspectorReset
             )
 
-            AppKitToolbarButton(
-                systemName: "xmark",
-                accessibilityID: "browser.snapshot3d.exit",
-                accessibilityLabel: "Exit 3D view",
-                action: onInspectorExit
-            )
         }
     }
 
@@ -137,7 +128,7 @@ extension URLBarView {
                     imageName: "SafariLogo",
                     accessibilityID: "browser.renderer.webkit",
                     accessibilityLabel: "WebKit",
-                    width: 54,
+                    width: 34,
                     iconSize: 16
                 ),
                 AppKitSegmentedStrip.Item(
@@ -145,7 +136,7 @@ extension URLBarView {
                     imageName: "ChromeLogo",
                     accessibilityID: "browser.renderer.chromium",
                     accessibilityLabel: "Chromium",
-                    width: 54,
+                    width: 34,
                     iconSize: 16
                 )
             ],
@@ -154,11 +145,10 @@ extension URLBarView {
             isEnabled: !rendererState.isSwitching,
             onSelect: { selectedID in
                 guard let engine = RendererState.Engine(rawValue: selectedID) else { return }
-                showTools = false
                 onSwitchRenderer(engine)
             }
         )
-        .frame(width: 118, height: 34)
+        .frame(width: 78, height: 34)
     }
 
     @ViewBuilder
