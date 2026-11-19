@@ -61,6 +61,7 @@ struct AccountMenuItems: View {
 }
 
 private struct AccountMenuActions: View {
+    @Environment(\.openURL) private var openURL
     @ObservedObject private var account = UOAAccount.shared
     @ObservedObject private var bookmarks = BookmarkStore.shared
 
@@ -70,6 +71,10 @@ private struct AccountMenuActions: View {
         } else {
             Button("Refresh favourites", action: bookmarks.refreshAccountBookmarks)
             Button("Sign out", role: .destructive, action: account.signOut)
+            if account.profile != nil, let url = URL(string: UOATransport.origin + "/auth/delete-account") {
+                Button("Delete account") { openURL(url) }
+                    .accessibilityIdentifier("browser.account.delete")
+            }
         }
     }
 }

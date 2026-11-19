@@ -24,9 +24,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.kelpie.browser.account.UOAAccount
+import com.kelpie.browser.account.UOATransport
 import com.kelpie.browser.browser.BookmarkStore
 
 @Composable
@@ -93,6 +95,7 @@ internal fun AccountMenuBack(onBack: () -> Unit) {
 
 @Composable
 internal fun AccountMenuActions(onDismiss: () -> Unit) {
+    val context = LocalContext.current
     val account by UOAAccount.state.collectAsState()
     val syncError by BookmarkStore.syncError.collectAsState()
     if (account.signingIn) {
@@ -112,6 +115,16 @@ internal fun AccountMenuActions(onDismiss: () -> Unit) {
             onDismiss()
             UOAAccount.signOut()
         })
+        if (account.profile != null) {
+            DropdownMenuItem(
+                text = { Text("Delete account") },
+                modifier = Modifier.testTag("browser.account.delete"),
+                onClick = {
+                    onDismiss()
+                    openHelpURL(context, UOATransport.ORIGIN + "/auth/delete-account")
+                },
+            )
+        }
     }
 }
 

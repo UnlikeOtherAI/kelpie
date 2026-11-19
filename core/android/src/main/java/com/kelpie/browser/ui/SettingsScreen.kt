@@ -103,6 +103,9 @@ fun SettingsScreen(
         HelpActionRow("Open UnlikeOtherAI") {
             openHelpURL(context, "https://unlikeotherai.com")
         }
+        HelpActionRow("Privacy Policy") {
+            openHelpURL(context, "https://unlikeotherai.github.io/kelpie/privacy/")
+        }
 
         Spacer(Modifier.height(8.dp))
         SectionHeader("Experimental")
@@ -237,7 +240,7 @@ private fun HelpActionRow(
     }
 }
 
-private fun openHelpURL(
+internal fun openHelpURL(
     context: android.content.Context,
     value: String,
 ) {
