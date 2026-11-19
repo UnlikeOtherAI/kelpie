@@ -25,6 +25,7 @@ int main() {
     }
   }
   Accept("tap", {{"x", 12.5}, {"y", 22}, {"tabId", "a"}});
+  Accept("tap", {{"x", 12.5}, {"y", 22}, {"marker", {{"style", "crosshair-coordinates"}, {"durationMs", 0}}}});
   Accept("highlight", {{"selector", "button"}, {"color", "red"}, {"durationMs", 0}});
   Accept("scroll2", {{"selector", "button"}, {"position", "center"}, {"maxScrolls", 4}});
   Accept("screenshot", {{"format", "jpeg"}, {"quality", 75}, {"fullPage", true}, {"resolution", "native"}});
@@ -40,12 +41,20 @@ int main() {
   assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("set-request-interception"), &invalid));
   invalid = {{"text", 1}};
   assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("set-clipboard"), &invalid));
+  for (const auto& marker : {json{{"style", "square"}}, json{{"durationMs", 1.5}},
+                             json{{"durationMs", -1}}, json{{"durationMs", 2147483648LL}},
+                             json{{"durationMs", true}}, json{{"unexpected", 1}}, json(nullptr)}) {
+    invalid = {{"x", 1}, {"y", 2}, {"marker", marker}};
+    assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("tap"), &invalid));
+  }
   invalid = json::object();
   assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("missing"), &invalid));
   const json extension = {{"name", "kelpie_tap"}, {"method", "tap"}, {"inputSchema", kelpie::NativeExtensionInputSchema("tap")}, {"mutates", true}};
   kelpie::BrowserGateway gateway({{"nativeMethods", {"tap"}}, {"requireAuthorization", false}, {"extensions", json::array({extension})}});
-  auto step = gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"}, {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_tap"}, {"arguments", {{"x", 1}, {"y", 2}}}}}}}});
+  const json arguments = {{"x", 1}, {"y", 2}, {"marker", {{"style", "crosshair-coordinates"}, {"durationMs", 1500}}}};
+  auto step = gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"}, {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_tap"}, {"arguments", arguments}}}}}});
   assert(step["method"] == "tap" && step["params"]["x"] == 1);
+  assert(step["params"]["marker"] == arguments["marker"]);
   assert(gateway.Advance({{"success", true}})["response"]["result"]["isError"] == false);
   std::cout << "Native extension catalog and forwarding parity passed\n";
 }

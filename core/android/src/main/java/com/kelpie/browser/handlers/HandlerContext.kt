@@ -224,35 +224,25 @@ class HandlerContext(
         x: Double,
         y: Double,
         color: String = DEFAULT_OVERLAY_RGB,
+    ) = showTouchIndicator(x, y, color, TapMarkerOptions.DEFAULTS)
+
+    private var tapMarkerSource: String? = null
+
+    internal suspend fun showTouchIndicator(
+        x: Double,
+        y: Double,
+        color: String,
+        marker: TapMarkerOptions,
     ) {
-        val js =
-            """
-            (function() {
-                var dot = document.createElement('div');
-                dot.style.cssText = 'position:fixed;left:${x}px;top:${y}px;width:36px;height:36px;' +
-                    'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                    'background:rgba(${JSEscape.string(color)},0.7);pointer-events:none;z-index:2147483647;' +
-                    'transition:transform 0.5s ease-out, opacity 0.5s ease-out;transform:scale(1);opacity:1;';
-                document.body.appendChild(dot);
-                var ripple = document.createElement('div');
-                ripple.style.cssText = 'position:fixed;left:${x}px;top:${y}px;width:36px;height:36px;' +
-                    'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                    'border:2px solid rgba(${JSEscape.string(color)},0.7);pointer-events:none;z-index:2147483647;' +
-                    'transition:transform 0.6s ease-out, opacity 0.6s ease-out;transform:scale(1);opacity:1;';
-                document.body.appendChild(ripple);
-                requestAnimationFrame(function() {
-                    ripple.style.transform = 'scale(3)';
-                    ripple.style.opacity = '0';
-                });
-                setTimeout(function() {
-                    dot.style.transform = 'scale(0.5)';
-                    dot.style.opacity = '0';
-                }, 550);
-                setTimeout(function() { dot.remove(); ripple.remove(); }, 1100);
-            })();
-            """.trimIndent()
+        val assets = webView?.context?.assets ?: return
         try {
-            evaluateJS(js)
+            val source =
+                tapMarkerSource ?: assets
+                    .open("tap-marker.js")
+                    .bufferedReader()
+                    .use { it.readText() }
+            tapMarkerSource = source
+            evaluateJS(marker.script(source, x, y, color))
         } catch (_: Exception) {
         }
     }

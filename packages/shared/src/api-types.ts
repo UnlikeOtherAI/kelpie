@@ -1,4 +1,6 @@
 import type { DeviceInfoFull, DeviceCapabilities, Platform } from "./device-types.js";
+import type { z } from "zod";
+import type { tapMarkerSchema } from "./extension-tools.js";
 
 // --- Base ---
 
@@ -139,6 +141,7 @@ export interface ClickResponse extends SuccessResponse {
 export interface TapRequest {
   x: number;
   y: number;
+  marker?: z.infer<typeof tapMarkerSchema>;
 }
 
 export interface TapResponse extends SuccessResponse {

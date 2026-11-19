@@ -81,6 +81,9 @@ struct InteractionHandler {
         // Screenshots are captured at native resolution (points * backingScaleFactor),
         // but elementFromPoint expects CSS viewport pixels. LLMs read pixel coords
         // from the screenshot image, so "screenshot" is the natural input space.
+        guard let marker = TapMarkerOptions.parse(body["marker"]) else {
+            return errorResponse(code: "INVALID_PARAMS", message: TapMarkerOptions.invalidMessage)
+        }
         let coordinateSpace = (body["coordinateSpace"] as? String ?? "viewport").lowercased()
         if coordinateSpace == "screenshot" {
             do {
@@ -109,6 +112,7 @@ struct InteractionHandler {
             x: execution.appliedX,
             y: execution.appliedY,
             color: overlayColor(from: body),
+            marker: marker,
             tabId: tabId
         )
         do {
