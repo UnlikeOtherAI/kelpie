@@ -1,13 +1,13 @@
 #include <winresrc.h>
 #include "resource.h"
 
-IDI_KELPIE ICON "kelpie.ico"
+IDI_KELPIE ICON "@CMAKE_CURRENT_SOURCE_DIR@/resources/kelpie.ico"
 
-1 RT_MANIFEST "manifest.xml"
+1 RT_MANIFEST "@CMAKE_CURRENT_SOURCE_DIR@/resources/manifest.xml"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,2,11,0
- PRODUCTVERSION 0,2,11,0
+ FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+ PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS 0x40004L
@@ -20,11 +20,11 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "UnlikeOtherAI\0"
       VALUE "FileDescription", "Kelpie Windows Browser\0"
-      VALUE "FileVersion", "0.2.11\0"
+      VALUE "FileVersion", "@PROJECT_VERSION@\0"
       VALUE "InternalName", "kelpie.dll\0"
       VALUE "OriginalFilename", "kelpie.dll\0"
       VALUE "ProductName", "Kelpie\0"
-      VALUE "ProductVersion", "0.2.11\0"
+      VALUE "ProductVersion", "@PROJECT_VERSION@\0"
     END
   END
   BLOCK "VarFileInfo"
