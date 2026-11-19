@@ -129,12 +129,14 @@ class SessionStorageTest {
                         }
                         handler.webView = first.webView
                         val cookies = CookieHandlers(handler)
-                        cookies.setCookie(mapOf("url" to url, "name" to cookieName, "value" to "shared", "httpOnly" to true))
+                        val cookieRouter = Router().also(cookies::register)
+                        val sharedCookie = mapOf("url" to url, "name" to cookieName, "value" to "shared", "httpOnly" to true)
+                        assertEquals(200, cookieRouter.handle("set-cookie", sharedCookie).first)
                         handler.webView = second.webView
                         assertTrue(cookies.getCookies(mapOf("url" to url)).toString().contains("shared"))
                         handler.webView = isolated.webView
                         assertFalse(cookies.getCookies(mapOf("url" to url)).toString().contains(cookieName))
-                        cookies.setCookie(mapOf("url" to url, "name" to cookieName, "value" to "isolated", "httpOnly" to true))
+                        assertEquals(200, cookieRouter.handle("set-cookie", sharedCookie + ("value" to "isolated")).first)
                         handler.webView = sibling.webView
                         assertTrue(cookies.getCookies(mapOf("url" to url)).toString().contains("isolated"))
                         handler.webView = other.webView
