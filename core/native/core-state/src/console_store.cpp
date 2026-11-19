@@ -26,6 +26,7 @@ json EntryToJsonObject(const ConsoleEntry& entry) {
   } else {
     output["stack_trace"] = nullptr;
   }
+  if (!entry.tab_id.empty()) output["tabId"] = entry.tab_id;
   return output;
 }
 
@@ -79,6 +80,7 @@ void ConsoleStore::LoadJson(const std::string& json_text) {
           store_support::StringOrDefault(item, {"timestamp"},
                                          store_support::CurrentIso8601Utc()),
           store_support::OptionalValue<std::string>(item, "stack_trace"),
+          store_support::StringOrDefault(item, {"tabId"}),
       });
     }
   }

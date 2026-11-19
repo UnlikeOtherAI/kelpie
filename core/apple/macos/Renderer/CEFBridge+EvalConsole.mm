@@ -14,7 +14,8 @@ static void FinishEval(CEFBridge *owner, NSString *identifier, NSString *result,
 
 - (void)cefBridgeHandleConsoleMessage:(NSString *)message
                                source:(NSString *)source
-                                 line:(NSInteger)line {
+                                 line:(NSInteger)line
+                                level:(NSString *)level {
     if ([message hasPrefix:kCEFBridgeEvalConsolePrefix]) {
         NSString *payload = [message substringFromIndex:kCEFBridgeEvalConsolePrefix.length];
         NSData *data = [payload dataUsingEncoding:NSUTF8StringEncoding];
@@ -32,7 +33,9 @@ static void FinishEval(CEFBridge *owner, NSString *identifier, NSString *result,
 
     if (self.onConsoleMessage != nil) {
         NSDictionary *payload = @{
-            @"message": message ?: @"",
+            @"text": message ?: @"",
+            @"level": level ?: @"log",
+            @"timestamp": [[NSISO8601DateFormatter new] stringFromDate:[NSDate date]],
             @"source": source ?: @"",
             @"line": @(line),
         };

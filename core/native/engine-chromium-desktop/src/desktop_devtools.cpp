@@ -82,7 +82,7 @@ std::optional<DesktopNetworkEventAdapter::Json> DesktopNetworkEventAdapter::Obse
     }
     Request state;
     state.url = *url;
-    state.method = StringMember(*request, "method").value_or("GET");
+    state.method = StringMember(*request, "method").value_or("");
     state.type = StringMember(params, "type").value_or("Other");
     state.started_at = NumberMember(params, "timestamp");
     state.timestamp = IsoUtc(NumberMember(params, "wallTime", std::numeric_limits<double>::quiet_NaN()));
@@ -103,6 +103,7 @@ std::optional<DesktopNetworkEventAdapter::Json> DesktopNetworkEventAdapter::Obse
     if (const auto status = response->find("status"); status != response->end() && status->is_number()) {
       pending->second.status = static_cast<int>(status->get<double>());
     }
+    pending->second.status_text = StringMember(*response, "statusText").value_or("");
     pending->second.content_type = StringMember(*response, "mimeType").value_or("");
     pending->second.type = StringMember(params, "type").value_or(pending->second.type);
     return std::nullopt;
@@ -113,13 +114,14 @@ std::optional<DesktopNetworkEventAdapter::Json> DesktopNetworkEventAdapter::Obse
   if (!finished && !failed) return std::nullopt;
   Request state = std::move(pending->second);
   requests_.erase(pending);
+  state.type = StringMember(params, "type").value_or(state.type);
   const double completed_at = NumberMember(params, "timestamp", state.started_at);
   const auto duration = static_cast<int>(std::clamp(
       std::llround(std::max(0.0, completed_at - state.started_at) * 1000.0), 0LL,
       static_cast<long long>(std::numeric_limits<int>::max())));
   Json event = {
       {"id", *request_id}, {"method", state.method}, {"url", state.url},
-      {"status", state.status}, {"contentType", state.content_type}, {"type", state.type},
+      {"status", state.status}, {"statusText", state.status_text}, {"contentType", state.content_type}, {"type", state.type},
       {"duration", duration}, {"size", 0}, {"initiator", state.initiator}, {"timestamp", state.timestamp},
   };
   if (finished) {
@@ -128,7 +130,11 @@ std::optional<DesktopNetworkEventAdapter::Json> DesktopNetworkEventAdapter::Obse
       event["size"] = static_cast<long long>(std::max(0.0, bytes->get<double>()));
     }
   } else {
-    event["failure"] = StringMember(params, "errorText").value_or("Network request failed");
+    const std::string failure = StringMember(params, "errorText").value_or("Network request failed");
+    // Chromium can abort its body loader after a complete response that has no body.
+    const bool no_body = (state.method == "HEAD" && state.status > 0) ||
+                         state.status == 204 || state.status == 205 || state.status == 304;
+    if (failure != "net::ERR_ABORTED" || !no_body) event["failure"] = failure;
   }
   return event;
 }

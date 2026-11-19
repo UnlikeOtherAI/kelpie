@@ -12,6 +12,47 @@ import org.junit.Test
  * so they run on the plain JVM via `testDebugUnitTest`.
  */
 class NetworkLogHandlerTest {
+    @Test
+    fun transportFailureMatchesOnlyError() {
+        assertTrue(NetworkLogHandler.matchesStatusCategory(null, "error", failed = true))
+        assertFalse(NetworkLogHandler.matchesStatusCategory(null, "pending", failed = true))
+        assertFalse(NetworkLogHandler.matchesStatusCategory(200, "success", failed = true))
+    }
+
+    @Test
+    fun crossOriginPostRetainsStatusWithoutReplacingOtherRequests() {
+        val url = "https://api.example.test/items"
+        val started = 1704067200123.0
+        val page =
+            mapOf(
+                "timeOrigin" to started - 100,
+                "entries" to
+                    listOf(
+                        mapOf(
+                            "url" to url,
+                            "type" to "fetch",
+                            "status" to null,
+                            "timing" to mapOf("started" to "2024-01-01T00:00:00.123Z"),
+                        ),
+                        mapOf(
+                            "url" to url,
+                            "type" to "fetch",
+                            "status" to null,
+                            "timing" to mapOf("started" to "2024-01-01T00:00:00.323Z"),
+                        ),
+                    ),
+            )
+        val captured =
+            listOf(
+                mapOf("url" to url, "type" to "fetch", "started" to started, "method" to "POST", "statusCode" to 404),
+            )
+        val entries = mergeNetworkEntries(page, captured, null)
+        assertEquals(2, entries.size)
+        assertEquals("POST", entries[0]["method"])
+        assertEquals(404, entries[0]["status"])
+        assertNull(entries[1]["status"])
+    }
+
     // region parseStatusCategory
 
     @Test

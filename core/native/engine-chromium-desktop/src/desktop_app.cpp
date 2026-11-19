@@ -56,6 +56,7 @@ void AppendConsole(ConsoleStore& store, const nlohmann::json& event) {
       event.contains("stack_trace") && !event["stack_trace"].is_null()
           ? std::optional<std::string>(event["stack_trace"].get<std::string>())
           : std::nullopt,
+      event.value("tabId", std::string()),
   });
 }
 
@@ -72,8 +73,13 @@ void AppendNetwork(NetworkTrafficStore& store, const nlohmann::json& event) {
       "",
       event.value("timestamp", std::string()),
       event.value("duration", 0),
-      event.value("size", 0),
+      event.value("size", std::int64_t{0}),
       event.value("initiator", std::string("browser")),
+      event.value("tabId", std::string()),
+      event.value("type", std::string()),
+      event.value("statusText", std::string()),
+      event.value("failure", std::string()),
+      event.value("method", std::string()),
   });
 }
 

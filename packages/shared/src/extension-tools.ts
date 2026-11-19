@@ -226,11 +226,11 @@ export const sharedBrowserTools: BrowserToolDef[] = [
   { name: "kelpie_toast", description: "Show a toast message overlay on the device screen. Use this to narrate actions, explain what you are doing, or communicate status to anyone watching the device. The message appears in a semi-transparent card at the bottom of the viewport for 3 seconds.", method: "toast", schema: { device, message: z.string().describe("Message to display on the device screen") }, bodyFromArgs: passthrough },
 
   // Console
-  { name: "kelpie_get_console_messages", description: "Get browser console messages", method: "getConsoleMessages", schema: { device, level: z.enum(["log", "warn", "error", "info", "debug"]).optional().describe("Filter by level"), since: z.string().optional().describe("ISO timestamp cutoff"), limit: z.number().optional().describe("Max messages"), tabId }, bodyFromArgs: passthrough },
-  { name: "kelpie_get_js_errors", description: "Get JavaScript errors from the page", method: "getJSErrors", schema: { device, tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_console_messages", description: "Get console messages for the requested browser tab", method: "getConsoleMessages", schema: { device, level: z.enum(["log", "warn", "error", "info", "debug"]).optional().describe("Filter by level"), since: z.string().optional().describe("ISO timestamp cutoff"), limit: z.number().optional().describe("Max messages"), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_js_errors", description: "Get JavaScript errors for the requested browser tab", method: "getJSErrors", schema: { device, tabId }, bodyFromArgs: passthrough },
 
   // Network
-  { name: "kelpie_get_network_log", description: "Get network request log", method: "getNetworkLog", schema: { device, type: z.string().optional().describe("Filter by resource type"), status: z.enum(["success", "error", "pending"]).optional(), since: z.string().optional(), limit: z.number().optional(), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_network_log", description: "Get network request log for the requested tab, including HTTP and transport errors", method: "getNetworkLog", schema: { device, type: z.string().optional().describe("Filter by resource type"), status: z.enum(["success", "error", "pending"]).optional(), since: z.string().optional(), limit: z.number().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_clear_network_log", description: "Clear the network request log", method: "clearNetworkLog", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_get_resource_timeline", description: "Get resource loading timeline", method: "getResourceTimeline", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_get_websockets", description: "List active WebSocket connections", method: "getWebSockets", schema: { device, tabId }, bodyFromArgs: passthrough },

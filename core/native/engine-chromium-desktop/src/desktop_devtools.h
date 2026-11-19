@@ -32,9 +32,10 @@ class DesktopNetworkEventAdapter {
  private:
   struct Request {
     std::string url;
-    std::string method = "GET";
+    std::string method;
     std::string type = "Other";
     std::string content_type;
+    std::string status_text;
     std::string initiator = "browser";
     std::string timestamp;
     double started_at = 0;

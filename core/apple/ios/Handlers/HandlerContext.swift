@@ -107,7 +107,6 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     }
     var tabStore: TabStore?
     var browserControlTabId: String?
-    var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
     var annotationSessionId: String?
@@ -133,8 +132,7 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
                 }
                 return
             }
-            consoleMessages.append(body)
-            if consoleMessages.count > 5000 { consoleMessages.removeFirst() }
+            if let view = message.webView { BrowserDiagnostics.forTarget(view).recordConsole(body) }
 
         case "kelpie3DSnapshot":
             if body["action"] as? String == "exit" {
@@ -144,6 +142,8 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
             }
 
         case "kelpieNetwork":
+            if let view = message.webView { BrowserDiagnostics.forTarget(view).recordNetwork(body) }
+            if body["failure"] is String { return }
             let entry = NetworkTrafficStore.TrafficEntry(
                 id: UUID(),
                 method: (body["method"] as? String ?? "GET").uppercased(),

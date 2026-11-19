@@ -47,6 +47,20 @@ int main() {
   assert((*failed)["duration"] == 250);
   assert((*failed)["timestamp"] == "2024-01-01T00:00:01.000Z");
 
+  for (const int status : {200, 204}) {
+    assert(!events.Observe("Network.requestWillBeSent", {
+        {"requestId", "abort"}, {"request", {{"url", "http://127.0.0.1/data"}, {"method", "GET"}}},
+    }));
+    assert(!events.Observe("Network.responseReceived", {
+        {"requestId", "abort"}, {"response", {{"status", status}}},
+    }));
+    const auto aborted = events.Observe("Network.loadingFailed", {
+        {"requestId", "abort"}, {"errorText", "net::ERR_ABORTED"},
+    });
+    assert(aborted && (*aborted)["status"] == status);
+    assert(aborted->contains("failure") == (status == 200));
+  }
+
   for (int index = 0; index < 513; ++index) {
     assert(!events.Observe("Network.requestWillBeSent", {
         {"requestId", "bounded-" + std::to_string(index)},

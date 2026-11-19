@@ -254,6 +254,9 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any] else { return }
+        let diagnostics = BrowserDiagnostics.forTarget(self)
+        if message.name == "kelpieConsole" { diagnostics.recordConsole(body) }
+        if message.name == "kelpieNetwork" { diagnostics.recordNetwork(body) }
         onScriptMessage?(message.name, body)
     }
 
@@ -272,6 +275,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         self.lastNavigationError = nil
         self.documentNavigationStart = Date()
         self.capturedDocumentResponseURL = nil
+        BrowserDiagnostics.forTarget(self).documentResponse = nil
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -444,6 +448,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
             startedAt: documentNavigationStart ?? Date()
         )
 
+        BrowserDiagnostics.forTarget(self).documentResponse = (url, response.statusCode, contentType)
         capturedDocumentResponseURL = url
     }
 }

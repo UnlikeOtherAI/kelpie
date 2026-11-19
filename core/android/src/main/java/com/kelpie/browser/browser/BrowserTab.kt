@@ -16,6 +16,8 @@ class BrowserTab(
     var isStartPage: Boolean = true,
 ) {
     var currentUrl: String by mutableStateOf("")
+    internal val diagnostics = BrowserDiagnostics()
+
     var documentVersion: String = UUID.randomUUID().toString()
     var remoteNavigationLease: com.kelpie.browser.connect.ConnectNavigationLease? = null
     var pageTitle: String by mutableStateOf("")

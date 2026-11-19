@@ -158,7 +158,10 @@ final class CEFRenderer: RendererEngine {
 
         bridge.onConsoleMessage = { [weak self] message in
             Task { @MainActor in
-                self?.onScriptMessage?("kelpieConsole", message as? [String: Any] ?? [:])
+                guard let self else { return }
+                let body = message as? [String: Any] ?? [:]
+                BrowserDiagnostics.forTarget(self).recordConsole(body)
+                self.onScriptMessage?("kelpieConsole", body)
             }
         }
 
@@ -205,6 +208,7 @@ final class CEFRenderer: RendererEngine {
             NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
+            BrowserDiagnostics.forTarget(self).documentResponse = nil
         } else if !isLoading, previousLoading {
             recordCompletedDocumentNavigation()
             NotificationCenter.default.post(name: .kelpieChromiumDocumentLoaded, object: nil)
@@ -226,6 +230,7 @@ final class CEFRenderer: RendererEngine {
         currentURL = url
         documentNavigationStart = Date()
         capturedDocumentResponseURL = nil
+        BrowserDiagnostics.forTarget(self).documentResponse = nil
         ensureBridge()
         if hadBridge {
             if containerView.isHidden {
@@ -353,6 +358,7 @@ final class CEFRenderer: RendererEngine {
             contentType: "",
             startedAt: documentNavigationStart
         )
+        BrowserDiagnostics.forTarget(self).documentResponse = (url, bridge?.mainFrameHTTPStatusCode() ?? 0, "")
         capturedDocumentResponseURL = url
     }
 }

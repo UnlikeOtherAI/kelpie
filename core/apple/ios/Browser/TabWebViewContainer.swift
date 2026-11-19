@@ -205,6 +205,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             handlerContext?.mark3DInspectorInactive(notify: false)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
+            BrowserDiagnostics.forTarget(webView).documentResponse = nil
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -248,7 +249,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
         ) {
             guard webView === currentWebView else { decisionHandler(.allow); return }
-            recordMainDocumentResponse(navigationResponse)
+            recordMainDocumentResponse(navigationResponse, in: webView)
             decisionHandler(.allow)
         }
 
@@ -320,7 +321,7 @@ struct TabWebViewContainer: UIViewRepresentable {
 
         // MARK: - Network Recording
 
-        private func recordMainDocumentResponse(_ response: WKNavigationResponse) {
+        private func recordMainDocumentResponse(_ response: WKNavigationResponse, in webView: WKWebView) {
             guard response.isForMainFrame,
                   let http = response.response as? HTTPURLResponse,
                   let url = http.url?.absoluteString,
@@ -345,6 +346,7 @@ struct TabWebViewContainer: UIViewRepresentable {
                 startedAt: documentNavigationStart ?? Date()
             )
 
+            BrowserDiagnostics.forTarget(webView).documentResponse = (url, http.statusCode, contentType)
             capturedDocumentResponseURL = url
         }
     }

@@ -72,7 +72,8 @@ void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser);
 - (void)cefBridgeUpdateLoadingProgress:(double)progress;
 - (void)cefBridgeHandleConsoleMessage:(NSString *)message
                                source:(NSString *)source
-                                 line:(NSInteger)line;
+                                 line:(NSInteger)line
+                                level:(NSString *)level;
 @end
 
 NS_ASSUME_NONNULL_END

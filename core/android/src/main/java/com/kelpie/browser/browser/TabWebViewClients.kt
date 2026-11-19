@@ -8,7 +8,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import com.kelpie.browser.handlers.ConsoleHandler
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.WebSocketHandler
 
@@ -67,6 +66,7 @@ private fun tabWebViewClient(
                 browserState.updateLoading(true)
                 handlerContext.mark3DInspectorInactive()
             }
+            tab.diagnostics.documentResponse = null
             documentNavigationUrl = url
             didCaptureDocumentForNavigation = false
         }
@@ -93,6 +93,7 @@ private fun tabWebViewClient(
         ) {
             if (request?.isForMainFrame != true) return
             val code = errorResponse?.statusCode ?: return
+            tab.diagnostics.documentResponse = DocumentResponse(request.url.toString(), code, errorResponse.mimeType)
             if (code >= 400) {
                 handlerContext.lastNavigationError = "HTTP $code"
             }
@@ -118,8 +119,7 @@ private fun tabWebViewClient(
                 browserState.updateCanGoForward(view.canGoForward())
             }
 
-            view.evaluateJavascript(ConsoleHandler.BRIDGE_SCRIPT, null)
-            view.evaluateJavascript(JsBridge.NETWORK_BRIDGE_SCRIPT, null)
+            tab.diagnostics.installFallbackBridges(view)
             if (!WebSocketHandler.isDocumentStartSupported) {
                 view.evaluateJavascript(WebSocketHandler.BRIDGE_SCRIPT, null)
             }

@@ -2,6 +2,9 @@ package com.kelpie.browser.network
 
 /** Structural run scope, checked for every canonical request and rich extension invocation. */
 object BrowserGatewayTabPolicy {
+    internal val diagnosticReads =
+        setOf("get-console-messages", "get-js-errors", "get-network-log", "get-resource-timeline")
+
     fun permitsDispatch(
         method: String,
         params: Map<String, Any?>,
@@ -10,6 +13,7 @@ object BrowserGatewayTabPolicy {
     ): Boolean {
         if (pinned != null && active != pinned) return false
         if (method in setOf("switch-tab", "close-tab", "new-tab", "delete-partition")) return true
+        if (pinned == null && method in diagnosticReads) return true
         val target = params["tabId"] as? String
         return target == null || target == active
     }

@@ -32,7 +32,7 @@ StringMap ParseHeaders(const json& object,
 }
 
 json EntryToJsonObject(const TrafficEntry& entry, const std::string& category) {
-  return json{
+  json output = {
       {"id", entry.id},
       {"method", entry.method},
       {"url", entry.url},
@@ -48,6 +48,12 @@ json EntryToJsonObject(const TrafficEntry& entry, const std::string& category) {
       {"duration", entry.duration},
       {"size", entry.size},
   };
+  if (!entry.tab_id.empty()) output["tabId"] = entry.tab_id;
+  if (!entry.resource_type.empty()) output["resource_type"] = entry.resource_type;
+  if (!entry.status_text.empty()) output["status_text"] = entry.status_text;
+  if (!entry.failure.empty()) output["failure"] = entry.failure;
+  if (entry.request_method) output["request_method"] = *entry.request_method;
+  return output;
 }
 
 }  // namespace
@@ -56,10 +62,10 @@ void NetworkTrafficStore::Append(const TrafficEntry& entry) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   TrafficEntry normalized = entry;
+  normalized.method = NormalizeMethod(normalized.method);
   if (normalized.id.empty()) {
     normalized.id = store_support::GenerateUuidV4();
   }
-  normalized.method = NormalizeMethod(normalized.method);
   if (normalized.start_time.empty()) {
     normalized.start_time = store_support::CurrentIso8601Utc();
   }
@@ -158,6 +164,11 @@ void NetworkTrafficStore::LoadJson(const std::string& json_text) {
           std::max<std::int32_t>(0, store_support::IntOrDefault(item, {"duration"})),
           std::max<std::int64_t>(0, store_support::Int64OrDefault(item, {"size"})),
           store_support::StringOrDefault(item, {"initiator"}, "browser"),
+          store_support::StringOrDefault(item, {"tabId"}),
+          store_support::StringOrDefault(item, {"resource_type"}),
+          store_support::StringOrDefault(item, {"status_text"}),
+          store_support::StringOrDefault(item, {"failure"}),
+          store_support::OptionalValue<std::string>(item, "request_method"),
       });
     }
   }
