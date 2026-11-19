@@ -12,6 +12,7 @@ class InteractionHandler {
   void Register(DesktopRouter& router) const;
 
  private:
+  nlohmann::json Tap(const nlohmann::json& params) const;
   nlohmann::json Click(const nlohmann::json& params) const;
   nlohmann::json Fill(const nlohmann::json& params) const;
   nlohmann::json Type(const nlohmann::json& params) const;

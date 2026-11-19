@@ -49,6 +49,17 @@ void TestCookiePlanner() {
 }
 
 void TestInputPlanner() {
+  const auto tap = kelpie::desktop_input::PlanTrustedInput(
+      {{"type", "tap"}, {"x", 12.5}, {"y", 44}}, std::nullopt);
+  assert(tap.ok && tap.commands.size() == 2);
+  assert(tap.commands[0]["method"] == "Input.dispatchMouseEvent");
+  assert(tap.commands[0]["params"] == nlohmann::json({
+      {"type", "mousePressed"}, {"x", 12.5}, {"y", 44}, {"button", "left"}, {"clickCount", 1}}));
+  auto release = tap.commands[0];
+  release["params"]["type"] = "mouseReleased";
+  assert(tap.commands[1] == release);
+  assert(!kelpie::desktop_input::PlanTrustedInput({{"type", "tap"}, {"x", 0}}, std::nullopt).ok);
+
   std::string error;
   auto parsed = kelpie::desktop_input::ParseTarget(Target(), &error);
   assert(parsed && error.empty());

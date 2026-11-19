@@ -36,6 +36,8 @@ class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
 class MockControl final : public kelpie::DesktopBrowserControl {
  public:
   std::string last_script;
+  Json last_input;
+  bool reject_input = false;
   kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false; std::uint64_t nav_requested = 1; std::uint64_t nav_completed = 1; std::string nav_error; int nav_polls = 0;
   bool owned_navigation = false; bool replace_owned_navigation = false; std::string owned_destination; std::string owned_source_version="source-doc"; std::string owned_new_version="owned-doc";
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
@@ -84,7 +86,23 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult Back(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Forward(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Reload(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
-  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; last_script=script; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
+  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override {
+    last_lease = lease;
+    last_script = script;
+    if (timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT", "evaluation timed out");
+    if (script.find("return {x, y, appliedX, appliedY}") != std::string::npos) {
+      *value = {{"x", 12.5}, {"y", 23}, {"appliedX", 12.5}, {"appliedY", 23}};
+    } else if (script.find("readyState") != std::string::npos) {
+      *value = "complete";
+    } else if (script.find("attached") != std::string::npos) {
+      *value = {{"attached", true}, {"visible", true}, {"text", "matched"}};
+    } else if (script.find("found") != std::string::npos) {
+      *value = {{"found", true}, {"text", "matched"}};
+    } else {
+      *value = {{"elements", nlohmann::json::array()}, {"count", 0}};
+    }
+    return kelpie::BrowserControlResult::Success(lease.id == "second" ? second : first);
+  }
   std::string last_screenshot_format; std::optional<int> last_screenshot_quality;
   kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override {
     last_lease=lease; last_screenshot_format=image->format; last_screenshot_quality=image->quality;
@@ -93,7 +111,13 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json& cookies, Json* out, Timeout) override { last_lease=lease; last_cookie=cookies; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DeleteCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"deleted",1}}; return kelpie::BrowserControlResult::Success(second); }
-  kelpie::BrowserControlResult DispatchTrustedInput(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"trusted",true}}; return kelpie::BrowserControlResult::Success(second); }
+  kelpie::BrowserControlResult DispatchTrustedInput(kelpie::TabLease lease, const Json& input, Json* out, Timeout) override {
+    last_lease = lease;
+    last_input = input;
+    if (reject_input) return kelpie::BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab is stale");
+    *out = {{"trusted", true}};
+    return kelpie::BrowserControlResult::Success(second);
+  }
   kelpie::BrowserControlResult GetDialog(kelpie::TabLease lease, Json* out, Timeout) override { last_lease=lease; *out={{"showing",true},{"dialog",{{"type","alert"},{"message","hi"},{"defaultValue",nullptr}}}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult HandleDialog(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"action","accept"},{"dialogType","confirm"}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DevTools(kelpie::TabLease lease, std::string method, const Json& params, Json* out, Timeout) override {
@@ -139,6 +163,35 @@ int main() {
   assert(router.Dispatch("delete-cookies",{{"tabId","second"},{"generation",9},{"domain","example.test"}}).status_code==200);
   assert(router.Dispatch("set-storage",{{"tabId","second"},{"generation",9},{"key","empty"},{"value",""}}).status_code==200);
   assert(router.Dispatch("fill",{{"tabId","second"},{"generation",9},{"selector","#name"},{"value",""}}).status_code==200);
+  control.second.document_version = "second-doc";
+  const nlohmann::json tap = {{"x", 12.5}, {"y", 23}, {"tabId", "second"}, {"generation", 9}};
+  auto tapped = router.Dispatch("tap", tap);
+  assert(tapped.status_code == 200 && tapped.body["appliedX"] == 12.5 && tapped.body["input"]["trusted"] == true);
+  assert(tapped.body["tab"]["id"] == "second" && control.last_lease.document_version == "second-doc");
+  assert(control.last_input == nlohmann::json({{"type", "tap"}, {"x", 12.5}, {"y", 23}}));
+  assert(control.last_script.find(R"("59,130,246","circle",550)") != std::string::npos);
+  auto marked = tap;
+  marked["marker"] = {{"style", "crosshair-coordinates"}, {"durationMs", 2147483647}};
+  assert(router.Dispatch("tap", marked).status_code == 200);
+  assert(control.last_script.find(R"("crosshair-coordinates",2147483647)") != std::string::npos);
+  control.last_script.clear();
+  for (const auto& invalid : {nlohmann::json(nullptr), nlohmann::json{{"style", "ring"}},
+                              nlohmann::json{{"durationMs", true}}, nlohmann::json{{"durationMs", 1.5}},
+                              nlohmann::json{{"durationMs", 2147483648LL}}, nlohmann::json{{"extra", 0}}}) {
+    marked["marker"] = invalid;
+    assert(router.Dispatch("tap", marked).status_code == 400);
+  }
+  auto window_tap = tap;
+  window_tap["windowId"] = "other-window";
+  assert(router.Dispatch("tap", window_tap).status_code == 400);
+  {
+    kelpie::ScopedBrowserControlLease owned({"first", 3, "first-doc"});
+    assert(router.Dispatch("tap", tap).body["error"]["code"] == "TAB_STALE");
+  }
+  assert(control.last_script.empty());
+  control.reject_input = true;
+  assert(router.Dispatch("tap", tap).body["error"]["code"] == "TAB_NOT_FOUND");
+  control.reject_input = false;
   auto dialog_result=router.Dispatch("handle-dialog",{{"tabId","second"},{"generation",9},{"action","accept"}}); assert(dialog_result.status_code==200 && control.last_lease.id=="second");
   assert(dialog_result.body["action"]=="accept" && dialog_result.body["dialogType"]=="confirm");
   auto shown=router.Dispatch("get-dialog",{{"tabId","second"},{"generation",9}}); assert(shown.body["showing"]==true && shown.body["dialog"]["type"]=="alert");

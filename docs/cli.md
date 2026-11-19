@@ -370,7 +370,7 @@ kelpie tap 195 420 --device "My iPhone" --marker-style crosshair-coordinates --m
 ```
 
 Use this only as a fallback. Coordinates are sensitive to viewport changes, scrolling, and overlays.
-On iOS, Android, and macOS, `--marker-style` accepts `circle` (the default) or `crosshair-coordinates`.
+`--marker-style` accepts `circle` (the default) or `crosshair-coordinates` on iOS, Android, macOS, and the Windows and Linux Chromium builds.
 The crosshair displays the applied viewport point and the page point including scroll offsets.
 `--marker-duration <ms>` sets how long the marker holds before fading (default 550 ms).
 MCP callers can set the same [tap marker options](api/core.md#tap) in `kelpie_tap` arguments.
