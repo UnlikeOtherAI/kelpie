@@ -26,6 +26,7 @@ protocol RendererEngine: AnyObject {
     // MARK: - JavaScript
     /// Evaluate JS and return the result. Equivalent to WKWebView.evaluateJavaScript.
     func evaluateJS(_ script: String) async throws -> Any?
+    func evaluatePageJS(_ script: String) async throws -> Any?
     func evaluateBrowserControlJS(_ script: String) async throws -> Any?
 
     // Cookies are not renderer state: each engine's store is a `CookieJar`.
@@ -60,6 +61,10 @@ protocol RendererEngine: AnyObject {
 }
 
 extension RendererEngine {
+    func evaluatePageJS(_ script: String) async throws -> Any? {
+        try await evaluateJS(script)
+    }
+
     func willDeactivate() {}
     func didActivate() {}
     func viewportDidChange() {}

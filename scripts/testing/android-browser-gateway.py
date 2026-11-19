@@ -236,6 +236,24 @@ def main():
     fixture_url = f'http://10.0.2.2:{args.fixture_port}/fixture' + FixtureHandler.fixture_query
     tab = core('tabs.new')['id']
     core('tab.goto', tab, {'url': fixture_url})
+    for expression, expected in (
+        ("(async()=>{await new Promise(resolve=>setTimeout(resolve,75));"
+         "window.evalFixtureRuns=(window.evalFixtureRuns||0)+1;return 5})()", 5),
+        ("window.evalFixtureRuns", 1),
+        ("var evalFixtureNumber=4; evalFixtureNumber+2", 6),
+        ("'false'", 'false'),
+        ("Promise.resolve(false)", False),
+        ("Promise.resolve(undefined)", None),
+    ):
+        status, evaluated = request('/v1/evaluate', {'expression': expression})
+        assert status == 200 and evaluated['success']
+        actual = evaluated['result']
+        assert type(actual) is type(expected) and actual == expected, (expression, evaluated)
+    _, rejected = request('/v1/evaluate', {'expression': "Promise.reject(new Error('fixture rejection'))"})
+    assert not rejected['success'] and rejected['error']['code'] == 'EVAL_ERROR'
+    assert 'fixture rejection' in rejected['error']['message']
+    assert native('evaluate', {'expression': 'Promise.resolve(7)'})['result'] == 7
+    print('PASS public HTTP and MCP Promise evaluation, rejection and primitive results', flush=True)
     native('evaluate', {'expression': 'window.navigationMarker = 1'})
     core('tab.goto', tab, {'url': fixture_url + '#section'})
     assert native('evaluate', {'expression': 'window.navigationMarker'})['result'] == 1

@@ -166,13 +166,14 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
         }
     }
 
-    func evaluateJS(_ script: String) async throws -> Any? {
+    func evaluateJS(_ script: String, awaitPromise: Bool = false) async throws -> Any? {
         try Task.checkCancellation()
         if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
         if let browserControlTabId, browserControlTabId != (tabStore?.activeBrowserTabID?.uuidString ?? (webView != nil ? "external" : nil)) {
             throw HandlerError.noWebView
         }
         guard let webView else { throw HandlerError.noWebView }
+        if awaitPromise { return try await PageJavaScript.evaluate(script, in: webView) }
         return try await webView.evaluateJavaScript(script)
     }
 

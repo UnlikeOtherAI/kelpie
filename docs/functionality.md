@@ -211,7 +211,9 @@ Wait for an element to appear, become visible, or disappear — with configurabl
 
 ## JavaScript Evaluation
 
-Execute arbitrary JavaScript in the page context and get the result back. Use it for anything the built-in methods don't cover.
+Execute JavaScript in the page context and get its result. When a script returns
+a Promise, evaluation returns its resolved value or reports its rejection.
+See [the evaluate endpoint](api/browser.md#evaluate) for renderer limits.
 
 ## Console and Error Capture
 

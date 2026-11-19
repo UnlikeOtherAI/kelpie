@@ -128,10 +128,10 @@ final class HandlerContext {
     }
 
     /// Convenience: evaluate JS on a specific tab.
-    func evaluateJS(_ script: String, windowId: String? = nil, tabId: String?) async throws -> Any? {
+    func evaluateJS(_ script: String, windowId: String? = nil, tabId: String?, awaitPromise: Bool = false) async throws -> Any? {
         let target = try resolveRenderer(windowId: windowId, tabId: tabId)
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
-        let result = try await target.evaluateJS(script)
+        let result = try await awaitPromise ? target.evaluatePageJS(script) : target.evaluateJS(script)
         guard remoteDocumentGuard?() != false else { throw CancellationError() }
         return result
     }
