@@ -60,13 +60,11 @@ class HandlerContext(
     var annotationPageURL: String? = null
     var annotationElementCount: Int? = null
     var aiManager: AiManager? = null
-    val consoleMessages = mutableListOf<Map<String, Any?>>()
     val dialogState = DialogState()
 
     /** Most recent WebView navigation error (cleared on each new navigation). */
     @Volatile
     var lastNavigationError: String? = null
-    private val consoleMessagesLock = Any()
 
     private val _activePanel = MutableStateFlow<String?>(null)
     private val _isIn3DInspector = MutableStateFlow(false)
@@ -90,27 +88,6 @@ class HandlerContext(
     fun mark3DInspectorInactive() {
         isIn3DInspector = false
     }
-
-    fun appendConsoleMessage(message: Map<String, Any?>) {
-        synchronized(consoleMessagesLock) {
-            consoleMessages.add(message)
-            if (consoleMessages.size > 5000) {
-                consoleMessages.removeFirst()
-            }
-        }
-    }
-
-    fun snapshotConsoleMessages(): List<Map<String, Any?>> =
-        synchronized(consoleMessagesLock) {
-            consoleMessages.toList()
-        }
-
-    fun clearConsoleMessages(): Int =
-        synchronized(consoleMessagesLock) {
-            val cleared = consoleMessages.size
-            consoleMessages.clear()
-            cleared
-        }
 
     suspend fun evaluateJS(script: String): String = evaluateGuardedJS(script, remoteDocumentGuard)
 

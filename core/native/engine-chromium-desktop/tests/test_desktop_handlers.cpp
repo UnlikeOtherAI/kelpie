@@ -142,7 +142,30 @@ int main() {
   auto dialog_result=router.Dispatch("handle-dialog",{{"tabId","second"},{"generation",9},{"action","accept"}}); assert(dialog_result.status_code==200 && control.last_lease.id=="second");
   assert(dialog_result.body["action"]=="accept" && dialog_result.body["dialogType"]=="confirm");
   auto shown=router.Dispatch("get-dialog",{{"tabId","second"},{"generation",9}}); assert(shown.body["showing"]==true && shown.body["dialog"]["type"]=="alert");
-  assert(router.Dispatch("get-console-messages",{{"tabId","second"}}).status_code==400); assert(router.Dispatch("get-network-log",{{"generation",9}}).status_code==400);
+  console.Append({.level = kelpie::ConsoleLevel::kError, .text = "other tab", .tab_id = "first"});
+  console.Append({.level = kelpie::ConsoleLevel::kError, .text = "this tab", .tab_id = "second"});
+  const auto console_result = router.Dispatch("get-console-messages", second).body;
+  assert(console_result["count"] == 1 && console_result["messages"][0]["text"] == "this tab");
+  assert(console_result["hasMore"] == false);
+  assert(router.Dispatch("get-js-errors", second).body["errors"][0]["text"] == "this tab");
+
+  network.Append({.method = "GET", .url = "https://other.test", .status_code = 404, .tab_id = "first"});
+  network.Append({.method = "POST", .url = "https://test.local/api", .status_code = 404,
+                  .tab_id = "second", .resource_type = "Fetch", .status_text = "Not Found"});
+  network.Append({.method = "GET", .url = "https://test.local/script", .status_code = 204,
+                  .tab_id = "second", .resource_type = "Script"});
+  network.Append({.method = "GET", .url = "https://test.local/aborted", .tab_id = "second",
+                  .resource_type = "XHR", .failure = "net::ERR_FAILED"});
+  const auto network_result = router.Dispatch("get-network-log", second).body;
+  assert(network_result["count"] == 3 && network_result["summary"]["errors"] == 2);
+  auto error_filter = second;
+  error_filter["status"] = "error";
+  const auto requests = router.Dispatch("get-network-log", error_filter).body;
+  assert(requests["count"] == 2 && requests["summary"]["totalRequests"] == 3);
+  assert(requests["entries"][0]["status"] == 404 && requests["entries"][0]["method"] == "POST");
+  assert(requests["entries"][0]["type"] == "fetch" && requests["entries"][0]["statusText"] == "Not Found");
+  assert(requests["entries"][1]["status"].is_null() && requests["entries"][1]["failure"] == "net::ERR_FAILED");
+  assert(router.Dispatch("get-network-log", {{"generation", 9}}).status_code == 400);
   auto bad_generation=router.Dispatch("get-page-text",{{"generation","nine"}}); assert(bad_generation.status_code==400);
   auto bad_storage=router.Dispatch("get-storage",{{"type",7}}); assert(bad_storage.status_code==400);
   assert(router.Dispatch("resize-viewport", {{"width", 4294967297ULL}, {"height", 720}}).status_code == 400);

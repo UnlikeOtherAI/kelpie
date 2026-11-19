@@ -67,6 +67,7 @@ private fun tabWebViewClient(
                 browserState.updateLoading(true)
                 handlerContext.mark3DInspectorInactive()
             }
+            tab.diagnostics.documentResponse = null
             documentNavigationUrl = url
             didCaptureDocumentForNavigation = false
         }
@@ -93,6 +94,7 @@ private fun tabWebViewClient(
         ) {
             if (request?.isForMainFrame != true) return
             val code = errorResponse?.statusCode ?: return
+            tab.diagnostics.documentResponse = DocumentResponse(request.url.toString(), code, errorResponse.mimeType)
             if (code >= 400) {
                 handlerContext.lastNavigationError = "HTTP $code"
             }
@@ -118,8 +120,8 @@ private fun tabWebViewClient(
                 browserState.updateCanGoForward(view.canGoForward())
             }
 
-            view.evaluateJavascript(ConsoleHandler.BRIDGE_SCRIPT, null)
             view.evaluateJavascript(JsBridge.NETWORK_BRIDGE_SCRIPT, null)
+            view.evaluateJavascript(ConsoleHandler.BRIDGE_SCRIPT, null)
             if (!WebSocketHandler.isDocumentStartSupported) {
                 view.evaluateJavascript(WebSocketHandler.BRIDGE_SCRIPT, null)
             }

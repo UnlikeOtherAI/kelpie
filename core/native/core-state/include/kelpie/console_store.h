@@ -25,6 +25,7 @@ struct ConsoleEntry {
   std::int32_t column = 0;
   std::string timestamp;
   std::optional<std::string> stack_trace;
+  std::string tab_id;
 };
 
 class ConsoleStore {

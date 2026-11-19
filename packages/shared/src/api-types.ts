@@ -456,12 +456,14 @@ export interface GetFormStateResponse extends SuccessResponse {
 // --- DevTools: Console ---
 
 export interface GetConsoleMessagesRequest {
+  tabId?: string;
   level?: "log" | "warn" | "error" | "info" | "debug";
   since?: string;
   limit?: number;
 }
 
 export interface ConsoleMessage {
+  tabId?: string;
   level: string;
   text: string;
   source: string;
@@ -489,29 +491,32 @@ export interface ClearConsoleResponse extends SuccessResponse {
 // --- DevTools: Network ---
 
 export interface GetNetworkLogRequest {
+  tabId?: string;
   type?: string;
   status?: "success" | "error" | "pending";
-  since?: string;
+  since?: string | number;
   limit?: number;
 }
 
 export interface NetworkEntry {
+  tabId?: string;
+  failure?: string;
   url: string;
   type: string;
-  method: string;
-  status: number;
-  statusText: string;
-  mimeType: string;
-  size: number;
-  transferSize: number;
+  method: string | null;
+  status: number | null;
+  statusText: string | null;
+  mimeType: string | null;
+  size: number | null;
+  transferSize: number | null;
   timing: {
     started: string;
-    dnsLookup?: number;
-    tcpConnect?: number;
-    tlsHandshake?: number;
-    requestSent?: number;
-    waiting?: number;
-    contentDownload?: number;
+    dnsLookup?: number | null;
+    tcpConnect?: number | null;
+    tlsHandshake?: number | null;
+    requestSent?: number | null;
+    waiting?: number | null;
+    contentDownload?: number | null;
     total: number;
   };
   initiator: string;
@@ -536,7 +541,7 @@ export interface ResourceTimelineEntry {
   type: string;
   start: number;
   end: number;
-  status: number;
+  status: number | null;
 }
 
 export interface GetResourceTimelineResponse extends SuccessResponse {

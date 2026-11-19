@@ -1,9 +1,12 @@
 package com.kelpie.browser.devtools
 
 import com.kelpie.browser.handlers.HandlerContext
+import com.kelpie.browser.handlers.diagnosticTab
+import com.kelpie.browser.handlers.missingDiagnosticTab
 import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 
 class NetworkLogHandler(
@@ -11,58 +14,38 @@ class NetworkLogHandler(
 ) {
     fun register(router: Router) {
         router.register("get-network-log") { getNetworkLog(it) }
-        router.register("get-resource-timeline") { getResourceTimeline() }
+        router.register("get-resource-timeline") { getResourceTimeline(it) }
     }
 
     private suspend fun getNetworkLog(body: Map<String, Any?>): Map<String, Any?> {
-        val typeFilter = body["type"] as? String
-        val statusCategory = parseStatusCategory(body["status"])
-        val sinceFilter = parseSinceMillis(body["since"])
-        val limit = (body["limit"] as? Int) ?: 200
-        val js = """
-(function(){
-    var entries = performance.getEntriesByType('resource');
-    var nav = performance.getEntriesByType('navigation');
-    return JSON.stringify(nav.concat(entries).map(function(e){
-        var type = 'other';
-        if (e.entryType === 'navigation') type = 'document';
-        else if (e.initiatorType === 'script') type = 'script';
-        else if (e.initiatorType === 'link' || e.initiatorType === 'css') type = 'stylesheet';
-        else if (e.initiatorType === 'img') type = 'image';
-        else if (e.initiatorType === 'fetch') type = 'fetch';
-        else if (e.initiatorType === 'xmlhttprequest') type = 'xhr';
-        else if (e.initiatorType === 'font' || (e.name && e.name.match(/\.(woff2?|ttf|otf|eot)/))) type = 'font';
-        return {
-            url: e.name, type: type, method: 'GET',
-            status: e.responseStatus || 200, statusText: 'OK', mimeType: '',
-            size: e.decodedBodySize || 0, transferSize: e.transferSize || 0,
-            timing: { started: new Date(performance.timeOrigin + e.startTime).toISOString(), total: Math.round(e.duration) },
-            initiator: e.initiatorType || 'other'
-        };
-    }));
-})()
-"""
+        val tab = ctx.diagnosticTab(body) ?: return missingDiagnosticTab()
+        val type = body["type"] as? String
+        val category = parseStatusCategory(body["status"])
+        val since = parseSinceMillis(body["since"])
+        val limit = (body["limit"] as? Int ?: 200).coerceAtLeast(0)
         return try {
-            val entries = ctx.evaluateJSReturningArray(js.replace("\n", " "))
-            var filtered = entries
-            if (typeFilter != null) {
-                filtered = filtered.filter { (it["type"] as? String) == typeFilter }
-            }
-            if (statusCategory != null) {
-                filtered = filtered.filter { matchesStatusCategory(entryStatus(it), statusCategory) }
-            }
-            if (sinceFilter != null) {
-                filtered = filtered.filter { entryStartedMillis(it)?.let { started -> started >= sinceFilter } ?: false }
-            }
+            val page = ctx.withBrowserTarget(tab.webView) { ctx.evaluateJSReturningJSON(NETWORK_SNAPSHOT) }
+            val entries = mergeNetworkEntries(page, tab.diagnostics.snapshotNetwork(), tab.diagnostics.documentResponse)
+            val eligible =
+                entries.filter {
+                    (type == null || it["type"] == type) &&
+                        (since == null || entryStartedMillis(it)?.let { millis -> millis >= since } == true)
+                }
+            val filtered =
+                eligible.filter {
+                    category == null || matchesStatusCategory(entryStatus(it), category, it["failure"] is String)
+                }
             val limited = filtered.take(limit)
             successResponse(
                 mapOf(
                     "entries" to limited,
                     "count" to limited.size,
                     "hasMore" to (filtered.size > limit),
-                    "summary" to buildSummary(filtered),
+                    "summary" to buildSummary(eligible),
                 ),
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
@@ -88,11 +71,13 @@ class NetworkLogHandler(
         internal fun matchesStatusCategory(
             status: Int?,
             category: String,
+            failed: Boolean = false,
         ): Boolean =
-            when (category) {
-                "success" -> status != null && status in 200..399
-                "error" -> status != null && status >= 400
-                "pending" -> status == null || status == 0
+            when {
+                failed -> category == "error"
+                category == "success" -> status != null && status in 200..399
+                category == "error" -> status != null && status >= 400
+                category == "pending" -> status == null || status == 0
                 else -> false
             }
 
@@ -141,8 +126,7 @@ class NetworkLogHandler(
             totalTransfer += numberAsLong(entry["transferSize"])
             val type = entry["type"] as? String ?: "other"
             byType[type] = (byType[type] ?: 0) + 1
-            val status = entryStatus(entry) ?: 200
-            if (status >= 400) errors++
+            if (matchesStatusCategory(entryStatus(entry), "error", entry["failure"] is String)) errors++
             val timing = entry["timing"] as? Map<*, *>
             val total = numberAsLong(timing?.get("total"))
             if (total > maxEnd) maxEnd = total
@@ -166,30 +150,13 @@ class NetworkLogHandler(
             else -> 0L
         }
 
-    private suspend fun getResourceTimeline(): Map<String, Any?> {
-        val js = """
-(function(){
-    var nav = performance.getEntriesByType('navigation')[0] || {};
-    var entries = performance.getEntriesByType('resource');
-    return {
-        pageUrl: location.href,
-        navigationStart: new Date(performance.timeOrigin).toISOString(),
-        domContentLoaded: Math.round(nav.domContentLoadedEventEnd || 0),
-        domComplete: Math.round(nav.domComplete || 0),
-        loadEvent: Math.round(nav.loadEventEnd || 0),
-        resources: entries.map(function(e){
-            var type = 'other';
-            if (e.initiatorType === 'script') type = 'script';
-            else if (e.initiatorType === 'link' || e.initiatorType === 'css') type = 'stylesheet';
-            else if (e.initiatorType === 'img') type = 'image';
-            else if (e.initiatorType === 'fetch') type = 'fetch';
-            return { url: e.name, type: type, start: Math.round(e.startTime), end: Math.round(e.startTime + e.duration), status: e.responseStatus || 200 };
-        })
-    };
-})()
-"""
+    private suspend fun getResourceTimeline(body: Map<String, Any?>): Map<String, Any?> {
+        val tab = ctx.diagnosticTab(body) ?: return missingDiagnosticTab()
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js.replace("\n", " ")))
+            val page = ctx.withBrowserTarget(tab.webView) { ctx.evaluateJSReturningJSON(NETWORK_SNAPSHOT) }
+            successResponse(page - setOf("entries", "timeOrigin"))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }

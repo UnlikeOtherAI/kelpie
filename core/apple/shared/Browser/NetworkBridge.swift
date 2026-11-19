@@ -10,13 +10,26 @@ enum NetworkBridge {
                 window.webkit.messageHandlers.kelpieNetwork
             );
 
+            function requestUrl(input) {
+                try {
+                    var url = new URL(input instanceof Request ? input.url : input, document.baseURI);
+                    url.hash = '';
+                    return url.href;
+                } catch(e) { return ''; }
+            }
+
+            function requestMethod(method) {
+                var upper = String(method).toUpperCase();
+                return ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT'].includes(upper) ? upper : String(method);
+            }
+
             // --- XMLHttpRequest interception ---
             var origOpen = XMLHttpRequest.prototype.open;
             var origSend = XMLHttpRequest.prototype.send;
             var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
 
             XMLHttpRequest.prototype.open = function(method, url) {
-                this._mltv = { method: method, url: String(url), headers: {}, startTime: 0 };
+                this._mltv = { method: requestMethod(method), url: requestUrl(url), headers: {}, startTime: 0 };
                 return origOpen.apply(this, arguments);
             };
 
@@ -28,13 +41,13 @@ enum NetworkBridge {
             XMLHttpRequest.prototype.send = function(body) {
                 if (this._mltv) {
                     this._mltv.body = typeof body === 'string' ? body.substring(0, 10000) : null;
-                    this._mltv.startTime = Date.now();
+                    this._mltv.startTime = performance.timeOrigin + performance.now();
                 }
                 var self = this;
+                var m = this._mltv;
                 this.addEventListener('loadend', function() {
-                    if (!self._mltv) return;
-                    var m = self._mltv;
-                    var duration = Date.now() - m.startTime;
+                    if (!m) return;
+                    var duration = Math.round(performance.timeOrigin + performance.now() - m.startTime);
                     var rh = {};
                     (self.getAllResponseHeaders() || '').split('\\r\\n').forEach(function(l) {
                         var i = l.indexOf(': ');
@@ -42,9 +55,13 @@ enum NetworkBridge {
                     });
                     try {
                         _post({
-                            method: m.method || 'GET',
-                            url: m.url || '',
+                            method: m.method,
+                            url: m.url,
+                            type: 'xhr',
+                            started: m.startTime,
                             statusCode: self.status,
+                            statusText: self.statusText,
+                            failure: self.status === 0 ? 'XHR failed or was aborted' : null,
                             contentType: self.getResponseHeader('Content-Type') || '',
                             requestHeaders: m.headers,
                             responseHeaders: rh,
@@ -53,10 +70,11 @@ enum NetworkBridge {
                                 ? (self.responseText || '').substring(0, 10000) : null,
                             duration: duration,
                             size: parseInt(self.getResponseHeader('Content-Length') || '0', 10)
-                                || (self.responseText || '').length
+                                || ((self.responseType === '' || self.responseType === 'text')
+                                    ? (self.responseText || '').length : 0)
                         });
                     } catch(e) {}
-                });
+                }, {once: true});
                 return origSend.apply(this, arguments);
             };
 
@@ -65,13 +83,11 @@ enum NetworkBridge {
             var _pendingFetches = 0;
             var _maxPendingFetches = 100;
             window.fetch = function(input, init) {
-                var signal = init && init.signal;
-                if (signal && signal.aborted) return origFetch.apply(this, arguments);
                 if (_pendingFetches >= _maxPendingFetches) return origFetch.apply(this, arguments);
                 _pendingFetches++;
-                var startTime = Date.now();
-                var method = (init && init.method) || 'GET';
-                var url = typeof input === 'string' ? input : (input && input.url) || '';
+                var startTime = performance.timeOrigin + performance.now();
+                var method = requestMethod((init && init.method) || (input instanceof Request && input.method) || 'GET');
+                var url = requestUrl(input);
                 var reqHeaders = {};
                 if (init && init.headers) {
                     if (init.headers instanceof Headers) {
@@ -85,7 +101,7 @@ enum NetworkBridge {
 
                 return origFetch.apply(this, arguments).then(function(response) {
                     _pendingFetches--;
-                    var duration = Date.now() - startTime;
+                    var duration = Math.round(performance.timeOrigin + performance.now() - startTime);
                     var respHeaders = {};
                     response.headers.forEach(function(v, k) { respHeaders[k] = v; });
                     var ct = response.headers.get('content-type') || '';
@@ -94,6 +110,7 @@ enum NetworkBridge {
                         try {
                             _post({
                                 method: method, url: url, statusCode: response.status,
+                                type: 'fetch', started: startTime, statusText: response.statusText,
                                 contentType: ct, requestHeaders: reqHeaders,
                                 responseHeaders: respHeaders, requestBody: reqBody,
                                 responseBody: text.substring(0, 10000),
@@ -106,6 +123,7 @@ enum NetworkBridge {
                         try {
                             _post({
                                 method: method, url: url, statusCode: response.status,
+                                type: 'fetch', started: startTime, statusText: response.statusText,
                                 contentType: ct, requestHeaders: reqHeaders,
                                 responseHeaders: respHeaders, requestBody: reqBody,
                                 responseBody: null, duration: duration,
@@ -114,8 +132,15 @@ enum NetworkBridge {
                         } catch(e) {}
                     });
                     return response;
-                }).catch(function(err) {
+                }, function(err) {
                     _pendingFetches--;
+                    try {
+                        _post({
+                            method: method, url: url, type: 'fetch', started: startTime, statusCode: 0,
+                            failure: err && err.message || 'Fetch failed',
+                            duration: Math.round(performance.timeOrigin + performance.now() - startTime)
+                        });
+                    } catch(e) {}
                     throw err;
                 });
             };

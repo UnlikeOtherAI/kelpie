@@ -194,7 +194,8 @@ extension Router {
                     return errorResponse(code: "TAB_CHANGED", message: "The pinned tab is no longer visible")
                 }
                 #if os(iOS)
-                if !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method), selectedView !== self.handlerContext?.webView {
+                if !Self.tabDiagnosticReads.contains(method),
+                   !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method), selectedView !== self.handlerContext?.webView {
                     return errorResponse(code: "TAB_CHANGED", message: "The selected renderer changed")
                 }
                 #endif
@@ -236,13 +237,18 @@ extension Router {
         #endif
     }
 
+    private static let tabDiagnosticReads: Set<String> = [
+        "get-console-messages", "get-js-errors", "get-network-log", "get-resource-timeline"
+    ]
+
     @MainActor
     func browserDispatch(method: String, params: [String: Any], pinnedTabId: String?) async -> [String: Any] {
         var params = params
         if let pinnedTabId { params["tabId"] = pinnedTabId }
         if let target = params["tabId"] as? String, !target.isEmpty {
             #if os(iOS)
-            if !["switch-tab", "close-tab", "get-tabs"].contains(method), target != selectedBrowserTabId {
+            if !Self.tabDiagnosticReads.contains(method),
+               !["switch-tab", "close-tab", "get-tabs"].contains(method), target != selectedBrowserTabId {
                 return errorResponse(code: "TAB_CHANGED", message: "The target tab is no longer visible")
             }
             #else
@@ -256,6 +262,7 @@ extension Router {
         handlerContext?.browserControlTabId = params["tabId"] as? String
         defer { handlerContext?.browserControlTabId = previousTarget }
         if let store = handlerContext?.tabStore, store.activeBrowserTab?.webView !== handlerContext?.webView,
+           !Self.tabDiagnosticReads.contains(method),
            !["get-tabs", "switch-tab", "close-tab", "new-tab"].contains(method) {
             return errorResponse(code: "TAB_CHANGED", message: "The selected renderer has not settled")
         }

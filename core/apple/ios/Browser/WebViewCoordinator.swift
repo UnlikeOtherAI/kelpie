@@ -119,6 +119,7 @@ struct WebViewContainer: UIViewRepresentable {
             handlerContext?.mark3DInspectorInactive(notify: false)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
+            BrowserDiagnostics.forTarget(webView).documentResponse = nil
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -159,7 +160,7 @@ struct WebViewContainer: UIViewRepresentable {
             decidePolicyFor navigationResponse: WKNavigationResponse,
             decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
         ) {
-            recordMainDocumentResponse(navigationResponse)
+            recordMainDocumentResponse(navigationResponse, in: webView)
             decisionHandler(.allow)
         }
 
@@ -212,7 +213,7 @@ struct WebViewContainer: UIViewRepresentable {
             dialogState.enqueue(dialog)
         }
 
-        private func recordMainDocumentResponse(_ navigationResponse: WKNavigationResponse) {
+        private func recordMainDocumentResponse(_ navigationResponse: WKNavigationResponse, in webView: WKWebView) {
             guard navigationResponse.isForMainFrame,
                   let response = navigationResponse.response as? HTTPURLResponse,
                   let url = response.url?.absoluteString,
@@ -237,6 +238,7 @@ struct WebViewContainer: UIViewRepresentable {
                 startedAt: documentNavigationStart ?? Date()
             )
 
+            BrowserDiagnostics.forTarget(webView).documentResponse = (url, response.statusCode, contentType)
             capturedDocumentResponseURL = url
         }
     }

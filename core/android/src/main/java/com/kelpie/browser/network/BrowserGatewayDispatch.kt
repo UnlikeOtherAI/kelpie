@@ -15,6 +15,7 @@ class BrowserGatewayDispatch<T>(
         if (!BrowserGatewayTabPolicy.permitsDispatch(method, params, pinned, admitted)) {
             return errorResponse("TAB_CHANGED", "The requested tab is no longer active")
         }
+        if (pinned == null && method in BrowserGatewayTabPolicy.diagnosticReads) return operation(null)
         val management = method in setOf("switch-tab", "close-tab", "new-tab", "delete-partition")
         val result = operation(if (management) null else renderer())
         return if (!management && active() != admitted) errorResponse("TAB_CHANGED", "The requested tab changed during dispatch") else result

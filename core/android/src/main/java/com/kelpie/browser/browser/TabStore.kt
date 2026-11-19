@@ -163,10 +163,10 @@ class TabStore(
                 settings.setSupportMultipleWindows(false)
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.userAgentString = BROWSER_USER_AGENT
-                addJavascriptInterface(JsBridge(handlerContext), JS_BRIDGE_NAME)
                 WebSocketHandler.installBridge(this)
             }
         val tab = BrowserTab(webView = webView, isStartPage = isStartPage, partition = partition, name = name)
+        webView.addJavascriptInterface(JsBridge(handlerContext, tab.diagnostics), JS_BRIDGE_NAME)
         installTabWebViewClients(webView, tab, this, browserState, handlerContext)
         return tab
     }

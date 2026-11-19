@@ -24,6 +24,11 @@ struct TrafficEntry {
   std::int32_t duration = 0;
   std::int64_t size = 0;
   std::string initiator = "browser";  // "browser" or "js"
+  std::string tab_id;
+  std::string resource_type;
+  std::string status_text;
+  std::string failure;
+  std::optional<std::string> request_method;
 };
 
 class NetworkTrafficStore {

@@ -20,7 +20,6 @@ final class HandlerContext {
     /// wherever the active renderer changes.
     var activeEngineIsChromium = false
     var browserControlEngineName: String?
-    var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
     var annotationSessionId: String?
@@ -291,8 +290,6 @@ final class HandlerContext {
                 }
                 return
             }
-            consoleMessages.append(body)
-            if consoleMessages.count > 5000 { consoleMessages.removeFirst() }
 
         case "kelpie3DSnapshot":
             if body["action"] as? String == "exit" {
@@ -302,6 +299,7 @@ final class HandlerContext {
             }
 
         case "kelpieNetwork":
+            if body["failure"] is String { return }
             let entry = NetworkTrafficStore.TrafficEntry(
                 id: UUID(),
                 method: (body["method"] as? String ?? "GET").uppercased(),

@@ -1,5 +1,6 @@
 package com.kelpie.browser.handlers
 
+import com.kelpie.browser.devtools.NetworkLogHandler
 import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.successResponse
 
@@ -8,15 +9,24 @@ class ConsoleHandler(
 ) {
     fun register(router: Router) {
         router.register("get-console-messages") { body -> getConsoleMessages(body) }
-        router.register("get-js-errors") { getJSErrors() }
-        router.register("clear-console") { clearConsole() }
+        router.register("get-js-errors") { getJSErrors(it) }
+        router.register("clear-console") { clearConsole(it) }
     }
 
     private fun getConsoleMessages(body: Map<String, Any?>): Map<String, Any?> {
         val level = body["level"] as? String
-        val limit = body["limit"] as? Int ?: 100
+        val limit = (body["limit"] as? Int ?: 100).coerceAtLeast(0)
+        val since = NetworkLogHandler.parseSinceMillis(body["since"])
+        val tab = context.diagnosticTab(body) ?: return missingDiagnosticTab()
 
-        var messages = context.snapshotConsoleMessages()
+        var messages = tab.diagnostics.snapshotConsole()
+        if (since != null) {
+            messages =
+                messages.filter {
+                    val timestamp = it["timestamp"] as? String
+                    timestamp?.let { NetworkLogHandler.parseIso8601Millis(it) }?.let { millis -> millis >= since } == true
+                }
+        }
         if (level != null) {
             messages = messages.filter { it["level"] == level }
         }
@@ -30,23 +40,28 @@ class ConsoleHandler(
         )
     }
 
-    private fun getJSErrors(): Map<String, Any?> {
+    private fun getJSErrors(body: Map<String, Any?>): Map<String, Any?> {
+        val tab = context.diagnosticTab(body) ?: return missingDiagnosticTab()
         val errors =
-            context.snapshotConsoleMessages().filter { it["level"] == "error" }
+            tab.diagnostics.snapshotConsole().filter { it["level"] == "error" }
         return successResponse(
             mapOf(
-                "errors" to errors.map { it + ("type" to "console-error") },
+                "errors" to errors.map { if ("type" in it) it else it + ("type" to "console-error") },
                 "count" to errors.size,
             ),
         )
     }
 
-    private fun clearConsole(): Map<String, Any?> = successResponse(mapOf("cleared" to context.clearConsoleMessages()))
+    private fun clearConsole(body: Map<String, Any?>): Map<String, Any?> {
+        val tab = context.diagnosticTab(body) ?: return missingDiagnosticTab()
+        return successResponse(mapOf("cleared" to tab.diagnostics.clearConsole()))
+    }
 
     companion object {
         const val BRIDGE_SCRIPT =
             """
             (function() {
+                if (console.log.__kelpieInstrumented) return;
                 var _origConsole = {};
                 ['log','warn','error','info','debug'].forEach(function(level) {
                     _origConsole[level] = console[level];
@@ -81,9 +96,11 @@ class ConsoleHandler(
                         _origConsole[level].apply(console, arguments);
                     };
                 });
+                console.log.__kelpieInstrumented = true;
                 window.addEventListener('error', function(e) {
                     if (window.KelpieBridge) window.KelpieBridge.onConsoleMessage(JSON.stringify({
                         level: 'error',
+                        type: 'uncaught-exception',
                         text: e.message || String(e),
                         source: e.filename || '',
                         line: e.lineno || 0,
@@ -95,6 +112,7 @@ class ConsoleHandler(
                 window.addEventListener('unhandledrejection', function(e) {
                     if (window.KelpieBridge) window.KelpieBridge.onConsoleMessage(JSON.stringify({
                         level: 'error',
+                        type: 'unhandled-rejection',
                         text: 'Unhandled Promise rejection: ' + (e.reason ? (e.reason.message || String(e.reason)) : 'unknown'),
                         source: '',
                         line: 0,

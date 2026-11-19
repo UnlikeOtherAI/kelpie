@@ -231,7 +231,7 @@ void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefStr
   owner_->UpdateActiveState();
 }
 
-bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
+bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
                                         cef_log_severity_t level,
                                         const CefString& message,
                                         const CefString& source,
@@ -249,7 +249,10 @@ bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
     level_name = "info";
   }
 
+  auto* tab = owner_->FindTab(browser);
+  if (!tab) return false;
   owner_->console_sink({
+      {"tabId", tab->id},
       {"level", level_name},
       {"text", message.ToString()},
       {"source", source.ToString()},
