@@ -61,7 +61,10 @@ let macResources = Target.target(
         .glob(pattern: "../native/resources/*"),
         "../../assets/tap-marker.js"
     ],
-    settings: .settings(base: ["PRODUCT_NAME": "KelpieBrowserResources"])
+    settings: .settings(base: [
+        "PRODUCT_NAME": "KelpieBrowserResources",
+        "OTHER_CODE_SIGN_FLAGS": .array(["$(inherited)", "--identifier", "$(PRODUCT_BUNDLE_IDENTIFIER)"])
+    ])
 )
 
 let iosResources = Target.target(

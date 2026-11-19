@@ -26,6 +26,35 @@ and relevant toolchain inputs. A Mac-only change or release-workflow edit does n
 build those apps. Workflow-only changes can be checked with Actionlint; their
 explicit `workflow_dispatch` entry points remain available for a platform build.
 
+## Mac App Store and TestFlight
+
+Generate the standalone WebKit-only app with `TUIST_KELPIE_WEBKIT_ONLY=true`.
+This target uses the `com.unlikeotherai.kelpie` App Store Connect record and the
+macOS sandbox entitlements. Archive the `Kelpie` scheme on the signing Mac.
+
+```sh
+TUIST_KELPIE_WEBKIT_ONLY=true tuist generate --path apps/macos --no-open
+xcodebuild -workspace apps/macos/Kelpie.xcworkspace -scheme Kelpie \
+  -configuration Release -destination 'generic/platform=macOS' \
+  -archivePath /absolute/staging/Kelpie.xcarchive CODE_SIGN_IDENTITY=- archive
+
+python3 scripts/package-macos-store.py \
+  --archive /absolute/staging/Kelpie.xcarchive \
+  --profile /absolute/signing/Kelpie-Mac-App-Store.provisionprofile \
+  --version "$store_version" --build "$store_build" \
+  --output /absolute/staging/Kelpie-App-Store.pkg
+```
+
+Supply the App Store version and a new build number for that version. Use the
+UnlikeOtherAI Mac App Store distribution profile and its Apple Distribution
+private key, along with the team's Mac App Store installer identity. The
+packager signs the browser resources before the app and verifies the identifiers,
+certificate, entitlements, and embedded profile in the extracted installer.
+Validate the exact package with `xcrun altool --validate-app` for macOS before
+uploading it to App Store Connect. Confirm processing completes in TestFlight.
+
+For profile creation, see [Apple's Mac App Store provisioning instructions](https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile/).
+
 ## Direct-distribution signing
 
 Build the desired architecture with the existing UnlikeOtherAI Developer ID
