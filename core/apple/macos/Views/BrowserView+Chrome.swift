@@ -10,40 +10,23 @@ extension BrowserView {
 
     var browserTabs: some View {
         HStack(spacing: 0) {
-            if rendererState.activeEngine == .chromium {
-                HStack(spacing: 12) {
-                    Image("ChromeLogo", bundle: KelpieResources.bundle).resizable().frame(width: 16, height: 16)
-                    Text(tabStore.activeTab?.isStartPage == true ? "Start Page" : windowTitle)
-                        .font(.system(size: 12)).lineLimit(1)
-                    AppKitToolbarButton(
-                    systemName: "xmark",
-                    accessibilityID: "browser.tabs.close",
-                    accessibilityLabel: "Close window"
-                ) { NSApp.keyWindow?.close() }
+            TabBarView(
+                appearance: chromeAppearance,
+                tabStore: tabStore,
+                onNewTab: handleNewTabCommand,
+                onCloseTab: { id in
+                    guard !rendererState.isSwitching else { return }
+                    isChromeCollapsed = false
+                    let wasActive = tabStore.activeTabID == id
+                    tabStore.closeTab(id: id)
+                    if wasActive, let next = tabStore.activeTab { activateTab(next) }
+                },
+                onSelectTab: { id in
+                    guard !rendererState.isSwitching else { return }
+                    tabStore.selectTab(id: id)
+                    if let tab = tabStore.activeTab { activateTab(tab) }
                 }
-                .padding(.leading, 14)
-                .frame(width: 210, height: 28)
-                .foregroundStyle(Color(nsColor: chromeAppearance.palette.foreground.color))
-                .background(Color(nsColor: chromeAppearance.palette.selectedTab.color), in: UnevenRoundedRectangle(topLeadingRadius: 9, topTrailingRadius: 9))
-                .padding(.top, 4)
-                Spacer(minLength: 0)
-            } else {
-                TabBarView(
-                    appearance: chromeAppearance,
-                    tabStore: tabStore,
-                    onNewTab: handleNewTabCommand,
-                    onCloseTab: { id in
-                        isChromeCollapsed = false
-                        let wasActive = tabStore.activeTabID == id
-                        tabStore.closeTab(id: id)
-                        if wasActive, let next = tabStore.activeTab { activateTab(next) }
-                    },
-                    onSelectTab: { id in
-                        tabStore.selectTab(id: id)
-                        if let tab = tabStore.activeTab { activateTab(tab) }
-                    }
-                )
-            }
+            )
         }
         .frame(height: 32)
         .background(BrowserChromeStyle.tabs)

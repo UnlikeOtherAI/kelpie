@@ -29,6 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
     BridgeClient *_client;
     cef_browser_t *_createdBrowser;
     cef_browser_t *_callbackBrowser;
+    void (^_retirementCompletion)(void);
 }
 
 /// Returns the live browser handle, preferring `_createdBrowser` over `_callbackBrowser`.

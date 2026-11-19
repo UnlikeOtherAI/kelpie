@@ -226,19 +226,12 @@ On Windows and Linux, a trusted input call (`click`, `press-key`, `type`, …) w
 
 ## Tabs
 
-Tab management is **WebKit-only**. In Chromium (CEF) mode, all tab endpoints return:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "WEBKIT_ONLY",
-    "message": "Tab management is not available in Chromium (CEF) mode. ..."
-  }
-}
-```
-
-Switch to WebKit first: `kelpie_set_renderer({"engine": "webkit"})`
+Both macOS engines support listing, opening, selecting, and closing tabs.
+Chromium tabs share the default Chromium request context. A Chromium
+`new-tab` request with a `partition` returns `PARTITION_UNSUPPORTED`.
+Chromium loads a tab's initial URL once the tab has a visible, sized native
+surface. Select that tab before using an operation that requires a visible
+renderer, such as evaluating JavaScript.
 
 ### Per-window tab routing (macOS)
 

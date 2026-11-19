@@ -12,13 +12,25 @@ final class HandlerContext {
     var remoteNavigationWaitGuard: (() -> Bool)?
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
-    var renderer: (any RendererEngine)?
-    /// True while the Chromium (CEF) engine is active. CEF is a single-renderer
-    /// engine — it has no per-tab WebKit renderers — so renderer resolution must
-    /// target `renderer` (the live CEF instance) rather than the tab store's
-    /// hidden about:blank `WKWebViewRenderer`. Kept in sync by ServerState
-    /// wherever the active renderer changes.
+    private var fallbackRenderer: (any RendererEngine)?
+    /// Server contexts follow the focused window. Job and test contexts can keep
+    /// a fixed renderer without consulting the application's window registry.
+    var targetsRegisteredTabs = false
+    var renderer: (any RendererEngine)? {
+        get {
+            if targetsRegisteredTabs, let entry = WindowRegistry.shared.defaultEntry() {
+                return entry.tabStore.activeRenderer
+            }
+            return fallbackRenderer
+        }
+        set { fallbackRenderer = newValue }
+    }
+    var rendererSwitchInProgress: (() -> Bool)?
     var activeEngineIsChromium = false
+    var selectedBrowserTabID: String? {
+        if activeEngineIsChromium && !targetsRegisteredTabs { return "chromium" }
+        return tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString
+    }
     var browserControlEngineName: String?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
@@ -57,13 +69,7 @@ final class HandlerContext {
         try Task.checkCancellation()
         if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
         if let browserControlEngineName, browserControlEngineName != renderer?.engineName { throw HandlerError.rendererHidden }
-        // Chromium (CEF) is a single-renderer engine. Tabs are modeled only for
-        // WebKit, so resolving through the tab store here would return a hidden
-        // WKWebViewRenderer that never navigated (stuck on about:blank): navigate
-        // would drive the live CEF renderer while eval/dom/screenshot read the
-        // blank WebView (issues #74/#77/#78/#79). Target the live renderer
-        // directly; windowId/tabId do not apply in single-renderer mode.
-        if activeEngineIsChromium {
+        if activeEngineIsChromium && !targetsRegisteredTabs {
             guard let renderer else { throw HandlerError.noWebView }
             return renderer
         }
@@ -72,42 +78,28 @@ final class HandlerContext {
             throw HandlerError.windowNotFound(windowId)
         }
 
-        guard let tabId else {
+        if tabId == nil || (activeEngineIsChromium && tabId == "chromium") {
             // No tabId: auto-select if the resolved window has exactly one tab,
             // otherwise require explicit targeting.
             let entry = resolveWindow(windowId: windowId, tabId: nil)
-            if let store = entry?.tabStore, store.tabs.count > 1 {
+            if let store = entry?.tabStore, store.tabs.count > 1, !activeEngineIsChromium {
                 let listing = store.tabs.map { tab in
                     "\(tab.id.uuidString)  \(tab.title)  \(tab.currentURL)"
                 }.joined(separator: "\n")
                 throw HandlerError.tabRequired(listing)
             }
-            if let tab = entry?.tabStore.activeTab {
-                return tab.renderer
-            }
+            if let active = entry?.tabStore.activeRenderer { return active }
             guard let renderer else { throw HandlerError.noWebView }
             return renderer
         }
 
-        guard let uuid = UUID(uuidString: tabId) else {
-            throw HandlerError.tabNotFound(tabId)
+        guard let tabId, let uuid = UUID(uuidString: tabId),
+              let entry = resolveWindow(windowId: windowId, tabId: tabId),
+              let tab = entry.tabStore.tabs.first(where: { $0.id == uuid }),
+              let target = entry.tabStore.renderer(for: tab) else {
+            throw HandlerError.tabNotFound(tabId ?? "")
         }
-
-        // If windowId is explicit, the tab must live in that window.
-        if let windowId,
-           let entry = WindowRegistry.shared.entry(for: windowId) {
-            guard let tab = entry.tabStore.tabs.first(where: { $0.id == uuid }) else {
-                throw HandlerError.tabNotFound(tabId)
-            }
-            return tab.renderer
-        }
-
-        // Otherwise locate the tab in any window.
-        if let entry = WindowRegistry.shared.entry(containingTabId: uuid) {
-            // swiftlint:disable:next force_unwrapping
-            return entry.tabStore.tabs.first(where: { $0.id == uuid })!.renderer
-        }
-        throw HandlerError.tabNotFound(tabId)
+        return target
     }
 
     /// Legacy single-window form retained for handlers that have not yet been
@@ -392,7 +384,7 @@ final class HandlerContext {
         errorResponse(
             code: "WEBKIT_ONLY",
             message: "\(feature) is not available in Chromium (CEF) mode. " +
-                "CEF is a single-renderer testing engine — \(feature) requires WebKit. " +
+                "\(feature) requires WebKit. " +
                 "To use this feature, switch first: " +
                 "kelpie_set_renderer({\"engine\": \"webkit\"})"
         )

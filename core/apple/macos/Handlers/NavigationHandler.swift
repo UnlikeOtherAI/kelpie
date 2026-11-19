@@ -17,6 +17,7 @@ struct NavigationHandler {
     @MainActor
     private func navigate(_ body: [String: Any]) async -> [String: Any] {
         let tabId = HandlerContext.tabId(from: body)
+        let windowId = HandlerContext.windowId(from: body)
         guard let urlString = body["url"] as? String,
               let url = URL(string: urlString),
               let scheme = url.scheme?.lowercased(),
@@ -24,7 +25,7 @@ struct NavigationHandler {
             return errorResponse(code: "INVALID_URL", message: "Missing or invalid URL")
         }
         do {
-            let renderer = try context.resolveRenderer(tabId: tabId)
+            let renderer = try context.resolveRenderer(windowId: windowId, tabId: tabId)
             let start = CFAbsoluteTimeGetCurrent()
             // Drive the SAME renderer reads resolve to, so navigate works even
             // when no window has rendered to wire context.renderer to the active
@@ -33,7 +34,7 @@ struct NavigationHandler {
             // this navigation's result (`load(url:)` also clears it, but reset
             // here too for an explicit, race-free start — mirrors iOS/Android).
             (renderer as? WKWebViewRenderer)?.clearNavigationError()
-            context.prepareForNavigation()
+            context.prepareForNavigation(windowId: windowId, tabId: tabId)
             renderer.load(url: url)
 
             // Wait for the load to finish, bailing early on a captured failure.
@@ -49,7 +50,7 @@ struct NavigationHandler {
             var didFinish = false
             for _ in 0..<iterations {
                 try? await Task.sleep(nanoseconds: 100_000_000)
-                if let navError = context.navigationError(tabId: tabId) {
+                if let navError = context.navigationError(windowId: windowId, tabId: tabId) {
                     return errorResponse(code: "NAVIGATION_ERROR", message: navError)
                 }
                 if !renderer.isLoading {
