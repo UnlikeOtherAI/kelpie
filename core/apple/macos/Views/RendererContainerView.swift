@@ -7,23 +7,19 @@ import WebKit
 /// Wraps the active renderer's NSView in SwiftUI.
 struct RendererContainerView: NSViewRepresentable {
     let chromeAppearance: BrowserChromeAppearance
-    @ObservedObject var serverState: ServerState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var tabStore: TabStore
     var chromeUnderlap: CGFloat = 0
     var onHoverURL: (String) -> Void = { _ in }
     var onChromeScroll: (Bool) -> Void = { _ in }
 
-    // The automation target changes independently of this window's tab selection.
     private var displayedRenderer: (any RendererEngine)? {
-        if rendererState.activeEngine == .webkit { return tabStore.activeTab?.renderer }
-        return serverState.handlerContext.renderer
+        tabStore.activeRenderer
     }
 
     @MainActor
     final class Coordinator {
-        var attachedEngine: RendererState.Engine?
-        weak var attachedView: NSView?
+        weak var attachedRenderer: (any RendererEngine)?
         private var eventMonitor: Any?
         private var scrollMonitor: Any?
         let hoverTracker = RendererHoverTracker()
@@ -73,6 +69,7 @@ struct RendererContainerView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.attachedRenderer?.willDeactivate()
         coordinator.hoverTracker.detach()
         coordinator.chromeSampler.update(webView: nil, onSample: { _ in })
     }
@@ -104,12 +101,6 @@ struct RendererContainerView: NSViewRepresentable {
             removeClosedTabViews(from: container)
         }
 
-        // Hide the WKWebView when the active tab is on the start page so the
-        // SwiftUI StartPageView overlay can receive mouse events unobstructed.
-        if let activeTab = tabStore.activeTab {
-            activeTab.renderer.makeView().isHidden = activeTab.isStartPage || rendererState.activeEngine != .webkit
-            if activeTab.isStartPage { context.coordinator.attachedView?.isHidden = true }
-        }
     }
 
     private func updateHover(in container: NSView, coordinator: Coordinator) {
@@ -138,11 +129,15 @@ struct RendererContainerView: NSViewRepresentable {
     }
 
     private func attachActiveRenderer(to container: NSView, coordinator: Coordinator) {
-        guard let activeView = displayedRenderer?.makeView() else {
+        let renderer = displayedRenderer
+        let selectionChanged = renderer !== coordinator.attachedRenderer
+        if selectionChanged { coordinator.attachedRenderer?.willDeactivate() }
+        guard let renderer else {
             container.subviews.forEach { $0.isHidden = true }
-            coordinator.attachedEngine = nil
+            coordinator.attachedRenderer = nil
             return
         }
+        let activeView = renderer.makeView()
 
         if #available(macOS 26.0, *) {
             for tab in tabStore.tabs {
@@ -158,21 +153,18 @@ struct RendererContainerView: NSViewRepresentable {
         activeView.autoresizingMask = [.width, .height]
 
         // Add the view if it isn't already a subview.
-        // Active renderer views are never removed — only hidden/shown.
-        // CEF's NSView must NEVER be removed: re-adding it corrupts
-        // its compositing state and crashes CrBrowserMain.
-        // Closed WKWebView tab views ARE removed (by removeClosedTabViews)
-        // to free memory and WKWebView process slots.
+        // Keep dormant CEF views in their original container. Tab retirement
+        // removes their CEF-owned child before removing the Swift host view.
         if activeView.superview !== container {
             container.addSubview(activeView)
         }
 
         // Show the active view, hide all others.
         for subview in container.subviews {
-            subview.isHidden = subview !== activeView
+            subview.isHidden = subview !== activeView || tabStore.activeTab?.isStartPage == true
         }
 
-        coordinator.attachedView = activeView
-        coordinator.attachedEngine = rendererState.activeEngine
+        renderer.didActivate()
+        coordinator.attachedRenderer = renderer
     }
 }

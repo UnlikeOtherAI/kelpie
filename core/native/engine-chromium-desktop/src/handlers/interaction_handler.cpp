@@ -22,6 +22,7 @@ nlohmann::json Dispatch(const DesktopHandlerRuntime& runtime, const nlohmann::js
 InteractionHandler::InteractionHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
 void InteractionHandler::Register(DesktopRouter& router) const {
+  router.Register("tap", [this](const nlohmann::json& params) { return Tap(params); });
   router.Register("click", [this](const nlohmann::json& params) { return Click(params); });
   router.Register("fill", [this](const nlohmann::json& params) { return Fill(params); });
   router.Register("type", [this](const nlohmann::json& params) { return Type(params); });

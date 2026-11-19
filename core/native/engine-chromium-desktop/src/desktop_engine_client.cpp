@@ -154,6 +154,7 @@ void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
                                             bool can_go_back,
                                             bool can_go_forward) {
   if (auto* tab = owner_->FindTab(browser)) {
+    if (is_loading && !tab->loading) tab->load_progress = 0;
     tab->loading = is_loading;
     tab->can_go_back = can_go_back;
     tab->can_go_forward = can_go_forward;
@@ -223,6 +224,10 @@ void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
   owner_->UpdateActiveState();
 }
 
+void DesktopCefClient::OnLoadingProgressChange(CefRefPtr<CefBrowser> browser, double progress) {
+  if (auto* tab = owner_->FindTab(browser)) tab->load_progress = progress;
+}
+
 void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
   if (auto* tab = owner_->FindTab(browser)) {
     tab->title = title.ToString();
@@ -231,7 +236,7 @@ void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefStr
   owner_->UpdateActiveState();
 }
 
-bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
+bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
                                         cef_log_severity_t level,
                                         const CefString& message,
                                         const CefString& source,
@@ -249,7 +254,10 @@ bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
     level_name = "info";
   }
 
+  auto* tab = owner_->FindTab(browser);
+  if (!tab) return false;
   owner_->console_sink({
+      {"tabId", tab->id},
       {"level", level_name},
       {"text", message.ToString()},
       {"source", source.ToString()},

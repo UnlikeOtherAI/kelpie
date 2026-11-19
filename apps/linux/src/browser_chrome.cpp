@@ -64,8 +64,8 @@ BrowserChrome::BrowserChrome(LinuxApp& app,GtkWindow* window):app_(app),window_(
 BrowserChrome::~BrowserChrome() {
   gtk_style_context_remove_provider_for_screen(gdk_screen_get_default(),GTK_STYLE_PROVIDER(css_)); g_object_unref(css_);
 }
-void BrowserChrome::Tabs() {
-  auto tabs=app_.Tabs(); std::string key;
+void BrowserChrome::Tabs(const std::vector<TabSnapshot>& tabs) {
+  std::string key;
   for(auto& tab:tabs)key+=tab.id+tab.title+(tab.active?"1":"0")+(tab.favicon_png_base64?*tab.favicon_png_base64:"");
   if(key==tabs_key_)return; tabs_key_=key; Clear(tabs_);
   int tab_x=0;
@@ -198,7 +198,7 @@ void BrowserChrome::Palette() {
   gtk_css_provider_load_from_data(css_,css.c_str(),-1,nullptr);
   gtk_widget_queue_draw(tabs_);
 }
-void BrowserChrome::Sync() { Tabs(); Favorites(); Palette(); }
+void BrowserChrome::Sync(const std::vector<TabSnapshot>& tabs) { Tabs(tabs); Favorites(); Palette(); }
 void BrowserChrome::AccountMenu(GtkWidget* anchor) {
   auto state=app_.AccountState();
   if(!state.signed_in && !state.signing_in) { app_.AccountSignIn(); return; }

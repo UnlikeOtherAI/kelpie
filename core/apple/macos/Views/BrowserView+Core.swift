@@ -24,28 +24,6 @@ extension BrowserView {
     }
 
     @MainActor
-    func connectRendererState() async {
-        // WebKit renderer state is managed per-tab by connectNewTab.
-        // Only wire onStateChange for the Chromium renderer here.
-        guard rendererState.activeEngine == .chromium else { return }
-
-        for _ in 0..<10 {
-            if let renderer = serverState.handlerContext.renderer {
-                renderer.onStateChange = { [weak browserState, weak handlerContext = serverState.handlerContext] in
-                    Task { @MainActor in
-                        guard let browserState, let renderer = handlerContext?.renderer else { return }
-                        sync(browserState: browserState, from: renderer)
-                    }
-                }
-                sync(browserState: browserState, from: renderer)
-                return
-            }
-
-            try? await Task.sleep(nanoseconds: 50_000_000)
-        }
-    }
-
-    @MainActor
     func sync(browserState: BrowserState, from renderer: any RendererEngine) {
         browserState.currentURL = renderer.currentURL?.absoluteString ?? ""
         browserState.pageTitle = renderer.currentTitle
@@ -56,33 +34,36 @@ extension BrowserView {
     }
 
     func connectNewTab(_ tab: Tab) {
-        // In Chromium mode the active handler target is the shared CEF renderer,
-        // not a tab's WebKit renderer. Re-pointing it here (e.g. from onAppear on
-        // a persisted-chromium launch) would make every HTTP/MCP call drive a
-        // hidden WebKit renderer while the visible engine is CEF, so the API
-        // appears to navigate "about:blank". Only adopt the tab's renderer as the
-        // active target when WebKit is the active engine.
-        if rendererState.activeEngine == .webkit {
+        guard let renderer = tabStore.renderer(for: tab) else { return }
+        if tabStore.engine == .webkit {
             serverState.setActiveWebKitRenderer(tab.renderer)
-            sync(browserState: browserState, from: tab.renderer)
+        } else {
+            serverState.router.invalidateAllBrowserReferences()
+            renderer.onScriptMessage = { [weak context = serverState.handlerContext, weak renderer] name, body in
+                guard let context, context.renderer === renderer else { return }
+                context.handleScriptMessage(name: name, body: body)
+            }
         }
+        sync(browserState: browserState, from: renderer)
         // This replaces the store's callback, so it hands the tab's own state,
         // history and screenshot work back to the store before syncing the
         // window.
-        tab.renderer.onStateChange = { [weak tab, weak tabStore, weak browserState] in
-            guard let tab, let tabStore, let browserState else { return }
+        renderer.onStateChange = { [weak tab, weak tabStore, weak browserState, weak renderer] in
+            guard let tab, let tabStore, let browserState, let renderer else { return }
             Task { @MainActor in
+                guard tabStore.tabs.contains(where: { $0 === tab }),
+                      tabStore.engine.rawValue == renderer.engineName else { return }
                 // Update tab's own stored state (always, for all tabs — tab bar needs these)
                 let wasLoading = tab.isLoading
-                tabStore.rendererStateChanged(tab)
+                tabStore.rendererStateChanged(tab, from: renderer)
 
                 // Each window's chrome follows its own active tab.
-                guard tabStore.activeTab === tab else { return }
-                sync(browserState: browserState, from: tab.renderer)
+                guard tabStore.activeTab === tab, !tab.isStartPage else { return }
+                sync(browserState: browserState, from: renderer)
 
                 // Favicon fetch on load completion (active tab only)
                 if wasLoading && !tab.isLoading, !tab.currentURL.isEmpty {
-                    FaviconExtractor.extract(from: tab.renderer) { [weak tab] image in
+                    FaviconExtractor.extract(from: renderer) { [weak tab] image in
                         tab?.favicon = image
                     }
                 }
@@ -100,22 +81,16 @@ extension BrowserView {
     /// active window opens a new tab, never every window simultaneously.
     func handleNewTabCommand() {
         isChromeCollapsed = false
-        guard !serverState.isScriptRecording else { return }
-        guard rendererState.activeEngine != .chromium else { return }
+        guard !serverState.isScriptRecording, !rendererState.isSwitching else { return }
         let tab = tabStore.addTab()
         connectNewTab(tab)
         addressFocusRequested = true
     }
 
     /// Cmd+W handler. Routed per-window by `BrowserCommandRouter`. Closes the
-    /// active tab on WebKit; closes the window itself when Chromium is active
-    /// because Chromium tab management is single-tab today.
+    /// active tab and selects its neighbor in the same window.
     func handleCloseTabCommand() {
-        guard !serverState.isScriptRecording else { return }
-        if rendererState.activeEngine == .chromium {
-            NSApp.keyWindow?.close()
-            return
-        }
+        guard !serverState.isScriptRecording, !rendererState.isSwitching else { return }
         guard let id = tabStore.activeTabID else { return }
         tabStore.closeTab(id: id)
         if let next = tabStore.activeTab { activateTab(next) }
@@ -191,7 +166,7 @@ extension BrowserView {
     func notifyRendererViewportChangeIfNeeded() {
         guard rendererState.activeEngine == .chromium else { return }
         guard viewportState.showsViewportStageChrome else { return }
-        serverState.handlerContext.renderer?.viewportDidChange()
+        tabStore.activeRenderer?.viewportDidChange()
     }
 
     @ViewBuilder
@@ -205,13 +180,13 @@ extension BrowserView {
             ZStack {
                 RendererContainerView(
                     chromeAppearance: chromeAppearance,
-                    serverState: serverState,
                     rendererState: rendererState,
                     tabStore: tabStore,
                     chromeUnderlap: chromeUnderlap,
                     onHoverURL: { hoveredLinkURL = $0 },
                     onChromeScroll: { collapsed in
-                        guard !serverState.isScriptRecording, tabStore.activeTab?.isStartPage != true else { return }
+                        guard !serverState.isScriptRecording, !browserState.isLoading,
+                              tabStore.activeTab?.isStartPage != true else { return }
                         withAnimation(.easeOut(duration: 0.18)) { isChromeCollapsed = collapsed }
                     }
                 )

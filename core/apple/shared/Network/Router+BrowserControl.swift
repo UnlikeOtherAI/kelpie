@@ -80,11 +80,8 @@ extension Router {
             return context.webView === view
         }
         #else
-        let external = tabId == nil && !context.activeEngineIsChromium && selectedBrowserTabId == nil && context.tabStore(windowId: nil, tabId: nil) == nil
-        target = tabId ?? (context.activeEngineIsChromium ? "chromium" : selectedBrowserTabId ?? "external")
-        if context.activeEngineIsChromium && target != "chromium" {
-            return errorResponse(code: "TAB_NOT_FOUND", message: "Inactive Chromium observation is unavailable")
-        }
+        let external = tabId == nil && !context.activeEngineIsChromium && selectedBrowserTabId == nil
+        target = tabId ?? selectedBrowserTabId ?? (context.activeEngineIsChromium ? "chromium" : "external")
         guard let renderer = try? context.resolveRenderer(tabId: external ? nil : target) else {
             return errorResponse(code: "TAB_NOT_FOUND", message: "The context tab is unavailable")
         }
@@ -194,7 +191,8 @@ extension Router {
                     return errorResponse(code: "TAB_CHANGED", message: "The pinned tab is no longer visible")
                 }
                 #if os(iOS)
-                if !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method), selectedView !== self.handlerContext?.webView {
+                if !Self.tabDiagnosticReads.contains(method),
+                   !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method), selectedView !== self.handlerContext?.webView {
                     return errorResponse(code: "TAB_CHANGED", message: "The selected renderer changed")
                 }
                 #endif
@@ -222,19 +220,18 @@ extension Router {
         #if os(iOS)
         return handlerContext?.tabStore?.activeBrowserTabID?.uuidString ?? (handlerContext?.webView != nil ? "external" : nil)
         #else
-        return handlerContext?.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString
+        return handlerContext?.selectedBrowserTabID
         #endif
     }
 
     @MainActor
     private func agentTargetAllowed(tabId: String?) -> Bool {
-        #if os(iOS)
-        return selectedBrowserTabId == tabId
-        #else
-        if handlerContext?.activeEngineIsChromium == true { return tabId == "chromium" }
-        return handlerContext?.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString == tabId
-        #endif
+        selectedBrowserTabId == tabId
     }
+
+    private static let tabDiagnosticReads: Set<String> = [
+        "get-console-messages", "get-js-errors", "get-network-log", "get-resource-timeline"
+    ]
 
     @MainActor
     func browserDispatch(method: String, params: [String: Any], pinnedTabId: String?) async -> [String: Any] {
@@ -242,12 +239,9 @@ extension Router {
         if let pinnedTabId { params["tabId"] = pinnedTabId }
         if let target = params["tabId"] as? String, !target.isEmpty {
             #if os(iOS)
-            if !["switch-tab", "close-tab", "get-tabs"].contains(method), target != selectedBrowserTabId {
+            if !Self.tabDiagnosticReads.contains(method),
+               !["switch-tab", "close-tab", "get-tabs"].contains(method), target != selectedBrowserTabId {
                 return errorResponse(code: "TAB_CHANGED", message: "The target tab is no longer visible")
-            }
-            #else
-            if handlerContext?.activeEngineIsChromium == true, target != "chromium" {
-                return errorResponse(code: "TAB_NOT_FOUND", message: "Unknown Chromium tab")
             }
             #endif
         }
@@ -256,6 +250,7 @@ extension Router {
         handlerContext?.browserControlTabId = params["tabId"] as? String
         defer { handlerContext?.browserControlTabId = previousTarget }
         if let store = handlerContext?.tabStore, store.activeBrowserTab?.webView !== handlerContext?.webView,
+           !Self.tabDiagnosticReads.contains(method),
            !["get-tabs", "switch-tab", "close-tab", "new-tab"].contains(method) {
             return errorResponse(code: "TAB_CHANGED", message: "The selected renderer has not settled")
         }
@@ -287,7 +282,7 @@ extension Router {
             }
             #endif
             #if os(macOS)
-            if let context = handlerContext, context.activeEngineIsChromium {
+            if let context = handlerContext, context.activeEngineIsChromium, !context.targetsRegisteredTabs {
                 return successResponse(["activeTab": "chromium", "tabs": [[
                     "id": "chromium", "active": true, "url": context.renderer?.currentURL?.absoluteString ?? "",
                     "title": context.renderer?.currentTitle ?? ""

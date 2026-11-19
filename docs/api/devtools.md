@@ -2,7 +2,7 @@
 
 Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception.
 
-> **iOS parity note:** Many DevTools features on iOS use ephemeral bridge scripts since WKWebView lacks CDP. See the [Platform Support Matrix](README.md) for per-method details. Network logging now reaches parity across iOS, Android, and macOS (filters and summary). Request interception is unimplemented on every platform (see below).
+> **iOS parity note:** Many DevTools features on iOS use ephemeral bridge scripts since WKWebView lacks CDP. See the [Platform Support Matrix](README.md) for per-method details. Request interception is unimplemented on every platform (see below).
 
 For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
@@ -11,11 +11,12 @@ For protocol details, errors, and MCP tool names, see [README.md](README.md).
 ## Console & DevTools
 
 ### `getConsoleMessages`
-Get JavaScript console messages (errors, warnings, logs) from the current page. The browser captures these in real time via an injected native bridge on Android and `WKScriptMessageHandler` console override on Apple platforms.
+Get JavaScript console messages from the requested tab. The browser associates messages with the renderer that emitted them. When `tabId` is omitted, Apple WebKit and Android use the selected tab, macOS Chromium uses its single renderer, and Windows/Linux return a browser-wide log with `tabId` on each captured entry.
 
 ```json
 POST /v1/get-console-messages
 {
+  "tabId": null,              // optional, from get-tabs
   "level": null,              // optional filter: "log" | "warn" | "error" | "info" | "debug"
   "since": null,              // optional, ISO timestamp — only messages after this time
   "limit": 100                // optional, max messages to return
@@ -63,6 +64,7 @@ Shorthand for `getConsoleMessages` filtered to errors only. Includes uncaught ex
 
 ```json
 POST /v1/get-js-errors
+{ "tabId": null }
 
 Response:
 {
@@ -92,13 +94,14 @@ Response:
 ```
 
 ### `getNetworkLog`
-Get the full network activity log — every resource the page loaded, with timing data. Entries are derived from the page's Resource Timing API on all platforms.
+Get captured network activity for the requested tab. Windows and Linux use Chromium network events. Apple and Android use Resource Timing, supplemented by native main-document response information and, in WKWebView and Android WebView, the existing fetch/XHR bridge. With no `tabId`, the scope follows the console log.
 
 ```json
 POST /v1/get-network-log
 {
+  "tabId": null,              // optional, from get-tabs
   "type": null,               // optional filter: "document" | "script" | "stylesheet" | "image" | "font" | "xhr" | "fetch" | "websocket" | "other"
-  "status": null,             // optional filter: "success" (2xx–3xx), "error" (>=400 or failed), or "pending" (in-flight)
+  "status": null,             // optional filter: "success" (2xx–3xx), "error" (>=400 or failed), or "pending" (no known status or failure)
   "since": null,              // optional, epoch millis or ISO-8601 timestamp — only entries started at/after this time
   "limit": 200                // optional, max entries
 }
@@ -192,7 +195,9 @@ Response:
 }
 ```
 
-The `type`, `status`, and `since` filters are now honored on all platforms (iOS, Android, macOS), and all three return the `summary` aggregate (`totalRequests`, `totalSize`, `totalTransferSize`, `byType`, `errors`, `loadTime`) computed over the filtered entries. `hasMore` reflects whether the filtered set exceeded `limit`.
+`summary` counts the selected tab's requests after the `type` and `since` filters, before the `status` filter and `limit`. `count` is the number of returned entries. `hasMore` indicates that the matching entries exceeded `limit`. Desktop timestamps use UTC `Z` or epoch milliseconds for `since`.
+
+An observed transport failure includes a `failure` string and may have a null HTTP status. Unknown status, method, reason, sizes, and timing phases are null when the engine cannot supply them. Resource Timing may hide cross-origin response data, and it does not expose the request method. An opaque response can have an unknown status. Android installs the bridge at page completion, so earlier fetch and XHR requests may have only Resource Timing data. macOS Chromium uses Resource Timing and native main-document status, with subresource methods unavailable through this adapter. Windows/Linux report Chromium's encoded transfer size when available.
 
 ---
 
@@ -461,7 +466,7 @@ Response:
 ```
 
 ### `clearConsole`
-Clear the captured console messages buffer.
+Clear the selected tab’s console buffer on Apple and Android, or the browser-wide console buffer on Windows and Linux.
 
 ```json
 POST /v1/clear-console

@@ -148,7 +148,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.2.7";
+  runtime.app_version = "0.2.10";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.cookie_sync_status = [this] { return CookieSyncStatus(); };
@@ -386,7 +386,8 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
         const auto color = page_color_sampler_.Poll(desktop_app_->engine(), tab, GetTickCount64());
         if (color) shell_->SetPageColor(*color);
       }
-      OnBrowserStateChanged({tab.url, tab.title, tab.is_loading, tab.can_go_back, tab.can_go_forward});
+      OnBrowserStateChanged({tab.url, tab.title, tab.is_loading, tab.can_go_back, tab.can_go_forward,
+                             tab.load_progress, tab.id});
       SaveSession();
       return;
     }

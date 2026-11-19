@@ -22,6 +22,8 @@ The toolbar has 44-point/dp controls and a capsule address field. Its expanded
 height is 62 points/dp, collapsing to a 34-point/dp domain lane after deliberate
 finger scrolling. Programmatic scrolling does not change chrome geometry. The
 bar stays above system navigation and the keyboard, and expands on tab changes.
+During navigation, the address capsule shows a three-point/dp blue outline
+that grows from its left edge along both sides and fades when loading ends.
 Android retains history autocomplete and reload/stop in the address field.
 Tablet address fields are centered and capped at 620 points/dp. Account, Share,
 Bookmarks and More remain directly accessible beside them; phones put Share and

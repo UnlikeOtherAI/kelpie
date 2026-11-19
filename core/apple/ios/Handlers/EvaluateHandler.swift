@@ -16,7 +16,7 @@ struct EvaluateHandler {
             return errorResponse(code: "MISSING_PARAM", message: "expression is required")
         }
         do {
-            let result = try await context.evaluateJS(expression)
+            let result = try await context.evaluateJS(expression, awaitPromise: true)
             return successResponse(["result": result ?? NSNull()])
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)

@@ -25,7 +25,8 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
     }
     selector = input["selector"].get<std::string>();
   }
-  if (type->get<std::string>() != "key" && type->get<std::string>() != "type" && !selector) {
+  const std::string& input_type = type->get_ref<const std::string&>();
+  if (input_type != "key" && input_type != "type" && input_type != "tap" && !selector) {
     return BrowserControlResult::Failure("INVALID_PARAMS", "selector is required for this input type");
   }
 
@@ -41,7 +42,7 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
     return target ? BrowserControlResult::Success() : BrowserControlResult::Failure("CDP_MALFORMED_RESULT", error);
   };
 
-  if (type->get<std::string>() != "key") {
+  if (input_type != "key" && input_type != "tap") {
     const auto result = inspect(selector.has_value());
     if (!result.ok) return result;
   }

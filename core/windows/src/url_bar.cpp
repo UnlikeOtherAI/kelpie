@@ -204,6 +204,25 @@ void UrlBar::SetNavigationState(bool can_go_back, bool can_go_forward, bool is_l
   InvalidateRect(reload_button_, nullptr, FALSE);
 }
 
+void UrlBar::UpdateLoadProgress(bool loading, double progress, bool tab_changed) {
+  const auto now = AddressLoadProgress::Clock::now();
+  BOOL animations = TRUE;
+  SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations, 0);
+  load_progress_.Update(loading, progress, tab_changed, animations != FALSE, now);
+  if (load_progress_.IsAnimating(now)) SetTimer(parent_, kAddressLoadTimerId, 16, nullptr);
+  TickLoadProgress();
+}
+
+void UrlBar::TickLoadProgress() {
+  const auto now = AddressLoadProgress::Clock::now();
+  if (!load_progress_.IsAnimating(now)) KillTimer(parent_, kAddressLoadTimerId);
+  const auto frame = load_progress_.Frame(now);
+  if (!(frame == load_frame_)) {
+    load_frame_ = frame;
+    InvalidateRect(parent_, &surface_, FALSE);
+  }
+}
+
 void UrlBar::Focus() {
   completion_active_ = false;
   SetFocus(url_edit_);
@@ -276,6 +295,12 @@ void UrlBar::Paint(HDC device_context) const {
   ui::PaintRounded(device_context, surface_, palette_.field,
       focused ? ui::Colors().focus : ui::Blend(palette_.text, palette_.bar, 0.12),
       ui::Dip(parent_, 22), focused ? 2 : 1);
+  const auto frame = load_frame_;
+  if (frame.opacity > 0) {
+    ui::PaintAddressLoadOutline(device_context, surface_, ui::Dip(parent_, 3),
+                                ui::HighContrast() ? ui::Colors().focus : RGB(0, 122, 255),
+                                frame.extent, frame.opacity);
+  }
   if (secure_) {
     const RECT lock{surface_.left+ui::Dip(parent_, 12), surface_.top,
                     surface_.left+ui::Dip(parent_, 42), surface_.bottom};

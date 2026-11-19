@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -201,13 +200,6 @@ fun BrowserScreen(
                 )
             }
 
-            if (isLoading && !isScriptRecording) {
-                LinearProgressIndicator(
-                    progress = { progress / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
             com.kelpie.browser.connect
                 .ConnectControls(compact = true)
             BrowserViewport(
@@ -247,9 +239,16 @@ fun BrowserScreen(
                         webView?.goForward()
                     },
                     isLoading = isLoading,
+                    loadOutline = addressLoadOutline(activeTabId, isLoading, progress / 100f),
                     onReload = {
                         NessieConnection.personInteracted()
-                        if (isLoading) webView?.stopLoading() else webView?.reload()
+                        if (isLoading) {
+                            tabStore.activeTab?.isLoading = false
+                            browserState.updateLoading(false)
+                            webView?.stopLoading()
+                        } else {
+                            webView?.reload()
+                        }
                     },
                     onBookmarks = { showBookmarks = true },
                     onShare = { sharePage(context, currentUrl) },

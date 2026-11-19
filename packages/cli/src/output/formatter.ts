@@ -42,8 +42,8 @@ function formatTable(data: unknown): string {
 
   // Device list
   if ("devices" in (data as Record<string, unknown>)) {
-    const list = (data as { devices: DiscoveredDevice[] }).devices;
-    return formatDeviceTable(list);
+    const { devices, hint } = data as { devices: DiscoveredDevice[]; hint?: string };
+    return [formatDeviceTable(devices), hint].filter(Boolean).join("\n");
   }
 
   if ("browsers" in (data as Record<string, unknown>)) {

@@ -78,6 +78,11 @@ prohibit simultaneous app instances, and the CLI no longer requests a new one.
 
 ## Device Discovery
 
+CLI and MCP discovery report the mDNS service, timeout, and whether the scan
+could run. An empty result gives a direct-address hint. Discovery never starts
+pairing. An exact `host:port` works independently of mDNS, and connection errors
+name the socket tried.
+
 Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension. On Android, a foreground-service notification ("Kelpie is reachable") keeps the server alive in the background; tapping it brings the running browser back without restarting it, so open tabs, pending pairing prompts and just-approved tokens survive.
 
 Works identically with real devices, iOS Simulators, and Android Emulators — a developer with no phones can spin up multiple simulators at different screen sizes and control them all.
@@ -153,11 +158,16 @@ Apple apps expose the shared versioned `POST /v1/browser-control` and authentica
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
 
+While the active page loads, a three-unit blue stroke starts at the left edge of
+the address field and follows its upper and lower borders to the right, with
+rounded leading tips. The outline fades when loading ends. The indicator is
+part of the address field on iOS, Android, macOS, Windows, and Linux.
+
 On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell matches the Windows title-strip tabs, outlined navigation controls, rounded address field, conditional favorites row and UOA account menu.
 
 On Linux, the desktop shell runs in either GUI or headless mode. Both Chromium modes expose the shared HTTP/MCP surface with implicit localhost trust and persistent signing-key approval, persist profile-backed bookmarks, history, full tab sessions and a home page URL. They do not advertise the listener over mDNS. The no-CEF fallback build keeps its limited legacy runtime but follows the same control contract: it accepts localhost without a token and remote clients with a bearer from an approved computer key, sends no CORS grant and does not advertise over mDNS. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
 
-On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with Windows-style minimize/maximize/close controls, a native tab strip, URL bar, native settings dialog, resizable bookmarks/history windows and a DevTools-style network panel (all opening centred over the browser window), native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server supports local programs automatically and remote clients through signed computer pairing. The protected readiness file remains available for local integrations. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
+On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with Windows-style minimize/maximize/close controls, a native tab strip, URL bar, native settings dialog, resizable bookmarks/history windows and a DevTools-style network panel (all opening centred over the browser window), native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server supports local programs automatically and remote clients through signed computer pairing. The protected readiness file remains available for local integrations. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Viewport size is browser-wide.
 
 The Windows shell places curved tabs in the title bar, a new-tab plus at the top left, and window controls at the top right. The navigation row has unboxed controls and an IME-capable rounded address field. Home opens the saved home URL; the address-field star adds the current page to favorites. The favorites row disappears when empty and offers an overflow menu when crowded. Rendered page-edge colors animate into the chrome, with a one-pixel separator at 10% contrasting opacity. Native accessibility, high contrast, DPI scaling, tab shortcuts and inline history completion remain available. See [Windows shell notes](ui/README.md#windows-shell-notes) for sampling limits and viewport behavior.
 
@@ -184,6 +194,8 @@ WebView. With hardware acceleration on Android 10 or later, they include
 hardware-rendered page content such as WebGL. Hidden tabs return a screenshot
 error. Android 9 and software-only hosts use software viewport capture.
 
+On macOS, a fully covered browser window can suspend the selected page's animation frames. Screenshot requests for a hidden page return `RENDERER_HIDDEN`. Bring the window into view and retry after the page resumes.
+
 ### Annotated Screenshots
 
 Take a screenshot with numbered labels overlaid on every interactive element (buttons, links, inputs). The LLM sees both the image and a structured list of what each number corresponds to, plus an annotation session ID and validity hint. Then it can say "click element 5" or "fill element 12 with hello@example.com" — visual-first automation without needing CSS selectors. For LLM use, Kelpie prefers CSS-pixel/non-retina annotated screenshots so the image payload is smaller and the coordinate system lines up with interaction APIs more directly. Annotation indices are valid until the page URL changes; after navigation, Kelpie returns `ANNOTATION_EXPIRED` and expects a fresh annotated screenshot.
@@ -198,7 +210,11 @@ Click elements by selector or tap at specific coordinates. Fill form inputs, typ
 
 For LLM-driven automation, the intended order is semantic first: read the accessibility tree or use the smart find endpoints, then interact by selector. If the model needs to reason over an image after it already knows the selector, Kelpie can draw a visible highlight box/ring around that exact DOM element and then capture a screenshot, which keeps the visual target and the selector aligned. Annotated screenshots are the broader visual fallback when semantic targeting fails. Raw coordinate taps exist for edge cases and are intentionally the least-preferred option because they drift with viewport changes, scrolling, and overlays. Selector clicks and annotation clicks now dispatch coordinate-bearing pointer and mouse events at the rendered hit target instead of shortcutting through `el.click()`, so DOM-targeted automation exercises the same observable interaction path as raw taps and fails with a visibility error when the target center is obscured. When raw taps do drift, every shipped app build now includes a bundled local calibration page at `/debug/coordinate-calibration` that shows manual tap coordinates, previews requested versus applied automation taps, and persists additive X/Y offsets used by the raw `tap` endpoint.
 
+On iOS, Android, macOS, and the Windows and Linux Chromium builds, a coordinate tap shows a blue circle by default. Callers can request a crosshair labeled with the applied viewport and page coordinates, and set the hold time before either marker fades. Windows and Linux deliver the tap as a native Chromium click in the target tab. [Tap API and marker options](api/core.md#tap)
+
 Swipe gestures are first-class too: give Kelpie start and end viewport coordinates and it renders a visible swipe trail while dispatching synthetic pointer events to JS-driven touch listeners. For native scrolling, use the scroll endpoints instead.
+
+Console messages, JavaScript errors and the network log accept a tab ID so an agent can inspect a background tab without changing the visible tab. Network entries preserve observed HTTP statuses, methods and resource types. The error filter includes HTTP failures and observed transport errors, and the summary counts errors before the status filter and entry limit are applied. Engines with limited visibility report unavailable metadata as null. See [DevTools API](api/devtools.md).
 
 For regression debugging, `coordinate-diagnostics` combines hit-test samples, page-side event logs, optional tap/swipe/scroll actions, viewport metadata, optional oracle JavaScript, and optional screenshot capture into one structured response. It reports `inputSource` and `inputCapabilities` explicitly; today the mirrored iOS, macOS, and Android implementation uses page-synthesized coordinate events, not trusted OS-level input.
 
@@ -216,11 +232,13 @@ Scroll by pixel deltas, scroll a specific element into view (with configurable a
 
 ## Wait and Synchronisation
 
-Wait for an element to appear, become visible, or disappear — with configurable timeout. Wait for page navigation to complete. Essential for reliable automation when pages load dynamically.
+Wait for an element to appear, become visible, or disappear, or for page navigation to complete. The CLI and its MCP server allow extra time for the browser to report the outcome of a wait.
 
 ## JavaScript Evaluation
 
-Execute arbitrary JavaScript in the page context and get the result back. Use it for anything the built-in methods don't cover.
+Execute JavaScript in the page context and get its result. When a script returns
+a Promise, evaluation returns its resolved value or reports its rejection.
+See [the evaluate endpoint](api/browser.md#evaluate) for renderer limits.
 
 ## Console and Error Capture
 
@@ -441,9 +459,15 @@ Query elements inside shadow roots, even nested ones. List all shadow DOM hosts 
 
 List open tabs, create new ones, switch between them, close them. Each tab tracks its URL, title, and active state. Each tab owns its own WebView instance so page state, scroll position, and history are preserved across tab switches.
 
+On macOS, WebKit and Chromium both use the native tab strip, keyboard shortcuts,
+and tab API. Each opened Chromium page uses a separate browser in the window's
+tab store, retaining its document and scroll position when another tab is
+selected. Select a Chromium tab before using automation that needs a visible
+renderer, such as JavaScript evaluation.
+
 On macOS, `Cmd+T` focuses the address field immediately after opening a new tab. Windows does the same with `Ctrl+T`, the new-tab plus and **New isolated tab**. Clicking an unfocused address field selects its full contents on both desktops, so typing replaces the existing address; later clicks allow normal caret placement and text selection. On Windows, address text follows the window DPI, including 200% scaling and moves between displays.
 
-On macOS, Windows and Linux, every tab-scoped browser command accepts an optional `tabId` and `generation` lease so multiple agents can control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. `new-tab` returns the tab identifier and generation. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, cookies, storage, and dialogs execute against the resolved lease. iOS and Android always operate on the active tab. Legacy mobile requests capture that tab's WebView at dispatch, so a pending UI refresh cannot redirect navigation or cookie access to the previous tab's store.
+On macOS with WebKit, and on Windows and Linux, tab-scoped browser commands can target a background tab by `tabId`. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. The Windows and Linux lease also accepts the `generation` returned by `new-tab`. Legacy macOS Chromium calls without a tab ID target the active tab. iOS and Android always operate on the active tab. Legacy mobile requests capture that tab's WebView at dispatch, so a pending UI refresh cannot redirect navigation or cookie access to the previous tab's store.
 
 macOS also supports multiple top-level windows. Each window has its own tab list, and tab IDs are scoped per window. Tab-related requests accept an optional `windowId` field, and `get-tabs` returns a `windows` array enumerating every window when more than one is open. iOS and Android only ever expose one window and report `windowId: "main"`.
 
@@ -578,9 +602,12 @@ Every CLI command supports `--llm-help` for machine-readable documentation. `kel
 
 The CLI manages local browser aliases under `~/.kelpie`. On macOS, `kelpie browser register <name>` and `kelpie browser launch <name>` start a fresh Kelpie.app instance on an explicit or auto-assigned port. On Windows, users extract the release ZIP into a current-user-owned directory, register the executable with an absolute profile directory, and launch it through the same alias commands. Windows aliases use a protected readiness file and `kelpie --browser <name> mcp` for local agent stdio. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
 
-CLI MCP also honors `--device <id|name|ip>` as its default browser, using the
+CLI MCP also honors `--device <id|name|ip|host:port>` as its default browser, using the
 same resolver as explicit pairing. Tools may override the target explicitly;
 an unresolved launch target fails instead of silently selecting another device.
+Without a target, browser-control documentation and local help capabilities
+are available immediately. A tab-targeted command using automatic discovery
+requires an explicit target before starting a new pairing.
 
 Published GitHub releases also build Android release artifacts and publish the CLI packages to npm automatically, so the release page and npm stay aligned with the tagged version.
 

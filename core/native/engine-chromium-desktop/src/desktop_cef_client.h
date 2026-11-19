@@ -68,6 +68,7 @@ class DesktopCefClient final : public CefClient,
   void OnAddressChange(CefRefPtr<CefBrowser> browser,
                        CefRefPtr<CefFrame> frame,
                        const CefString& url) override;
+  void OnLoadingProgressChange(CefRefPtr<CefBrowser> browser, double progress) override;
   void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
   void OnFaviconURLChange(CefRefPtr<CefBrowser> browser,
                           const std::vector<CefString>& icon_urls) override;

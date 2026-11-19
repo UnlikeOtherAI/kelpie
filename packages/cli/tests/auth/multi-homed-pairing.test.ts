@@ -89,3 +89,25 @@ it("never sends another device's token or a token to a socket that did not appro
     "http://192.168.1.77:8420/v1/pair",
   ]);
 });
+
+it("uses saved approvals for implicit tab commands without starting a fresh pairing", async () => {
+  mockDevice("always");
+  const options = { pairingTargetHint: "Select the tab's browser first." };
+  const device = discoveredAt("192.168.1.77");
+  expect((await sendCommand(device, "resizeViewport", { tabId: "own" }, undefined, options)).data)
+    .toMatchObject({ error: { code: "PAIR_TARGET_REQUIRED", message: options.pairingTargetHint } });
+  expect(calls).toEqual(["http://192.168.1.77:8420/v1/resize-viewport"]);
+
+  await store.set("native", "192.168.1.229", 8420, "always");
+  expect((await sendCommand(device, "resizeViewport", { tabId: "own" }, undefined, options)).ok).toBe(true);
+  expect(calls.at(-1)).toBe("http://192.168.1.229:8420/v1/resize-viewport Bearer always");
+});
+
+it("keeps an explicit address on the selected socket even with another saved approval", async () => {
+  await store.set("native", "192.168.1.229", 8420, "always");
+  mockDevice("always");
+  const device = { ...discoveredAt("192.168.1.77"), explicitAddress: true };
+  const response = await sendCommand(device, "getTabs", undefined, undefined, { pairingTargetHint: "Select a target." });
+  expect(response.ok).toBe(false);
+  expect(calls).toEqual(["http://192.168.1.77:8420/v1/get-tabs"]);
+});

@@ -21,10 +21,10 @@ kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <ur
 
 | Flag | Description |
 |---|---|
-| `--device <id\|name\|ip>` | Target a specific device by ID (most reliable), name, or IP |
+| `--device <id\|name\|ip\|host:port>` | Target a device by ID, name, IP address, or exact socket such as `192.168.1.42:8422` |
 | `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
-| `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
+| `--timeout <ms>` | HTTP request timeout in milliseconds, usually 10000 ms. See [browser request timeouts](cli/advanced.md#browser-request-timeouts). |
 | `--port <port>` | Override default port 8420. With `--device <ip>`, targets the matching `<ip>:<port>` device before any stale same-IP entry. It is one flag wherever it sits on the line, so the commands that give it their own meaning read this same value: `browser launch` starts the app on it and `mcp --http` serves on it. |
 | `--help` | Show help for any command |
 | `--version` | Show CLI version |
@@ -66,6 +66,8 @@ mDNS announcements are racy. If the scan finds no devices, the CLI falls back to
 ```
 
 **Alias:** `kelpie devices` is equivalent to `kelpie discover`.
+
+`kelpie discover` and MCP `kelpie_discover` report the mDNS status, service type and timeout. They give a hint on an empty or unavailable scan. Discovery does not start pairing. MCP `kelpie_list_devices` reads its cache.
 
 ### `kelpie describe`
 Describe this Kelpie install in one machine-readable document: which version is
@@ -251,6 +253,8 @@ kelpie navigate "https://example.com" --device "My iPhone"
 kelpie "https://example.com" --device "My iPhone"          # shorthand
 ```
 
+`localhost` refers to the host running the target browser.
+
 ### `kelpie back` / `kelpie forward` / `kelpie reload`
 
 ```bash
@@ -362,9 +366,14 @@ kelpie click "#submit-btn" --device "My iPhone"
 
 ```bash
 kelpie tap 195 420 --device "My iPhone"
+kelpie tap 195 420 --device "My iPhone" --marker-style crosshair-coordinates --marker-duration 1500
 ```
 
 Use this only as a fallback. Coordinates are sensitive to viewport changes, scrolling, and overlays.
+`--marker-style` accepts `circle` (the default) or `crosshair-coordinates` on iOS, Android, macOS, and the Windows and Linux Chromium builds.
+The crosshair displays the applied viewport point and the page point including scroll offsets.
+`--marker-duration <ms>` sets how long the marker holds before fading (default 550 ms).
+MCP callers can set the same [tap marker options](api/core.md#tap) in `kelpie_tap` arguments.
 
 ### `kelpie fill <selector> <value>`
 
@@ -861,7 +870,7 @@ kelpie feedback-summary --limit 25
 
 ```bash
 kelpie wait ".results-loaded" --device "My iPhone"
-kelpie wait ".results-loaded" --device "My iPhone" --timeout 15000
+kelpie wait ".results-loaded" --device "My iPhone" --wait-timeout 15000
 kelpie wait ".spinner" --device "My iPhone" --state hidden
 ```
 
@@ -870,7 +879,7 @@ Wait for a navigation event to complete.
 
 ```bash
 kelpie wait-nav --device "My iPhone"
-kelpie wait-nav --device "My iPhone" --timeout 15000
+kelpie wait-nav --device "My iPhone" --wait-timeout 15000
 ```
 
 ---
@@ -879,9 +888,14 @@ kelpie wait-nav --device "My iPhone" --timeout 15000
 
 ### `kelpie eval <expression>`
 
+If the expression returns a Promise, `kelpie eval` waits for the resolved result
+and reports a rejected Promise as an error. The browser's evaluation limits
+apply. See [the evaluate endpoint](api/browser.md#evaluate).
+
 ```bash
 kelpie eval "document.title" --device "My iPhone"
 kelpie eval "window.innerHeight" --device "My iPhone"
+kelpie eval '(async () => 5)()' --device "My iPhone"
 ```
 
 ---
@@ -990,6 +1004,8 @@ exclusive profile lock. The CLI reads the bearer capability locally and rejects
 `kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It automatically reuses account access or computer-key permission, including after a port or address changes. A new computer receives the same single native approval as an ordinary CLI command. The default catalog advertises four tools: core controls, extension names, extension schemas, and a generic extension caller. Existing rich commands and legacy MCP names remain callable. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.
 
 `kelpie browser-control <request-json>` sends one strict versioned request to the selected device using existing `--device` or `--browser` routing. For example: `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`. Native owns all observed refs. Authentication uses the same automatic account/computer pairing as other CLI commands; a command retries once after a `401` when pairing succeeds.
+
+See [browser control routing](api/browser-control.md#cli-device-selection) for local help and device targeting.
 
 ### Favourites tree through MCP
 

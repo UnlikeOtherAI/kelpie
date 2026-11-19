@@ -26,6 +26,9 @@ struct RendererHandler {
         if engine == rendererState.activeEngine {
             return successResponse(["engine": engine.rawValue, "changed": false])
         }
+        guard !rendererState.isSwitching else {
+            return errorResponse(code: "ENGINE_SWITCH_IN_PROGRESS", message: "Wait for the engine switch to complete.")
+        }
         if engine == .chromium, let blocked = partitionedTabsBlockSwitch() { return blocked }
 
         await onSwitch(engine)
@@ -46,10 +49,9 @@ struct RendererHandler {
     /// the user could never get back to the engine those tabs need.
     @MainActor
     private func partitionedTabsBlockSwitch() -> [String: Any]? {
-        let partitioned = WindowRegistry.shared.allEntriesIncludingDetached()
-            .flatMap { $0.tabStore.tabs.compactMap(\.partition) }
+        let partitioned = WindowRegistry.shared.openPartitionNames()
         guard !partitioned.isEmpty else { return nil }
-        let names = Set(partitioned).sorted().joined(separator: ", ")
+        let names = partitioned.sorted().joined(separator: ", ")
         return errorResponse(
             code: "ENGINE_SWITCH_BLOCKED_BY_PARTITION",
             message: "Cannot switch to the Chromium engine while partitioned tabs are open (\(names)). " +

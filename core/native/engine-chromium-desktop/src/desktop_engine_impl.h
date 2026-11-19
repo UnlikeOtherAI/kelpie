@@ -53,6 +53,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     std::optional<std::string> name;
     std::optional<std::string> partition;
     bool loading = false;
+    double load_progress = 0;
     bool can_go_back = false;
     bool can_go_forward = false;
     std::uint64_t navigation_requested = 0;
@@ -111,7 +112,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   Tab* FindTab(const TabLease& lease);
   Tab* FindTab(CefRefPtr<CefBrowser> browser);
   // A tab's DevTools session, attached so its Network events reach network_sink.
-  CefRefPtr<DesktopDevToolsSession> NewDevToolsSession(CefRefPtr<CefBrowser> browser);
+  CefRefPtr<DesktopDevToolsSession> NewDevToolsSession(CefRefPtr<CefBrowser> browser, std::string tab_id);
   Tab* ActiveTab();
   // Records a downloaded favicon against `page_host` in the registry, and on
   // the tab when it is still showing that site.

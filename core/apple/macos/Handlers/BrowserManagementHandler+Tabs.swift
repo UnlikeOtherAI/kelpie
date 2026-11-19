@@ -2,18 +2,11 @@ import Foundation
 
 /// Tab lifecycle endpoints for `BrowserManagementHandler`.
 ///
-/// Split out of the main handler so the partition fields on `new-tab` had
-/// somewhere to live without pushing that file past the 500-line limit. Tab
-/// management is WebKit-only throughout: CEF models a single browser, so every
-/// endpoint here refuses while Chromium is active.
 extension BrowserManagementHandler {
     // MARK: - Tabs
 
     @MainActor
     func getTabs(_ body: [String: Any]) async -> [String: Any] {
-        if context.renderer?.engineName == "chromium" {
-            return context.cefUnsupportedError(feature: "Tab management")
-        }
         let requestedWindowId = HandlerContext.windowId(from: body)
 
         // Multi-window listing: when no windowId is supplied, return every
@@ -127,15 +120,8 @@ extension BrowserManagementHandler {
 
     @MainActor
     func newTab(_ body: [String: Any]) async -> [String: Any] {
-        if context.renderer?.engineName == "chromium" {
-            // A partition request gets the discriminating error so the caller
-            // knows the engine is the problem; a plain new-tab keeps the
-            // existing tab-management message.
-            if body["partition"] != nil, let unsupported = chromiumUnsupportedIfActive() {
-                return unsupported
-            }
-            return context.cefUnsupportedError(feature: "Tab management")
-        }
+        if let switching = tabMutationBlocked() { return switching }
+        if body["partition"] != nil, let unsupported = chromiumUnsupportedIfActive() { return unsupported }
         let spec: TabSpec
         switch tabSpec(from: body) {
         case .resolved(let value): spec = value
@@ -159,7 +145,7 @@ extension BrowserManagementHandler {
             // Page even though the navigation succeeds (matches `onWillLoad`).
             tab.isStartPage = false
             tab.currentURL = url.absoluteString
-            tab.renderer.load(url: url)
+            entry.tabStore.renderer(for: tab)?.load(url: url)
         }
         return successResponse([
             "tabId": tab.id.uuidString,
@@ -171,9 +157,7 @@ extension BrowserManagementHandler {
 
     @MainActor
     func switchTab(_ body: [String: Any]) async -> [String: Any] {
-        if context.renderer?.engineName == "chromium" {
-            return context.cefUnsupportedError(feature: "Tab switching")
-        }
+        if let switching = tabMutationBlocked() { return switching }
         guard let tabIdStr = body["tabId"] as? String,
               let tabId = UUID(uuidString: tabIdStr) else {
             return errorResponse(code: "MISSING_PARAM", message: "tabId (UUID string) required")
@@ -203,9 +187,7 @@ extension BrowserManagementHandler {
 
     @MainActor
     func closeTab(_ body: [String: Any]) async -> [String: Any] {
-        if context.renderer?.engineName == "chromium" {
-            return context.cefUnsupportedError(feature: "Tab management")
-        }
+        if let switching = tabMutationBlocked() { return switching }
         guard let tabIdStr = body["tabId"] as? String,
               let tabId = UUID(uuidString: tabIdStr) else {
             return errorResponse(code: "MISSING_PARAM", message: "tabId (UUID string) required")
@@ -229,5 +211,11 @@ extension BrowserManagementHandler {
             "tabCount": entry.tabStore.tabs.count,
             "windowId": entry.id
         ])
+    }
+
+    @MainActor
+    private func tabMutationBlocked() -> [String: Any]? {
+        guard context.rendererSwitchInProgress?() == true else { return nil }
+        return errorResponse(code: "ENGINE_SWITCH_IN_PROGRESS", message: "Wait for the engine switch to complete.")
     }
 }

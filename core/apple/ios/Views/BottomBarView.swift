@@ -191,6 +191,10 @@ struct BottomBarView<MoreContent: View>: View {
         .frame(height: compact ? 28 : 44)
         .modifier(BrowserGlass())
         .overlay {
+            AddressLoadIndicator(isLoading: browserState.isLoading, progress: browserState.progress)
+                .id(tabStore.activeBrowserTabID)
+        }
+        .overlay {
             if compact {
                 Button { isCollapsed = false } label: {
                     Color.clear.frame(height: 44).contentShape(Rectangle())

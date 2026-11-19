@@ -54,6 +54,22 @@ final class NetworkHandlerTests: XCTestCase {
         XCTAssertFalse(NetworkHandler.matchesStatusCategory(200, "bogus"))
     }
 
+    func testErrorFilterIncludesTransportFailureAndKeepsSummary() {
+        let result = NetworkHandler.networkLog([
+            ["type": "fetch", "status": 204],
+            ["type": "fetch", "status": 404, "method": "POST"],
+            ["type": "xhr", "status": NSNull(), "failure": "timed out"],
+            ["type": "image", "status": NSNull()]
+        ], filters: ["status": "error", "limit": 1])
+        let entries = result["entries"] as? [[String: Any]]
+        let summary = result["summary"] as? [String: Any]
+        XCTAssertEqual(entries?.first?["method"] as? String, "POST")
+        XCTAssertEqual(result["count"] as? Int, 1)
+        XCTAssertEqual(result["hasMore"] as? Bool, true)
+        XCTAssertEqual(summary?["totalRequests"] as? Int, 4)
+        XCTAssertEqual(summary?["errors"] as? Int, 2)
+    }
+
     // MARK: - parseSinceMillis
 
     func testParseSinceFromNumber() {

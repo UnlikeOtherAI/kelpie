@@ -62,6 +62,8 @@ class DesktopApp {
     // Directory for the start page's site screenshots and favicons, normally
     // inside the profile. Empty keeps them in memory for this session only.
     std::filesystem::path site_previews_path;
+    // Optional existing profile file with additive CSS-pixel tap offsets.
+    std::filesystem::path tap_calibration_path;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;

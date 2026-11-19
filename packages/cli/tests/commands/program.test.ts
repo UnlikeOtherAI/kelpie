@@ -52,6 +52,7 @@ describe("CLI program compatibility", () => {
   });
 
   it("treats a bare URL argument as navigate shorthand", async () => {
+    const startTimer = vi.spyOn(globalThis, "setTimeout");
     mockFetch({ success: true, url: "https://example.com/app", title: "Example", loadTime: 10 });
     addDevice(device);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -66,6 +67,25 @@ describe("CLI program compatibility", () => {
 
     expect(capturedUrl()).toBe("http://192.168.1.42:8420/v1/navigate");
     expect(capturedBody()).toEqual({ url: "https://example.com/app" });
+    expect(startTimer).toHaveBeenCalledWith(expect.any(Function), 15_000);
+  });
+
+  it.each([
+    { flags: [], requestTimeout: 25_000 },
+    { flags: ["--timeout", "1000"], requestTimeout: "1000" },
+  ])("uses a separate transport timeout for selector waits ($requestTimeout ms)", async ({ flags, requestTimeout }) => {
+    const startTimer = vi.spyOn(globalThis, "setTimeout");
+    mockFetch({ success: true, waitTime: 0 });
+    addDevice(device);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await makeProgram().parseAsync([
+      "node", "kelpie", "--device", "test-device",
+      "wait", "#late", "--wait-timeout", "20000", ...flags,
+    ]);
+
+    expect(capturedBody()).toEqual({ selector: "#late", timeout: 20_000, state: "visible" });
+    expect(startTimer).toHaveBeenCalledWith(expect.any(Function), requestTimeout);
   });
 
   it("keeps unknown non-URL arguments as command errors", async () => {

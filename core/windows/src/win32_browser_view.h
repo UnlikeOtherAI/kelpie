@@ -21,6 +21,8 @@ struct BrowserState {
   bool is_loading = false;
   bool can_go_back = false;
   bool can_go_forward = false;
+  double load_progress = 0;
+  std::string tab_id;
 };
 
 class BrowserStateObserver {

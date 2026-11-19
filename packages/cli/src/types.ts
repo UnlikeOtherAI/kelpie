@@ -15,6 +15,8 @@ export interface DiscoveredDevice {
   version: string;
   lastSeen: number;
   capabilities?: DeviceCapabilities;
+  /** An address selector must stay on its chosen socket during auth retry. */
+  explicitAddress?: boolean;
   /** Read from an ACL-protected local readiness file; never persisted or printed. */
   localControlToken?: string;
   localReadinessFile?: string;

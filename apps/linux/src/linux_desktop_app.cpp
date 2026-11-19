@@ -52,6 +52,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   runtime.bookmarks_supplier=[this] { return impl_->account.Bookmarks(); };
   runtime.cookie_sync_status=[this] { return impl_->CookieSyncStatus(); };
   runtime.site_previews_path=std::filesystem::path(impl_->config.profile_dir)/"site-previews";
+  runtime.tap_calibration_path=std::filesystem::path(impl_->config.profile_dir)/"tap-calibration.json";
   runtime.request_shutdown=[this] { RequestShutdown(); return BrowserControlResult::Success(); };
   runtime.set_home=[this](std::string url) { SetHomeUrl(url); return BrowserControlResult::Success(); };
   runtime.get_home=[this](std::string* url) { *url=HomeUrl(); return BrowserControlResult::Success(); };

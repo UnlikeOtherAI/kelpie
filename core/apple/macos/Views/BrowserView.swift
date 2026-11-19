@@ -57,6 +57,7 @@ struct BrowserView: View {
                     URLBarView(
                         appearance: chromeAppearance,
                         browserState: browserState,
+                        progressTabID: tabStore.activeTabID,
                         rendererState: rendererState,
                         viewportState: viewportState,
                         aiState: aiState,
@@ -125,11 +126,6 @@ struct BrowserView: View {
                     ZStack {
                         rendererSurface
 
-                        if browserState.isLoading {
-                            FloatingProgressPill(progress: browserState.progress)
-                                .zIndex(10)
-                        }
-
                         if let message = serverState.shellToastMessage, !serverState.isScriptRecording {
                             VStack {
                                 Spacer()
@@ -197,6 +193,7 @@ struct BrowserView: View {
         }
         .onChange(of: browserState.isLoading) { _, isLoading in
             guard isLoading else { return }
+            isChromeCollapsed = false
             guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
             serverState.handlerContext.mark3DInspectorInactive(notify: false)
             isIn3DInspector = false
@@ -268,8 +265,6 @@ struct BrowserView: View {
         .onAppear {
             if let activeTab = tabStore.activeTab {
                 activateTab(activeTab)
-            } else {
-                connectNewTab(tabStore.tabs[0])
             }
             // Register this window with the registry and install its
             // tab-mutation callbacks so HTTP handlers can route per-window
@@ -286,7 +281,6 @@ struct BrowserView: View {
                 aiState.onAuthFailureNavigate = { [weak serverState] url in
                     serverState?.handlerContext.load(url: url)
                 }
-                await connectRendererState()
             }
         }
         .onDisappear {
@@ -298,9 +292,7 @@ struct BrowserView: View {
         }
         .onChange(of: rendererState.activeEngine) { _, _ in
             hoveredLinkURL = ""
-            Task { @MainActor in
-                await connectRendererState()
-            }
+            if let tab = tabStore.activeTab { connectNewTab(tab) }
         }
         .onChange(of: viewportState.resolutionLabel) { _, _ in
             notifyRendererViewportChangeIfNeeded()

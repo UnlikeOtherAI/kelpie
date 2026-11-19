@@ -28,6 +28,7 @@ void PaintRounded(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius,
 
 // A focus ring drawn just outside `rect`, matching the keyboard focus
 // affordance on the macOS address field.
+void PaintAddressLoadOutline(HDC dc, RECT rect, int width, COLORREF color, double extent, double opacity);
 void PaintFocusRing(HDC dc, RECT rect, COLORREF color, int radius, int width);
 
 // Fills the ellipse inscribed in `rect` with `image`, scaled to fit, with an
