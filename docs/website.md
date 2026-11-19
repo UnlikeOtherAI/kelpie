@@ -88,3 +88,10 @@ scripts/deploy-website.sh <ssh-target> --rollback
 
 After publishing, load <https://kelpie.rocks> and <https://kelpie.rocks/privacy/>
 and check both.
+
+To rehearse without touching the live site, point the script at a scratch
+folder on the host that holds a `dist` directory:
+
+```sh
+KELPIE_WEB_ROOT=/tmp/kelpie-web-rehearsal scripts/deploy-website.sh <ssh-target>
+```

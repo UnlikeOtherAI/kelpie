@@ -13,6 +13,9 @@ Usage: scripts/deploy-website.sh <ssh-target> [--rollback]
 
   <ssh-target>  SSH host or alias of the machine that serves kelpie.rocks
   --rollback    Put back the version the last deploy replaced
+
+KELPIE_WEB_ROOT overrides the remote folder (default /srv/kelpie-web), for
+example to rehearse a deploy in a scratch folder.
 EOF
 }
 
@@ -23,7 +26,7 @@ fi
 
 TARGET="$1"
 MODE="${2:-deploy}"
-REMOTE_ROOT="/srv/kelpie-web"
+REMOTE_ROOT="${KELPIE_WEB_ROOT:-/srv/kelpie-web}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SITE_DIR="${REPO_ROOT}/site"
 
