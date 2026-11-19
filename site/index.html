@@ -22,6 +22,8 @@
   <link rel="stylesheet" href="css/phones.css">
   <link rel="stylesheet" href="css/wall.css">
   <link rel="stylesheet" href="css/stories.css">
+  <link rel="stylesheet" href="css/engines.css">
+  <link rel="stylesheet" href="css/engines-loop.css">
   <link rel="stylesheet" href="css/agents.css">
   <link rel="stylesheet" href="css/demos.css">
   <link rel="stylesheet" href="css/demos-inspect.css">
@@ -92,31 +94,6 @@
         <div>
           <div class="wall is-loaded is-found" role="img" aria-label="Animation: one agent navigates four phones to the same page, finds the Sign up button, fills in the form and takes a screenshot on each phone.">
             <div class="wall-shelf" data-phones="home notch island hole"></div>
-            <template>
-              <div class="phone">
-                <div class="phone-screen">
-                  <i class="mini-progress"></i>
-                  <div class="mini">
-                    <div class="mini-view mini-view--home">
-                      <div class="mini-nav"><i></i><i></i></div>
-                      <b></b><b class="s"></b>
-                      <i class="mini-art"></i>
-                      <i class="mini-text"></i><i class="mini-text s"></i>
-                      <span class="mini-cta">Sign up</span>
-                    </div>
-                    <div class="mini-view mini-view--form">
-                      <div class="mini-nav"><i></i><i></i></div>
-                      <b class="s"></b>
-                      <i class="mini-text"></i>
-                      <span class="mini-field"><span>ada@example.com</span></span>
-                      <span class="mini-cta">Continue</span>
-                    </div>
-                  </div>
-                  <div class="mini-bar"><i></i><i></i></div>
-                  <i class="mini-flash"></i>
-                </div>
-              </div>
-            </template>
             <noscript><img class="wall-still" src="assets/screens/device-wall-crop.webp" alt="" width="900" height="706"></noscript>
             <div class="console">
               <div class="console-bar"><i></i>Agent session<span>kelpie mcp</span></div>
@@ -155,6 +132,31 @@
         <div class="shot shot--phone"><img src="assets/screens/iphone-unlikeotherai.webp" alt="The same page in Kelpie on an iPhone." width="660" height="1434" loading="lazy"></div>
         <div class="shot shot--phone"><img src="assets/screens/android-unlikeotherai.webp" alt="The same page in Kelpie on Android." width="600" height="1333" loading="lazy"></div>
       </figure>
+
+      <div class="story" id="mac">
+        <div>
+          <span class="kicker">On the Mac</span>
+          <h3 class="h2">Chrome and Safari in one browser.</h3>
+          <p>Kelpie for Mac carries two engines: WebKit, the engine behind Safari, and Chromium, the engine behind Chrome. Flip the switch in the toolbar and every open tab loads its page in the other engine.</p>
+          <ul class="ticks">
+            <li>Your cookies cross over with the switch, so you stay signed in.</li>
+            <li>An agent switches with one call and checks a page in both engines in the same session.</li>
+            <li>Both engines ship in <a href="#download">the Mac download</a>. There is no second browser to install.</li>
+          </ul>
+        </div>
+        <div class="engines" role="img" aria-label="Animation: an agent calls kelpie_set_renderer. The switch in the toolbar of Kelpie for Mac moves from Safari to Chrome, the page loads again in Chromium and the account stays signed in.">
+          <div class="mac">
+            <div class="mac-tabs"><i></i><i></i><i></i><span>Example Shop</span></div>
+            <div class="mac-bar"><i></i><i></i><i></i><span class="mac-url">staging.example.com/account</span><span class="mac-switch"><b>Safari</b><b>Chrome</b></span></div>
+            <div class="mac-page">
+              <div class="mac-nav"><i></i><span class="mac-user">Signed in</span></div>
+              <b></b><b class="s"></b><i class="mac-art"></i><i class="mac-text"></i><i class="mac-text s"></i>
+              <span class="mac-engine">Rendered by <em>WebKit</em><em>Chromium</em></span>
+            </div>
+          </div>
+          <ol class="mac-log"><li class="log-call"><b>kelpie_set_renderer</b> { engine: "chromium" }</li><li class="log-ok">engine: "chromium", changed: true</li></ol>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -398,7 +400,7 @@
         <div class="tile tile--get">
           <span class="tile-icon"><svg aria-hidden="true"><use href="assets/icons.svg#laptop"/></svg></span>
           <h3 class="h3">Mac</h3>
-          <p>Apple Silicon, macOS 14 or later. Signed and notarized.</p>
+          <p>Apple Silicon, macOS 14 or later. Signed and notarized, with the WebKit and Chromium engines.</p>
           <a class="btn" href="https://github.com/UnlikeOtherAI/kelpie/releases" data-asset="^Kelpie-macos-.*-arm64\.zip$"><svg aria-hidden="true"><use href="assets/icons.svg#download"/></svg>Download<span data-version></span></a>
         </div>
         <div class="tile tile--get">

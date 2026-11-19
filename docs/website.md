@@ -57,9 +57,16 @@ generated for the store banner and recoloured to the site's pink. When the apps
 change, replace the captures with new ones of the same pixel size, check that
 they show no private browsing data, and keep the `alt` text accurate.
 
-The phones in the hero and the small demos in the "for agents" cards are drawn
-in HTML and CSS. The tool names and arguments they show are real; keep them in
-step with `packages/shared/src/extension-tools.ts`.
+The phones in the hero, the Mac window in "Chrome and Safari in one browser"
+and the small demos in the "for agents" cards are drawn in HTML and CSS. The
+tool names and arguments they show are real; keep them in step with
+`packages/shared/src/extension-tools.ts`.
+
+The Mac window shows the engine switch, which only the direct Mac download
+has. The Mac App Store build is WebKit only (`TUIST_KELPIE_WEBKIT_ONLY`), so
+keep that section's claim tied to the download. The real switch shows two
+browser icons; the drawing uses the words "Safari" and "Chrome" instead of the
+logos.
 
 ## Preview
 

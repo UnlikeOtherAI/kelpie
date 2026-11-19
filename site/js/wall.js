@@ -2,8 +2,32 @@
 // state class to .wall (css/wall.css draws the result on every phone) and
 // prints the matching MCP call in the console underneath.
 //
-// The markup holds one phone as a template and a finished still frame of the
-// console. This script stamps out the phones and then replays the session.
+// The page holds an empty shelf and a finished still frame of the console.
+// This script builds the phones and then replays the session.
+
+// What every phone shows: a page with a Sign up button, and the form behind it.
+const PHONE_SCREEN = `
+  <div class="phone-screen">
+    <i class="mini-progress"></i>
+    <div class="mini">
+      <div class="mini-view mini-view--home">
+        <div class="mini-nav"><i></i><i></i></div>
+        <b></b><b class="s"></b>
+        <i class="mini-art"></i>
+        <i class="mini-text"></i><i class="mini-text s"></i>
+        <span class="mini-cta">Sign up</span>
+      </div>
+      <div class="mini-view mini-view--form">
+        <div class="mini-nav"><i></i><i></i></div>
+        <b class="s"></b>
+        <i class="mini-text"></i>
+        <span class="mini-field"><span>ada@example.com</span></span>
+        <span class="mini-cta">Continue</span>
+      </div>
+    </div>
+    <div class="mini-bar"><i></i><i></i></div>
+    <i class="mini-flash"></i>
+  </div>`;
 
 const STEPS = [
   { at: 0, state: "is-nav", call: ["kelpie_group_navigate", '{ url: "https://staging.example.com" }'] },
@@ -25,12 +49,12 @@ const STATES = STEPS.map((step) => step.state).filter(Boolean);
 // One phone per name in data-phones, oldest outline first.
 function buildPhones(wall) {
   const shelf = wall.querySelector(".wall-shelf");
-  const template = wall.querySelector("template");
-  if (!shelf || !template) return;
+  if (!shelf) return;
 
   shelf.dataset.phones.split(" ").forEach((kind) => {
-    const phone = template.content.firstElementChild.cloneNode(true);
-    phone.classList.add(`phone--${kind}`);
+    const phone = document.createElement("div");
+    phone.className = `phone phone--${kind}`;
+    phone.innerHTML = PHONE_SCREEN;
     shelf.append(phone);
   });
 }

@@ -173,22 +173,23 @@
   animation: wall-line 260ms ease both;
 }
 
-.console-log .log-call b {
+/* Console lines, here and under the Mac window (engines.css). */
+.log-call b {
   color: var(--k-mint);
   font-weight: 500;
 }
 
-.console-log .log-call::before {
+.log-call::before {
   margin-right: 8px;
   color: var(--k-pink);
   content: "→";
 }
 
-.console-log .log-ok {
+.log-ok {
   color: rgba(255, 255, 255, 0.66);
 }
 
-.console-log .log-ok::before {
+.log-ok::before {
   margin-right: 8px;
   color: var(--k-mint);
   content: "✓";
