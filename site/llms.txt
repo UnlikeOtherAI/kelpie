@@ -1,0 +1,22 @@
+# Kelpie
+
+> Kelpie is an open-source browser for iPhone, iPad, Android, macOS, Windows and Linux. People browse with it; AI agents drive it through MCP, an HTTP API or the `kelpie` command line.
+
+Kelpie runs real browser engines on real devices. An agent can open tabs, navigate, read a page as a compact snapshot, click, type, take screenshots and inspect network traffic. Devices are discovered on the local network with mDNS (`_kelpie._tcp`); a remote computer needs one approval on the device, tied to its signing key.
+
+## Connect
+
+- Install the CLI: `npm install -g @unlikeotherai/kelpie` (Node.js 20 or later)
+- MCP client configuration: `{ "command": "kelpie", "args": ["mcp"] }`
+- The default MCP catalog has four tools: `kelpie_browser_control`, `kelpie_extensions`, `kelpie_extension_tools` and `kelpie_extension`
+- `kelpie_browser_control` takes `{ version: 1, method, tabId?, params }`. Call `documentation` for the guide and `capabilities` for the methods a device supports
+- `kelpie --llm-help` prints structured command help
+
+## Documentation
+
+- [Repository](https://github.com/UnlikeOtherAI/kelpie): source, releases and issues
+- [Shared browser control](https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/api/browser-control.md): the versioned core interface
+- [API reference](https://github.com/UnlikeOtherAI/kelpie/tree/main/docs/api): every HTTP and MCP method
+- [CLI reference](https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/cli.md): discovery, pairing and commands
+- [Feature catalogue](https://github.com/UnlikeOtherAI/kelpie/blob/main/docs/functionality.md): features and platform behaviour
+- [Releases](https://github.com/UnlikeOtherAI/kelpie/releases): downloads for every platform

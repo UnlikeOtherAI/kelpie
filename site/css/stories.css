@@ -1,0 +1,249 @@
+/* Stories: one use case per row, with real captures of the apps. */
+.photo-card {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  min-height: clamp(380px, 44vw, 520px);
+  margin-top: 40px;
+  border-radius: 24px;
+  background: #0d0f15 url("../assets/screens/device-wall.webp") right center / cover no-repeat;
+  color: #fff;
+}
+
+.photo-card-body {
+  align-self: center;
+  max-width: 470px;
+  padding: clamp(28px, 5vw, 64px);
+}
+
+.photo-card .h2 {
+  font-size: clamp(32px, 4.4vw, 54px);
+}
+
+.photo-card p {
+  margin-top: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 18px;
+}
+
+.photo-card img {
+  display: none;
+}
+
+.story {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(32px, 6vw, 88px);
+  align-items: center;
+  margin-top: clamp(72px, 9vw, 128px);
+}
+
+.story--flip .story-media {
+  order: -1;
+}
+
+.story .h2 {
+  font-size: clamp(28px, 3.4vw, 42px);
+}
+
+.story p {
+  max-width: 500px;
+  margin-top: 16px;
+  color: var(--k-muted);
+  font-size: 18px;
+}
+
+.ticks {
+  display: grid;
+  gap: 10px;
+  max-width: 500px;
+  margin-top: 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.ticks li {
+  position: relative;
+  padding-left: 30px;
+}
+
+.ticks li::before {
+  position: absolute;
+  top: 0.42em;
+  left: 2px;
+  width: 14px;
+  height: 8px;
+  border-bottom: 2.5px solid var(--k-rose);
+  border-left: 2.5px solid var(--k-rose);
+  content: "";
+  transform: rotate(-45deg) scale(0.86);
+}
+
+.story-media {
+  position: relative;
+  display: flex;
+  gap: clamp(12px, 2.4vw, 28px);
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* A real capture inside a plain device outline. */
+.shot {
+  overflow: hidden;
+  width: min(100%, 290px);
+  padding: 9px;
+  border-radius: 13.5% / 6.3%;
+  background: #10131c;
+  box-shadow: 0 30px 60px -30px rgba(0, 12, 48, 0.5), 0 2px 6px rgba(0, 12, 48, 0.16);
+}
+
+.shot img {
+  width: 100%;
+  height: auto;
+  border-radius: 11.4% / 5.2%;
+}
+
+.shot--small {
+  width: min(46%, 236px);
+}
+
+.shot--wide {
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--k-line);
+  border-radius: 16px;
+  background: #e6ebf3;
+}
+
+.shot--wide img {
+  border-radius: 0;
+}
+
+/* The apps showcase: one page in a desktop window, on a tablet and on two
+   phones. The window sits behind; the devices line up along the bottom. */
+.showcase {
+  position: relative;
+  display: flex;
+  gap: clamp(8px, 1.6vw, 20px);
+  align-items: flex-end;
+  justify-content: flex-end;
+  margin-top: 48px;
+  padding-top: 19%;
+}
+
+.showcase .shot {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}
+
+.showcase .shot--window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 74%;
+  padding: 0;
+  border: 1px solid #c9cdd9;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.shot--window img {
+  border-radius: 0;
+}
+
+.shot--tablet {
+  width: 25%;
+  padding: 8px;
+  border-radius: 5.4% / 4.2%;
+}
+
+.shot--tablet img {
+  border-radius: 3.4% / 2.6%;
+}
+
+.shot--phone {
+  width: 14%;
+  padding: 6px;
+}
+
+.call {
+  position: absolute;
+  right: 0;
+  bottom: 12%;
+  max-width: min(78%, 330px);
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--k-ink);
+  box-shadow: 0 24px 48px -20px rgba(0, 12, 48, 0.6);
+  color: #fff;
+  font-family: var(--k-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.call b {
+  color: var(--k-mint);
+  font-weight: 600;
+}
+
+.call span {
+  display: block;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 960px) {
+  .story {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .story--flip .story-media {
+    order: 0;
+  }
+
+  .photo-card {
+    min-height: 0;
+    background: #0d0f15;
+  }
+
+  .photo-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .showcase {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-top: 0;
+  }
+
+  .showcase .shot--window {
+    position: static;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .shot--tablet {
+    width: 44%;
+    padding: 6px;
+  }
+
+  .shot--phone {
+    width: 24%;
+    padding: 4px;
+  }
+
+  .call {
+    position: static;
+    max-width: none;
+    margin-top: 16px;
+  }
+
+  .story-media {
+    flex-wrap: wrap;
+  }
+}

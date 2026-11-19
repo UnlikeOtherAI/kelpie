@@ -1,0 +1,253 @@
+/* Site chrome: the navy header with its water edge, wave dividers and the footer. */
+
+/* Header: a navy bar whose water edge hangs over the page. */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--k-ink);
+  color: #fff;
+}
+
+.header-inner {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  max-width: 1280px;
+  height: 76px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.brand {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: inherit;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.brand img {
+  width: 52px;
+  height: 52px;
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-right: auto;
+}
+
+.nav a,
+.header-link {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nav a:hover,
+.header-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.header-link svg {
+  width: 20px;
+  height: 20px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.nav-toggle svg {
+  width: 24px;
+  height: 24px;
+  margin: auto;
+}
+
+.wave-hang {
+  position: absolute;
+  top: calc(100% - 1px);
+  right: 0;
+  left: 0;
+  color: var(--k-ink);
+  line-height: 0;
+  pointer-events: none;
+}
+
+.wave-hang svg {
+  width: 100%;
+  height: clamp(18px, 2.6vw, 32px);
+  transform: scale(-1, -1);
+}
+
+/* Wave divider between sections of different colour: --from above, --to
+   below. No wave dips under 80% of the height, so painting the bottom strip in
+   the lower colour hides the seam where the stretched SVG meets its box. */
+.wave {
+  --from: #fff;
+  --to: var(--k-ink);
+  margin: -1px 0;
+  background: linear-gradient(var(--from) 82%, var(--to) 82%);
+  color: var(--to);
+  line-height: 0;
+}
+
+.wave--from-blush {
+  --from: var(--k-blush);
+}
+
+.wave--to-white {
+  --from: var(--k-ink);
+  --to: #fff;
+}
+
+.wave svg {
+  width: 100%;
+  height: clamp(56px, 8vw, 120px);
+}
+
+/* Footer */
+.footer {
+  padding: 48px 0 32px;
+  background: #fff;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, 1fr);
+  gap: 32px;
+}
+
+.footer .brand {
+  color: var(--k-ink);
+}
+
+.footer-note {
+  max-width: 300px;
+  margin-top: 14px;
+  color: var(--k-muted);
+  font-size: 15px;
+}
+
+.footer h4 {
+  color: var(--k-muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.footer ul {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.footer ul a {
+  color: var(--k-text);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.footer ul a:hover {
+  color: var(--k-rose);
+}
+
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--k-line);
+  color: var(--k-muted);
+  font-size: 14px;
+}
+
+.footer-legal a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.footer-legal a:hover {
+  color: var(--k-rose);
+}
+
+.footer-legal nav {
+  display: flex;
+  gap: 20px;
+}
+
+@media (max-width: 960px) {
+  .nav-toggle {
+    display: block;
+  }
+
+  .nav,
+  .header-actions {
+    display: none;
+  }
+
+  .header.is-open .header-inner {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 20px;
+  }
+
+  .header.is-open .brand {
+    height: 76px;
+  }
+
+  .header.is-open .nav,
+  .header.is-open .header-actions {
+    display: flex;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    margin: 0;
+  }
+
+  .header.is-open .nav a,
+  .header.is-open .header-link {
+    padding: 12px;
+    font-size: 17px;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footer-grid > :first-child {
+    grid-column: 1 / -1;
+  }
+}

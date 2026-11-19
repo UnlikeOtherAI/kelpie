@@ -21,6 +21,7 @@ Direct Mac artifacts use the inside-out signer and notarization checks in [Mac r
 - Native UOA-backed outbound Nessie connectivity, document pins, and durable job results: [docs/nessie-connect.md](docs/nessie-connect.md).
 - Windows/Linux outbound Nessie account connections and native verification: [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 - UI documentation: [docs/ui/](docs/ui/) — browser app screens, settings panel, platform specifics
+- Website: [docs/website.md](docs/website.md) — the static `site/` folder, store links and publishing to kelpie.rocks
 
 **Evolving docs — created as needed when work begins (do not auto-load):**
 - Design plans: `docs/plans/` (active) / `docs/done/` (completed)
