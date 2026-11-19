@@ -129,7 +129,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.2.9"
+    KELPIE_LINUX_VERSION="0.2.10"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -178,7 +178,7 @@ add_custom_command(TARGET kelpie-linux POST_BUILD
 
 add_custom_command(TARGET kelpie-linux POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../assets/kelpie-icon-1024.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../assets/kelpie-mark-1024.png"
     "$<TARGET_FILE_DIR:kelpie-linux>/icon-1024.png"
 )
 
