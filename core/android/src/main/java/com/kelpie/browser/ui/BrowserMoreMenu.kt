@@ -20,8 +20,6 @@ internal fun BrowserMoreMenu(
     onHistory: () -> Unit,
     onNetworkInspector: () -> Unit,
     onAI: () -> Unit,
-    onSnapshot3D: () -> Unit,
-    show3DInspector: Boolean,
     showMobileViewportToggle: Boolean,
     mobileViewportPresets: List<TabletViewportPreset>,
     selectedMobileViewportPresetId: String?,
@@ -44,7 +42,6 @@ internal fun BrowserMoreMenu(
     item("History", onHistory)
     item("AI", onAI)
     item("Network inspector", onNetworkInspector)
-    if (show3DInspector) item("3D inspector", onSnapshot3D)
     if (showMobileViewportToggle) {
         HorizontalDivider()
         mobileViewportPresets.forEach { preset ->

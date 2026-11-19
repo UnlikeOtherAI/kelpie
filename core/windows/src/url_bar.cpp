@@ -3,6 +3,7 @@
 #include <commctrl.h>
 
 #include <algorithm>
+#include <iterator>
 
 #include "../resources/resource.h"
 #include "theme/theme.h"
@@ -24,7 +25,33 @@ std::wstring ReadWindowText(HWND hwnd) {
 bool IsIconButton(UINT id) {
   return id == IDC_BACK_BUTTON || id == IDC_FORWARD_BUTTON || id == IDC_RELOAD_BUTTON ||
          id == IDC_BOOKMARKS_BUTTON || id == IDC_HISTORY_BUTTON || id == IDC_NETWORK_BUTTON ||
+         id == IDC_INSPECTOR_3D_BUTTON ||
          id == IDC_SETTINGS_BUTTON || id == IDC_HOME_BUTTON || id == IDC_ACCOUNT_BUTTON || id == IDC_ADD_FAVORITE_BUTTON;
+}
+
+void DrawCube(HDC dc, HWND window, const RECT& bounds, COLORREF color, bool active) {
+  const int cx = (bounds.left + bounds.right) / 2;
+  const int cy = (bounds.top + bounds.bottom) / 2;
+  const int x = ui::Dip(window, 9), y = ui::Dip(window, 10), half = y / 2;
+  const POINT outline[] = {{cx, cy-y}, {cx+x, cy-half}, {cx+x, cy+half},
+                           {cx, cy+y}, {cx-x, cy+half}, {cx-x, cy-half}, {cx, cy-y}};
+  const POINT top_face[] = {{cx, cy-y}, {cx+x, cy-half}, {cx, cy}, {cx-x, cy-half}};
+  const POINT edges[] = {{cx-x, cy-half}, {cx, cy}, {cx+x, cy-half}};
+  const HPEN pen = CreatePen(PS_SOLID, ui::Dip(window, 1), color);
+  const auto old_pen = SelectObject(dc, pen);
+  if (active) {
+    const HBRUSH brush = CreateSolidBrush(color);
+    const auto old_brush = SelectObject(dc, brush);
+    Polygon(dc, top_face, 4);
+    SelectObject(dc, old_brush);
+    DeleteObject(brush);
+  }
+  Polyline(dc, outline, 7);
+  Polyline(dc, edges, 3);
+  MoveToEx(dc, cx, cy, nullptr);
+  LineTo(dc, cx, cy+y);
+  SelectObject(dc, old_pen);
+  DeleteObject(pen);
 }
 
 wchar_t IconFor(UINT id, bool loading) {
@@ -69,7 +96,9 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
       !make_button(IDC_HISTORY_BUTTON, L"History", &history_button_) ||
       !make_button(IDC_NETWORK_BUTTON, L"Network Inspector", &network_button_) ||
       !make_button(IDC_ACCOUNT_BUTTON, L"UOA account", &account_button_) ||
+      !make_button(IDC_INSPECTOR_3D_BUTTON, L"3D inspector, Off", &inspector_3d_button_) ||
       !make_button(IDC_SETTINGS_BUTTON, L"Settings", &settings_button_)) return false;
+  EnableWindow(inspector_3d_button_, FALSE);
   url_edit_ = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                               0, 0, 0, 0, parent, reinterpret_cast<HMENU>(IDC_URL_EDIT), instance, nullptr);
   if (url_edit_ == nullptr) return false;
@@ -94,6 +123,7 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
     add_tooltip(bookmarks_button_, L"Bookmarks");
     add_tooltip(history_button_, L"History");
     add_tooltip(network_button_, L"Network inspector");
+    add_tooltip(inspector_3d_button_, L"3D inspector");
     add_tooltip(settings_button_, L"Settings");
   }
   SetWindowLongPtrW(url_edit_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -124,7 +154,9 @@ void UrlBar::Resize(const RECT& bounds) {
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
     left += button_width + gap;
   }
-  const int edit_right = bounds.right - padding - 5 * (button_width + gap);
+  const HWND trailing_controls[] = {bookmarks_button_, network_button_, history_button_,
+                                    account_button_, inspector_3d_button_, settings_button_};
+  const int edit_right = bounds.right - padding - static_cast<int>(std::size(trailing_controls)) * (button_width + gap);
   surface_ = {left, top, edit_right, top + control_height};
   const int edit_height = ui::Dip(parent_, 24);
   SetWindowPos(url_edit_, nullptr, left + ui::Dip(parent_, 48), top + (control_height-edit_height)/2,
@@ -132,7 +164,7 @@ void UrlBar::Resize(const RECT& bounds) {
   SetWindowPos(add_favorite_button_, nullptr, edit_right-ui::Dip(parent_, 46), top+ui::Dip(parent_, 5),
       ui::Dip(parent_, 34), ui::Dip(parent_, 34), SWP_NOZORDER);
   left = edit_right + gap;
-  for (HWND button : {bookmarks_button_, network_button_, history_button_, account_button_, settings_button_}) {
+  for (HWND button : trailing_controls) {
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
     left += button_width + gap;
   }
@@ -142,7 +174,7 @@ void UrlBar::Resize(const RECT& bounds) {
 std::vector<HWND> UrlBar::FocusableControls() const {
   std::vector<HWND> controls;
   for (HWND control : {back_button_, forward_button_, reload_button_, home_button_, url_edit_, add_favorite_button_, bookmarks_button_,
-                       history_button_, network_button_, account_button_, settings_button_}) {
+                       history_button_, network_button_, account_button_, inspector_3d_button_, settings_button_}) {
     if (control != nullptr && IsWindowVisible(control) && IsWindowEnabled(control)) controls.push_back(control);
   }
   return controls;
@@ -223,6 +255,17 @@ void UrlBar::TickLoadProgress() {
   }
 }
 
+void UrlBar::Set3DInspectorState(bool enabled, bool active) {
+  if (enabled != (IsWindowEnabled(inspector_3d_button_) != FALSE)) {
+    EnableWindow(inspector_3d_button_, enabled);
+  }
+  if (inspector_3d_active_ == active) return;
+  inspector_3d_active_ = active;
+  SetWindowTextW(inspector_3d_button_, active ? L"3D inspector, On" : L"3D inspector, Off");
+  NotifyWinEvent(EVENT_OBJECT_NAMECHANGE, inspector_3d_button_, OBJID_CLIENT, CHILDID_SELF);
+  InvalidateRect(inspector_3d_button_, nullptr, FALSE);
+}
+
 void UrlBar::Focus() {
   completion_active_ = false;
   SetFocus(url_edit_);
@@ -246,6 +289,10 @@ bool UrlBar::DrawControl(const DRAWITEMSTRUCT& item) const {
   ui::FillSolid(item.hDC, item.rcItem, base);
   if (pressed || hovered || focused) ui::PaintRounded(item.hDC, item.rcItem, palette_.hover,
       focused ? ui::Colors().focus : palette_.hover, ui::Dip(parent_, 8), focused ? 2 : 0);
+  if (item.CtlID == IDC_INSPECTOR_3D_BUTTON) {
+    DrawCube(item.hDC, parent_, item.rcItem, disabled ? palette_.muted : palette_.text, inspector_3d_active_);
+    return true;
+  }
   const bool loading = item.CtlID == IDC_RELOAD_BUTTON && GetWindowLongPtrW(item.hwndItem, GWLP_USERDATA) != 0;
   ui::DrawGlyph(item.hDC, parent_, item.rcItem, IconFor(item.CtlID, loading),
                  disabled ? palette_.muted : palette_.text, 20);

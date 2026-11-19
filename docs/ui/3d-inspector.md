@@ -1,7 +1,11 @@
 # 3D inspector
 
-The experimental inspector is supported by macOS, iOS and Android, including
-embedded browsers. Enter through the browser's 3D action or `snapshot-3d-enter`.
+On phones and narrow tablet windows, open More and select the 3D inspector cube.
+On wider tablets, Windows and Linux, select the cube beside the three dots. On macOS
+the engine switch sits between the cube
+and the three dots in builds with both WebKit and Chromium. The toolbar action
+uses WebKit on macOS and Chromium on Windows and Linux. On iOS, Android and macOS
+you can also enter with `snapshot-3d-enter`.
 
 The left toolbar selects Rotate, Pan, Scroll or Inspect, opens Elements, and resets
 the camera. Dedicated up/down buttons move the page by 60% of the viewport height
@@ -34,7 +38,7 @@ the toolbox does not continuously monitor site mutations.
 
 The card and toolbox use a scene-local shadow root, outside the transformed body,
 so website CSS does not style the controls. Existing native shell controls remain
-available, including Exit. Exiting removes the overlay and event listeners and
+available. Exiting removes the overlay and event listeners and
 restores element styles, viewport pivot and scrolling. Re-entry cleans stale scene
 state automatically. The preview is kept only in memory for the current session.
 

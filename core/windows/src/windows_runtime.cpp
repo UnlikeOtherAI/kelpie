@@ -148,7 +148,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.2.10";
+  runtime.app_version = "0.2.11";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.cookie_sync_status = [this] { return CookieSyncStatus(); };
@@ -366,6 +366,8 @@ bool WindowsApp::ShutdownDesktopRuntime() {
 
 void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (!desktop_app_) return;
+  const auto inspector = desktop_app_->engine().Active3DInspector();
+  shell_->Set3DInspectorState(inspector.enabled, inspector.active);
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
     TickCookieSync();

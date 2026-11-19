@@ -46,6 +46,10 @@ FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }
 
 void DesktopEngine::DoMessageLoopWork() {}
 
+DesktopEngine::Inspector3DState DesktopEngine::Active3DInspector() const { return {}; }
+
+void DesktopEngine::Toggle3DInspector() {}
+
 const std::string& DesktopEngine::last_error() const {
   static const std::string error = "Chromium support is unavailable in this build";
   return error;

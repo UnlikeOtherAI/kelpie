@@ -27,7 +27,7 @@
 - The macOS `Help` menu also links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`.
 - The active macOS browser scene maps `Cmd+R` to a hard refresh. WebKit uses `reloadFromOrigin()`, and Chromium uses CEF's cache-bypassing reload path.
 - MCP and HTTP `toast` messages render as a native bottom card in the macOS shell, not as an injected page overlay.
-- The macOS navigation row contains back, forward, reload, Home, bookmark, native sharing, history and a trailing vertical three-dot popup. The popup holds bookmark management, network inspector, settings, AI, 3D inspection and its controls, renderer, viewport preset, orientation and scale. It scrolls within a constrained height.
+- The macOS navigation row ends with the 3D inspector cube, the WebKit/Chromium switch when both engines are available, and a vertical three-dot popup. The popup holds bookmark management, network inspector, settings, AI, active inspector camera controls, viewport preset, orientation and scale. It scrolls within a constrained height.
 - The navigation row is 44 points high with a 28-point address field; favourites use a 29-point row. Native within-window blur gives the chrome its translucent background. On macOS 26+ full-size WebKit pages paint beneath it using public obscured-content insets, preserving the visible CSS viewport and screenshot coordinates. Chromium, older macOS and staged device viewports keep their reserved content area.
 - A compact light-blue link preview overlays the bottom-left of the page only while hovering a link. It fits the destination, caps long URLs at 640 points or the available width with middle truncation, and fades in and out over 150 ms (instantly with Reduce Motion). It reserves no viewport space, lets page clicks pass through, and clears on pointer exit, scrolling, navigation, tab selection or renderer changes. The native tracker uses one-shot DOM hit tests, including open shadow roots and same-origin frames; cross-origin frame links are not inspectable through that path.
 - The chrome palette follows a tiny native WebKit snapshot of the visible top page edge on navigation and throttled scroll, using a foreground-resistant median in sRGB. One 200 ms transition drives background, selected tabs, text and toolbar icons together; it does not poll while idle or persist snapshots.
@@ -52,7 +52,7 @@
 - The 72-DIP navigation row has unboxed Back, Forward, Reload/Stop and Home
   controls, a 44-DIP pill address field with a secure-transport lock and
   Add favorite star, followed by bookmarks (the star-and-list Favorites glyph),
-  network inspector (up and down transfer arrows), history, account and the
+  network inspector (up and down transfer arrows), history, account, the 3D inspector cube and the
   three-dot settings control. Home uses the persisted home URL. The star stores
   the current page once, locally when signed out or in UOA when signed in.
 - The account control is a 30-DIP circle with a hairline ring, like the macOS

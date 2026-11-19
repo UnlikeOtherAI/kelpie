@@ -177,6 +177,10 @@ void WindowsApp::OnReloadRequested() {
   if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
+void WindowsApp::OnToggle3DInspectorRequested() {
+  if (desktop_app_) desktop_app_->engine().Toggle3DInspector();
+}
+
 void WindowsApp::OnOpenSettingsRequested() {
   SettingsValues updated = CurrentSettings();
   if (settings_view_->ShowModal(instance_, shell_->hwnd(), CurrentSettings(), updated,

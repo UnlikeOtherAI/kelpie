@@ -40,6 +40,8 @@ class LinuxApp {
   PeerApprovalQueue& ComputerApprovals();
   bool FinishShutdown();
   std::vector<TabSnapshot> Tabs() const;
+  DesktopEngine::Inspector3DState Active3DInspector() const;
+  void Toggle3DInspector();
   void NewTab(bool isolated=false);
   bool IsolateNewTabs() const;
   void SetIsolateNewTabs(bool enabled);

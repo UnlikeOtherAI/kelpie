@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Reference-style navigation row. Developer tools live in the trailing popup.
+/// Reference-style navigation row with page and developer controls.
 struct URLBarView: View {
     @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var browserState: BrowserState
@@ -18,10 +18,8 @@ struct URLBarView: View {
     let onAIToggle: () -> Void
     let onSnapshot3D: () -> Void
     let is3DActive: Bool
-    let show3DControls: Bool
     let inspectorMode: String
     let onSetInspectorMode: (String) -> Void
-    let onInspectorExit: () -> Void
     let onInspectorZoomIn: () -> Void
     let onInspectorZoomOut: () -> Void
     let onInspectorReset: () -> Void
@@ -33,6 +31,8 @@ struct URLBarView: View {
     @Binding var addressFocusRequested: Bool
 
     @ObservedObject var bookmarkStore = BookmarkStore.shared
+    @AppStorage("enable3DInspector", store: KelpieStorage.defaults)
+    private var is3DInspectorEnabled = FeatureFlags.is3DInspectorEnabled
     @State var showTools = false
     @State private var showHistory = false
     @State private var urlText = ""
@@ -93,6 +93,21 @@ struct URLBarView: View {
                     HistoryView(onNavigate: onNavigate)
                 }
                 AccountButton(tintColor: appearance.palette.foreground.color)
+                if is3DInspectorEnabled || is3DActive {
+                    AppKitToolbarButton(
+                        systemName: is3DActive ? "cube.fill" : "cube.transparent",
+                        accessibilityID: "browser.action.snapshot3d",
+                        accessibilityLabel: "3D inspector",
+                        isEnabled: rendererState.activeEngine == .webkit && !rendererState.isSwitching,
+                        isSelected: is3DActive,
+                        accessibilityValue: is3DActive ? "On" : "Off",
+                        tintColor: appearance.palette.foreground.color,
+                        action: onSnapshot3D
+                    )
+                }
+                if RendererState.Engine.allCases.count > 1 {
+                    rendererSwitch
+                }
                 AppKitToolbarButton(
                     systemName: "ellipsis.vertical",
                     accessibilityID: "browser.action.more",
@@ -132,9 +147,6 @@ struct URLBarView: View {
                 popupAction("Settings", icon: "gearshape", id: "settings", action: onSettings)
                 if aiState.isAvailable {
                     popupAction(isAIPanelOpen ? "Hide AI assistant" : "AI assistant", icon: "sparkles", id: "ai", action: onAIToggle)
-                }
-                if RendererState.Engine.allCases.contains(.chromium), rendererState.activeEngine != .chromium {
-                    popupAction(is3DActive ? "Exit 3D inspector" : "3D inspector", icon: "cube.transparent", id: "snapshot3d", action: onSnapshot3D)
                 }
                 Divider()
                 Text("Viewport · \(viewportState.resolutionLabel)").font(.subheadline).foregroundStyle(.secondary)

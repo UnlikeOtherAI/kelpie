@@ -183,7 +183,10 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
 void DesktopCefClient::OnLoadStart(CefRefPtr<CefBrowser> browser,CefRefPtr<CefFrame> frame,
                                   TransitionType) {
   if(frame && frame->IsMain()) {
-    if(auto* tab=owner_->FindTab(browser))tab->document_version=NextDocumentVersion();
+    if (auto* tab = owner_->FindTab(browser)) {
+      tab->document_version = NextDocumentVersion();
+      tab->inspector = {};
+    }
   }
 }
 
@@ -241,6 +244,12 @@ bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser> browser,
                                         const CefString& message,
                                         const CefString& source,
                                         int line) {
+  if (message.ToString() == "__kelpie_3d_exit__") {
+    if (auto* tab = owner_->FindTab(browser); tab && tab->inspector.active) {
+      owner_->Exit3DInspector(*tab);
+      return true;
+    }
+  }
   if (!owner_->console_sink) {
     return false;
   }

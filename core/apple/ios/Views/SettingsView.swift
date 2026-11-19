@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @AppStorage("debugOverlay", store: KelpieStorage.defaults) private var debugOverlay = false
+    @AppStorage("enable3DInspector", store: KelpieStorage.defaults)
+    private var enable3DInspector = FeatureFlags.is3DInspectorEnabled
     @ObservedObject private var aiState = AIState.shared
     @State private var showTokenField = false
     @State private var tokenInput = ""
@@ -103,10 +105,7 @@ struct SettingsView: View {
                 }
 
                 Section("Experimental") {
-                    Toggle("3D DOM Inspector", isOn: Binding(
-                        get: { FeatureFlags.is3DInspectorEnabled },
-                        set: { KelpieStorage.defaults.set($0, forKey: "enable3DInspector") }
-                    ))
+                    Toggle("3D DOM Inspector", isOn: $enable3DInspector)
                 }
 
                 Section("Help") {
