@@ -1,4 +1,5 @@
-import type { Command } from "commander";
+import { InvalidArgumentError, Option, type Command } from "commander";
+import { tapMarkerSchema } from "@unlikeotherai/kelpie-shared";
 import { deviceCommand } from "./helpers.js";
 
 export function registerInteraction(program: Command): void {
@@ -15,8 +16,21 @@ export function registerInteraction(program: Command): void {
   program
     .command("tap <x> <y>")
     .description("Tap at specific coordinates (last resort)")
-    .action(async (x: string, y: string) => {
-      await deviceCommand(program, "tap", { x: Number(x), y: Number(y) });
+    .addOption(new Option("--marker-style <style>", "Tap marker style (default: circle)")
+      .choices(tapMarkerSchema.shape.style.unwrap().options))
+    .option("--marker-duration <ms>", "Milliseconds before the tap marker fades (default: 550)", (value) => {
+      const parsed = tapMarkerSchema.shape.durationMs.safeParse(value.trim() ? Number(value) : NaN);
+      if (!parsed.success) {
+        throw new InvalidArgumentError("Expected an integer from 0 to 2147483647.");
+      }
+      return parsed.data;
+    })
+    .action(async (x: string, y: string, opts: { markerStyle?: string; markerDuration?: number }) => {
+      const body: Record<string, unknown> = { x: Number(x), y: Number(y) };
+      if (opts.markerStyle !== undefined || opts.markerDuration !== undefined) {
+        body.marker = { style: opts.markerStyle, durationMs: opts.markerDuration };
+      }
+      await deviceCommand(program, "tap", body);
     });
 
   program

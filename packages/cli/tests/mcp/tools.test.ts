@@ -105,6 +105,17 @@ describe("MCP tool definitions", () => {
     expect(tool.bodyFromArgs(args)).not.toHaveProperty("device");
   });
 
+  it("validates and forwards tap marker options", () => {
+    const tool = browserTools.find((t) => t.name === "kelpie_tap")!;
+    const marker = { style: "crosshair-coordinates", durationMs: 0 };
+    expect(tool.schema.marker.parse(marker)).toEqual(marker);
+    expect(tool.bodyFromArgs({ device: "iphone", x: 120, y: 240, marker })).toEqual({ x: 120, y: 240, marker });
+    expect(tool.schema.marker.safeParse(undefined).success).toBe(true);
+    for (const invalid of [null, { style: "square" }, { durationMs: 1.5 }, { durationMs: -1 }, { durationMs: "5" }, { extra: 1 }]) {
+      expect(tool.schema.marker.safeParse(invalid).success).toBe(false);
+    }
+  });
+
   it("bodyFromArgs strips filter params from CLI tools", () => {
     const groupNav = cliTools.find((t) => t.name === "kelpie_group_navigate")!;
     const body = groupNav.bodyFromArgs({ platform: "ios", include: "iPhone", exclude: "", url: "https://example.com" });
