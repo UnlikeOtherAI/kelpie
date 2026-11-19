@@ -5,6 +5,10 @@ The embeddable browser extraction keeps the complete native UI, tabs and behavio
 
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.
 
+## App icon
+
+The Orbit icon combines Kelpie's multicolour K with a globe and a cyan orbit. It appears across the standalone apps and their welcome screens. The [icon assets](brief.md#app-icon) include the Apple and Google Play listing formats.
+
 ## App updates
 
 Standalone Kelpie apps on macOS, Windows, Linux and Android check GitHub for compatible stable releases at launch and

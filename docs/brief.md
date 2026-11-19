@@ -165,12 +165,9 @@ The `getDeviceInfo` endpoint (see [api/core.md](api/core.md)) includes an `isSim
 
 ## App Icon
 
-The canonical app icon is a geometric multicolour **K**, built from three rounded
-capsules whose overlaps blend into secondary colours, on a deep navy field.
+The Orbit app icon puts Kelpie's multicolour K inside a navy globe with a cyan orbit.
 
-- **Source file (1024x1024)**: `assets/kelpie-icon-1024.png` — the shipped tile, opaque; use this for App Store and Play Store submission
-- **Transparent mark**: `assets/kelpie-mark-1024.png` — the bare K, for placing on any background
-- **Windows**: `apps/windows/resources/kelpie.ico` is the same tile with rounded corners (radius 18.75% of the edge, transparent outside), in 16/24/32/48/64/128/256 sizes
-- **Field colour**: `#000C30` — the deep navy shared with the Nessie mark
-- **Mark palette**: green `#05BE92`, yellow `#FDC803`, pink `#FC389C`, blue `#13A8FC` at the overlaps
-- **Style**: Flat geometric, rounded capsule strokes, no outlines, no text
+- [Apple app and App Store icon](../assets/kelpie-icon-1024.png) is an opaque 1024 x 1024 PNG. The Apple apps include it in their app icon asset catalogs.
+- [Transparent Orbit mark](../assets/kelpie-mark-1024.png) is a 1024 x 1024 PNG for desktop launchers, welcome screens and other placements where the circular silhouette is visible.
+- [Google Play listing icon](../assets/kelpie-play-store-512.png) is a 512 x 512 PNG. The Android launcher uses an adaptive version sized to fit inside the launcher mask.
+- Windows includes the circular mark in 16, 24, 32, 48, 64, 128 and 256 pixel sizes.
