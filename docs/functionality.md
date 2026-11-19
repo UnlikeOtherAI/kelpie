@@ -74,6 +74,11 @@ prohibit simultaneous app instances, and the CLI no longer requests a new one.
 
 ## Device Discovery
 
+CLI and MCP discovery report the mDNS service, timeout, and whether the scan
+could run. An empty result gives a direct-address hint. Discovery never starts
+pairing. An exact `host:port` works independently of mDNS, and connection errors
+name the socket tried.
+
 Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension. On Android, a foreground-service notification ("Kelpie is reachable") keeps the server alive in the background; tapping it brings the running browser back without restarting it, so open tabs, pending pairing prompts and just-approved tokens survive.
 
 Works identically with real devices, iOS Simulators, and Android Emulators — a developer with no phones can spin up multiple simulators at different screen sizes and control them all.
@@ -569,9 +574,12 @@ Every CLI command supports `--llm-help` for machine-readable documentation. `kel
 
 The CLI manages local browser aliases under `~/.kelpie`. On macOS, `kelpie browser register <name>` and `kelpie browser launch <name>` start a fresh Kelpie.app instance on an explicit or auto-assigned port. On Windows, users extract the release ZIP into a current-user-owned directory, register the executable with an absolute profile directory, and launch it through the same alias commands. Windows aliases use a protected readiness file and `kelpie --browser <name> mcp` for local agent stdio. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
 
-CLI MCP also honors `--device <id|name|ip>` as its default browser, using the
+CLI MCP also honors `--device <id|name|ip|host:port>` as its default browser, using the
 same resolver as explicit pairing. Tools may override the target explicitly;
 an unresolved launch target fails instead of silently selecting another device.
+Without a target, browser-control documentation and local help capabilities
+are available immediately. A tab-targeted command using automatic discovery
+requires an explicit target before starting a new pairing.
 
 Published GitHub releases also build Android release artifacts and publish the CLI packages to npm automatically, so the release page and npm stay aligned with the tagged version.
 

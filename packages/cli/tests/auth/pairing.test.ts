@@ -82,12 +82,14 @@ describe("pollPairStatus", () => {
       { status: 200, body: { status: "pending" } },
       { status: 200, body: { status: "approved", scope: "persistent", token: "tok-1" } },
     ]);
-    const result = await pollPairStatus(baseCtx, "r1");
-    m.restore();
-    expect(result.status).toBe("approved");
-    if (result.status === "approved") {
-      expect(result.scope).toBe("persistent");
-      expect(result.token).toBe("tok-1");
+    vi.useFakeTimers();
+    try {
+      const result = pollPairStatus(baseCtx, "r1");
+      await vi.advanceTimersByTimeAsync(baseCtx.pollIntervalMs);
+      expect(await result).toEqual({ status: "approved", scope: "persistent", token: "tok-1", requestId: "r1" });
+    } finally {
+      vi.useRealTimers();
+      m.restore();
     }
   });
 

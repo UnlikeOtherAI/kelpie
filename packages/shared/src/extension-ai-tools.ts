@@ -1,8 +1,8 @@
 import { z } from "zod";
-import type { BrowserToolDef } from "./extension-tools.js";
+import { deviceSelector, type BrowserToolDef } from "./extension-tools.js";
 
 const aiPlatforms = ["ios", "android", "macos"] as const;
-const device = z.string().describe("Device ID, name, or IP address");
+const device = deviceSelector;
 const endpointId = z.string().describe("Endpoint id from kelpie_ai_endpoints");
 
 const LOCALHOST =

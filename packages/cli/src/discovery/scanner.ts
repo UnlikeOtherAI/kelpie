@@ -19,6 +19,11 @@ interface BonjourServiceRecord {
 interface BonjourBrowser {
   on(event: "up", listener: (service: BonjourServiceRecord) => void): void;
   stop(): void;
+  /** Bonjour's browse transport; the public callback only covers replies sent by publishers. */
+  mdns: {
+    on(event: "error", listener: (error: Error) => void): void;
+    query(name: string, type: "PTR", callback: (error?: Error) => void): void;
+  };
 }
 
 interface BonjourClient {
@@ -49,8 +54,8 @@ export async function scanForDevices(
   const devices: DiscoveredDevice[] = [];
   const seen = new Set<string>();
 
-  return new Promise((resolve) => {
-    const browser = bonjour.find({ type: MDNS_SERVICE_TYPE.replace("_", "").replace("._tcp", "") });
+  return new Promise((resolve, reject) => {
+    const browser = bonjour.find({ type: MDNS_SERVICE_TYPE.slice(1, -5) });
 
     browser.on("up", (service) => {
       const device = parseService(service);
@@ -60,11 +65,26 @@ export async function scanForDevices(
       }
     });
 
-    setTimeout(() => {
+    let finished = false;
+    const finish = (error?: Error): void => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(retry);
+      clearTimeout(deadline);
       browser.stop();
       bonjour.destroy();
-      resolve(devices);
-    }, duration);
+      if (error && devices.length === 0) reject(error);
+      else resolve(devices);
+    };
+    const retry = setTimeout(() => {
+      if (devices.length === 0) {
+        browser.mdns.query(`${MDNS_SERVICE_TYPE}.local`, "PTR", (error) => {
+          if (error) finish(error);
+        });
+      }
+    }, duration / 2);
+    const deadline = setTimeout(finish, duration);
+    browser.mdns.on("error", finish);
   });
 }
 

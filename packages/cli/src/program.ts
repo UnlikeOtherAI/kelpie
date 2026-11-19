@@ -23,7 +23,7 @@ export function createProgram(version: string): Command {
     .name("kelpie")
     .description("LLM-first browser automation CLI for iOS and Android")
     .version(version)
-    .option("--device <id|name|ip>", "Target a specific device by ID, name, or IP")
+    .option("--device <id|name|ip|host:port>", "Target a specific device by ID, name, IP address, or host:port")
     .option("--browser <alias>", "Target a CLI-managed local browser alias")
     .option("--tabId <id>", "Target a specific tab on macOS commands that support per-tab control")
     .option("--tab-id <id>", "Alias for --tabId")

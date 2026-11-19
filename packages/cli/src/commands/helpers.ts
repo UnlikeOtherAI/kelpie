@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { getBrowserAlias, loadBrowserStore, readLocalReadiness, readinessPath } from "../browser/store.js";
-import { getDevice } from "../discovery/registry.js";
+import { getDevice, refreshDevicesIfEmpty } from "../discovery/registry.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 import type { GlobalOptions, DiscoveredDevice } from "../types.js";
@@ -42,6 +42,11 @@ export function withGlobalTabId(
   if (!globals.tabId || body?.tabId) return body;
   const generation = globals.tabGeneration;
   return { ...(body ?? {}), tabId: globals.tabId, ...(Number.isInteger(generation) ? { generation } : {}) };
+}
+
+export function cliPairingTargetHint(globals: GlobalOptions): string | undefined {
+  return globals.device || globals.browser ? undefined
+    : "The discovered browser requires pairing. Use --device with the ID, name, IP address, or host:port of the browser that owns the tab.";
 }
 
 export async function localBrowserDevice(aliasName: string): Promise<DiscoveredDevice | null> {
@@ -89,18 +94,7 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
   }
 
   // No --device flag: auto-scan and pick the sole device if exactly one is found
-  const { scanForDevices } = await import("../discovery/scanner.js");
-  const { addDevices, getAllDevices } = await import("../discovery/registry.js");
-  if (getAllDevices().length === 0) {
-    addDevices(await scanForDevices(2500));
-  }
-  // mDNS is racy; a Kelpie on this host is reachable on 127.0.0.1 even when the
-  // browse misses its announcement. Fall back to a direct localhost probe.
-  if (getAllDevices().length === 0) {
-    const { probeLocalDevices } = await import("../discovery/local-probe.js");
-    addDevices(await probeLocalDevices());
-  }
-  const all = getAllDevices();
+  const all = await refreshDevicesIfEmpty();
   if (all.length === 1) return all[0] ?? null;
   if (all.length === 0) {
     print({ success: false, error: { code: "NO_DEVICES", message: "No Kelpie devices found on the network" } }, globals.format);
@@ -137,7 +131,10 @@ export async function deviceCommand(
   const device = await requireDevice(program);
   if (!device) return;
   const timeout = commandTimeout(program, options.defaultTimeoutMs);
-  const result = await sendCommand(device, method, withGlobalTabId(globals, body), timeout);
+  const requestBody = withGlobalTabId(globals, body);
+  const result = await sendCommand(device, method, requestBody, timeout, {
+    pairingTargetHint: requestBody?.tabId ? cliPairingTargetHint(globals) : undefined,
+  });
   print(result.data, globals.format);
   if (!result.ok) process.exitCode = 1;
 }

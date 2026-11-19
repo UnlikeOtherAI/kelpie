@@ -88,7 +88,7 @@ describe("HTTP client", () => {
     expect(result.status).toBe(408);
     expect(result.data).toEqual({
       success: false,
-      error: { code: "TIMEOUT", message: "Request timed out after 1234ms" },
+      error: { code: "TIMEOUT", message: expect.stringMatching(/:\d+ timed out after 1234ms.*host:port/) },
     });
   });
 
