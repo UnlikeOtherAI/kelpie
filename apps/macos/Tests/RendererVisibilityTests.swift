@@ -5,8 +5,9 @@ import XCTest
 
 @MainActor
 final class RendererVisibilityTests: XCTestCase {
-    func testScreenshotRefusesHiddenSelectedTabAndRecoversWhenShown() async throws {
+    func testScreenshotRefusesOccludedSelectedTabAndRecoversWhenUncovered() async throws {
         let tab = KelpieBrowser.Tab(spec: TabSpec(persistent: false, dataStore: .nonPersistent()))
+        tab.isStartPage = false
         let store = TabStore(isolatedTab: tab)
         let renderer = tab.renderer
         let webView = try XCTUnwrap(renderer.makeView() as? WKWebView)
@@ -20,11 +21,16 @@ final class RendererVisibilityTests: XCTestCase {
         let router = Router()
         ScreenshotHandler(context: context).register(on: router)
         BrowserManagementHandler(context: context, viewportState: ViewportState()).register(on: router)
+        window.center()
         window.contentView = webView
         window.level = .floating
+        let cover = NSWindow(contentRect: window.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        cover.level = .modalPanel
+        cover.backgroundColor = .black
         window.orderFrontRegardless()
         WindowRegistry.shared.register(id: windowId, window: window, tabStore: store)
         defer {
+            cover.orderOut(nil)
             WindowRegistry.shared.unregister(id: windowId)
             window.orderOut(nil)
             window.contentView = nil
@@ -35,21 +41,29 @@ final class RendererVisibilityTests: XCTestCase {
         let first = await router.handle(method: "screenshot", body: target).json
         XCTAssertEqual(first["success"] as? Bool, true)
         XCTAssertNotNil(first["image"])
+        await assertListedVisibility("visible", windowId: windowId, tabId: tab.id, router: router)
 
-        window.orderOut(nil)
+        cover.orderFrontRegardless()
         try await waitForDocument("hidden", in: renderer)
-        let listing = await router.handle(method: "get-tabs", body: ["windowId": windowId]).json
-        XCTAssertEqual(listing["activeTab"] as? String, tab.id.uuidString)
+        await assertListedVisibility("hidden", windowId: windowId, tabId: tab.id, router: router)
         let hidden = await router.handle(method: "screenshot", body: target).json
         XCTAssertEqual(hidden["success"] as? Bool, false)
         XCTAssertEqual((hidden["error"] as? [String: Any])?["code"] as? String, "RENDERER_HIDDEN")
         XCTAssertNil(hidden["image"])
 
-        window.orderFrontRegardless()
+        cover.orderOut(nil)
         try await waitForDocument("visible", in: renderer)
         let recovered = await router.handle(method: "screenshot", body: target).json
         XCTAssertEqual(recovered["success"] as? Bool, true)
         XCTAssertNotNil(recovered["image"])
+        await assertListedVisibility("visible", windowId: windowId, tabId: tab.id, router: router)
+    }
+
+    private func assertListedVisibility(_ expected: String, windowId: String, tabId: UUID, router: Router) async {
+        let listing = await router.handle(method: "get-tabs", body: ["windowId": windowId]).json
+        let tabs = listing["tabs"] as? [[String: Any]]
+        XCTAssertEqual(listing["activeTab"] as? String, tabId.uuidString)
+        XCTAssertEqual(tabs?.first?["rendererVisibility"] as? String, expected)
     }
 
     private func waitForDocument(_ visibility: String, in renderer: WKWebViewRenderer) async throws {

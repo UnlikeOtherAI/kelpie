@@ -147,7 +147,6 @@ struct ScreenshotHandler {
         }
 
         do {
-            _ = try context.resolveRenderer(tabId: tabId)
             let image: NSImage
             var fullPageContentHeight: Int?
             if fullPage {
@@ -191,6 +190,7 @@ struct ScreenshotHandler {
     /// reaching into either engine.
     @MainActor
     func captureFullPage(tabId: String?) async throws -> FullPageCapture {
+        _ = try context.resolveVisibleRenderer(tabId: tabId)
         let geometry = try await measureGeometry(tabId: tabId)
         defer {
             Task { @MainActor in

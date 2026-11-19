@@ -163,7 +163,7 @@ struct LLMHandler {
             return errorResponse(code: "INVALID_PARAMS", message: "resolution must be 'native' or 'viewport'")
         }
         do {
-            let renderer = try context.resolveRenderer(tabId: tabId)
+            let renderer = try context.resolveVisibleRenderer(tabId: tabId)
             let annotations = try await context.evaluateJSReturningArray(annotationElementsScript(), tabId: tabId)
             // Reuse the regular screenshot handler's scroll-and-stitch capture so
             // the annotated full-page image spans the whole document, not just the

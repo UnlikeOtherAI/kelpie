@@ -61,6 +61,14 @@ protocol RendererEngine: AnyObject {
 }
 
 extension RendererEngine {
+    /// AppKit can occlude a selected renderer while leaving its view attached.
+    /// Use the real window state without activating the browser or querying the page.
+    var isSurfaceVisible: Bool {
+        let view = makeView()
+        return !view.isHiddenOrHasHiddenAncestor && !view.bounds.isEmpty &&
+            view.window?.occlusionState.contains(.visible) == true
+    }
+
     func evaluatePageJS(_ script: String) async throws -> Any? {
         try await evaluateJS(script)
     }

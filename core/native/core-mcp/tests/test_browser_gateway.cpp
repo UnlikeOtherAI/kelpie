@@ -93,6 +93,24 @@ void Mcp() {
   assert(fallback.Capabilities()["methods"].size() == 2);
   assert(fallback.Begin(Request("tab.goto", {{"url", "url"}}))["response"]["error"]["code"] == "UNSUPPORTED");
 }
+void McpHiddenScreenshot() {
+  const json extension = {{"name", "kelpie_screenshot"}, {"method", "screenshot"}, {"mutates", false}, {"inputSchema", {{"type", "object"}}}};
+  kelpie::BrowserGateway gateway({{"nativeMethods", {"screenshot"}}, {"requireAuthorization", false}, {"extensions", json::array({extension})}});
+  const auto screenshot = Request("tab.screenshot");
+  for (const auto& params : {
+      json{{"name", "kelpie_browser_control"}, {"arguments", {{"request", screenshot}}}},
+      json{{"name", "kelpie_screenshot"}, {"arguments", json::object()}}
+  }) {
+    assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"}, {"params", params}})["method"] == "screenshot");
+    const auto step = gateway.Advance({{"success", false}, {"error", {{"code", "RENDERER_HIDDEN"}}}});
+    const auto result = step["response"]["result"];
+    assert(result["isError"] == true);
+    assert(result["content"].size() == 1);
+    const auto error = json::parse(result["content"][0]["text"].get<std::string>())["error"];
+    assert(error["code"] == "RENDERER_HIDDEN");
+    assert(error["mayHaveCompleted"] == false);
+  }
+}
 void ExtensionReachability() {
   const json schema = {{"type", "object"}, {"properties", {{"url", {{"type", "string"}}}}}, {"required", {"url"}}, {"additionalProperties", false}};
   const json tool = {{"name", "kelpie_bookmarks_add"}, {"method", "bookmarks-add"}, {"mutates", true}, {"inputSchema", schema}};
@@ -201,4 +219,4 @@ void Notifications() {
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "notifications/unknown"}})["response"].is_null());
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "tools/call"}, {"params", {{"name", 123}}}})["response"].is_null());
 }
-int main() { ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+int main() { ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); McpHiddenScreenshot(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
