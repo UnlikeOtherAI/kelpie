@@ -74,6 +74,9 @@ struct InteractionHandler {
         guard var requestedX = double(body["x"]), var requestedY = double(body["y"]) else {
             return errorResponse(code: "MISSING_PARAM", message: "x and y are required")
         }
+        guard let marker = TapMarkerOptions.parse(body["marker"]) else {
+            return errorResponse(code: "INVALID_PARAMS", message: TapMarkerOptions.invalidMessage)
+        }
         let coordinateSpace = (body["coordinateSpace"] as? String ?? "viewport").lowercased()
         if coordinateSpace == "screenshot" {
             do {
@@ -98,7 +101,8 @@ struct InteractionHandler {
         await context.showTouchIndicator(
             x: execution.appliedX,
             y: execution.appliedY,
-            color: overlayColor(from: body)
+            color: overlayColor(from: body),
+            marker: marker
         )
         do {
             let diagnostics = try await context.evaluateJSReturningJSON(tapScript(execution: execution))

@@ -109,7 +109,7 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("kelpie_get_element_text", "get-element-text", "Get text content of an element"),
       Tool("kelpie_get_attributes", "get-attributes", "Get all attributes of an element"),
       Tool("kelpie_click", "click", "Click an element by selector. Prefer this over coordinate taps whenever semantic targeting is possible. Feed the selectors returned by semantic and annotation tools back here directly. Shows a blue touch indicator at the element location."),
-      Tool("kelpie_tap", "tap", "Tap at specific coordinates as a last resort. Saved tap calibration offsets are applied automatically before dispatch. Shows a blue touch indicator at the applied tap point."),
+      Tool("kelpie_tap", "tap", "Tap at specific coordinates as a last resort. Saved tap calibration offsets are applied automatically before dispatch. Shows a marker at the applied tap point."),
       Tool("kelpie_fill", "fill", "Fill a form field with a value. Shows a touch indicator at the field."),
       Tool("kelpie_type", "type", "Type text character by character"),
       Tool("kelpie_press_key", "press-key", "Send a trusted native key press to the focused browser element.",

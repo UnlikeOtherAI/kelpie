@@ -474,6 +474,10 @@ Tap at specific coordinates as a last resort. Prefer `click` or `click-annotatio
 | `x` | number | **required** | X coordinate |
 | `y` | number | **required** | Y coordinate |
 | `coordinateSpace` | string | `"viewport"` | `"viewport"` for CSS viewport pixels, `"screenshot"` for screenshot image pixels (auto-converted via devicePixelRatio) |
+| `marker.style` | string | `"circle"` | `"circle"` shows the blue dot and ripple. `"crosshair-coordinates"` shows a crosshair and two labeled coordinate pairs. |
+| `marker.durationMs` | integer | `550` | Time before the marker starts to fade, from 0 through 2,147,483,647 milliseconds. |
+
+The optional `marker` object is supported on iOS, Android, and macOS with WebKit or Chromium. The circle's ripple starts immediately, and the hold time applies to the center dot. The crosshair labels show the applied tap point after calibration and clamping. Both pairs use CSS pixels. The page pair includes the document's horizontal and vertical scroll offsets at the time of the tap.
 
 When using coordinates read from a screenshot image, pass `"coordinateSpace": "screenshot"` so Kelpie converts from image pixels to viewport CSS pixels automatically. Without this, taps will miss on Retina/high-DPI displays because screenshot images have more pixels than the CSS viewport.
 
@@ -482,7 +486,8 @@ POST /v1/tap
 {
   "x": 195,
   "y": 420,
-  "coordinateSpace": "screenshot"
+  "coordinateSpace": "screenshot",
+  "marker": { "style": "crosshair-coordinates", "durationMs": 1500 }
 }
 
 Response:

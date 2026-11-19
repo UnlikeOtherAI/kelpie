@@ -55,6 +55,7 @@ class InteractionHandler(
     private suspend fun tap(body: Map<String, Any?>): Map<String, Any?> {
         var requestedX = (body["x"] as? Number)?.toDouble() ?: return errorResponse("MISSING_PARAM", "x and y are required")
         var requestedY = (body["y"] as? Number)?.toDouble() ?: return errorResponse("MISSING_PARAM", "x and y are required")
+        val marker = TapMarkerOptions.parse(body) ?: return errorResponse("INVALID_PARAMS", TapMarkerOptions.INVALID_MESSAGE)
         val coordinateSpace = (body["coordinateSpace"] as? String ?: "viewport").lowercase()
         if (coordinateSpace == "screenshot") {
             try {
@@ -72,7 +73,7 @@ class InteractionHandler(
             } catch (e: Exception) {
                 return errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
             }
-        ctx.showTouchIndicator(execution.appliedX, execution.appliedY, ctx.overlayColor(body))
+        ctx.showTouchIndicator(execution.appliedX, execution.appliedY, ctx.overlayColor(body), marker)
         return try {
             val diagnostics = ctx.evaluateJSReturningJSON(tapScript(execution))
             successResponse(
@@ -361,6 +362,6 @@ class InteractionHandler(
                 dispatchMouse('click', 0, 0);
             }
             return kelpieTapDiagnostics(eventTarget, requestedX, requestedY, appliedX, appliedY, offsetX, offsetY);
-        })();
+        })()
         """.trimIndent()
 }

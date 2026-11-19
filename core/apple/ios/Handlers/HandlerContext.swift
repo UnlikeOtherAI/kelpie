@@ -198,36 +198,14 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     }
 
     /// Show a touch indicator at viewport coordinates with a ripple animation.
-    func showTouchIndicator(x: Double, y: Double, color: String = HandlerContext.defaultOverlayRGB) async {
-        let js = """
-        (function() {
-            var dot = document.createElement('div');
-            dot.style.cssText = 'position:fixed;left:\(x)px;top:\(y)px;width:36px;height:36px;' +
-                'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                'background:rgba(\(JSEscape.string(color)),0.7);pointer-events:none;z-index:2147483647;' +
-                'transition:transform 0.5s ease-out, opacity 0.5s ease-out;transform:scale(1);opacity:1;';
-            document.body.appendChild(dot);
-            var ripple = document.createElement('div');
-            ripple.style.cssText = 'position:fixed;left:\(x)px;top:\(y)px;width:36px;height:36px;' +
-                'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                'border:2px solid rgba(\(JSEscape.string(color)),0.7);pointer-events:none;z-index:2147483647;' +
-                'transition:transform 0.6s ease-out, opacity 0.6s ease-out;transform:scale(1);opacity:1;';
-            document.body.appendChild(ripple);
-            requestAnimationFrame(function() {
-                ripple.style.transform = 'scale(3)';
-                ripple.style.opacity = '0';
-            });
-            setTimeout(function() {
-                dot.style.transform = 'scale(0.5)';
-                dot.style.opacity = '0';
-            }, 550);
-            setTimeout(function() {
-                dot.remove();
-                ripple.remove();
-            }, 1100);
-        })();
-        """
-        _ = try? await evaluateJS(js)
+    func showTouchIndicator(
+        x: Double,
+        y: Double,
+        color: String = HandlerContext.defaultOverlayRGB,
+        marker: TapMarkerOptions = .defaults
+    ) async {
+        guard let script = marker.script(x: x, y: y, rgb: color) else { return }
+        _ = try? await evaluateJS(script)
     }
 
     /// Show touch indicator at an element's center by selector.
