@@ -26,8 +26,9 @@ struct NavigationHandler {
         let timeout = (body["timeout"] as? Int) ?? 10000
         let iterations = max(timeout / 100, 1)
         let start = CFAbsoluteTimeGetCurrent()
-        context.lastNavigationError = nil
         guard mayNavigate() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
+        let diagnostics = BrowserDiagnostics.forTarget(webView)
+        diagnostics.navigationError = nil
         context.navigationIssued(webView.load(URLRequest(url: url)))
 
         // Wait for the load to finish. A captured error is only fatal once the page is no
@@ -47,7 +48,7 @@ struct NavigationHandler {
         // benign cancellations were already filtered out in the navigation delegate.
         if didFinish {
             guard await mayReadNavigation() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
-            if let error = context.lastNavigationError {
+            if let error = diagnostics.navigationError {
                 return errorResponse(code: "NAVIGATION_ERROR", message: error)
             }
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
@@ -60,7 +61,7 @@ struct NavigationHandler {
 
         // Loop expired without the page settling. Surface a captured error if one exists,
         // otherwise treat the unfinished load as a timeout.
-        if let error = context.lastNavigationError {
+        if let error = diagnostics.navigationError {
             return errorResponse(code: "NAVIGATION_ERROR", message: error)
         }
         return errorResponse(code: "TIMEOUT", message: "Navigation did not complete within \(timeout)ms")

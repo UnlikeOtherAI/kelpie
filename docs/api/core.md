@@ -27,7 +27,7 @@ Response:
 }
 ```
 
-`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, macOS, and Windows. When the wait elapses without the load completing, iOS and Windows return a `TIMEOUT` error; a captured navigation failure (e.g. DNS error) returns `NAVIGATION_ERROR`.
+`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, macOS, and Windows. An unfinished load can return `TIMEOUT`. A captured navigation failure (e.g. a DNS error) returns `NAVIGATION_ERROR`. Apple WebKit adds loopback guidance when it cannot connect to a server on the browser device or when it requires HTTPS.
 
 ### `back`
 Go back in browser history.
@@ -964,11 +964,9 @@ Response:
 ```
 
 ### `waitForNavigation`
-Wait for an already-started navigation to complete. `navigate` reports that
-the request was accepted; it does not claim the destination has loaded. This
-method returns a navigation error when the selected tab is not loading, which
-prevents an old `document.readyState === "complete"` from being reported as a
-new navigation.
+Wait for an already-started navigation to complete. On Apple WebKit, a
+settled load with a recorded failure returns `NAVIGATION_ERROR`. The next
+navigation clears the failure for that tab.
 
 ```json
 POST /v1/wait-for-navigation
