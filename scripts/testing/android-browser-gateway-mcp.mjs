@@ -24,6 +24,25 @@ try {
   } });
   const decode = result => JSON.parse(result.content.find(item => item.type === 'text').text);
   assert.equal(decode(capabilities).ok, true);
+  const extension = async (name, args) => {
+    const result = decode(await client.callTool({ name: 'kelpie_extension', arguments: {
+      name, arguments: { tabId: tab, ...args },
+    } }));
+    assert.equal(result.ok, true, JSON.stringify(result));
+    return result.value;
+  };
+  await extension('kelpie_evaluate', { expression: `document.body.insertAdjacentHTML('afterbegin',
+    '<div data-selector-fixture><button id="2:entry">Decoy selector action</button><button id="2:entry">Exact selector action</button></div>');
+    const selectorFixture = document.querySelector('[data-selector-fixture]');
+    selectorFixture.onclick = event => selectorFixture.dataset.clicked = event.target.textContent; true` });
+  const found = await extension('kelpie_find_element', { text: 'Exact selector action', role: 'button' });
+  assert.equal(found.found, true);
+  await extension('kelpie_click', { selector: found.element.selector });
+  assert.equal((await extension('kelpie_evaluate', {
+    expression: "document.querySelector('[data-selector-fixture]').dataset.clicked",
+  })).result, 'Exact selector action');
+  await extension('kelpie_evaluate', { expression: "document.querySelector('[data-selector-fixture]').remove(); true" });
+  console.log('PASS Android semantic find and selector click activate the intended duplicate-ID button');
   const refusal = await client.callTool({ name: 'kelpie_browser_control', arguments: {
     request: { version: 1, method: 'tab.click', tabId: tab, params: { ref: 'unobserved' } },
   } });

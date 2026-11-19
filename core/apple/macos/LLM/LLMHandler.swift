@@ -123,7 +123,7 @@ struct LLMHandler {
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js, tabId: tabId)
-            return result
+            return successResponse(result)
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
@@ -147,7 +147,7 @@ struct LLMHandler {
         (function(){\(elementSelectorBuilderScript())var all=document.querySelectorAll('*'),best=null,bt='';for(var el of all){if(!(\(filter)))continue;var t=(el.textContent||'').trim();if(!t.toLowerCase().includes('\(JSEscape.string(text.lowercased()))'))continue;var r=el.getBoundingClientRect();if(r.width<=0||r.height<=0)continue;if(!best||t.length<=bt.length){best=el;bt=t;}}if(!best)return{found:false};var b=best.getBoundingClientRect();return{found:true,element:{tag:best.tagName.toLowerCase(),text:bt.substring(0,100),selector:kelpieBuildSelector(best),rect:{x:b.x,y:b.y,width:b.width,height:b.height}}};})()
         """
         do {
-            return try await context.evaluateJSReturningJSON(js, tabId: tabId)
+            return successResponse(try await context.evaluateJSReturningJSON(js, tabId: tabId))
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
