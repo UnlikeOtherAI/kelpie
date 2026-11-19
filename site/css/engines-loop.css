@@ -1,0 +1,173 @@
+/* The loop that plays in the Mac window drawn by engines.css.
+
+   One loop: Safari until 27%, Chrome from 32% to 95%, then back for the next
+   run. The paired keyframes are named for the Safari side: its label is lit
+   and its engine name shown first. The Chrome side runs the other of each. */
+@keyframes mac-thumb {
+  0%,
+  27%,
+  100% {
+    transform: translateX(0);
+  }
+
+  32%,
+  95% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes mac-label-on {
+  0%,
+  27%,
+  100% {
+    color: var(--k-ink);
+  }
+
+  32%,
+  95% {
+    color: #8a8f9c;
+  }
+}
+
+@keyframes mac-label-off {
+  0%,
+  27%,
+  100% {
+    color: #8a8f9c;
+  }
+
+  32%,
+  95% {
+    color: var(--k-ink);
+  }
+}
+
+/* The engine names share one cell, so one is gone before the other appears. */
+@keyframes mac-show {
+  0%,
+  32%,
+  100% {
+    opacity: 1;
+  }
+
+  34%,
+  97% {
+    opacity: 0;
+  }
+}
+
+@keyframes mac-hide {
+  0%,
+  34%,
+  97%,
+  100% {
+    opacity: 0;
+  }
+
+  36%,
+  95% {
+    opacity: 1;
+  }
+}
+
+@keyframes mac-load {
+  0%,
+  28% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+
+  39% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  42%,
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes mac-reload {
+  0%,
+  29%,
+  39%,
+  95%,
+  100% {
+    opacity: 1;
+  }
+
+  32%,
+  35%,
+  97.5% {
+    opacity: 0.12;
+  }
+}
+
+@keyframes mac-kept {
+  0%,
+  41% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  45% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  58%,
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes mac-call {
+  0%,
+  16% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  19%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+
+  97%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+@keyframes mac-reply {
+  0%,
+  41% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  44%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+
+  97%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engines *,
+  .engines *::before,
+  .engines *::after {
+    animation: none !important;
+  }
+}

@@ -2,7 +2,7 @@
 
 > Kelpie is an open-source browser for iPhone, iPad, Android, macOS, Windows and Linux. People browse with it; AI agents drive it through MCP, an HTTP API or the `kelpie` command line.
 
-Kelpie runs real browser engines on real devices. An agent can open tabs, navigate, read a page as a compact snapshot, click, type, take screenshots and inspect network traffic. Devices are discovered on the local network with mDNS (`_kelpie._tcp`); a remote computer needs one approval on the device, tied to its signing key.
+Kelpie runs real browser engines on real devices. The Mac download carries two, WebKit and Chromium: `kelpie_set_renderer` switches between them and carries cookies across. An agent can open tabs, navigate, read a page as a compact snapshot, click, type, take screenshots and inspect network traffic. Devices are discovered on the local network with mDNS (`_kelpie._tcp`); a remote computer needs one approval on the device, tied to its signing key.
 
 ## Connect
 
