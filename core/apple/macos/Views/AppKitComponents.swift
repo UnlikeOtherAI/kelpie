@@ -9,6 +9,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
     let accessibilityLabel: String
     var isEnabled: Bool = true
     var isSelected: Bool = false
+    var accessibilityValue: String?
     var tintColor: NSColor?
     let action: () -> Void
 
@@ -27,6 +28,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
     func updateNSView(_ nsView: ToolbarButtonView, context: Context) {
         context.coordinator.action = action
         nsView.setAccessibilityLabel(accessibilityLabel)
+        nsView.setAccessibilityValue(accessibilityValue)
         nsView.toolTip = accessibilityLabel
         nsView.chromeTintColor = tintColor
         nsView.isEnabled = isEnabled

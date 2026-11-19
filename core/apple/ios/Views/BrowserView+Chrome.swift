@@ -12,6 +12,8 @@ extension BrowserView {
                 if browserState.isLoading { browserState.webView?.stopLoading() } else { reload() }
             },
             onBookmarks: { showBookmarks = true },
+            is3DInspectorActive: isIn3DInspector,
+            onSnapshot3D: { Task { @MainActor in await toggle3DInspector() } },
             onShowTabs: {
                 tabStore.captureActivePreview()
                 showTabOverview = true
@@ -37,11 +39,6 @@ extension BrowserView {
         Button { showHistory = true } label: { Label("History", systemImage: "clock") }
         Button { showAI = true } label: { Label("AI", systemImage: "sparkles") }
         Button { showNetworkInspector = true } label: { Label("Network inspector", systemImage: "network") }
-        if FeatureFlags.is3DInspectorEnabled {
-            Button { Task { @MainActor in await toggle3DInspector() } } label: {
-                Label("3D inspector", systemImage: "cube.transparent")
-            }
-        }
         if isPad {
             Menu("Viewport") {
                 Button("Full width") { setTabletViewportPreset("") }

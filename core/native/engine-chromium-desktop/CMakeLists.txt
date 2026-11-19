@@ -120,7 +120,23 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
   if(NOT KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER OR NOT KELPIE_CHROMIUM_DESKTOP_CEF_LIB)
     message(FATAL_ERROR "CEF desktop engine requires libcef and libcef_dll_wrapper")
   endif()
+  set(inspector_dir "${CMAKE_CURRENT_SOURCE_DIR}/../../apple/shared/Resources/Snapshot3D")
+  set(inspector_resources_cpp "${CMAKE_CURRENT_BINARY_DIR}/generated/desktop_inspector_resources.cpp")
+  kelpie_embed_resources(
+    OUTPUT "${inspector_resources_cpp}"
+    HEADER "desktop_inspector_resources.h"
+    NAMESPACE "kelpie::desktop_inspector"
+    RESOURCES
+      "kSetup=${inspector_dir}/enter-setup.js"
+      "kCollect=${inspector_dir}/enter-collect.js"
+      "kApply=${inspector_dir}/enter-apply.js"
+      "kScene=${inspector_dir}/enter-scene.js"
+      "kTree=${inspector_dir}/enter-tree.js"
+      "kTools=${inspector_dir}/enter-tools.js"
+      "kInput=${inspector_dir}/enter-input.js"
+      "kExit=${inspector_dir}/exit.js")
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
+    "${inspector_resources_cpp}"
     src/account_login_window.cpp
     src/desktop_engine.cpp
     src/desktop_engine_client.cpp
@@ -131,6 +147,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine_control.cpp
     src/desktop_engine_control_support.cpp
     src/desktop_engine_input.cpp
+    src/desktop_engine_inspector.cpp
     src/desktop_engine_page_control.cpp
     src/desktop_engine_partitions.cpp
     src/desktop_partition_registry.cpp

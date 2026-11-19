@@ -8,6 +8,8 @@ struct SettingsView: View {
     var onNavigate: ((String) -> Void)?
     @ObservedObject private var aiState = AIState.shared
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("enable3DInspector", store: KelpieStorage.defaults)
+    private var enable3DInspector = FeatureFlags.is3DInspectorEnabled
     @State private var showHFTokenField = false
     @State private var hfTokenDraft = ""
     @State private var showPairedClients = false
@@ -174,10 +176,7 @@ struct SettingsView: View {
                 }
 
                 Section("Experimental") {
-                    Toggle("3D DOM Inspector", isOn: Binding(
-                        get: { KelpieStorage.defaults.bool(forKey: "enable3DInspector") },
-                        set: { KelpieStorage.defaults.set($0, forKey: "enable3DInspector") }
-                    ))
+                    Toggle("3D DOM Inspector", isOn: $enable3DInspector)
                     Text("Explode the page into 3D layers to debug element stacking. Restart not required.")
                         .font(.caption)
                         .foregroundColor(.secondary)

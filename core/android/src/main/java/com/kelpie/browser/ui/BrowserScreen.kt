@@ -255,6 +255,9 @@ fun BrowserScreen(
                     onShare = { sharePage(context, currentUrl) },
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
+                    show3DInspector = FeatureFlags.is3DInspectorEnabled(context) || isIn3DInspector,
+                    is3DInspectorActive = isIn3DInspector,
+                    onSnapshot3D = { coroutineScope.launch { toggle3DInspector() } },
                     moreContent = { dismiss ->
                         BrowserMoreMenu(
                             onDismiss = dismiss,
@@ -271,10 +274,6 @@ fun BrowserScreen(
                             onHistory = { showHistory = true },
                             onNetworkInspector = { showNetworkInspector = true },
                             onAI = { showAI = true },
-                            onSnapshot3D = {
-                                coroutineScope.launch { toggle3DInspector() }
-                            },
-                            show3DInspector = FeatureFlags.is3DInspectorEnabled(context),
                             showMobileViewportToggle = isTablet,
                             mobileViewportPresets = availableTabletViewportPresets,
                             selectedMobileViewportPresetId =

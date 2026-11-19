@@ -27,9 +27,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,6 +48,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -68,6 +73,9 @@ fun BottomBar(
     onShare: () -> Unit,
     onShowTabs: () -> Unit,
     onExpand: () -> Unit,
+    show3DInspector: Boolean,
+    is3DInspectorActive: Boolean,
+    onSnapshot3D: () -> Unit,
     moreContent: @Composable ColumnScope.(() -> Unit) -> Unit,
 ) {
     var editing by remember { mutableStateOf(false) }
@@ -161,6 +169,9 @@ fun BottomBar(
                             ChromeButton(Icons.Default.Share, "Share page", action = onShare)
                         }
                         if (wide) ChromeButton(Icons.Default.Bookmarks, "Bookmarks", action = onBookmarks)
+                        if (show3DInspector) {
+                            Inspector3DButton(is3DInspectorActive, onSnapshot3D)
+                        }
                         Box {
                             ChromeButton(Icons.Default.MoreHoriz, "More", action = {
                                 onExpand()
@@ -174,6 +185,31 @@ fun BottomBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun Inspector3DButton(
+    active: Boolean,
+    onToggle: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    IconToggleButton(
+        checked = active,
+        onCheckedChange = { onToggle() },
+        modifier =
+            Modifier
+                .testTag("browser.snapshot-3d.button")
+                .semantics { contentDescription = "3D inspector" }
+                .size(44.dp)
+                .background(if (active) colors.primaryContainer else colors.surfaceVariant.copy(alpha = 0.6f), CircleShape),
+    ) {
+        Icon(
+            Icons.Default.ViewInAr,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = if (active) colors.onPrimaryContainer else colors.onSurfaceVariant,
+        )
     }
 }
 

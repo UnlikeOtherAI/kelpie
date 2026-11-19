@@ -1,5 +1,7 @@
 #include "linux_app_internal.h"
 namespace kelpie::linuxapp {
+DesktopEngine::Inspector3DState LinuxApp::Active3DInspector() const { return {}; }
+void LinuxApp::Toggle3DInspector() {}
 bool LinuxApp::FinishShutdown(){ return true; }
 std::vector<TabSnapshot> LinuxApp::Tabs() const { return {}; }
 void LinuxApp::NewTab(bool) {}

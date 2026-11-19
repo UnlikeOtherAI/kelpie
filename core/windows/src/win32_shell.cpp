@@ -304,6 +304,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         case IDC_BOOKMARKS_BUTTON: ShowPanel(IDM_VIEW_BOOKMARKS); return 0;
         case IDC_HISTORY_BUTTON: ShowPanel(IDM_VIEW_HISTORY); return 0;
         case IDC_NETWORK_BUTTON: ShowPanel(IDM_VIEW_NETWORK); return 0;
+        case IDC_INSPECTOR_3D_BUTTON: delegate_->OnToggle3DInspectorRequested(); return 0;
         case IDC_SETTINGS_BUTTON:
         case IDM_SETTINGS: delegate_->OnOpenSettingsRequested(); return 0;
         case IDC_NEW_TAB_BUTTON:

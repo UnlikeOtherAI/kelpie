@@ -366,6 +366,8 @@ bool WindowsApp::ShutdownDesktopRuntime() {
 
 void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (!desktop_app_) return;
+  const auto inspector = desktop_app_->engine().Active3DInspector();
+  shell_->Set3DInspectorState(inspector.enabled, inspector.active);
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
     TickCookieSync();

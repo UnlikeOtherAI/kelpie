@@ -264,27 +264,27 @@ API: `network-list`, `network-detail`, `network-select`, `network-current`, `net
 
 ## 3D DOM Inspector
 
-**Experimental**. On iOS and Android the 3D inspector is visible by default and can be turned off in Settings. On macOS it stays opt-in until enabled in Settings (Experimental section) or with `KELPIE_3D_INSPECTOR=1`. No restart required.
+**Experimental**. On iOS, Android and macOS the 3D inspector is visible by default and can be turned off in Settings without restarting. On macOS the toolbar icon is enabled for WebKit. On Windows and Linux the icon is enabled on loaded pages in Chromium builds.
 
-A visual debugging tool for inspecting element stacking and layer order. Click the 3D button in the floating menu (or call the `snapshot-3d-enter` endpoint) to explode the page DOM into a 3D layered view. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
+A visual debugging tool for inspecting element stacking and layer order. Select the cube next to the three-dot control to enter or exit the layered DOM view. On macOS the Chromium/WebKit switch sits between the cube and the three dots when both engines are available. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
 
-**Controls on macOS, iOS, and Android:**
+**Inspector controls:**
 - **Left toolbar** — Rotate orbits the page, Pan moves the camera horizontally and vertically using drag or wheel/trackpad input, without changing zoom, Scroll moves through the source page, and Inspect picks an element without moving the scene. Pointer and one-finger drags follow the selected tool.
 - **Page orientation card** — a native screenshot taken before disassembly shows the actual website inside red X, green Y, and blue Z rings. Drag the preview to orbit the scene, or choose Top, Side, and Front views. If snapshot capture is unavailable, the card says so; inspection remains available.
 - **Zoom controls** — zoom out/in or select a percentage from 15% to 250%. Wheel/trackpad and pinch gestures update the displayed level.
 - **Vertical layer slider** — adjust separation from 0 (assembled) to 80 pixels per DOM depth step. The current value is displayed beside the slider; + and - keys also adjust it.
 - **Elements toolbox** — open Elements to browse the page's DOM, including hidden elements, open shadow roots and accessible same-origin frames. Branches expand on demand. Hover or focus a tree row to highlight its plane; hovering a plane expands its ancestor branches and reveals the matching tree row. Off-screen planes are brought into view by camera translation, preserving the zoom level and rotation. Hidden elements and nodes outside the render limit are identified as having no rendered plane.
-- **Native shell controls** — existing rotate/scroll, zoom, reset and exit shortcuts remain available. R resets the camera; Escape or the native exit button restores normal browsing.
+- **Native shell controls** — macOS, iOS and Android provide shortcuts for rotation, scrolling, zoom and reset. R resets the camera. Escape or the toolbar cube restores normal browsing.
 
 The camera pivots around the visible viewport, including on long pages. The toolbox supports keyboard expansion, navigation and selection; the layer slider supports keyboard adjustment. Controls adapt to narrow phone and landscape viewports.
 
-iOS and macOS bundle the same inspector scripts, and Android bundles identical scene/tool sources. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open. Windows and Linux do not currently expose this experimental inspector.
+iOS, macOS, Windows and Linux bundle the same inspector scripts, and Android bundles identical scene and tool sources. Missing or unreadable scripts fail activation without terminating the app. On macOS the inspector follows the visible tab even when several tabs are open. Windows and Linux keep the inspector state with the tab and reset it on document navigation.
 
 The 3D view shows DOM depth (tree nesting), not CSS paint order. Tag, classes, dimensions, original position and z-index appear in the hover info panel. Source-page interactions are suppressed while inspecting, but background page logic (timers, network callbacks) may still execute. Exit removes controls and listeners and restores the source styles. The screenshot remains in memory for that inspector session only. Works with WebKit and Chromium renderers.
 
 **Limitations:** Canvas, WebGL, and video elements appear as opaque layers. Cross-origin frames cannot expose their contents; closed shadow roots are not traversable. Hover detection degrades at steep rotation angles. Pages with more than 5,000 visible elements have their rendered planes capped with a warning toast; the toolbox can still browse their DOM. The tree reflects the structure when its branches are expanded; it does not continuously track background DOM changes.
 
-API: `snapshot-3d-enter`, `snapshot-3d-exit`, `snapshot-3d-status`, `snapshot-3d-set-mode`, `snapshot-3d-zoom`, `snapshot-3d-reset-view` (MCP: `kelpie_snapshot_3d_enter`, `kelpie_snapshot_3d_exit`, `kelpie_snapshot_3d_status`, `kelpie_snapshot_3d_set_mode`, `kelpie_snapshot_3d_zoom`, `kelpie_snapshot_3d_reset_view`).
+The macOS, iOS and Android API exposes `snapshot-3d-enter`, `snapshot-3d-exit`, `snapshot-3d-status`, `snapshot-3d-set-mode`, `snapshot-3d-zoom`, and `snapshot-3d-reset-view` (MCP: `kelpie_snapshot_3d_enter`, `kelpie_snapshot_3d_exit`, `kelpie_snapshot_3d_status`, `kelpie_snapshot_3d_set_mode`, `kelpie_snapshot_3d_zoom`, `kelpie_snapshot_3d_reset_view`).
 
 ## Bookmarks
 
@@ -657,9 +657,9 @@ iPhone opens a two-column tab overview by dragging upward on the bottom address
 bar, or selecting Tabs in More. Tap a preview to switch; swipe a card sideways
 or use its close button to close it. Closing the last tab creates a start tab.
 
-The native bottom toolbar provides Back, Forward, address/reload, Share and More;
+The native bottom toolbar provides Back, Forward, address/reload, Share, the 3D inspector cube and More;
 iPad also shows Bookmarks directly. More holds Bookmarks, History,
-AI, network and 3D inspectors, viewport presets and Settings. Narrow phones put
+AI, network inspector, viewport presets and Settings. Narrow phones put
 Share in More. Scrolling down shrinks the toolbar to a small domain capsule;
 scrolling upward or tapping it expands it. The same address capsule shrinks and
 moves continuously while the surrounding controls and material fade away.

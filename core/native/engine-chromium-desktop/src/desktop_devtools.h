@@ -86,6 +86,8 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   // session lock held, so it may hop to the CEF UI thread.
   Result Wait(const std::shared_ptr<Operation>& operation, std::chrono::milliseconds timeout,
               const std::function<bool()>& interrupted = {});
+  // Checks the reply without blocking the CEF UI thread.
+  static std::optional<Result> ReadCompleted(const std::shared_ptr<Operation>& operation);
   void CancelAll();
 
   static Json EvaluateParams(const std::string& expression);

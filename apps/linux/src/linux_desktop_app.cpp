@@ -114,6 +114,8 @@ bool LinuxApp::FinishShutdown() {
   impl_->profile.Clear(); impl_->started=false; impl_->running=false; return true;
 }
 bool LinuxApp::IsRunning() const { return impl_->running && !impl_->closing; }
+DesktopEngine::Inspector3DState LinuxApp::Active3DInspector() const { return impl_->desktop.engine().Active3DInspector(); }
+void LinuxApp::Toggle3DInspector() { impl_->desktop.engine().Toggle3DInspector(); }
 PeerApprovalQueue& LinuxApp::ComputerApprovals() { return impl_->desktop.http_server().approvals(); }
 void LinuxApp::PumpBrowser() {
   impl_->desktop.Tick(); impl_->account.Poll();
