@@ -37,6 +37,16 @@ class DesktopEngine final : public DesktopBrowserControl {
     bool persistent = true;
   };
 
+  struct FileChooserRequest {
+    std::string title;
+    std::vector<std::string> accept_types;
+    bool multiple = false;
+    bool directory = false;
+  };
+
+  using FileChooserCompletion = std::function<void(std::vector<std::string>)>;
+  using FileChooser = std::function<void(FileChooserRequest, FileChooserCompletion)>;
+
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
@@ -69,6 +79,8 @@ class DesktopEngine final : public DesktopBrowserControl {
     bool external_message_pump = true;
     std::function<void(void*)> configure_window_info;
     std::function<void(void*, const std::string&)> configure_tab_window_info;
+    // Optional native upload picker for shells with no CEF-owned window.
+    FileChooser file_chooser;
     // Supplies the `kelpie://start` data payload. The engine owns no stores, so
     // the application wires this to its BookmarkStore and HistoryStore. Called
     // on the CEF IO thread; the implementation must be thread-safe.

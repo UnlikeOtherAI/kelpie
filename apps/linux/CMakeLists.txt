@@ -103,6 +103,7 @@ add_executable(kelpie-linux
   src/headless_shell.cpp
   src/gui_shell.cpp
   src/gtk_browser_view.cpp
+  src/gtk_file_chooser.cpp
   src/gtk_browser_input.cpp
   src/browser_chrome.cpp
   src/chrome_icons.cpp
@@ -129,7 +130,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.2.14"
+    KELPIE_LINUX_VERSION="0.2.15"
 )
 
 if(KELPIE_LINUX_HAS_CEF)

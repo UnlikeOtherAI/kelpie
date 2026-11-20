@@ -168,6 +168,11 @@ MCP: `kelpie_pair`.
 
 ## Browser Control
 
+Use a webpage's upload button or file input to open the system file picker on
+macOS (Safari/WebKit and Chrome/Chromium), Windows, Linux, iOS, and Android.
+Choose one or more files as allowed by the page, or cancel to dismiss the
+picker without adding files.
+
 Apple apps expose the shared versioned `POST /v1/browser-control` and authenticated `POST /mcp` surface. Common snapshots, references, append typing and navigation share one native coordinator; product tools are discovered separately. See [Apple binding](api/native-browser-gateway.md#apple-bindings).
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.

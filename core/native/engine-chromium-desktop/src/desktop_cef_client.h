@@ -4,6 +4,7 @@
 
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
+#include "include/cef_dialog_handler.h"
 #include "include/cef_jsdialog_handler.h"
 #include "include/cef_render_handler.h"
 #include "include/cef_version.h"
@@ -23,6 +24,7 @@ class DesktopCefClient final : public CefClient,
                                public CefLoadHandler,
                                public CefDisplayHandler,
                                public CefRenderHandler,
+                               public CefDialogHandler,
                                public CefJSDialogHandler {
  public:
   explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
@@ -31,6 +33,7 @@ class DesktopCefClient final : public CefClient,
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
   CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
   CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+  CefRefPtr<CefDialogHandler> GetDialogHandler() override;
   CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
 
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
@@ -85,6 +88,17 @@ class DesktopCefClient final : public CefClient,
                   CefRefPtr<CefJSDialogCallback> callback,
                   bool& suppress_message) override;
   void OnResetDialogState(CefRefPtr<CefBrowser> browser) override;
+
+  bool OnFileDialog(CefRefPtr<CefBrowser> browser,
+                    FileDialogMode mode,
+                    const CefString& title,
+                    const CefString& default_path,
+                    const std::vector<CefString>& accept_filters,
+#if CEF_VERSION_MAJOR >= 130
+                    const std::vector<CefString>& accept_extensions,
+                    const std::vector<CefString>& accept_descriptions,
+#endif
+                    CefRefPtr<CefFileDialogCallback> callback) override;
 
   void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
   void OnPopupShow(CefRefPtr<CefBrowser> browser, bool show) override;
