@@ -28,12 +28,10 @@ Enabled app targets are `windows-x64`, `macos-arm64`, `macos-x64`,
 and `android`. Only advertise architectures that were actually built. Versions
 are numeric `major.minor.patch` from the component manifest, never the date tag.
 
-Android store releases use `--store-url` instead of `--asset` with the Kelpie
-Play Store page. Publish metadata only once that version is available to users.
-iOS app integration is deferred until its distribution route is ready. The
-metadata tooling reserves an `ios` target for an App Store page, but the iOS app
-does not check for updates in this delivery. A Simulator ZIP cannot update a
-physical iPhone or iPad and is rejected by the publisher.
+Use `--asset` with the Android APK for direct installs. Google Play and other
+store-managed Android installs leave updates to the store, as do the Mac App
+Store and TestFlight builds. iOS receives updates through the App Store or
+TestFlight. A Simulator ZIP cannot update a physical iPhone or iPad.
 
 The release workflow advertises Linux and Android only after their verified
 artifacts have been attached. Direct Mac and Windows publishers run the command
@@ -71,7 +69,7 @@ finished, run the `Deploy to GitHub Pages` workflow; it reads the published pack
 
 ## Prompt and preference behavior
 
-Apps check the public GitHub releases API without credentials on launch and
+Direct installs check the public GitHub releases API without credentials on launch and
 every six hours. They select the highest compatible component version in the
 latest 100 releases before considering the user's choices. Skipping the newest
 must never cause a prompt for an older release. A new version can prompt in the
@@ -101,6 +99,8 @@ the original arguments. Profiles and browsing data remain outside the package.
   must have valid timestamped UnlikeOtherAI signatures with the same certificate,
   preserving CEF's sandbox contract. The expected app version and runtime files
   are checked. Other running instances using that installation prevent replacement.
+  The helper hashes the ZIP through .NET, including under Windows PowerShell
+  5.1 sessions where `Get-FileHash` is unavailable.
 - Mac requires a normal `.app` bundle in a writable parent directory. It verifies
   the new bundle's signature, matching TeamIdentifier and bundle identifier,
   Gatekeeper acceptance and component version. Ad-hoc or unnotarized builds are

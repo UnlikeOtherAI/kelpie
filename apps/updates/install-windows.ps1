@@ -13,6 +13,15 @@ $installed = $false
 $backup = $null
 $request = $null
 function Set-Status([string]$Value) { [IO.File]::WriteAllText($statusPath, $Value) }
+function Get-PackageSha256([string]$Path) {
+    # Hash the download even when Windows PowerShell cannot autoload Get-FileHash.
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try { return [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+        finally { $sha256.Dispose() }
+    } finally { $stream.Dispose() }
+}
 function Extended-Path([string]$Path) {
     if ($Path.StartsWith('\\?\')) { return $Path }
     if ($Path.StartsWith('\\')) { return '\\?\UNC\' + $Path.Substring(2) }
@@ -36,7 +45,12 @@ function Start-Kelpie([string]$Directory) {
 }
 
 try {
-    $request = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json
+    # The launcher can inherit a PowerShell 7 module path from a terminal.
+    # Load the Windows PowerShell modules from the host that runs the helper.
+    $env:PSModulePath = Join-Path $PSHOME 'Modules'
+    Import-Module (Join-Path $env:PSModulePath 'Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1')
+    Import-Module (Join-Path $env:PSModulePath 'Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1')
+    $request = Get-Content -LiteralPath $RequestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($request.url -cnotmatch '^https://github\.com/UnlikeOtherAI/kelpie/releases/download/[^\s\\?#%]+\.zip$' -or
         $request.url.Contains('..') -or $request.sha256 -cnotmatch '^[a-f0-9]{64}$' -or
         $request.version -notmatch '^\d{1,6}\.\d{1,6}\.\d{1,6}$') { throw 'Invalid update metadata.' }
@@ -59,7 +73,7 @@ try {
     Set-Status 'downloading'
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -UseBasicParsing -Uri $request.url -OutFile $archive -TimeoutSec 300
-    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $request.sha256) {
+    if ((Get-PackageSha256 $archive) -cne $request.sha256) {
         throw 'The downloaded package checksum does not match GitHub.'
     }
     if (Test-Path -LiteralPath (Join-Path $operation 'cancel')) { throw 'Update cancelled.' }

@@ -17,7 +17,7 @@ The Orbit icon combines Kelpie's multicolour K with a globe and a cyan orbit. It
 
 ## App updates
 
-Standalone Kelpie apps on macOS, Windows, Linux and Android check GitHub for compatible stable releases at launch and
+Direct Kelpie installs on macOS, Windows, Linux and Android check GitHub for compatible stable releases at launch and
 every six hours while running. A new component version offers **Update**, **Skip
 version**, and **Not now**. Skip version remembers that component version across
 restarts; a later version can still prompt. Not now dismisses the prompt for this
@@ -30,8 +30,10 @@ must have valid, matching UnlikeOtherAI signatures on the CEF bootstrap, client
 DLL and `chrome_elf.dll`. All desktop downloads must match the SHA-256 published
 by GitHub. Portable installs retain the previous installation for recovery;
 Linux `.deb` and `.rpm` installs use the system package manager and its normal
-authorization prompt. Mobile Update opens the published APK or store update page.
-iOS update notifications are deferred. Simulator archives are never advertised as physical iOS updates.
+authorization prompt. Sideloaded Android installs can open the published APK.
+Mac App Store, iOS App Store and Google Play installs receive updates through
+their stores. Android also defers to other stores when the OS identifies the
+installation as store-managed.
 
 Unrelated component releases, prereleases, drafts, missing packages and installed
 or older versions do not prompt. Offline checks retry after fifteen minutes without

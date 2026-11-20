@@ -20,8 +20,8 @@ android {
         minSdk = 28
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 34
-        versionName = "0.2.14"
+        versionCode = 35
+        versionName = "0.2.15"
         buildConfigField("int", "LOCAL_HTTP_PORT", "8420")
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
