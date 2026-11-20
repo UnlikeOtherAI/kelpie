@@ -42,7 +42,10 @@ function enableAnalytics() {
 function disableAnalytics() {
   window[disableKey] = true;
   for (const name of ["_ga", `_ga_${measurementId.slice(2)}`]) {
-    document.cookie = `${name}=; Max-Age=0; Path=/; Secure; SameSite=Lax`;
+    const expired = `${name}=; Max-Age=0; Path=/; Secure; SameSite=Lax`;
+    // Google can set either a host-only cookie or a cookie for the whole domain.
+    document.cookie = expired;
+    document.cookie = `${expired}; Domain=${location.hostname}`;
   }
 }
 
@@ -67,7 +70,7 @@ document.body.append(panel);
 function applyPreference(preference) {
   panel.hidden = preference === "allowed" || preference === "declined";
   if (preference === "allowed") enableAnalytics();
-  else if (window.gtag) disableAnalytics();
+  else if (preference === "declined" || window.gtag) disableAnalytics();
 }
 
 applyPreference(readPreference());
