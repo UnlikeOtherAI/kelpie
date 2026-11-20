@@ -22,9 +22,16 @@ final class Snapshot3DUITests: XCTestCase {
             XCTAssertFalse(shortcut.exists)
             XCTAssertFalse(app.buttons["browser.account"].exists)
             more.tap()
-            XCTAssertTrue(app.buttons["Network inspector"].waitForExistence(timeout: 5))
+            let networkInspector = app.buttons["Network inspector"]
+            XCTAssertTrue(networkInspector.waitForExistence(timeout: 5))
+            let evidence = XCTAttachment(screenshot: app.screenshot())
+            evidence.name = "3D inspector in More"
+            evidence.lifetime = .keepAlways
+            add(evidence)
             XCTAssertTrue(app.buttons["browser.account.menu"].exists || app.buttons["Cancel login"].exists)
-            XCTAssertTrue(menuItem.exists)
+            XCTAssertTrue(menuItem.isHittable)
+            XCTAssertEqual(menuItem.label, "3D inspector")
+            XCTAssertEqual(menuItem.frame.maxY, networkInspector.frame.minY, accuracy: 1)
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.18)).tap()
         } else {
             XCTAssertTrue(shortcut.exists)

@@ -21,7 +21,7 @@ extension BrowserView {
             },
             isCollapsed: $bottomBarCollapsed,
             isEditing: $addressEditing,
-            moreContent: { browserMoreMenu }
+            moreContent: browserMoreMenu
         )
     }
 
@@ -35,10 +35,20 @@ extension BrowserView {
     }
 
     @ViewBuilder
-    var browserMoreMenu: some View {
+    func browserMoreMenu(onSnapshot3D: (() -> Void)?) -> some View {
         Button { showHistory = true } label: { Label("History", systemImage: "clock") }
         Button { showAI = true } label: { Label("AI", systemImage: "sparkles") }
         Button { showNetworkInspector = true } label: { Label("Network inspector", systemImage: "network") }
+        // The bottom-anchored iOS More menu lays out its actions upward.
+        if let onSnapshot3D {
+            Button(
+                "3D inspector",
+                systemImage: isIn3DInspector ? "cube.fill" : "cube.transparent",
+                action: onSnapshot3D
+            )
+            .accessibilityIdentifier("browser.snapshot-3d.menu")
+            .accessibilityValue(isIn3DInspector ? "On" : "Off")
+        }
         if isPad {
             Menu("Viewport") {
                 Button("Full width") { setTabletViewportPreset("") }

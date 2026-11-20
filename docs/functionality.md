@@ -308,7 +308,7 @@ API: `network-list`, `network-detail`, `network-select`, `network-current`, `net
 
 **Experimental**. On iOS, Android and macOS the 3D inspector is visible by default and can be turned off in Settings without restarting. On macOS the toolbar icon is enabled for WebKit. On Windows and Linux the icon is enabled on loaded pages in Chromium builds.
 
-A visual debugging tool for inspecting element stacking and layer order. On phones and tablet windows narrower than 600 points or dp, select the cube in More. On wider tablets and desktops, select the cube next to the three dots. On macOS the Chromium/WebKit switch sits between the cube and the three dots when both engines are available. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
+A visual debugging tool for inspecting element stacking and layer order. On phones and tablet windows narrower than 600 points or dp, select `3D inspector` directly above `Network inspector` in More. On wider tablets and desktops, select the cube next to the three dots. On macOS the Chromium/WebKit switch sits between the cube and the three dots when both engines are available. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
 
 **Inspector controls:**
 - **Left toolbar** — Rotate orbits the page, Pan moves the camera horizontally and vertically using drag or wheel/trackpad input, without changing zoom, Scroll moves through the source page, and Inspect picks an element without moving the scene. Pointer and one-finger drags follow the selected tool.
@@ -709,7 +709,7 @@ bar, or selecting Tabs in More. Tap a preview to switch; swipe a card sideways
 or use its close button to close it. Closing the last tab creates a start tab.
 
 The native bottom toolbar provides Back, Forward, address/reload and More.
-Wide tablets show Share, Bookmarks, the account control and the 3D inspector cube directly. On phones and narrow tablet windows, More holds the account control and the 3D inspector cube. More also holds Bookmarks, History, AI, network inspector, viewport presets and Settings. Narrow phones put Share in More. Scrolling down shrinks the toolbar to a small domain capsule;
+Wide tablets show Share, Bookmarks, the account control and the 3D inspector cube directly. On phones and narrow tablet windows, More holds the account control and a labeled `3D inspector` row directly above `Network inspector`. More also holds Bookmarks, History, AI, viewport presets and Settings. Narrow phones put Share in More. Scrolling down shrinks the toolbar to a small domain capsule;
 scrolling upward or tapping it expands it. The same address capsule shrinks and
 moves continuously while the surrounding controls and material fade away.
 Editing locks the bar open above a docked keyboard; floating iPad keyboards leave
