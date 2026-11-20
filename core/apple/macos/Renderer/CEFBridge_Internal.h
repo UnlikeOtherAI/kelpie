@@ -30,6 +30,7 @@ NS_ASSUME_NONNULL_BEGIN
     cef_browser_t *_createdBrowser;
     cef_browser_t *_callbackBrowser;
     void (^_retirementCompletion)(void);
+    void (^_cancelMicrophoneRequest)(void);
 }
 
 /// Returns the live browser handle, preferring `_createdBrowser` over `_callbackBrowser`.
@@ -38,6 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Returns the main frame of the active browser, or NULL if unavailable.
 /// Caller is responsible for releasing the returned frame via base.release.
 - (nullable cef_frame_t *)copyMainFrame;
+
+- (void)cancelPendingMicrophoneAccess;
 
 /// Resume a pending JS evaluation block.
 - (void)_finishEvalWithIdentifier:(NSString *)identifier

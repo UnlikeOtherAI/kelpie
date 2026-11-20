@@ -26,6 +26,7 @@
 - (void)cefBridgeUpdateMainFrameHTTPStatusCode:(NSInteger)statusCode {
     _mainFrameHTTPStatusCode = statusCode;
     if (statusCode == 0) {
+        [self cancelPendingMicrophoneAccess];
         @synchronized (self) { _documentVersion = NSUUID.UUID.UUIDString; ++_documentNavigationCount; }
     }
 }

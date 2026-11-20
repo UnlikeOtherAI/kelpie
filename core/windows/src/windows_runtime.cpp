@@ -240,6 +240,18 @@ bool WindowsApp::InitializeDesktopRuntime() {
     }
     return BrowserControlResult::Success();
   };
+  runtime.engine.microphone_prompt = [this](std::string origin, DesktopEngine::MicrophoneDecision decide) {
+    const HWND window = shell_->hwnd();
+    if (!IsWindowVisible(window) || close_lifecycle_.requested()) {
+      decide(false);
+      return;
+    }
+    const auto message = utf::Utf8ToWideDisplay(origin) + L" wants to use your microphone.";
+    // The external CEF pump already guards against nested CefDoMessageLoopWork.
+    const int answer = MessageBoxW(window, message.c_str(), L"Allow microphone access?",
+                                   MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION);
+    decide(answer == IDYES && !close_lifecycle_.requested());
+  };
   runtime.engine.mode = DesktopEngine::Mode::kWindowed;
   runtime.engine.process_instance = config_.cef_process_instance;
   runtime.engine.sandbox_info = config_.sandbox_info;

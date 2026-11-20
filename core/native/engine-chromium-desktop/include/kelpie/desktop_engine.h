@@ -47,6 +47,11 @@ class DesktopEngine final : public DesktopBrowserControl {
   using FileChooserCompletion = std::function<void(std::vector<std::string>)>;
   using FileChooser = std::function<void(FileChooserRequest, FileChooserCompletion)>;
 
+  // Present a native site permission prompt on the CEF UI thread. Complete
+  // once, on the same thread, with the person's decision.
+  using MicrophoneDecision = std::function<void(bool)>;
+  using MicrophonePrompt = std::function<void(std::string origin, MicrophoneDecision)>;
+
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
@@ -81,6 +86,7 @@ class DesktopEngine final : public DesktopBrowserControl {
     std::function<void(void*, const std::string&)> configure_tab_window_info;
     // Optional native upload picker for shells with no CEF-owned window.
     FileChooser file_chooser;
+    MicrophonePrompt microphone_prompt;
     // Supplies the `kelpie://start` data payload. The engine owns no stores, so
     // the application wires this to its BookmarkStore and HistoryStore. Called
     // on the CEF IO thread; the implementation must be thread-safe.

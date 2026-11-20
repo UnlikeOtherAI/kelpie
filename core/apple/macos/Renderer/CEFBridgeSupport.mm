@@ -150,6 +150,12 @@ struct FrameHandler {
     __unsafe_unretained CEFBridge *owner;
 };
 
+struct PermissionHandler {
+    cef_permission_handler_t handler;
+    RefCountedState ref;
+    __unsafe_unretained CEFBridge *owner;
+};
+
 struct BridgeClient {
     cef_client_t client;
     RefCountedState ref;
@@ -159,6 +165,7 @@ struct BridgeClient {
     DisplayHandler *display;
     FrameHandler *frame;
     cef_jsdialog_handler_t *jsDialog;
+    PermissionHandler *permission;
 };
 
 struct DevToolsScreenshotObserver {
@@ -195,6 +202,7 @@ DEFINE_REFCOUNTED_FUNCS(LifeSpanHandler, handler, LifeSpan)
 DEFINE_REFCOUNTED_FUNCS(LoadHandler, handler, Load)
 DEFINE_REFCOUNTED_FUNCS(DisplayHandler, handler, Display)
 DEFINE_REFCOUNTED_FUNCS(FrameHandler, handler, Frame)
+DEFINE_REFCOUNTED_FUNCS(PermissionHandler, handler, Permission)
 static void DevToolsScreenshotAddRef(cef_base_ref_counted_t *base) {
     AddRefImpl<DevToolsScreenshotObserver>(base, offsetof(DevToolsScreenshotObserver, observer));
 }
@@ -292,6 +300,28 @@ static cef_jsdialog_handler_t *GetJSDialogHandler(cef_client_t *self) {
     return client->jsDialog;
 }
 
+static cef_permission_handler_t *GetPermissionHandler(cef_client_t *self) {
+    auto *client = StructFromBase<BridgeClient>(&self->base, offsetof(BridgeClient, client));
+    auto *handler = &client->permission->handler;
+    handler->base.add_ref(&handler->base);
+    return handler;
+}
+
+static int OnRequestMediaAccess(cef_permission_handler_t *self, cef_browser_t *browser, cef_frame_t *frame,
+                                const cef_string_t *origin, uint32_t permissions,
+                                cef_media_access_callback_t *callback) {
+    auto *handler = StructFromBase<PermissionHandler>(&self->base, offsetof(PermissionHandler, handler));
+    const BOOL mainFrame = frame && frame->is_main(frame);
+    const int handled = CEFBridgeRequestMicrophoneAccess(
+        handler->owner, mainFrame ? StringFromCEFString(origin) : nil, permissions, callback);
+    // The C API transfers one reference to each ref-counted callback argument.
+    // The prompt holds its own reference only while a decision is pending.
+    if (browser) browser->base.release(&browser->base);
+    if (frame) frame->base.release(&frame->base);
+    callback->base.release(&callback->base);
+    return handled;
+}
+
 static void ClientAddRef(cef_base_ref_counted_t *base) {
     AddRefImpl<BridgeClient>(base, offsetof(BridgeClient, client));
 }
@@ -319,6 +349,7 @@ static int ClientRelease(cef_base_ref_counted_t *base) {
             client->jsDialog->base.release(&client->jsDialog->base);
             client->jsDialog = nullptr;
         }
+        client->permission->handler.base.release(&client->permission->handler.base);
         delete client;
         return 1;
     }
@@ -478,6 +509,7 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->client.get_display_handler = GetDisplayHandler;
     client->client.get_frame_handler = GetFrameHandler;
     client->client.get_jsdialog_handler = GetJSDialogHandler;
+    client->client.get_permission_handler = GetPermissionHandler;
 
     client->lifeSpan = CreateHandler<LifeSpanHandler>(owner);
     client->lifeSpan->handler.base.add_ref = LifeSpanAddRef;
@@ -520,6 +552,12 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->frame->handler.on_main_frame_changed = OnMainFrameChanged;
 
     client->jsDialog = CEFBridgeCreateJSDialogHandler(owner);
+    client->permission = CreateHandler<PermissionHandler>(owner);
+    client->permission->handler.base.add_ref = PermissionAddRef;
+    client->permission->handler.base.release = PermissionRelease;
+    client->permission->handler.base.has_one_ref = PermissionHasOneRef;
+    client->permission->handler.base.has_at_least_one_ref = PermissionHasAtLeastOneRef;
+    client->permission->handler.on_request_media_access_permission = OnRequestMediaAccess;
     return client;
 }
 
@@ -535,6 +573,7 @@ void CEFBridgeNullifyClientOwner(BridgeClient *client) {
     if (client->display  != nullptr) { client->display->owner  = nil; }
     if (client->frame    != nullptr) { client->frame->owner    = nil; }
     if (client->jsDialog != nullptr) { CEFBridgeNullifyJSDialogHandler(client->jsDialog); }
+    client->permission->owner = nil;
 }
 
 void CEFBridgeReleaseClient(BridgeClient *client) {

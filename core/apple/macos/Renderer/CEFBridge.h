@@ -13,6 +13,12 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
     CEFBridgeJavaScriptDialogResolution resolve
 );
 
+typedef void (^CEFBridgeMicrophoneHandler)(
+    NSString *origin,
+    BOOL (^stillCurrent)(void),
+    void (^resolve)(BOOL allowed)
+);
+
 @interface CEFBridge : NSObject
 
 /// Create a new browser instance.
@@ -85,6 +91,9 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 
 /// Set callback for JavaScript alert/confirm/prompt dialogs.
 @property (nonatomic, copy, nullable) CEFBridgeJavaScriptDialogHandler onJavaScriptDialog;
+
+/// Resolve a visible, main-frame microphone request through the host's permission policy.
+@property (nonatomic, copy, nullable) CEFBridgeMicrophoneHandler onMicrophoneRequest;
 
 /// Set callback for CEF dialog-state resets such as navigation cancellation.
 @property (nonatomic, copy, nullable) void (^onJavaScriptDialogReset)(void);

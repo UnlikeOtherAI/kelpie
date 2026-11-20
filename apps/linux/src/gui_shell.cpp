@@ -6,6 +6,7 @@
 #include "bookmarks_view.h"
 #include "gtk_browser_view.h"
 #include "gtk_file_chooser.h"
+#include "gtk_microphone_prompt.h"
 #include "history_view.h"
 #include "linux_app.h"
 #include "network_inspector.h"
@@ -29,6 +30,10 @@ int GUIShell::Run() {
   GtkFileChooserPanel file_chooser(window);
   app_.SetFileChooser([&file_chooser](auto request, auto complete) {
     file_chooser.Open(request, std::move(complete));
+  });
+  GtkMicrophonePrompt microphone(window);
+  app_.SetMicrophonePrompt([&microphone](auto origin, auto decide) {
+    microphone.Show(origin, std::move(decide));
   });
   WindowGeometry geometry(window,app_.config().profile_dir);
   StandaloneUpdates updates(app_,window);
@@ -61,7 +66,7 @@ int GUIShell::Run() {
     if(action==4) { settings.Refresh(); settings.Show(window); }
   };
   ComputerApprovalView approvals(app_.ComputerApprovals(),window);
-  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; StandaloneUpdates& updates; ComputerApprovalView& approvals; GtkFileChooserPanel& file_chooser; unsigned tick=0; } context{app_,window,url,browser,chrome,toast,updates,approvals,file_chooser};
+  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; StandaloneUpdates& updates; ComputerApprovalView& approvals; GtkFileChooserPanel& file_chooser; GtkMicrophonePrompt& microphone; unsigned tick=0; } context{app_,window,url,browser,chrome,toast,updates,approvals,file_chooser,microphone};
   g_signal_connect(window,"delete-event",G_CALLBACK(+[](GtkWidget*,GdkEvent*,gpointer raw)->gboolean {
     static_cast<LinuxApp*>(raw)->RequestShutdown(); return TRUE; // Keep renderer and pump alive until drained.
   }),&app_);
@@ -84,6 +89,7 @@ int GUIShell::Run() {
     auto& c=*static_cast<Context*>(raw); c.app.PumpBrowser(); c.approvals.Poll();
     if(!c.app.IsRunning()) {
       c.file_chooser.Cancel();
+      c.microphone.Cancel();
       if(c.app.FinishShutdown())gtk_main_quit();
       return G_SOURCE_CONTINUE;
     }
@@ -108,6 +114,8 @@ int GUIShell::Run() {
     return G_SOURCE_CONTINUE;
   },&context);
   gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(app_.Tabs()); gtk_main();
+  microphone.Cancel();
+  app_.SetMicrophonePrompt({});
   app_.SetFileChooser({});
   g_source_remove(timer); geometry.Save(); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
 #else

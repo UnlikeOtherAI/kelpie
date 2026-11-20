@@ -57,6 +57,13 @@ project and depend on that local target when packaging Chromium. Tuist omits
 cross-project command-line-tool dependencies from the app build graph. The
 packaging script fails if the helper executable was not built.
 
+For website microphone access, Apple containing apps declare
+`NSMicrophoneUsageDescription` in the app's Info.plist. macOS apps sign with
+`com.apple.security.device.audio-input`, including the CEF helper that hosts
+the audio service when shipping Chromium. Both macOS renderers use the system
+permission prompt for microphone-only requests and scope access to the
+approved site. iOS uses WebKit's native site prompt.
+
 Android hosts include the Gradle library at `core/android`, create
 `KelpieBrowserSession(activity, uoaSession = ...)` when needed, and
 attach its view to their container. `KelpieBrowserActivity` is an optional full-window

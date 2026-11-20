@@ -13,9 +13,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.19</string>
+	<string>0.2.20</string>
 	<key>CFBundleVersion</key>
-	<string>47</string>
+	<string>48</string>
 	<key>CFBundleURLTypes</key>
     <array><dict><key>CFBundleURLSchemes</key><array><string>com.unlikeotherai.kelpie</string></array>
     <key>CFBundleURLName</key><string>UOA sign-in</string></dict></array>
@@ -34,6 +34,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Kelpie uses the local network to receive browser automation commands from the CLI and to sync cookies with your other signed-in Kelpie devices.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kelpie uses the microphone for websites you allow and for voice prompts in local AI.</string>
 	<key>NSQuitAlwaysKeepsWindows</key>
 	<false/>
 	<key>LSMultipleInstancesProhibited</key>

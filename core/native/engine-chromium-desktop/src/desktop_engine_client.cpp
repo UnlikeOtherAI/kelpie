@@ -300,6 +300,40 @@ CefRefPtr<CefDialogHandler> DesktopCefClient::GetDialogHandler() {
   return nullptr;
 }
 
+bool DesktopCefClient::OnRequestMediaAccessPermission(
+    CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+    const CefString& requesting_origin, uint32_t requested_permissions,
+    CefRefPtr<CefMediaAccessCallback> callback) {
+  constexpr uint32_t microphone = CEF_MEDIA_PERMISSION_DEVICE_AUDIO_CAPTURE;
+  if ((requested_permissions & microphone) == 0) return false;
+
+  // Chromium has already checked the secure context and Permissions Policy.
+  auto* tab = owner_->FindTab(browser);
+  if (requested_permissions != microphone || requesting_origin.empty() ||
+      !owner_->config.microphone_prompt || microphone_prompt_pending_ ||
+      !tab || tab->closing || !owner_->browser || !owner_->browser->IsSame(browser)) {
+    callback->Cancel();
+    return true;
+  }
+
+  microphone_prompt_pending_ = true;
+  TabLease lease{tab->id, tab->generation, tab->document_version};
+  owner_->config.microphone_prompt(requesting_origin.ToString(),
+      [client = CefRefPtr<DesktopCefClient>(this), owner = owner_->weak_from_this(),
+       lease = std::move(lease), browser, frame, callback](bool allowed) {
+        client->microphone_prompt_pending_ = false;
+        const auto engine = owner.lock();
+        const auto* target = engine ? engine->FindTab(lease) : nullptr;
+        if (allowed && target && engine->browser && engine->browser->IsSame(browser) &&
+            frame && frame->IsValid()) {
+          callback->Continue(CEF_MEDIA_PERMISSION_DEVICE_AUDIO_CAPTURE);
+        } else {
+          callback->Cancel();
+        }
+      });
+  return true;
+}
+
 bool DesktopCefClient::OnFileDialog(CefRefPtr<CefBrowser>,
                                     FileDialogMode mode,
                                     const CefString& title,
