@@ -16,12 +16,15 @@ if ($Worker) {
     param($Uri, $OutFile, $TimeoutSec, [switch]$UseBasicParsing)
     Copy-Item -LiteralPath $SignedPackage -Destination $OutFile
   }
+  function Get-FileHash {
+    throw 'The application updater must work when Get-FileHash is unavailable.'
+  }
   & (Join-Path $PSScriptRoot '../../apps/updates/install-windows.ps1') -RequestPath $RequestPath
   exit $LASTEXITCODE
 }
 
 function Wait-Until([scriptblock]$Condition, [string]$Description) {
-  $deadline = [DateTime]::UtcNow.AddSeconds(45)
+  $deadline = [DateTime]::UtcNow.AddSeconds(120)
   do {
     if (& $Condition) { return }
     Start-Sleep -Milliseconds 200
@@ -42,7 +45,7 @@ function Close-Browser([string]$Readiness) {
 }
 
 $root = Join-Path ([IO.Path]::GetFullPath($ArtifactRoot)) ([guid]::NewGuid().ToString('N'))
-$installation = Join-Path $root 'Kelpie'
+$installation = Join-Path $root ('Kelpie-' + [char]0x6D4B)
 $operation = Join-Path $root 'operation'
 $profile = Join-Path $installation 'verification-profile'
 $readiness = Join-Path $profile 'readiness.json'
@@ -63,17 +66,31 @@ try {
     return (Read-Record $readiness) -ne $null
   } 'isolated signed browser readiness'
   $request = Join-Path $operation 'request.json'
-  @{
+  $metadata = @{
     url = "https://github.com/UnlikeOtherAI/kelpie/releases/download/verification/kelpie-windows-x64-$version.zip"
     sha256 = (Get-FileHash -LiteralPath $SignedPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     version = $version; parent = $parent.Id; installDirectory = $installation
     profileDirectory = $profile; arguments = $arguments
-  } | ConvertTo-Json | Set-Content -LiteralPath $request -Encoding UTF8
+  }
   $workerArgs = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $PSCommandPath +
     '" -Worker -SignedPackage "' + $SignedPackage + '" -RequestPath "' + $request + '"'
-  $workerProcess = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $workerArgs -PassThru -WindowStyle Hidden `
-    -RedirectStandardOutput (Join-Path $operation 'worker-output.log') -RedirectStandardError (Join-Path $operation 'worker-error.log')
   $statusPath = Join-Path $operation 'status'
+  $powershell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+  $expectedHash = $metadata.sha256
+  $metadata.sha256 = '0' * 64
+  [IO.File]::WriteAllText($request, ($metadata | ConvertTo-Json))
+  $workerProcess = Start-Process -FilePath $powershell -ArgumentList $workerArgs -PassThru -WindowStyle Hidden
+  Wait-Until { $workerProcess.HasExited } 'checksum rejection'
+  if ($workerProcess.ExitCode -ne 1 -or $parent.HasExited -or
+      (Get-Content -LiteralPath (Join-Path $operation 'error') -Raw) -ne 'The downloaded package checksum does not match GitHub.') {
+    throw 'A checksum mismatch did not keep the existing installation running.'
+  }
+
+  $metadata.sha256 = $expectedHash
+  [IO.File]::WriteAllText($request, ($metadata | ConvertTo-Json))
+  Remove-Item -LiteralPath $statusPath
+  $workerProcess = Start-Process -FilePath $powershell -ArgumentList $workerArgs -PassThru -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $operation 'worker-output.log') -RedirectStandardError (Join-Path $operation 'worker-error.log')
   Wait-Until {
     if (Test-Path -LiteralPath $statusPath) {
       $state = Get-Content -LiteralPath $statusPath -Raw
@@ -95,7 +112,9 @@ try {
   if (Test-Path -LiteralPath (Join-Path $installation 'old-install-marker')) { throw 'The installation was not replaced.' }
   if (-not (Test-Path -LiteralPath (Join-Path $profile 'profile-marker'))) { throw 'The browser profile was lost.' }
   if ([IO.File]::ReadAllText(('\\?\' + $longProfileFile)) -ne 'preserve long paths') { throw 'A long profile filename was lost.' }
-  if (@(Get-ChildItem -LiteralPath $root -Directory -Filter 'Kelpie.previous-*').Count -ne 1) { throw 'No recovery copy retained.' }
+  if (@(Get-ChildItem -LiteralPath $root -Directory -Filter ((Split-Path -Leaf $installation) + '.previous-*')).Count -ne 1) {
+    throw 'No recovery copy retained.'
+  }
   Wait-Until { (Read-Record $readiness) -ne $null } 'restarted browser readiness'
   Write-Output "PASS: verified signed package, waited for parent exit, replaced installation, retained profile and backup, restarted browser. Transport was local to this test. Evidence: $root"
 } finally {

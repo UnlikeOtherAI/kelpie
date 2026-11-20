@@ -117,11 +117,12 @@ let kelpieApp = Target.target(
     bundleId: KelpieBrowserBuild.webKitOnly ? "com.unlikeotherai.kelpie" : "com.kelpie.browser.macos",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
-    sources: [.glob("Kelpie/**/*.swift"), .glob("../updates/apple/**/*.swift")],
-    resources: [
-        .glob(pattern: "Kelpie/Assets.xcassets"),
-        .glob(pattern: "../updates/install-macos.sh"),
-    ],
+    sources: KelpieBrowserBuild.webKitOnly
+        ? [.glob("Kelpie/**/*.swift")]
+        : [.glob("Kelpie/**/*.swift"), .glob("../updates/apple/**/*.swift")],
+    resources: KelpieBrowserBuild.webKitOnly
+        ? [.glob(pattern: "Kelpie/Assets.xcassets")]
+        : [.glob(pattern: "Kelpie/Assets.xcassets"), .glob(pattern: "../updates/install-macos.sh")],
     entitlements: .file(path: KelpieBrowserBuild.webKitOnly ? "Kelpie/Store.entitlements" : "Kelpie/Kelpie.entitlements"),
     scripts: [KelpieBrowserBuild.embedMacResources] + (KelpieBrowserBuild.webKitOnly ? [] : [
         fixCEFStructure,

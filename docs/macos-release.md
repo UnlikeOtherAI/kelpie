@@ -30,7 +30,8 @@ explicit `workflow_dispatch` entry points remain available for a platform build.
 
 Generate the standalone WebKit-only app with `TUIST_KELPIE_WEBKIT_ONLY=true`.
 This target uses the `com.unlikeotherai.kelpie` App Store Connect record and the
-macOS sandbox entitlements. Archive the `Kelpie` scheme on the signing Mac.
+macOS sandbox entitlements. The App Store and TestFlight manage updates for
+this build. Archive the `Kelpie` scheme on the signing Mac.
 
 ```sh
 TUIST_KELPIE_WEBKIT_ONLY=true tuist generate --path apps/macos --no-open

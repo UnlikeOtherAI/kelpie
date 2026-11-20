@@ -5,11 +5,11 @@ class MainActivity : KelpieBrowserActivity() {
 
     override fun onResume() {
         super.onResume()
-        updates.attach(this)
+        updates?.attach(this)
     }
 
     override fun onPause() {
-        updates.detach(this)
+        updates?.detach(this)
         super.onPause()
     }
 }
