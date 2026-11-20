@@ -2,6 +2,7 @@ package com.kelpie.browser.browser
 
 import android.graphics.Bitmap
 import android.net.Uri
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -30,7 +31,7 @@ internal fun installTabWebViewClients(
     val isActive: () -> Boolean = { tabStore.activeTabId.value == tab.id }
 
     webView.webViewClient = tabWebViewClient(tab, tabStore, browserState, handlerContext, isActive)
-    webView.webChromeClient = tabWebChromeClient(tab, tabStore, browserState, handlerContext, isActive)
+    webView.webChromeClient = tabWebChromeClient(webView, tab, tabStore, browserState, handlerContext, isActive)
 }
 
 private fun tabWebViewClient(
@@ -50,6 +51,7 @@ private fun tabWebViewClient(
             favicon: Bitmap?,
         ) {
             tabStore.fileChooser?.cancel(view)
+            tabStore.microphonePermission?.cancel(view)
             val previousVersion = tab.documentVersion
             tab.documentVersion =
                 java.util.UUID
@@ -159,6 +161,7 @@ private fun tabWebViewClient(
     }
 
 private fun tabWebChromeClient(
+    webView: WebView,
     tab: BrowserTab,
     tabStore: TabStore,
     browserState: BrowserState,
@@ -166,6 +169,19 @@ private fun tabWebChromeClient(
     isActive: () -> Boolean,
 ): WebChromeClient =
     object : WebChromeClient() {
+        override fun onPermissionRequest(request: PermissionRequest) {
+            val microphone = tabStore.microphonePermission
+            if (microphone == null) {
+                request.deny()
+            } else {
+                microphone.show(webView, request)
+            }
+        }
+
+        override fun onPermissionRequestCanceled(request: PermissionRequest) {
+            tabStore.microphonePermission?.requestCanceled(request)
+        }
+
         override fun onShowFileChooser(
             webView: WebView,
             filePathCallback: ValueCallback<Array<Uri>>,

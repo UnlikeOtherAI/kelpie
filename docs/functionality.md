@@ -173,6 +173,20 @@ macOS (Safari/WebKit and Chrome/Chromium), Windows, Linux, iOS, and Android.
 Choose one or more files as allowed by the page, or cancel to dismiss the
 picker without adding files.
 
+### Website microphone access
+
+Open a secure voice site and start the session from the page. HTTPS or a
+browser-trusted loopback origin is required. WebKit on macOS and iOS uses
+WebKit's site prompt. Chromium on macOS, Windows and Linux and WebView on
+Android prompt with the requesting site's origin for microphone-only
+requests. Choose **Allow** or **Deny**. macOS and Android also require
+Kelpie's system microphone permission. Windows and Linux respect system
+microphone and device availability. Closing the prompt denies the request.
+
+Some voice sites require a browser user gesture to start Web Audio before
+asking for the microphone. Start the session with a click or tap in the app
+when a synthetic browser-control action leaves the audio context suspended.
+
 Apple apps expose the shared versioned `POST /v1/browser-control` and authenticated `POST /mcp` surface. Common snapshots, references, append typing and navigation share one native coordinator; product tools are discovered separately. See [Apple binding](api/native-browser-gateway.md#apple-bindings).
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.

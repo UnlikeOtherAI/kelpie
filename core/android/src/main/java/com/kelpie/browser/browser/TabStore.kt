@@ -18,6 +18,10 @@ class TabStore(
 ) {
     private val previewSampler = context.kelpieActivity()?.window?.let(::ChromeSampler)
     internal val fileChooser = (context.kelpieActivity() as? ComponentActivity)?.let(::WebFileChooser)
+    internal val microphonePermission =
+        (context.kelpieActivity() as? ComponentActivity)?.let { activity ->
+            WebMicrophonePermission(activity) { activeTab?.webView === it && it.isShown }
+        }
     private val previewTabs = mutableListOf<String>()
 
     fun captureActivePreview() {
@@ -82,6 +86,7 @@ class TabStore(
         val profile = partition?.let { PartitionRegistry.resolve(it) }
         com.kelpie.browser.connect.NessieConnection
             .personChangedTab()
+        activeTab?.webView?.let { microphonePermission?.cancel(it) }
         captureActivePreview()
         val tab = createTab(partition = partition, profile = profile, name = name)
         _tabs.value = _tabs.value + tab
@@ -129,7 +134,10 @@ class TabStore(
                 .personChangedTab()
         }
         if (_tabs.value.any { it.id == id }) {
-            if (id != _activeTabId.value) captureActivePreview()
+            if (id != _activeTabId.value) {
+                activeTab?.webView?.let { microphonePermission?.cancel(it) }
+                captureActivePreview()
+            }
             _activeTabId.value = id
             persistSession()
         }
@@ -147,6 +155,7 @@ class TabStore(
         _activeTabId.value = null
         snapshot.forEach { destroyWebView(it.webView) }
         fileChooser?.close()
+        microphonePermission?.close()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -176,6 +185,7 @@ class TabStore(
 
     private fun destroyWebView(webView: WebView) {
         fileChooser?.cancel(webView)
+        microphonePermission?.cancel(webView)
         try {
             webView.removeJavascriptInterface(JS_BRIDGE_NAME)
         } catch (_: Exception) {

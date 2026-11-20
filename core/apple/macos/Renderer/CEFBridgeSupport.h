@@ -14,6 +14,7 @@
 #include "include/capi/cef_cookie_capi.h"
 #include "include/capi/cef_devtools_message_observer_capi.h"
 #include "include/capi/cef_request_context_capi.h"
+#include "include/capi/cef_permission_handler_capi.h"
 #include "include/capi/cef_frame_capi.h"
 #include "include/capi/cef_registration_capi.h"
 #include "include/internal/cef_time.h"
@@ -38,6 +39,10 @@ cef_client_t *CEFBridgeClientHandle(BridgeClient *client);
 void CEFBridgeNullifyClientOwner(BridgeClient *client);
 void CEFBridgeReleaseClient(BridgeClient *client);
 cef_jsdialog_handler_t *CEFBridgeCreateJSDialogHandler(CEFBridge *owner);
+int CEFBridgeRequestMicrophoneAccess(CEFBridge * _Nullable owner,
+                                    NSString *origin,
+                                    uint32_t permissions,
+                                    cef_media_access_callback_t *callback);
 void CEFBridgeNullifyJSDialogHandler(cef_jsdialog_handler_t *handler);
 
 /// Shared bounded CDP command transport; each result callback completes once.

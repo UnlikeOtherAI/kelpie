@@ -34,6 +34,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Kelpie uses the local network to receive browser automation commands from the CLI and to sync cookies with your other signed-in Kelpie devices.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kelpie uses the microphone for websites you allow and for voice prompts in local AI.</string>
 	<key>NSQuitAlwaysKeepsWindows</key>
 	<false/>
 	<key>LSMultipleInstancesProhibited</key>

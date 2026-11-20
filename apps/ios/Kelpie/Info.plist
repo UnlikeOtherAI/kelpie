@@ -45,7 +45,7 @@
 		<string>_appreveal._tcp</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Kelpie uses the microphone to capture voice prompts for local AI.</string>
+	<string>Kelpie uses the microphone for websites you allow and for voice prompts in local AI.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

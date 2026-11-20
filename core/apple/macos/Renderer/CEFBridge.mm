@@ -92,6 +92,7 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
 }
 
 - (void)retireEmbeddedBrowserWithCompletion:(void (^)(void))completion {
+    [self cancelPendingMicrophoneAccess];
     cef_browser_host_t *host = CEFBridgeCopyBrowserHost([self activeBrowser]);
     if (host == nullptr) {
         completion();
@@ -113,6 +114,7 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
 }
 
 - (void)setHidden:(BOOL)hidden {
+    if (hidden) [self cancelPendingMicrophoneAccess];
     cef_browser_host_t *host = CEFBridgeCopyBrowserHost([self activeBrowser]);
     if (host == nullptr) { return; }
     if (host->was_hidden != nullptr) {
@@ -121,7 +123,13 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
     host->base.release(&host->base);
 }
 
+- (void)cancelPendingMicrophoneAccess {
+    void (^cancel)(void) = _cancelMicrophonePrompt;
+    if (cancel) cancel();
+}
+
 - (void)dealloc {
+    [self cancelPendingMicrophoneAccess];
     // Resolve any still-pending evals so their continuations don't leak when the
     // bridge is torn down (e.g. renderer switch) before a result arrives.
     [self _failAllPendingEvalsWithError:[NSError
@@ -331,6 +339,7 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
 }
 
 - (void)cefBridgeWillCloseBrowser {
+    [self cancelPendingMicrophoneAccess];
     // The frame is going away, so any pending eval's console result can never
     // arrive. Resolve them now instead of leaving callers blocked until the
     // per-eval timeout fires.
