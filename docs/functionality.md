@@ -175,13 +175,18 @@ picker without adding files.
 
 ### Website microphone access
 
-Open a secure voice site and start the session from the page. HTTPS or a
-browser-trusted loopback origin is required. WebKit on macOS and iOS uses
-WebKit's site prompt. Chromium on macOS, Windows and Linux and WebView on
-Android prompt with the requesting site's origin for microphone-only
-requests. Choose **Allow** or **Deny**. macOS and Android also require
-Kelpie's system microphone permission. Windows and Linux respect system
-microphone and device availability. Closing the prompt denies the request.
+Open a secure voice site and start a microphone-only session from the page.
+The site needs HTTPS or a browser-trusted loopback origin.
+
+- macOS shows the Apple permission prompt on first use in both renderers.
+  Apple grants permission to Kelpie, and Kelpie remembers the site that requested
+  it. For another site, choose **More browser controls**, then
+  **Allow microphone on this site**, and start the session. To withdraw access
+  for the current site, choose **Remove microphone permission**.
+- iOS uses WebKit's site prompt.
+- Windows, Linux, and Android show the requesting site's origin so you can
+  choose **Allow** or **Deny**. Android also requires the system microphone
+  permission.
 
 Some voice sites require a browser user gesture to start Web Audio before
 asking for the microphone. Start the session with a click or tap in the app

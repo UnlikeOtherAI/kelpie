@@ -311,7 +311,9 @@ static int OnRequestMediaAccess(cef_permission_handler_t *self, cef_browser_t *b
                                 const cef_string_t *origin, uint32_t permissions,
                                 cef_media_access_callback_t *callback) {
     auto *handler = StructFromBase<PermissionHandler>(&self->base, offsetof(PermissionHandler, handler));
-    const int handled = CEFBridgeRequestMicrophoneAccess(handler->owner, StringFromCEFString(origin), permissions, callback);
+    const BOOL mainFrame = frame && frame->is_main(frame);
+    const int handled = CEFBridgeRequestMicrophoneAccess(
+        handler->owner, mainFrame ? StringFromCEFString(origin) : nil, permissions, callback);
     // The C API transfers one reference to each ref-counted callback argument.
     // The prompt holds its own reference only while a decision is pending.
     if (browser) browser->base.release(&browser->base);

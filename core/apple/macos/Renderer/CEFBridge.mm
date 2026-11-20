@@ -124,7 +124,7 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
 }
 
 - (void)cancelPendingMicrophoneAccess {
-    void (^cancel)(void) = _cancelMicrophonePrompt;
+    void (^cancel)(void) = _cancelMicrophoneRequest;
     if (cancel) cancel();
 }
 

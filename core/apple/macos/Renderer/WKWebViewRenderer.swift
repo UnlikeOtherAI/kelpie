@@ -264,6 +264,33 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         onScriptMessage?(message.name, body)
     }
 
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        guard type == .microphone else {
+            decisionHandler(.prompt)
+            return
+        }
+        guard frame.isMainFrame, webView.window?.isKeyWindow == true,
+              let site = MacMicrophonePermission.origin(scheme: origin.protocol, host: origin.host, port: origin.port)
+        else { decisionHandler(.deny); return }
+
+        let navigationStart = documentNavigationStart
+        MacMicrophonePermission.request(
+            site,
+            stillCurrent: { [weak self, weak webView] in
+                guard let self, let webView, webView.window?.isVisible == true, !webView.isHiddenOrHasHiddenAncestor,
+                      self.documentNavigationStart == navigationStart else { return false }
+                return MacMicrophonePermission.origin(for: webView.url) == site
+            },
+            completion: { decisionHandler($0 ? .grant : .deny) }
+        )
+    }
+
     // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

@@ -141,6 +141,17 @@ struct URLBarView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Browser controls").font(.headline)
+                if let site = MacMicrophonePermission.origin(for: pageURL) {
+                    let allowed = MacMicrophonePermission.isAllowed(site)
+                    popupAction(
+                        allowed ? "Remove microphone permission" : "Allow microphone on this site",
+                        icon: "mic",
+                        id: "microphone"
+                    ) {
+                        MacMicrophonePermission.setAllowed(!allowed, for: site)
+                        if allowed { onReload() }
+                    }
+                }
                 popupAction("Add bookmark", icon: "star", id: "add-bookmark", enabled: pageURL != nil && !isBookmarked, action: onAddBookmark)
                 popupAction("Bookmarks", icon: "bookmark", id: "bookmarks", action: onBookmarks)
                 popupAction("Network inspector", icon: "antenna.radiowaves.left.and.right", id: "network", action: onNetworkInspector)
