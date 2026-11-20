@@ -39,10 +39,16 @@ internal class WebMicrophonePermission(
         request: PermissionRequest,
     ) {
         val origin = request.origin
-        val secure = !origin.host.isNullOrEmpty() &&
-            (origin.scheme == "https" || (origin.scheme == "http" && origin.host?.let(::isLoopbackHost) == true))
-        if (!secure || request.resources.toList() != listOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE) ||
-            pending != null || systemPromptInFlight || !isActive(view) || activity.isFinishing || activity.isDestroyed
+        val secure =
+            !origin.host.isNullOrEmpty() &&
+                (origin.scheme == "https" || (origin.scheme == "http" && origin.host?.let(::isLoopbackHost) == true))
+        if (!secure ||
+            request.resources.toList() != listOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE) ||
+            pending != null ||
+            systemPromptInFlight ||
+            !isActive(view) ||
+            activity.isFinishing ||
+            activity.isDestroyed
         ) {
             request.deny()
             return
@@ -51,7 +57,8 @@ internal class WebMicrophonePermission(
         val next = Pending(view, request)
         pending = next
         next.dialog =
-            AlertDialog.Builder(activity)
+            AlertDialog
+                .Builder(activity)
                 .setTitle("Allow microphone access?")
                 .setMessage("$origin wants to use your microphone.")
                 .setNegativeButton("Deny") { _, _ -> complete(next, false) }
