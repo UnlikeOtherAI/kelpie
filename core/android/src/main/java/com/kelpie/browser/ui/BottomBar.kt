@@ -77,7 +77,7 @@ fun BottomBar(
     show3DInspector: Boolean,
     is3DInspectorActive: Boolean,
     onSnapshot3D: () -> Unit,
-    moreContent: @Composable ColumnScope.(() -> Unit) -> Unit,
+    moreContent: @Composable ColumnScope.(dismiss: () -> Unit, onSnapshot3D: (() -> Unit)?) -> Unit,
 ) {
     var editing by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
@@ -192,20 +192,8 @@ fun BottomBar(
                                 } else {
                                     if (!toolsInToolbar) {
                                         AccountMenuEntry(onDismiss = { more = false }, onShowAccount = { accountDetails = true })
-                                        if (show3DInspector) {
-                                            Box(Modifier.padding(horizontal = 12.dp)) {
-                                                Inspector3DButton(
-                                                    active = is3DInspectorActive,
-                                                    onToggle = {
-                                                        more = false
-                                                        onSnapshot3D()
-                                                    },
-                                                    testTag = "browser.snapshot-3d.menu",
-                                                )
-                                            }
-                                        }
                                     }
-                                    moreContent { more = false }
+                                    moreContent({ more = false }, onSnapshot3D.takeIf { !toolsInToolbar && show3DInspector })
                                 }
                             }
                         }
@@ -221,7 +209,6 @@ fun BottomBar(
 private fun Inspector3DButton(
     active: Boolean,
     onToggle: () -> Unit,
-    testTag: String = "browser.snapshot-3d.button",
 ) {
     val colors = MaterialTheme.colorScheme
     IconToggleButton(
@@ -229,7 +216,7 @@ private fun Inspector3DButton(
         onCheckedChange = { onToggle() },
         modifier =
             Modifier
-                .testTag(testTag)
+                .testTag("browser.snapshot-3d.button")
                 .semantics { contentDescription = "3D inspector" }
                 .size(44.dp)
                 .background(if (active) colors.primaryContainer else colors.surfaceVariant.copy(alpha = 0.6f), CircleShape),

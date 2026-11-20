@@ -27,7 +27,7 @@ struct BottomBarView<MoreContent: View>: View {
     let onShowTabs: () -> Void
     @Binding var isCollapsed: Bool
     @Binding var isEditing: Bool
-    @ViewBuilder let moreContent: () -> MoreContent
+    @ViewBuilder let moreContent: ((() -> Void)?) -> MoreContent
 
     @State private var urlText = ""
     @ObservedObject private var account = UOAAccount.shared
@@ -133,16 +133,6 @@ struct BottomBarView<MoreContent: View>: View {
                 Menu {
                     if !toolsInToolbar {
                         AccountMenuItems()
-                        if show3DInspector {
-                            ControlGroup {
-                                Button(action: onSnapshot3D) {
-                                    Image(systemName: is3DInspectorActive ? "cube.fill" : "cube.transparent")
-                                }
-                                .accessibilityLabel("3D inspector")
-                                .accessibilityIdentifier("browser.snapshot-3d.menu")
-                                .accessibilityValue(is3DInspectorActive ? "On" : "Off")
-                            }
-                        }
                         Divider()
                     }
                     Button("Tabs (\(tabStore.tabs.count))", systemImage: "square.on.square", action: onShowTabs)
@@ -152,7 +142,7 @@ struct BottomBarView<MoreContent: View>: View {
                     Button("Bookmarks", systemImage: "book", action: onBookmarks)
                     if let url = URL(string: browserState.currentURL) { ShareLink(item: url) }
                     Divider()
-                    moreContent()
+                    moreContent(!toolsInToolbar && show3DInspector ? onSnapshot3D : nil)
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 22, weight: .semibold))
