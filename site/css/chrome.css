@@ -205,7 +205,63 @@
 
 .footer-legal nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
+}
+
+.analytics-settings {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.analytics-settings:hover {
+  color: var(--k-rose);
+}
+
+.analytics-panel {
+  position: fixed;
+  z-index: 90;
+  inset: auto 16px 16px auto;
+  width: min(380px, calc(100% - 32px));
+  padding: 18px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--k-radius);
+  background: #fff;
+  color: var(--k-text);
+  box-shadow: 0 6px 28px #000c3026;
+  font-size: 14px;
+}
+
+.analytics-panel h2 {
+  font-size: 17px;
+}
+
+.analytics-panel p {
+  margin-top: 4px;
+}
+
+.analytics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.analytics-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--k-ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--k-ink);
+  cursor: pointer;
+}
+
+.analytics-actions button:hover {
+  background: var(--k-blush);
 }
 
 @media (max-width: 960px) {

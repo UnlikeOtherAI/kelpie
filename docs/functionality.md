@@ -5,6 +5,12 @@ The embeddable browser extraction keeps the complete native UI, tabs and behavio
 
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.
 
+## Website analytics
+
+Visitors to kelpie.rocks can allow or decline Google Analytics and change
+their choice through **Analytics settings** in the site footer. See
+[Website analytics](website.md#website-analytics).
+
 ## App icon
 
 The Orbit icon combines Kelpie's multicolour K with a globe and a cyan orbit. It appears across the standalone apps and their welcome screens. The [icon assets](brief.md#app-icon) include the Apple and Google Play listing formats.

@@ -48,6 +48,22 @@ Download buttons link to the GitHub releases page. Each one names the file it
 wants in a `data-asset` pattern, and `site/js/site.js` points it at the newest
 published release asset that matches. A new release needs no website change.
 
+## Website analytics
+
+Only the production origin `https://kelpie.rocks` loads the analytics module.
+The GA4 web stream is configured in `site/js/analytics.js`. The Google tag
+loads after a visitor allows analytics. The footer's **Analytics settings**
+control lets visitors change a saved choice on either page.
+
+Run the browser checks with `node --test tests/website/analytics.test.mjs`
+after installing workspace dependencies and the Playwright Chromium browser.
+Set `KELPIE_TEST_ENGINE=webkit` to use Playwright WebKit or
+`KELPIE_TEST_EXECUTABLE` to select an installed browser executable.
+
+To verify a deploy, open the site in a fresh browser profile and confirm there
+are no Google Analytics requests before a choice or after declining. Allow
+analytics and confirm a `page_view` appears in the property's Realtime report.
+
 ## Screenshots
 
 `site/assets/screens/` holds captures of the real apps, resized to WebP. The
