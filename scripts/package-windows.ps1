@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [string]$BuildDir = (Join-Path $PSScriptRoot "..\.cache\windows-release3"),
-  [string]$CefRoot = (Join-Path $PSScriptRoot "..\.cache\cef-windows-build\cef_binary_156.0.31+ge603d97+chromium-156.0.8078.100_windows64_minimal"),
+  [string]$CefRoot = (Join-Path $PSScriptRoot "..\.cache\cef-windows-build\cef_binary_158.0.3+g8c29be2+chromium-158.0.8127.18_windows64_minimal"),
   [string]$OutputDir = (Join-Path $PSScriptRoot "..\dist\release\windows"),
   [string]$Version,
   [string]$DumpbinPath
@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'runtime-windows.ps1')
 
-$cefVersion = "156.0.31+ge603d97+chromium-156.0.8078.100"
+$cefVersion = "158.0.3+g8c29be2+chromium-158.0.8127.18"
 function Require-File([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Required file is missing: $Path" }
 }
