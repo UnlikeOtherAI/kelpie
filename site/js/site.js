@@ -84,3 +84,7 @@ setUpNavigation();
 setUpCopyButtons();
 activateStoreLinks(window.KELPIE_LINKS || {});
 linkLatestDownloads();
+
+if (location.origin === "https://kelpie.rocks") {
+  import("./analytics.js");
+}
