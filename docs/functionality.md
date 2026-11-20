@@ -194,7 +194,7 @@ when a synthetic browser-control action leaves the audio context suspended.
 
 Apple apps expose the shared versioned `POST /v1/browser-control` and authenticated `POST /mcp` surface. Common snapshots, references, append typing and navigation share one native coordinator; product tools are discovered separately. See [Apple binding](api/native-browser-gateway.md#apple-bindings).
 
-Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
+Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior for website compatibility. Google can decline sign-in from embedded browsers. If it does, open the original website in Safari or Chrome and start sign-in there. That session stays in the external browser. On Mac, a sign-in that checks for a nearby device can trigger the macOS Bluetooth permission prompt.
 
 While the active page loads, a three-unit blue stroke starts at the left edge of
 the address field and follows its upper and lower borders to the right, with

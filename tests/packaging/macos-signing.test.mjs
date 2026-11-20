@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { signingArguments, signingPlan, validateSigner } from '../../scripts/sign-macos-app.mjs';
+import { signingArguments, signingPlan, validateBluetoothUsage, validateSigner } from '../../scripts/sign-macos-app.mjs';
 
 const identity = 'Developer ID Application: UnlikeOtherAI s.r.o. (23B7GTLBN7)';
 const app = resolve('artifacts/Kelpie.app');
@@ -30,4 +30,11 @@ test('keeps Chromium helper exceptions out of the main app and signs with a time
   assert(main.includes('runtime'));
   assert(main.includes('--timestamp'));
   assert(!main.includes('--deep'));
+});
+
+test('requires a nonempty Bluetooth usage description in the bundle before signing', () => {
+  for (const reason of [undefined, true, '   ']) {
+    assert.throws(() => validateBluetoothUsage({ NSBluetoothAlwaysUsageDescription: reason }), /Bluetooth/);
+  }
+  assert.doesNotThrow(() => validateBluetoothUsage({ NSBluetoothAlwaysUsageDescription: 'Find nearby devices.' }));
 });
