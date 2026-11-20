@@ -73,9 +73,12 @@ test("the tag loads on acceptance and stops after withdrawal", async t => {
   const otherTab = await page.context().newPage();
   await otherTab.goto(origin);
   await otherTab.waitForFunction(() => Boolean(window.gtag));
+  const domainCookies = ["_ga", "_ga_Q4485DL97E"].map(name => ({
+    name, value: "test", domain: ".kelpie.rocks", path: "/",
+  }));
   await page.context().addCookies([
-    { name: "_ga", value: "test", url: origin },
-    { name: "_ga_Q4485DL97E", value: "test", url: origin },
+    ...domainCookies,
+    ...domainCookies.map(({ name }) => ({ name, value: "test", url: origin })),
   ]);
   await page.getByRole("button", { name: "Analytics settings" }).click();
   await page.getByRole("button", { name: "Decline analytics" }).click();
@@ -83,8 +86,10 @@ test("the tag loads on acceptance and stops after withdrawal", async t => {
   assert.deepEqual(await page.context().cookies(origin), []);
   await otherTab.waitForFunction(() => window["ga-disable-G-Q4485DL97E"] === true);
 
+  await page.context().addCookies(domainCookies);
   await page.reload();
   await page.getByRole("button", { name: "Analytics settings" }).waitFor();
+  assert.deepEqual(await page.context().cookies(origin), []);
   assert.deepEqual(requests, [tagUrl, tagUrl]);
 });
 
