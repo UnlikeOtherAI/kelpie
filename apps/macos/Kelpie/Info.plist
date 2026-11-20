@@ -13,9 +13,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.20</string>
+	<string>0.2.21</string>
 	<key>CFBundleVersion</key>
-	<string>48</string>
+	<string>49</string>
 	<key>CFBundleURLTypes</key>
     <array><dict><key>CFBundleURLSchemes</key><array><string>com.unlikeotherai.kelpie</string></array>
     <key>CFBundleURLName</key><string>UOA sign-in</string></dict></array>
@@ -26,6 +26,8 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Kelpie uses Bluetooth when a website asks to connect to a nearby device, such as a phone used for sign-in.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_kelpie._tcp</string>

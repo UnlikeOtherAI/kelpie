@@ -14,6 +14,13 @@ export function validateSigner(identity, team) {
   }
 }
 
+export function validateBluetoothUsage(plist) {
+  const reason = plist.NSBluetoothAlwaysUsageDescription;
+  if (typeof reason !== 'string' || !reason.trim()) {
+    throw new Error('The Mac app needs a Bluetooth usage description for nearby sign-in devices.');
+  }
+}
+
 export function signingPlan(app, entries) {
   const root = resolve(app);
   if (!root.endsWith('.app')) throw new Error('The signing target must be an app bundle.');
@@ -70,6 +77,8 @@ async function main() {
   const team = options.get('--team');
   validateSigner(identity, team);
   if (process.platform !== 'darwin' || !app) throw new Error('Run on macOS with --app, --identity and --team.');
+  const { stdout } = await run('plutil', ['-convert', 'json', '-o', '-', join(app, 'Contents', 'Info.plist')]);
+  validateBluetoothUsage(JSON.parse(stdout));
   const targets = signingPlan(app, await discover(resolve(app)));
   const helperEntitlements = join(repository, 'core/apple/Helpers/KelpieHelper.entitlements');
   const appEntitlements = join(repository, 'apps/macos/Kelpie/Kelpie.entitlements');
