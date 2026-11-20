@@ -5,6 +5,7 @@
 #include "browser_chrome.h"
 #include "bookmarks_view.h"
 #include "gtk_browser_view.h"
+#include "gtk_file_chooser.h"
 #include "history_view.h"
 #include "linux_app.h"
 #include "network_inspector.h"
@@ -25,6 +26,10 @@ int GUIShell::Run() {
   gtk_disable_setlocale(); gtk_init(nullptr,nullptr); ui::InstallTheme();
   auto* window=GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
   gtk_window_set_title(window,"Kelpie"); gtk_window_set_default_size(window,app_.config().width,app_.config().height);
+  GtkFileChooserPanel file_chooser(window);
+  app_.SetFileChooser([&file_chooser](auto request, auto complete) {
+    file_chooser.Open(request, std::move(complete));
+  });
   WindowGeometry geometry(window,app_.config().profile_dir);
   StandaloneUpdates updates(app_,window);
   auto* header=gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
@@ -56,7 +61,7 @@ int GUIShell::Run() {
     if(action==4) { settings.Refresh(); settings.Show(window); }
   };
   ComputerApprovalView approvals(app_.ComputerApprovals(),window);
-  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; StandaloneUpdates& updates; ComputerApprovalView& approvals; unsigned tick=0; } context{app_,window,url,browser,chrome,toast,updates,approvals};
+  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; StandaloneUpdates& updates; ComputerApprovalView& approvals; GtkFileChooserPanel& file_chooser; unsigned tick=0; } context{app_,window,url,browser,chrome,toast,updates,approvals,file_chooser};
   g_signal_connect(window,"delete-event",G_CALLBACK(+[](GtkWidget*,GdkEvent*,gpointer raw)->gboolean {
     static_cast<LinuxApp*>(raw)->RequestShutdown(); return TRUE; // Keep renderer and pump alive until drained.
   }),&app_);
@@ -77,7 +82,11 @@ int GUIShell::Run() {
   }),&app_);
   const auto timer=g_timeout_add(16,+[](gpointer raw)->gboolean {
     auto& c=*static_cast<Context*>(raw); c.app.PumpBrowser(); c.approvals.Poll();
-    if(!c.app.IsRunning()) { if(c.app.FinishShutdown())gtk_main_quit(); return G_SOURCE_CONTINUE; }
+    if(!c.app.IsRunning()) {
+      c.file_chooser.Cancel();
+      if(c.app.FinishShutdown())gtk_main_quit();
+      return G_SOURCE_CONTINUE;
+    }
     c.updates.Tick();
     if(c.app.WantsFullscreen()!=c.app.IsFullscreen()) { if(c.app.WantsFullscreen())gtk_window_fullscreen(c.window); else gtk_window_unfullscreen(c.window); }
     auto [width,height]=c.app.TakeResizeRequest();
@@ -99,6 +108,7 @@ int GUIShell::Run() {
     return G_SOURCE_CONTINUE;
   },&context);
   gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(app_.Tabs()); gtk_main();
+  app_.SetFileChooser({});
   g_source_remove(timer); geometry.Save(); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
 #else
   return 1;

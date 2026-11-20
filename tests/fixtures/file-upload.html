@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kelpie file upload fixture</title>
+<style>
+  body { margin: 32px; font: 18px system-ui; }
+  button { font: inherit; padding: 8px 16px; }
+</style>
+<h1>File upload</h1>
+<button id="upload">Upload</button>
+<input id="single" type="file" accept=".aab,.txt" hidden>
+<p><label>Multiple files <input id="multiple" type="file" multiple></label></p>
+<p id="result" role="status">No files received</p>
+<script>
+  const single = document.getElementById('single');
+  const multiple = document.getElementById('multiple');
+  const result = document.getElementById('result');
+
+  document.getElementById('upload').addEventListener('click', () => single.click());
+  for (const input of [single, multiple]) {
+    input.addEventListener('change', async () => {
+      const files = await Promise.all(Array.from(input.files, async file =>
+        `${file.name}: ${(await file.text()).trim()}`
+      ));
+      result.textContent = files.join(', ') || 'No files received';
+    });
+  }
+</script>
+</html>

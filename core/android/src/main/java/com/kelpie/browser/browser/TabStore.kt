@@ -3,6 +3,7 @@ package com.kelpie.browser.browser
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.WebView
+import androidx.activity.ComponentActivity
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.WebSocketHandler
 import com.kelpie.browser.kelpieActivity
@@ -16,6 +17,7 @@ class TabStore(
     private val browserState: BrowserState,
 ) {
     private val previewSampler = context.kelpieActivity()?.window?.let(::ChromeSampler)
+    internal val fileChooser = (context.kelpieActivity() as? ComponentActivity)?.let(::WebFileChooser)
     private val previewTabs = mutableListOf<String>()
 
     fun captureActivePreview() {
@@ -144,6 +146,7 @@ class TabStore(
         _tabs.value = emptyList()
         _activeTabId.value = null
         snapshot.forEach { destroyWebView(it.webView) }
+        fileChooser?.close()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -172,6 +175,7 @@ class TabStore(
     }
 
     private fun destroyWebView(webView: WebView) {
+        fileChooser?.cancel(webView)
         try {
             webView.removeJavascriptInterface(JS_BRIDGE_NAME)
         } catch (_: Exception) {

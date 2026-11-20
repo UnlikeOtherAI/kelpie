@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -63,6 +64,7 @@ class LinuxApp {
   void AccountRefresh();
   std::pair<int,int> TakeResizeRequest();
   bool AttachBrowserHost(std::uintptr_t parent_window, int width, int height);
+  void SetFileChooser(DesktopEngine::FileChooser chooser) { file_chooser_ = std::move(chooser); }
   void ResizeBrowserHost(int width, int height);
   bool HasNativeBrowser() const;
   bool FocusBrowser(bool focused);
@@ -116,6 +118,7 @@ class LinuxApp {
 
  private:
   json HandleBrowserGateway(const json& request, bool mcp);
+  DesktopEngine::FileChooser file_chooser_;
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

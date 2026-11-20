@@ -295,6 +295,40 @@ void DesktopCefClient::OnResetDialogState(CefRefPtr<CefBrowser> browser) {
   if (auto* tab = owner_->FindTab(browser)) tab->dialogs.Reset(browser);
 }
 
+CefRefPtr<CefDialogHandler> DesktopCefClient::GetDialogHandler() {
+  if (owner_->config.file_chooser) return this;
+  return nullptr;
+}
+
+bool DesktopCefClient::OnFileDialog(CefRefPtr<CefBrowser>,
+                                    FileDialogMode mode,
+                                    const CefString& title,
+                                    const CefString&,
+                                    const std::vector<CefString>& accept_filters,
+#if CEF_VERSION_MAJOR >= 130
+                                    const std::vector<CefString>&,
+                                    const std::vector<CefString>&,
+#endif
+                                    CefRefPtr<CefFileDialogCallback> callback) {
+  if (!owner_->config.file_chooser || mode == FILE_DIALOG_SAVE) return false;
+
+  DesktopEngine::FileChooserRequest request;
+  request.title = title.ToString();
+  request.multiple = mode == FILE_DIALOG_OPEN_MULTIPLE;
+  request.directory = mode == FILE_DIALOG_OPEN_FOLDER;
+  for (const auto& filter : accept_filters) {
+    request.accept_types.push_back(filter.ToString());
+  }
+  owner_->config.file_chooser(std::move(request), [callback](std::vector<std::string> paths) {
+    if (paths.empty()) {
+      callback->Cancel();
+      return;
+    }
+    callback->Continue(std::vector<CefString>(paths.begin(), paths.end()));
+  });
+  return true;
+}
+
 void DesktopCefClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect& rect) {
   rect = CefRect(0, 0, owner_->viewport.width, owner_->viewport.height);
 }

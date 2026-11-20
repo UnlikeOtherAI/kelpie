@@ -1,6 +1,8 @@
 package com.kelpie.browser.browser
 
 import android.graphics.Bitmap
+import android.net.Uri
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -47,6 +49,7 @@ private fun tabWebViewClient(
             url: String,
             favicon: Bitmap?,
         ) {
+            tabStore.fileChooser?.cancel(view)
             val previousVersion = tab.documentVersion
             tab.documentVersion =
                 java.util.UUID
@@ -163,6 +166,12 @@ private fun tabWebChromeClient(
     isActive: () -> Boolean,
 ): WebChromeClient =
     object : WebChromeClient() {
+        override fun onShowFileChooser(
+            webView: WebView,
+            filePathCallback: ValueCallback<Array<Uri>>,
+            fileChooserParams: FileChooserParams,
+        ): Boolean = isActive() && tabStore.fileChooser?.show(webView, filePathCallback, fileChooserParams) == true
+
         override fun onReceivedTitle(
             view: WebView,
             title: String?,
