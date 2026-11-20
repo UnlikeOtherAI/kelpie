@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(kelpie_windows VERSION 0.2.13 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.2.14 LANGUAGES CXX RC)
 include(CTest)
 
 set(KELPIE_WINDOWS_VERSION "${PROJECT_VERSION}")
