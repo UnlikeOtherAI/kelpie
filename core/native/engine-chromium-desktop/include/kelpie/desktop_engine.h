@@ -82,6 +82,7 @@ class DesktopEngine final : public DesktopBrowserControl {
     std::string resources_dir_path;
     std::string locales_dir_path;
     bool external_message_pump = true;
+    bool native_popups = true;
     std::function<void(void*)> configure_window_info;
     std::function<void(void*, const std::string&)> configure_tab_window_info;
     // Optional native upload picker for shells with no CEF-owned window.

@@ -14,6 +14,7 @@ struct WebViewContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.websiteDataStore = WebViewDefaults.sharedWebsiteDataStore
 
         // Inject bridge scripts — network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)
@@ -168,11 +169,7 @@ struct WebViewContainer: UIViewRepresentable {
         // MARK: - WKUIDelegate
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            // Open target=_blank links in same view
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
-            }
-            return nil
+            WKPopupViewController.present(from: webView, configuration: configuration)
         }
 
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {

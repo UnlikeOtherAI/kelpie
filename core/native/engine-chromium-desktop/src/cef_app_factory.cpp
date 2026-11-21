@@ -25,11 +25,13 @@ class DesktopCefApp final : public CefApp, public CefBrowserProcessHandler {
     RegisterKelpieCustomSchemes(registrar);
   }
 
-  void OnBeforeCommandLineProcessing(const CefString&,
+  void OnBeforeCommandLineProcessing(const CefString& process_type,
                                      CefRefPtr<CefCommandLine> command_line) override {
     command_line->AppendSwitch("use-mock-keychain");
     command_line->AppendSwitch("disable-gpu");
     command_line->AppendSwitch("disable-gpu-compositing");
+    // A provider may request its window after an asynchronous iframe handoff.
+    if (process_type.empty()) command_line->AppendSwitch("disable-popup-blocking");
   }
 
   void OnScheduleMessagePumpWork(int64_t delay_ms) override {

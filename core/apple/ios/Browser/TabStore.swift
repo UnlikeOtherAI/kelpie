@@ -124,6 +124,7 @@ final class TabStore: ObservableObject {
     ) -> BrowserTab {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.websiteDataStore = dataStore ?? WebViewDefaults.sharedWebsiteDataStore
 
         if let handlerContext {
@@ -172,6 +173,7 @@ final class TabStore: ObservableObject {
     }
 
     private func unbind(_ tab: BrowserTab) {
+        WKPopupViewController.dismiss(openedBy: tab.webView)
         previewTabs.removeAll { $0 == tab.id }
         tabSinks.removeValue(forKey: tab.id)
     }

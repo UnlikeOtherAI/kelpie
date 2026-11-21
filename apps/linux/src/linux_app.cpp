@@ -134,6 +134,7 @@ kelpie::DesktopEngine::Config BuildDesktopEngineConfig(const AppConfig& config,
   engine_config.resources_dir_path = executable_dir.string();
   engine_config.locales_dir_path = (executable_dir / "locales").string();
   engine_config.external_message_pump = true;
+  engine_config.native_popups = !config.headless;
   return engine_config;
 }
 #endif
