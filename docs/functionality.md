@@ -173,6 +173,10 @@ macOS (Safari/WebKit and Chrome/Chromium), Windows, Linux, iOS, and Android.
 Choose one or more files as allowed by the page, or cancel to dismiss the
 picker without adding files.
 
+### Website pop-ups on macOS
+
+With WebKit selected, sites can open pop-ups in separate macOS windows, including sign-in buttons that hand off to an embedded provider. The original tab stays open, and the pop-up shares its sign-in session and storage partition. The window title shows the pop-up's current site. The site can send its result back to the original tab and close the window. You can also dismiss the window with its close button.
+
 ### Website microphone access
 
 Open a secure voice site and start a microphone-only session from the page.
