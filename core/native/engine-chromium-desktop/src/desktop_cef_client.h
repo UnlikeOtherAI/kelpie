@@ -30,6 +30,7 @@ class DesktopCefClient final : public CefClient,
                                public CefPermissionHandler {
  public:
   explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
+  DesktopCefClient(DesktopEngine::Impl* owner, int opener) : owner_(owner), opener_(opener) {}
 
   CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
@@ -121,6 +122,7 @@ class DesktopCefClient final : public CefClient,
 
  private:
   DesktopEngine::Impl* owner_;
+  int opener_ = 0;
   bool microphone_prompt_pending_ = false;
 
   IMPLEMENT_REFCOUNTING(DesktopCefClient);

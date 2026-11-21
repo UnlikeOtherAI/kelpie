@@ -173,6 +173,10 @@ macOS (Safari/WebKit and Chrome/Chromium), Windows, Linux, iOS, and Android.
 Choose one or more files as allowed by the page, or cancel to dismiss the
 picker without adding files.
 
+### Website pop-ups
+
+Sites can open a separate window on macOS, Windows and Linux, or a dismissible sheet on iOS and Android. This includes sign-in buttons that hand off to an embedded provider. The original tab stays open, and the pop-up inherits its storage profile and existing sign-in session. The site can return its result to the original tab and close the pop-up, and you can also dismiss it with the close control. Linux requires the graphical app for native pop-up windows.
+
 ### Website microphone access
 
 Open a secure voice site and start a microphone-only session from the page.

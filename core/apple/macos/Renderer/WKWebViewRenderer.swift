@@ -40,11 +40,11 @@ private final class WKRendererCompletion<T>: @unchecked Sendable {
 
 /// WKWebView-based renderer conforming to RendererEngine (Safari/WebKit).
 @MainActor
-final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
+final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler, WKNavigationDelegate {
     let engineName = "webkit"
     nonisolated private static let operationTimeoutSeconds: TimeInterval = 8
 
-    private let webView: WKWebView
+    let webView: WKWebView
     private var progressObservation: NSKeyValueObservation?
     private var titleObservation: NSKeyValueObservation?
     private var urlObservation: NSKeyValueObservation?
@@ -83,6 +83,8 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
+    var onOpenPopup: ((WKWebViewConfiguration, WKWindowFeatures) -> WKWebView?)?
+    var onClosePopup: (() -> Void)?
     /// The owning tab, reported on downloads this page starts.
     var downloadTabId: String?
     var downloadStore: DownloadStore = .shared
@@ -92,17 +94,26 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     ///   here so partition failures surface in the HTTP response instead of
     ///   inside a renderer constructor. Every cookie/storage path already reads
     ///   `webView.configuration.websiteDataStore`, so it follows automatically.
-    init(dataStore: WKWebsiteDataStore? = nil) {
+    convenience init(dataStore: WKWebsiteDataStore? = nil) {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = dataStore ?? KelpieWebsiteData.store
+        // Sign-in widgets can relay a click from an embedded frame before
+        // opening the window. That callback has no WebKit user gesture.
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        self.init(configuration: config)
+    }
 
-        let ucc = config.userContentController
+    init(configuration: WKWebViewConfiguration) {
+        // A popup configuration inherits the opener's controller. Give each
+        // renderer its own handlers so closing it cannot unregister the opener's.
+        let ucc = WKUserContentController()
+        configuration.userContentController = ucc
         // Inject network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)
         ucc.addUserScript(Self.networkBridgeScript)
         ucc.addUserScript(Self.webSocketBridgeScript)
         ucc.addUserScript(Self.consoleBridgeScript)
 
-        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800), configuration: config)
+        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800), configuration: configuration)
 
         super.init()
 
@@ -383,88 +394,6 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     }
 
     nonisolated static let frameLoadInterruptedByPolicyChange = 102
-
-    // MARK: - WKUIDelegate
-
-    func webView(
-        _ webView: WKWebView,
-        runOpenPanelWith parameters: WKOpenPanelParameters,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable ([URL]?) -> Void
-    ) {
-        guard let window = webView.window, window.attachedSheet == nil,
-              !webView.isHiddenOrHasHiddenAncestor else {
-            completionHandler(nil)
-            return
-        }
-
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = parameters.allowsDirectories
-        panel.canChooseFiles = !parameters.allowsDirectories
-        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
-        panel.beginSheetModal(for: window) { response in
-            completionHandler(response == .OK ? panel.urls : nil)
-        }
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
-        for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
-    ) -> WKWebView? {
-        if navigationAction.targetFrame == nil {
-            webView.load(navigationAction.request)
-        }
-        return nil
-    }
-
-    // MARK: - JavaScript dialogs
-
-    // Instead of presenting a native NSAlert (which would block the WebView and
-    // require a human click), each panel is captured into THIS renderer's
-    // DialogState. The WebKit completion handler is suspended inside a
-    // PendingDialog until either an auto-handler resolves it immediately or
-    // `handle-dialog` is called over HTTP/MCP for this tab. Per-renderer state
-    // keeps multi-window dialogs isolated. This mirrors the iOS
-    // WebViewCoordinator semantics exactly.
-
-    func webView(
-        _ webView: WKWebView,
-        runJavaScriptAlertPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping () -> Void
-    ) {
-        let dialog = DialogState.PendingDialog(type: .alert, message: message, defaultText: nil) { _ in
-            completionHandler()
-        }
-        dialogState.enqueue(dialog)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        runJavaScriptConfirmPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping (Bool) -> Void
-    ) {
-        let dialog = DialogState.PendingDialog(type: .confirm, message: message, defaultText: nil) { result in
-            completionHandler(result != nil)
-        }
-        dialogState.enqueue(dialog)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        runJavaScriptTextInputPanelWithPrompt prompt: String,
-        defaultText: String?,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping (String?) -> Void
-    ) {
-        let dialog = DialogState.PendingDialog(type: .prompt, message: prompt, defaultText: defaultText) { result in
-            completionHandler(result)
-        }
-        dialogState.enqueue(dialog)
-    }
 
     // MARK: - Bridge Scripts (same JS as iOS)
 

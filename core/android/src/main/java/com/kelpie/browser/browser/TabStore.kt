@@ -17,6 +17,7 @@ class TabStore(
     private val browserState: BrowserState,
 ) {
     private val previewSampler = context.kelpieActivity()?.window?.let(::ChromeSampler)
+    internal val popupPresenter = context.kelpieActivity()?.let(::WebPopupPresenter)
     internal val fileChooser = (context.kelpieActivity() as? ComponentActivity)?.let(::WebFileChooser)
     internal val microphonePermission =
         (context.kelpieActivity() as? ComponentActivity)?.let { activity ->
@@ -172,7 +173,8 @@ class TabStore(
                 settings.domStorageEnabled = true
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
-                settings.setSupportMultipleWindows(false)
+                settings.setSupportMultipleWindows(true)
+                settings.javaScriptCanOpenWindowsAutomatically = true
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.userAgentString = BROWSER_USER_AGENT
                 WebSocketHandler.installBridge(this)
@@ -184,6 +186,7 @@ class TabStore(
     }
 
     private fun destroyWebView(webView: WebView) {
+        popupPresenter?.closeFor(webView)
         fileChooser?.cancel(webView)
         microphonePermission?.cancel(webView)
         try {

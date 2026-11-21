@@ -34,7 +34,7 @@ BOOL CEFBridgeIsCEFInitialized(void);
 /// Tests only: the cookie bridge uses `manager` instead of CEF's global manager; NULL restores it.
 void CEFBridgeUseCookieManagerForTesting(cef_cookie_manager_t *_Nullable manager);
 
-BridgeClient *CEFBridgeCreateClient(CEFBridge *owner);
+BridgeClient *CEFBridgeCreateClient(CEFBridge * _Nullable owner);
 cef_client_t *CEFBridgeClientHandle(BridgeClient *client);
 void CEFBridgeNullifyClientOwner(BridgeClient *client);
 void CEFBridgeReleaseClient(BridgeClient *client);

@@ -297,11 +297,11 @@ bool DesktopEngine::Impl::Shutdown() {
   }
   closing.clear(); // Release CEF references before pumping close callbacks and CefShutdown.
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  while (!tabs.empty() && std::chrono::steady_clock::now() < deadline) {
+  while ((!tabs.empty() || !popups.empty()) && std::chrono::steady_clock::now() < deadline) {
     CefDoMessageLoopWork();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  if (!tabs.empty()) {
+  if (!tabs.empty() || !popups.empty()) {
     // CEF requires every browser close callback before CefShutdown. Keep the
     // runtime alive rather than invalidating outstanding CEF references.
     last_error = "Chromium browser shutdown did not complete";

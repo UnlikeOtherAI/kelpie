@@ -2,6 +2,7 @@ package com.kelpie.browser.browser
 
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Message
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -169,6 +170,13 @@ private fun tabWebChromeClient(
     isActive: () -> Boolean,
 ): WebChromeClient =
     object : WebChromeClient() {
+        override fun onCreateWindow(
+            view: WebView,
+            isDialog: Boolean,
+            isUserGesture: Boolean,
+            resultMsg: Message,
+        ): Boolean = isActive() && tabStore.popupPresenter?.open(view, tab.partition, resultMsg) == true
+
         override fun onPermissionRequest(request: PermissionRequest) {
             val microphone = tabStore.microphonePermission
             if (microphone == null) {

@@ -262,10 +262,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
-            }
-            return nil
+            WKPopupViewController.present(from: webView, configuration: configuration)
         }
 
         func webView(

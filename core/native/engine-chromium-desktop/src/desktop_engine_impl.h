@@ -83,6 +83,11 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   CefRefPtr<CefClient> client;
   CefRefPtr<CefBrowser> browser;
   std::vector<Tab> tabs;
+  struct Popup {
+    CefRefPtr<CefBrowser> browser;
+    int opener;
+  };
+  std::vector<Popup> popups;
   std::uint64_t next_tab_id = 1;
   DesktopPartitionRegistry partitions;
 
