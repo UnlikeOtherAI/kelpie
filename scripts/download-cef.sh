@@ -19,7 +19,7 @@ download_and_extract() {
 }
 
 install_macos_arm64() {
-    local cef_version="156.0.31+ge603d97+chromium-156.0.8078.100"
+    local cef_version="158.0.3+g8c29be2+chromium-158.0.8127.18"
     local cef_platform="macosarm64"
     local outdir="core/apple/macos/Frameworks"
     local tarball="${TMP_ROOT}/cef-${cef_platform}.tar.bz2"
@@ -59,7 +59,7 @@ install_macos_arm64() {
 }
 
 install_linux_x64() {
-    local cef_version="156.0.31+ge603d97+chromium-156.0.8078.100"
+    local cef_version="158.0.3+g8c29be2+chromium-158.0.8127.18"
     local cef_platform="linux64_minimal"
     local cache_root="${HOME}/.cache/kelpie/cef"
     local version_root="${cache_root}/cef_binary_${cef_version}_${cef_platform}"
