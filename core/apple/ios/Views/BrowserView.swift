@@ -13,6 +13,7 @@ struct BrowserView: View {
     @State var showSettings = false
     @State var showBookmarks = false
     @State var showHistory = false
+    @State var showDownloads = false
     @State var showNetworkInspector = false
     @State var showAI = false
     @State var availableIPadViewportPresetIDs: [String] = []
@@ -214,6 +215,11 @@ struct BrowserView: View {
                     navigate(url)
                 }
             )
+        }
+        .sheet(isPresented: $showDownloads) {
+            DownloadsPopup()
+                .presentationDetents([.height(280), .medium])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showHistory) {
             HistoryView(onNavigate: navigate)

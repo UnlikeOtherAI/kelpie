@@ -96,6 +96,42 @@ final class BrowserChromeUITests: XCTestCase {
     }
 
     @MainActor
+    func testDownloadPopupSavesAndClears() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let html = """
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <a download="kelpie-receipt.txt" href="data:text/plain,receipt">Download receipt</a>
+        """
+        let url = "data:text/html;base64," + Data(html.utf8).base64EncodedString()
+        app.launchArguments = ["-hideWelcomeCard", "YES", "-sessionTabsV2", "<>", "-sessionTabURLs", "()", "-homeURL", url]
+        app.launch()
+        let receipt = app.webViews.links["Download receipt"]
+        XCTAssertTrue(receipt.waitForExistence(timeout: 15))
+        let downloads = app.buttons["browser.downloads"]
+        XCTAssertFalse(downloads.exists)
+        receipt.tap()
+        XCTAssertTrue(downloads.waitForExistence(timeout: 10))
+        downloads.tap()
+        let share = app.buttons["Share downloaded file"].firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        capture("ios-downloads", app)
+        share.tap()
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 10))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Open kelpie-receipt")).firstMatch.tap()
+        XCTAssertTrue(app.textViews["receipt"].waitForExistence(timeout: 5))
+        let close = app.buttons["QLOverlayDoneButtonAccessibilityIdentifier"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        app.buttons["Clear"].tap()
+        XCTAssertTrue(app.staticTexts["No downloads"].exists)
+        XCTAssertFalse(app.buttons["Clear"].isEnabled)
+        XCTAssertFalse(downloads.exists)
+    }
+
+    @MainActor
     private func verifyTabCount(_ count: Int, _ app: XCUIApplication) {
         app.buttons["browser.more"].tap()
         let tabs = app.buttons["browser.tabs.count"]

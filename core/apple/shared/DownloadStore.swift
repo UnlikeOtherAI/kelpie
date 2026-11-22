@@ -1,3 +1,4 @@
+import Combine
 import CryptoKit
 import Foundation
 import WebKit
@@ -12,7 +13,7 @@ import WebKit
 /// SHA-256; any refusal or interruption is `failed` with a reason, and its
 /// partial file is removed.
 @MainActor
-final class DownloadStore: NSObject, WKDownloadDelegate {
+final class DownloadStore: NSObject, ObservableObject, WKDownloadDelegate {
     static let shared = DownloadStore()
 
     enum Origin: String { case page, agent }
@@ -42,10 +43,11 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     /// Where new downloads are saved; a host can choose it through `KelpieBrowserSession`.
     var directoryProvider: () -> URL
     private let fileManager = FileManager.default
-    private var records: [Record] = []
+    @Published private var records: [Record] = []
     private var active: [String: WKDownload] = [:]
     private var ids: [ObjectIdentifier: String] = [:]
     private var reserved: Set<String> = []
+    private var measuring: Set<String> = []
 
     init(directory: @escaping () -> URL = DownloadStore.userDownloadsDirectory) {
         directoryProvider = directory
@@ -53,8 +55,18 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     }
 
     nonisolated static func userDownloadsDirectory() -> URL {
-        FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        #if os(iOS)
+        return URL.documentsDirectory.appendingPathComponent("Downloads", isDirectory: true)
+        #else
+        return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true)
+        #endif
+    }
+
+    var hasDownloads: Bool { !records.isEmpty }
+
+    func clearFinished() {
+        records.removeAll { $0.state != .inProgress }
     }
 
     // MARK: - Tracking
@@ -101,6 +113,15 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
             update(id) { $0.error = refusal }
             return nil
         }
+        return destination(
+            id: id,
+            suggestedName: suggestedFilename,
+            mimeType: response.mimeType,
+            expectedLength: response.expectedContentLength
+        )
+    }
+
+    private func destination(id: String, suggestedName: String, mimeType: String?, expectedLength: Int64) -> URL? {
         let directory = directoryProvider()
         do {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -108,15 +129,15 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
             update(id) { $0.error = "Cannot create the downloads directory: \(error.localizedDescription)" }
             return nil
         }
-        let destination = DownloadPolicy.uniqueDestination(for: suggestedFilename, in: directory) { candidate in
+        let destination = DownloadPolicy.uniqueDestination(for: suggestedName, in: directory) { candidate in
             reserved.contains(candidate.path) || fileManager.fileExists(atPath: candidate.path)
         }
         reserved.insert(destination.path)
         update(id) {
             $0.filename = destination.lastPathComponent
             $0.path = destination.path
-            $0.mimeType = response.mimeType
-            $0.totalBytes = response.expectedContentLength >= 0 ? response.expectedContentLength : nil
+            $0.mimeType = mimeType
+            $0.totalBytes = expectedLength >= 0 ? expectedLength : nil
         }
         return destination
     }
@@ -124,10 +145,15 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     func downloadDidFinish(_ download: WKDownload) {
         guard let id = ids.removeValue(forKey: ObjectIdentifier(download)) else { return }
         active.removeValue(forKey: id)
+        measureCompletedFile(id)
+    }
+
+    private func measureCompletedFile(_ id: String) {
         guard let path = record(id: id)?.path else {
             finish(id, failure: "WebKit finished without a destination")
             return
         }
+        guard measuring.insert(id).inserted else { return }
         Task.detached(priority: .utility) {
             let result = Self.measure(path: path)
             await MainActor.run { self.complete(id, path: path, measurement: result) }
@@ -140,6 +166,29 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
         let existing = record(id: id)?.error
         finish(id, failure: existing ?? error.localizedDescription)
     }
+
+    #if os(macOS)
+    func beginChromium(id: String, url: String, suggestedName: String) -> URL? {
+        records.append(Record(id: id, url: url, tabId: nil, origin: .page, startedAt: Date()))
+        trimFinished()
+        let file = destination(id: id, suggestedName: suggestedName, mimeType: nil, expectedLength: -1)
+        if file == nil { finish(id, failure: record(id: id)?.error ?? "Cannot save download") }
+        return file
+    }
+
+    func updateChromium(id: String, received: Int64, total: Int64, complete: Bool, interrupted: Bool) {
+        guard !measuring.contains(id), record(id: id)?.state == .inProgress else { return }
+        update(id) {
+            $0.bytesReceived = received
+            $0.totalBytes = total >= 0 ? total : nil
+        }
+        if complete {
+            measureCompletedFile(id)
+        } else if interrupted {
+            finish(id, failure: "Download interrupted")
+        }
+    }
+    #endif
 
     // MARK: - Completion
 
@@ -159,6 +208,8 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     }
 
     private func complete(_ id: String, path: String, measurement: Result<(size: Int64, sha256: String), Error>) {
+        measuring.remove(id)
+        defer { trimFinished() }
         reserved.remove(path)
         switch measurement {
         case .success(let value):
@@ -177,6 +228,7 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     /// A failed download never leaves a partial file that looks like a result.
     private func finish(_ id: String, failure: String) {
         guard let current = record(id: id) else { return }
+        defer { trimFinished() }
         if let path = current.path {
             reserved.remove(path)
             try? fileManager.removeItem(atPath: path)

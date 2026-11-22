@@ -40,6 +40,7 @@ class UrlBar {
  public:
   bool Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarDelegate* delegate);
   void Resize(const RECT& bounds);
+  void SetDownloadsVisible(bool visible);
   // Rebuilds fonts and themed colours after a DPI or app-theme change.
   void RefreshTheme();
   void SetPalette(ui::ChromePalette palette);
@@ -92,6 +93,8 @@ class UrlBar {
   HWND reload_button_ = nullptr;
   HWND bookmarks_button_ = nullptr;
   HWND history_button_ = nullptr;
+  HWND downloads_button_ = nullptr;
+  bool downloads_visible_ = false;
   HWND network_button_ = nullptr;
   HWND settings_button_ = nullptr;
   HWND url_edit_ = nullptr;

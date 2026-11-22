@@ -109,6 +109,7 @@ add_executable(kelpie-linux
   src/chrome_icons.cpp
   src/window_geometry.cpp
   src/url_bar.cpp
+  src/downloads_popover.cpp
   src/ui_theme.cpp
   src/settings_view.cpp
   src/computer_approval.cpp
@@ -130,7 +131,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.2.17"
+    KELPIE_LINUX_VERSION="0.2.18"
 )
 
 if(KELPIE_LINUX_HAS_CEF)

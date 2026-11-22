@@ -12,6 +12,7 @@ extension BrowserView {
                 if browserState.isLoading { browserState.webView?.stopLoading() } else { reload() }
             },
             onBookmarks: { showBookmarks = true },
+            onDownloads: { showDownloads = true },
             is3DInspectorActive: isIn3DInspector,
             onSnapshot3D: { Task { @MainActor in await toggle3DInspector() } },
             onShowTabs: {

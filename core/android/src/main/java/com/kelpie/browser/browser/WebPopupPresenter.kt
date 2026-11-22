@@ -35,6 +35,7 @@ internal class WebPopupPresenter(
         val profile = partition?.let { PartitionRegistry.resolve(it, restoring = true) }
         val view = WebView(activity)
         PartitionRegistry.bind(view, profile)
+        BrowserDownloads.attach(view)
         view.settings.apply {
             javaScriptEnabled = opener.settings.javaScriptEnabled
             domStorageEnabled = opener.settings.domStorageEnabled

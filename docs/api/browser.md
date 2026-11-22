@@ -889,9 +889,8 @@ downloads since the browser launched (at most 200 are kept). A record is:
 file is on disk and its size and SHA-256 are measured. An HTTP error status fails
 it with `error: "HTTP 403"`; an interrupted transfer fails with WebKit's reason.
 A failed download removes its partial file and reports `path: null`. Retry by
-calling `download` again; it creates a new record. The Chromium renderer does not
-handle downloads yet: `download` answers `WEBKIT_ONLY` and neither tool is
-advertised while Chromium is active. The App Store build carries the sandbox
+calling `download` again. It creates a new record. Chromium supports page-initiated
+downloads through the Downloads popup. Both agent tools require the WebKit renderer. The App Store build carries the sandbox
 Downloads-folder entitlement.
 
 macOS asks once before an app writes to the Downloads folder. Until the person

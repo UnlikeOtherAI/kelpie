@@ -55,6 +55,34 @@ final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUID
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        let disposition = (navigationResponse.response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition")
+        decisionHandler(DownloadPolicy.shouldDownload(
+            canShowMIMEType: navigationResponse.canShowMIMEType,
+            contentDisposition: disposition
+        ) ? .download : .allow)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        DownloadStore.shared.track(download, tabId: nil, origin: .page)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        DownloadStore.shared.track(download, tabId: nil, origin: .page)
+    }
+
     override func loadView() { view = webView }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {

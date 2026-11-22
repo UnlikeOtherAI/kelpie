@@ -11,6 +11,7 @@
 #include "include/capi/cef_browser_capi.h"
 #include "include/capi/cef_client_capi.h"
 #include "include/capi/cef_callback_capi.h"
+#include "include/capi/cef_download_handler_capi.h"
 #include "include/capi/cef_cookie_capi.h"
 #include "include/capi/cef_devtools_message_observer_capi.h"
 #include "include/capi/cef_request_context_capi.h"
@@ -22,6 +23,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef struct BridgeClient BridgeClient;
+cef_download_handler_t *CEFBridgeDownloadHandler(cef_client_t *client);
 
 cef_main_args_t CEFBridgeMainArgs(void);
 cef_string_t CEFBridgeStringCreate(NSString *value);

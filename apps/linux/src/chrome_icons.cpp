@@ -35,6 +35,8 @@ GtkWidget* CreateChromeIcon(const char* name) {
     } else if(icon=="document-open-recent-symbolic") {
       circle(12,12,9);line(12,6,12,12);line(12,12,17,14);
     } else if(icon=="network-workgroup-symbolic") {
+      line(2,12,7,12);line(7,12,10,5);line(10,5,14,19);line(14,19,17,12);line(17,12,22,12);
+    } else if(icon=="folder-download-symbolic") {
       line(12,3,12,15);line(12,15,7,10);line(12,15,17,10);line(3,17,3,21);line(3,21,21,21);line(21,21,21,17);
     } else if(icon=="avatar-default-symbolic") {
       circle(12,12,10);circle(12,9,3);cairo_new_sub_path(cr);cairo_arc(cr,12,20,6,3.4,6.02);

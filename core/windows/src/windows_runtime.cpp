@@ -1,5 +1,7 @@
 #include "windows_app.h"
 
+#include <shlobj.h>
+
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
 #include "kelpie/desktop_mcp_server.h"
@@ -253,6 +255,12 @@ bool WindowsApp::InitializeDesktopRuntime() {
     decide(answer == IDYES && !close_lifecycle_.requested());
   };
   runtime.engine.mode = DesktopEngine::Mode::kWindowed;
+  runtime.engine.downloads = &downloads;
+  PWSTR downloads_path = nullptr;
+  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Downloads, KF_FLAG_DEFAULT, nullptr, &downloads_path))) {
+    runtime.engine.download_directory = downloads_path;
+    CoTaskMemFree(downloads_path);
+  }
   runtime.engine.process_instance = config_.cef_process_instance;
   runtime.engine.sandbox_info = config_.sandbox_info;
   runtime.engine.initial_url = config_.initial_url;

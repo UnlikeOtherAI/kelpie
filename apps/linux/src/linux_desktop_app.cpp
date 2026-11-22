@@ -5,7 +5,11 @@
 #include "kelpie/desktop_mcp_server.h"
 #include "kelpie/screenshot_fit.h"
 #include "kelpie/account_login_window.h"
+#include <cstdlib>
 #include <fstream>
+#if KELPIE_LINUX_HAS_GTK
+#include <glib.h>
+#endif
 #include <iostream>
 #include <thread>
 
@@ -76,6 +80,13 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   runtime.reset_viewport=[resize=runtime.resize_viewport,width,height] { return resize(width,height); };
   auto& engine=runtime.engine;
   engine.native_popups=!impl_->config.headless;
+  engine.downloads = &downloads;
+#if KELPIE_LINUX_HAS_GTK
+  if (auto* dir = g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD)) engine.download_directory = dir;
+#endif
+  if (engine.download_directory.empty()) {
+    if (auto* home = std::getenv("HOME")) engine.download_directory = std::filesystem::path(home) / "Downloads";
+  }
   engine.file_chooser=file_chooser_;
   engine.microphone_prompt = microphone_prompt_;
   engine.mode=DesktopEngine::Mode::kOffscreen; engine.argc=impl_->argc; engine.argv=impl_->argv;

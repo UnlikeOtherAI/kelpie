@@ -24,7 +24,7 @@ std::wstring ReadWindowText(HWND hwnd) {
 
 bool IsIconButton(UINT id) {
   return id == IDC_BACK_BUTTON || id == IDC_FORWARD_BUTTON || id == IDC_RELOAD_BUTTON ||
-         id == IDC_BOOKMARKS_BUTTON || id == IDC_HISTORY_BUTTON || id == IDC_NETWORK_BUTTON ||
+         id == IDC_BOOKMARKS_BUTTON || id == IDC_HISTORY_BUTTON || id == IDC_DOWNLOADS_BUTTON || id == IDC_NETWORK_BUTTON ||
          id == IDC_INSPECTOR_3D_BUTTON ||
          id == IDC_SETTINGS_BUTTON || id == IDC_HOME_BUTTON || id == IDC_ACCOUNT_BUTTON || id == IDC_ADD_FAVORITE_BUTTON;
 }
@@ -63,6 +63,7 @@ wchar_t IconFor(UINT id, bool loading) {
     case IDC_RELOAD_BUTTON: return loading ? ui::icon::kStop : ui::icon::kReload;
     case IDC_BOOKMARKS_BUTTON: return ui::icon::kBookmarks;
     case IDC_HISTORY_BUTTON: return ui::icon::kHistory;
+    case IDC_DOWNLOADS_BUTTON: return L'\uE896';
     case IDC_NETWORK_BUTTON: return ui::icon::kNetwork;
     default: return ui::icon::kSettings;
   }
@@ -93,11 +94,13 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
       !make_button(IDC_HOME_BUTTON, L"Home", &home_button_) ||
       !make_button(IDC_ADD_FAVORITE_BUTTON, L"Add favorite", &add_favorite_button_) ||
       !make_button(IDC_BOOKMARKS_BUTTON, L"Bookmarks", &bookmarks_button_) ||
+      !make_button(IDC_DOWNLOADS_BUTTON, L"Downloads", &downloads_button_) ||
       !make_button(IDC_HISTORY_BUTTON, L"History", &history_button_) ||
       !make_button(IDC_NETWORK_BUTTON, L"Network Inspector", &network_button_) ||
       !make_button(IDC_ACCOUNT_BUTTON, L"UOA account", &account_button_) ||
       !make_button(IDC_INSPECTOR_3D_BUTTON, L"3D inspector, Off", &inspector_3d_button_) ||
       !make_button(IDC_SETTINGS_BUTTON, L"Settings", &settings_button_)) return false;
+  ShowWindow(downloads_button_, SW_HIDE);
   EnableWindow(inspector_3d_button_, FALSE);
   url_edit_ = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                               0, 0, 0, 0, parent, reinterpret_cast<HMENU>(IDC_URL_EDIT), instance, nullptr);
@@ -121,6 +124,7 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
     add_tooltip(forward_button_, L"Forward");
     add_tooltip(reload_button_, L"Reload or stop loading");
     add_tooltip(bookmarks_button_, L"Bookmarks");
+    add_tooltip(downloads_button_, L"Downloads");
     add_tooltip(history_button_, L"History");
     add_tooltip(network_button_, L"Network inspector");
     add_tooltip(inspector_3d_button_, L"3D inspector");
@@ -154,9 +158,10 @@ void UrlBar::Resize(const RECT& bounds) {
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
     left += button_width + gap;
   }
-  const HWND trailing_controls[] = {bookmarks_button_, network_button_, history_button_,
+  const HWND trailing_controls[] = {bookmarks_button_, network_button_, history_button_, downloads_button_,
                                     account_button_, inspector_3d_button_, settings_button_};
-  const int edit_right = bounds.right - padding - static_cast<int>(std::size(trailing_controls)) * (button_width + gap);
+  const int trailing = static_cast<int>(std::size(trailing_controls)) - (downloads_visible_ ? 0 : 1);
+  const int edit_right = bounds.right - padding - trailing * (button_width + gap);
   surface_ = {left, top, edit_right, top + control_height};
   const int edit_height = ui::Dip(parent_, 24);
   SetWindowPos(url_edit_, nullptr, left + ui::Dip(parent_, 48), top + (control_height-edit_height)/2,
@@ -165,16 +170,22 @@ void UrlBar::Resize(const RECT& bounds) {
       ui::Dip(parent_, 34), ui::Dip(parent_, 34), SWP_NOZORDER);
   left = edit_right + gap;
   for (HWND button : trailing_controls) {
+    if (button == downloads_button_ && !downloads_visible_) continue;
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
     left += button_width + gap;
   }
   InvalidateSurface();
 }
 
+void UrlBar::SetDownloadsVisible(bool visible) {
+  downloads_visible_ = visible;
+  ShowWindow(downloads_button_, visible ? SW_SHOWNA : SW_HIDE);
+}
+
 std::vector<HWND> UrlBar::FocusableControls() const {
   std::vector<HWND> controls;
   for (HWND control : {back_button_, forward_button_, reload_button_, home_button_, url_edit_, add_favorite_button_, bookmarks_button_,
-                       history_button_, network_button_, account_button_, inspector_3d_button_, settings_button_}) {
+                       history_button_, downloads_button_, network_button_, account_button_, inspector_3d_button_, settings_button_}) {
     if (control != nullptr && IsWindowVisible(control) && IsWindowEnabled(control)) controls.push_back(control);
   }
   return controls;

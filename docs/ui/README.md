@@ -39,6 +39,8 @@
 - The macOS bookmarks, history, and network sheets use explicit full-row hit targets, and the network sheet uses a single method dropdown above the request list instead of a dense chip row.
 - iOS and Android mirror the same network-inspector simplification: the page document is recorded in the inspector, and the in-app filter is a compact method dropdown rather than a crowded strip of category chips.
 
+The Downloads control appears in the toolbar when a transfer starts. Select a completed filename to open it, or use its magnifying glass to show it in the desktop file manager. Mobile rows have a share icon. Clear removes finished rows and hides the toolbar control once the list is empty.
+
 ## Windows Shell Notes
 
 - The Windows reference chrome places tabs in a 52-DIP title row, with a single

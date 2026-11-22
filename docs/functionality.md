@@ -857,9 +857,13 @@ Native `/v1/browser-control`, direct `/mcp`, `kelpie browser-control <request-js
 
 The shared browser gateway preserves rich native extension argument schemas through the shared CLI catalogue projection. macOS `get-links` exposes bounded href/text pairs to existing local agent tools; other platforms do not advertise it. See [shared control](api/browser-control.md).
 
-### Downloads (macOS)
+### Downloads
 
-With the WebKit renderer, a link or response the site serves as a file (an attachment, or a type such as zip, dmg or binary) is saved to the Downloads folder instead of opening an empty page, and the tab stays on its page. The download uses the tab's own cookies and sign-ins. Agents start a download with `kelpie_download` and read its state, local path, size and SHA-256 with `kelpie_get_downloads`; a refused or interrupted download is reported as failed with a reason and leaves no partial file. The Chromium renderer and the mobile apps do not handle downloads yet. See [downloads](api/browser.md#downloads-macos-webkit).
+The **Downloads** toolbar button appears when the first transfer starts and disappears when the list is empty. The popup lists the latest transfers first, including files still downloading and failures. **Clear** removes finished entries from the list. Files stay on disk and active transfers continue.
+
+Desktop apps save files in the system Downloads folder. Android 10 and later use the shared Downloads collection. Android 9 and iOS keep files in Kelpie’s own Downloads folder. Select a completed filename to open it. The magnifying glass beside it reveals the file in Finder, File Explorer or the Linux file manager. On iPhone, iPad and Android, the share icon opens the system share sheet. Repeated filenames get separate files.
+
+With the macOS WebKit renderer, agents can start a download in a tab’s session and read its local path, size and SHA-256. See [downloads](api/browser.md#downloads-macos-webkit).
 
 ### Favourites folders and live updates
 

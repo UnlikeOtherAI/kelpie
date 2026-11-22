@@ -76,6 +76,7 @@ fun BrowserScreen(
     val pageTitle by browserState.pageTitle.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
+    var showDownloads by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var showNetworkInspector by remember { mutableStateOf(false) }
     var showAI by remember { mutableStateOf(false) }
@@ -251,6 +252,7 @@ fun BrowserScreen(
                         }
                     },
                     onBookmarks = { showBookmarks = true },
+                    onDownloads = { showDownloads = true },
                     onShare = { sharePage(context, currentUrl) },
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
@@ -436,6 +438,7 @@ fun BrowserScreen(
         )
     }
 
+    if (showDownloads) DownloadsDialog { showDownloads = false }
     if (showHistory) {
         ModalBottomSheet(
             onDismissRequest = { showHistory = false },

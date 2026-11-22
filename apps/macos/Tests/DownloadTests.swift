@@ -78,6 +78,9 @@ final class RealWebKitDownloadTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), DownloadSiteFixture.payload)
         XCTAssertEqual((done["bytesReceived"] as? NSNumber)?.intValue, DownloadSiteFixture.payload.count)
         XCTAssertEqual(done["sha256"] as? String, DownloadSiteFixture.payloadDigest)
+        store.clearFinished()
+        XCTAssertTrue(store.list().isEmpty)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), DownloadSiteFixture.payload)
     }
 
     func testSignedOutDownloadFailsWithTheStatusAndLeavesNoFile() async throws {
