@@ -57,11 +57,11 @@ final class Tab: ObservableObject, Identifiable {
     private var lastHistoryTitle: String = ""
     private var lastObservedHistoryClearGeneration = HistoryStore.shared.clearGeneration
 
-    init(spec: TabSpec = TabSpec()) {
+    init(spec: TabSpec = TabSpec(), renderer suppliedRenderer: WKWebViewRenderer? = nil) {
         self.name = spec.name
         self.partition = spec.partition
         self.persistent = spec.persistent
-        self.renderer = WKWebViewRenderer(dataStore: spec.dataStore)
+        self.renderer = suppliedRenderer ?? WKWebViewRenderer(dataStore: spec.dataStore)
         self.chatSession = AIChatSession(tabId: id.uuidString)
         renderer.downloadTabId = id.uuidString
     }
@@ -124,6 +124,7 @@ final class TabStore: ObservableObject {
 
     // Keyed by tab ID so unbind() can cancel cleanly.
     private var tabSinks: [UUID: AnyCancellable] = [:]
+    private var popups: [UUID: [UUID: WKPopupWindow]] = [:]
     private var sessionPersistence = true
 
     init(engine: RendererState.Engine = .webkit) {
@@ -150,10 +151,11 @@ final class TabStore: ObservableObject {
         activeTabID = initial.id
     }
 
-    /// An isolated renderer harness owns an in-memory tab without restoring,
-    /// observing or persisting a person's browser session/history.
+    /// An isolated renderer harness owns in-memory tabs without touching the
+    /// person's browser session or history.
     init(isolatedTab: Tab) {
         sessionPersistence = false
+        bind(isolatedTab)
         tabs = [isolatedTab]
         activeTabID = isolatedTab.id
     }
@@ -239,12 +241,18 @@ final class TabStore: ObservableObject {
         tab.title = rawTitle.isEmpty ? "Start Page" : rawTitle
         tab.currentURL = nextURL
         tab.isLoading = renderer.isLoading
-        tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
-        tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
+        if sessionPersistence {
+            tab.recordHistoryIfNeeded(url: nextURL, title: rawTitle)
+            tab.updateHistoryTitleIfNeeded(url: nextURL, title: rawTitle)
+        }
         capturePreviewIfSettled(tab)
     }
 
     private func bind(_ tab: Tab) {
+        tab.renderer.onOpenPopup = { [weak self, weak tab] configuration, features in
+            guard let self, let tab, self.engine == .webkit else { return nil }
+            return self.openPopup(for: tab, configuration: configuration, features: features)
+        }
         tab.renderer.onStateChange = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.rendererStateChanged(tab, from: tab.renderer)
@@ -254,6 +262,18 @@ final class TabStore: ObservableObject {
                 self?.objectWillChange.send()
                 self?.persistSession()
             }
+    }
+
+    private func openPopup(for opener: Tab, configuration: WKWebViewConfiguration, features: WKWindowFeatures) -> WKWebView {
+        let popup = WKPopupWindow(opener: opener, configuration: configuration, features: features)
+        let openerID = opener.id
+        let popupID = popup.id
+        popups[openerID, default: [:]][popupID] = popup
+        popup.onClose = { [weak self] in
+            self?.popups[openerID]?.removeValue(forKey: popupID)
+        }
+        popup.show()
+        return popup.webView
     }
 
     /// Start page screenshots come from the person's own session only, never
@@ -270,11 +290,19 @@ final class TabStore: ObservableObject {
         SitePreviewCapturer.shared.tabClosed(tab.id)
         tab.chatSession.close()
         tab.renderer.onStateChange = nil
+        tab.renderer.onOpenPopup = nil
+        tab.renderer.onClosePopup = nil
+        closePopups(for: tab.id)
         #if !KELPIE_WEBKIT_ONLY
         tab.chromiumRenderer?.retire()
         tab.chromiumRenderer = nil
         #endif
         tabSinks.removeValue(forKey: tab.id)
+    }
+
+    private func closePopups(for openerID: UUID) {
+        guard let children = popups.removeValue(forKey: openerID) else { return }
+        for popup in children.values { popup.close() }
     }
 
     func closeAll() {
@@ -320,6 +348,7 @@ final class TabStore: ObservableObject {
     func selectEngine(_ engine: RendererState.Engine) {
         guard engine != self.engine else { return }
         activeRenderer?.willDeactivate()
+        for tab in tabs { closePopups(for: tab.id) }
         self.engine = engine
         for tab in tabs where !tab.isStartPage {
             guard !tab.currentURL.isEmpty, let url = URL(string: tab.currentURL) else { continue }

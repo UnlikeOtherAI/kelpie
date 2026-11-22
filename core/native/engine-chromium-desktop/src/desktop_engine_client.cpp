@@ -6,12 +6,21 @@
 #endif
 
 #include "include/cef_task.h"
+#include "include/cef_parser.h"
 #include "include/cef_version.h"
 #include "kelpie/favicon_registry.h"
 
 #include "desktop_cef_client.h"
 
 namespace {
+
+std::string PopupTitle(const CefString& url) {
+  CefURLParts parts;
+  if (!CefParseURL(url, parts)) return "Pop-up";
+  const CefString scheme(&parts.scheme);
+  if (scheme != "https" && scheme != "http") return "Pop-up";
+  return CefString(&parts.origin).ToString();
+}
 
 #if defined(_WIN32)
 // A tab browser window is a child of the single application shell window, so
@@ -45,6 +54,14 @@ class DestroyTabHostWindowTask final : public CefTask {
 namespace kelpie {
 
 void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
+  if (opener_ != 0) {
+    owner_->popups.push_back({browser, opener_});
+    const auto opener = std::find_if(owner_->tabs.begin(), owner_->tabs.end(), [this](const auto& tab) {
+      return !tab.closing && tab.browser->GetIdentifier() == opener_;
+    });
+    if (opener == owner_->tabs.end()) browser->GetHost()->CloseBrowser(true);
+    return;
+  }
   if (owner_->browser == nullptr) {
     owner_->browser = browser;
   }
@@ -65,43 +82,50 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
                                      WindowOpenDisposition,
                                      bool,
                                      const CefPopupFeatures&,
-                                     CefWindowInfo&,
-                                     CefRefPtr<CefClient>&,
+                                     CefWindowInfo& window_info,
+                                     CefRefPtr<CefClient>& client,
                                      CefBrowserSettings&,
                                      CefRefPtr<CefDictionaryValue>&,
                                      bool*) {
-  const std::string url = target_url.ToString();
-  if (url.empty()) return true;
-  // The popup is cancelled and reopened as one of our own tabs, so CEF's own
-  // "popups inherit the opener's request context" rule does not apply here.
-  // Carrying the opener's partition across is what keeps window.open from
-  // being a hole straight out of an isolated tab.
-  NewTabRequest request;
-  request.url = url;
-  if (opener) {
+  if (owner_->shutting_down) return true;
+  if (!owner_->config.native_popups) {
+    if (target_url.empty()) return true;
+    NewTabRequest request;
+    request.url = target_url.ToString();
     if (const auto* source = owner_->FindTab(opener)) {
       request.partition = source->partition;
       if (source->partition) {
         const auto* entry = owner_->partitions.Find(*source->partition);
-        request.persistent = entry == nullptr ? true : entry->persistent;
+        request.persistent = entry == nullptr || entry->persistent;
       }
     }
+    TabSnapshot created;
+    if (owner_->CreateTabOnUi(request, &created).ok) {
+      if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
+        owner_->browser = tab->browser;
+        owner_->UpdateActiveState();
+      }
+    }
+    return true;
   }
-  TabSnapshot created;
-  const auto result = owner_->CreateTabOnUi(request, &created);
-  if (!result.ok) return true;
-  if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
+  // Let Chromium create the context so it inherits the request context and
+  // WindowProxy. Even about:blank must survive for providers that navigate it later.
+  const auto bounds = window_info.bounds;
 #if defined(_WIN32)
-    if (owner_->browser && owner_->browser->GetHost()) ShowWindow(owner_->browser->GetHost()->GetWindowHandle(), SW_HIDE);
-    if (tab->browser && tab->browser->GetHost()) ShowWindow(tab->browser->GetHost()->GetWindowHandle(), SW_SHOW);
+  window_info.SetAsPopup(nullptr, PopupTitle(target_url));
+#else
+  window_info.parent_window = 0;
+  CefString(&window_info.window_name) = PopupTitle(target_url);
 #endif
-    owner_->browser = tab->browser;
-    owner_->UpdateActiveState();
-  }
-  return true;
+  window_info.windowless_rendering_enabled = false;
+  window_info.bounds.width = bounds.width > 0 ? bounds.width : 520;
+  window_info.bounds.height = bounds.height > 0 ? bounds.height : 680;
+  client = new DesktopCefClient(owner_, opener_ != 0 ? opener_ : opener->GetIdentifier());
+  return false;
 }
 
 bool DesktopCefClient::DoClose(CefRefPtr<CefBrowser> browser) {
+  if (opener_ != 0) return false;
 #if defined(_WIN32)
   // Returning false here lets CEF send the OS close notification to the tab
   // window's top-level owner, which is the shared application shell window --
@@ -123,6 +147,15 @@ bool DesktopCefClient::DoClose(CefRefPtr<CefBrowser> browser) {
 }
 
 void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
+  if (opener_ != 0) {
+    std::erase_if(owner_->popups, [&browser](const auto& popup) { return popup.browser->IsSame(browser); });
+    return;
+  }
+  std::vector<CefRefPtr<CefBrowser>> children;
+  for (const auto& popup : owner_->popups) {
+    if (popup.opener == browser->GetIdentifier()) children.push_back(popup.browser);
+  }
+  for (const auto& child : children) child->GetHost()->CloseBrowser(true);
   for (auto& tab : owner_->tabs) {
     if (tab.browser && tab.browser->IsSame(browser)) {
       tab.chat_session->Close();
@@ -210,6 +243,14 @@ void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
                                        CefRefPtr<CefFrame> frame,
                                        const CefString& url) {
   if (!frame || !frame->IsMain()) return;
+  if (opener_ != 0) {
+#if defined(_WIN32)
+    const auto origin = CefString(PopupTitle(url)).ToWString();
+    const auto handle = browser->GetHost()->GetWindowHandle();
+    if (handle) SetWindowTextW(GetAncestor(handle, GA_ROOT), origin.c_str());
+#endif
+    return;
+  }
   if (auto* tab = owner_->FindTab(browser)) {
     const std::string next = url.ToString();
     // A new document has no icon until OnFaviconURLChange fires. Keeping the old
@@ -298,6 +339,40 @@ void DesktopCefClient::OnResetDialogState(CefRefPtr<CefBrowser> browser) {
 CefRefPtr<CefDialogHandler> DesktopCefClient::GetDialogHandler() {
   if (owner_->config.file_chooser) return this;
   return nullptr;
+}
+
+bool DesktopCefClient::OnRequestMediaAccessPermission(
+    CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+    const CefString& requesting_origin, uint32_t requested_permissions,
+    CefRefPtr<CefMediaAccessCallback> callback) {
+  constexpr uint32_t microphone = CEF_MEDIA_PERMISSION_DEVICE_AUDIO_CAPTURE;
+  if ((requested_permissions & microphone) == 0) return false;
+
+  // Chromium has already checked the secure context and Permissions Policy.
+  auto* tab = owner_->FindTab(browser);
+  if (requested_permissions != microphone || requesting_origin.empty() ||
+      !owner_->config.microphone_prompt || microphone_prompt_pending_ ||
+      !tab || tab->closing || !owner_->browser || !owner_->browser->IsSame(browser)) {
+    callback->Cancel();
+    return true;
+  }
+
+  microphone_prompt_pending_ = true;
+  TabLease lease{tab->id, tab->generation, tab->document_version};
+  owner_->config.microphone_prompt(requesting_origin.ToString(),
+      [client = CefRefPtr<DesktopCefClient>(this), owner = owner_->weak_from_this(),
+       lease = std::move(lease), browser, frame, callback](bool allowed) {
+        client->microphone_prompt_pending_ = false;
+        const auto engine = owner.lock();
+        const auto* target = engine ? engine->FindTab(lease) : nullptr;
+        if (allowed && target && engine->browser && engine->browser->IsSame(browser) &&
+            frame && frame->IsValid()) {
+          callback->Continue(CEF_MEDIA_PERMISSION_DEVICE_AUDIO_CAPTURE);
+        } else {
+          callback->Cancel();
+        }
+      });
+  return true;
 }
 
 bool DesktopCefClient::OnFileDialog(CefRefPtr<CefBrowser>,

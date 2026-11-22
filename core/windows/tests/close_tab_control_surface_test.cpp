@@ -134,6 +134,32 @@ std::vector<nlohmann::json> RequireStillServing(ControlClient& client, const std
   return TabsOf(response);
 }
 
+void CheckPopupRoundTrip(ControlClient& client, const std::string& tab_id) {
+  const auto start = client.Post("evaluate", {{"tabId", tab_id}, {"expression", R"JS(
+    (() => {
+      window.addEventListener('message', event => {
+        if (event.source === window.signIn && event.data === 'signed-in') document.title = 'Signed in';
+      });
+      setTimeout(() => {
+        window.signIn = window.open('about:blank', 'sign-in', 'popup,width=480,height=520');
+        if (!window.signIn) return;
+        window.signIn.eval("window.opener.postMessage('signed-in', '*'); window.close();");
+      }, 0);
+      return true;
+    })()
+  )JS"}});
+  if (!Check(start.value("success", false), "the sign-in fixture ran")) return;
+
+  std::vector<nlohmann::json> tabs;
+  for (int attempt = 0; attempt < 50; ++attempt) {
+    tabs = TabsOf(client.Post("get-tabs", nlohmann::json::object()));
+    if (tabs.size() == 1 && tabs.front().value("title", "") == "Signed in") break;
+    Wait(100);
+  }
+  Check(tabs.size() == 1 && tabs.front().value("title", "") == "Signed in" && ActiveTabId(tabs) == tab_id,
+        "the native popup closed and returned its result to the original tab");
+}
+
 class ProcessGuard {
  public:
   explicit ProcessGuard(HANDLE process) : process_(process) {}
@@ -201,6 +227,7 @@ int main(int argc, char** argv) {
   auto tabs = RequireStillServing(client, "startup");
   if (!Check(tabs.size() == 1, "the instance starts with exactly one tab")) return 1;
   const std::string first_tab = tabs.front().value("id", std::string());
+  CheckPopupRoundTrip(client, first_tab);
 
   const auto second = client.Post("new-tab", {{"url", "about:blank"}});
   const auto third = client.Post("new-tab", {{"url", "about:blank"}});

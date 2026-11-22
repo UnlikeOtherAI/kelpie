@@ -6,6 +6,7 @@
 #include "include/cef_client.h"
 #include "include/cef_dialog_handler.h"
 #include "include/cef_jsdialog_handler.h"
+#include "include/cef_permission_handler.h"
 #include "include/cef_render_handler.h"
 #include "include/cef_version.h"
 
@@ -25,9 +26,11 @@ class DesktopCefClient final : public CefClient,
                                public CefDisplayHandler,
                                public CefRenderHandler,
                                public CefDialogHandler,
-                               public CefJSDialogHandler {
+                               public CefJSDialogHandler,
+                               public CefPermissionHandler {
  public:
   explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
+  DesktopCefClient(DesktopEngine::Impl* owner, int opener) : owner_(owner), opener_(opener) {}
 
   CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
@@ -35,6 +38,13 @@ class DesktopCefClient final : public CefClient,
   CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
   CefRefPtr<CefDialogHandler> GetDialogHandler() override;
   CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
+
+  CefRefPtr<CefPermissionHandler> GetPermissionHandler() override { return this; }
+  bool OnRequestMediaAccessPermission(CefRefPtr<CefBrowser> browser,
+                                      CefRefPtr<CefFrame> frame,
+                                      const CefString& requesting_origin,
+                                      uint32_t requested_permissions,
+                                      CefRefPtr<CefMediaAccessCallback> callback) override;
 
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
   bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
@@ -112,6 +122,8 @@ class DesktopCefClient final : public CefClient,
 
  private:
   DesktopEngine::Impl* owner_;
+  int opener_ = 0;
+  bool microphone_prompt_pending_ = false;
 
   IMPLEMENT_REFCOUNTING(DesktopCefClient);
 };

@@ -158,6 +158,17 @@ final class CEFRenderer: RendererEngine {
             }
         }
 
+        bridge.onMicrophoneRequest = { [weak bridge] origin, stillCurrent, resolve in
+            guard let site = MacMicrophonePermission.origin(for: URL(string: origin)) else { resolve(false); return }
+            MacMicrophonePermission.request(
+                site,
+                stillCurrent: {
+                    guard let bridge, stillCurrent() else { return false }
+                    return MacMicrophonePermission.origin(for: URL(string: bridge.currentURL())) == site
+                },
+                completion: resolve
+            )
+        }
         bridge.onJavaScriptDialog = { [weak self] type, message, defaultText, resolve in
             Task { @MainActor in
                 self?.enqueueJavaScriptDialog(
