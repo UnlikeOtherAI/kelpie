@@ -1,4 +1,5 @@
 #include "url_bar.h"
+#include "downloads_popover.h"
 
 #include <string_view>
 #include "linux_app.h"
@@ -56,7 +57,7 @@ UrlBar::UrlBar(LinuxApp& app):app_(app) {
   }), this);
   for(auto [icon,title,index]:{std::tuple{"view-grid-symbolic","Bookmarks",0},
       {"network-workgroup-symbolic","Network inspector",1},{"document-open-recent-symbolic","History",2},
-      {"avatar-default-symbolic","Login/register",3},{"view-more-symbolic","Settings",4}}) {
+      {"folder-download-symbolic","Downloads",5},{"avatar-default-symbolic","Login/register",3},{"view-more-symbolic","Settings",4}}) {
     if (index == 4) {
       inspector_3d_button_ = gtk_toggle_button_new();
       gtk_button_set_image(GTK_BUTTON(inspector_3d_button_), ui::CreateChromeIcon("inspector-cube"));
@@ -74,6 +75,10 @@ UrlBar::UrlBar(LinuxApp& app):app_(app) {
       }), this);
     }
     auto* item=button(icon,title); if(index==3) account_button_=item;
+    if (index == 5) {
+      AttachDownloadsPopover(item, app_.downloads);
+      continue;
+    }
     g_object_set_data(G_OBJECT(item),"tool",GINT_TO_POINTER(index));
     g_signal_connect(item,"clicked",G_CALLBACK(+[](GtkButton* item,gpointer raw) {
       auto* self=static_cast<UrlBar*>(raw); if(self->tool_action) self->tool_action(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(item),"tool")));

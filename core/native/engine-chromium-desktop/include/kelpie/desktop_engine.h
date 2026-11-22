@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "kelpie/desktop_browser_control.h"
+#include "kelpie/download_history.h"
 #include "kelpie/cef_renderer.h"
 #include "kelpie/favicon_registry.h"
 #include "kelpie/offscreen_frame.h"
@@ -63,6 +64,8 @@ class DesktopEngine final : public DesktopBrowserControl {
     void* sandbox_info = nullptr;
     int argc = 0;
     char** argv = nullptr;
+    DownloadHistory* downloads = nullptr;
+    std::filesystem::path download_directory;
     std::string initial_url;
     std::vector<RestoredTab> restored_tabs;
     std::uint64_t restored_next_tab_id = 1;

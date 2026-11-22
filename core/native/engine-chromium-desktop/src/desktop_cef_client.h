@@ -5,6 +5,7 @@
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
 #include "include/cef_dialog_handler.h"
+#include "include/cef_download_handler.h"
 #include "include/cef_jsdialog_handler.h"
 #include "include/cef_permission_handler.h"
 #include "include/cef_render_handler.h"
@@ -26,6 +27,7 @@ class DesktopCefClient final : public CefClient,
                                public CefDisplayHandler,
                                public CefRenderHandler,
                                public CefDialogHandler,
+                               public CefDownloadHandler,
                                public CefJSDialogHandler,
                                public CefPermissionHandler {
  public:
@@ -37,6 +39,15 @@ class DesktopCefClient final : public CefClient,
   CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
   CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
   CefRefPtr<CefDialogHandler> GetDialogHandler() override;
+  CefRefPtr<CefDownloadHandler> GetDownloadHandler() override { return owner_->config.downloads ? this : nullptr; }
+  bool CanDownload(CefRefPtr<CefBrowser>, const CefString&, const CefString&) override { return true; }
+  // Older supported CEF SDKs use void here, newer ones return whether the event was handled.
+  using BeforeDownloadResult = decltype(std::declval<CefDownloadHandler&>().OnBeforeDownload(
+      nullptr, nullptr, std::declval<const CefString&>(), nullptr));
+  BeforeDownloadResult OnBeforeDownload(CefRefPtr<CefBrowser>, CefRefPtr<CefDownloadItem>, const CefString&,
+                        CefRefPtr<CefBeforeDownloadCallback>) override;
+  void OnDownloadUpdated(CefRefPtr<CefBrowser>, CefRefPtr<CefDownloadItem>,
+                         CefRefPtr<CefDownloadItemCallback>) override;
   CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
 
   CefRefPtr<CefPermissionHandler> GetPermissionHandler() override { return this; }

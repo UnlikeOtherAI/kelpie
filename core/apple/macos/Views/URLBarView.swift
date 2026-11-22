@@ -35,6 +35,8 @@ struct URLBarView: View {
     private var is3DInspectorEnabled = FeatureFlags.is3DInspectorEnabled
     @State var showTools = false
     @State private var showHistory = false
+    @ObservedObject private var downloads = DownloadStore.shared
+    @State private var showDownloads = false
     @State private var urlText = ""
     @State private var isAddressFieldFocused = false
 
@@ -81,6 +83,19 @@ struct URLBarView: View {
                     action: onHome
                 )
                 addressField.layoutPriority(1)
+                if downloads.hasDownloads {
+                    AppKitToolbarButton(
+                        systemName: "arrow.down.circle",
+                        accessibilityID: "browser.action.downloads",
+                        accessibilityLabel: "Downloads",
+                        isSelected: showDownloads,
+                        tintColor: appearance.palette.foreground.color,
+                        action: { showDownloads.toggle() }
+                    )
+                    .popover(isPresented: $showDownloads) {
+                        DownloadsPopup().frame(width: 330, height: 240)
+                    }
+                }
                 AppKitToolbarButton(
                     systemName: "clock",
                     accessibilityID: "browser.action.history",

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -53,6 +54,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kelpie.browser.browser.BrowserDownloads
 
 enum class ScrollDirection { UP, DOWN }
 
@@ -71,6 +73,7 @@ fun BottomBar(
     onForward: () -> Unit,
     onReload: () -> Unit,
     onBookmarks: () -> Unit,
+    onDownloads: () -> Unit,
     onShare: () -> Unit,
     onShowTabs: () -> Unit,
     onExpand: () -> Unit,
@@ -175,6 +178,7 @@ fun BottomBar(
                         ) {
                             ChromeButton(Icons.Default.Share, "Share page", action = onShare)
                         }
+                        if (BrowserDownloads.items.isNotEmpty()) ChromeButton(Icons.Default.Download, "Downloads", action = onDownloads)
                         if (wide) ChromeButton(Icons.Default.Bookmarks, "Bookmarks", action = onBookmarks)
                         if (toolsInToolbar && show3DInspector) {
                             Inspector3DButton(is3DInspectorActive, onSnapshot3D)

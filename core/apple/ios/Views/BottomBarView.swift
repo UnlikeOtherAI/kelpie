@@ -22,6 +22,8 @@ struct BottomBarView<MoreContent: View>: View {
     let onForward: () -> Void
     let onReload: () -> Void
     let onBookmarks: () -> Void
+    let onDownloads: () -> Void
+    @ObservedObject private var downloads = DownloadStore.shared
     let is3DInspectorActive: Bool
     let onSnapshot3D: () -> Void
     let onShowTabs: () -> Void
@@ -108,6 +110,9 @@ struct BottomBarView<MoreContent: View>: View {
                 }
                 .frame(width: 64, height: 44)
             } else {
+                if downloads.hasDownloads {
+                    BrowserChromeButton(symbol: "arrow.down.circle", label: "Downloads", identifier: "browser.downloads", action: onDownloads)
+                }
                 if toolsInToolbar { AccountButton() }
                 if wide, let url = URL(string: browserState.currentURL), url.scheme != nil {
                     ShareLink(item: url) {
@@ -161,7 +166,7 @@ struct BottomBarView<MoreContent: View>: View {
     private func trailingWidth(wide: Bool, toolsInToolbar: Bool, spacing: CGFloat) -> CGFloat {
         if addressFocused { return 64 }
         let share = wide && URL(string: browserState.currentURL)?.scheme != nil
-        let count = 1 + (wide ? 1 : 0) + (share ? 1 : 0)
+        let count = 1 + (downloads.hasDownloads ? 1 : 0) + (wide ? 1 : 0) + (share ? 1 : 0)
             + (toolsInToolbar ? 1 : 0) + (toolsInToolbar && show3DInspector ? 1 : 0)
         return CGFloat(count) * 44 + CGFloat(count - 1) * spacing
     }

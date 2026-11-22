@@ -31,6 +31,7 @@ internal fun installTabWebViewClients(
 ) {
     val isActive: () -> Boolean = { tabStore.activeTabId.value == tab.id }
 
+    BrowserDownloads.attach(webView)
     webView.webViewClient = tabWebViewClient(tab, tabStore, browserState, handlerContext, isActive)
     webView.webChromeClient = tabWebChromeClient(webView, tab, tabStore, browserState, handlerContext, isActive)
 }

@@ -104,6 +104,7 @@ class LinuxApp {
   void ClearHistory();
 
   std::string BookmarksJson() const;
+  DownloadHistory downloads;
   std::string HistoryJson() const;
   json ConsoleMessages(const std::optional<std::string>& level = std::nullopt) const;
   json NetworkEntries(const std::optional<std::string>& method = std::nullopt,

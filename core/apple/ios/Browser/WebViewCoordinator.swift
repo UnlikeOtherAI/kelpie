@@ -163,7 +163,27 @@ struct WebViewContainer: UIViewRepresentable {
             decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
         ) {
             recordMainDocumentResponse(navigationResponse, in: webView)
-            decisionHandler(.allow)
+            let disposition = (navigationResponse.response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition")
+            decisionHandler(DownloadPolicy.shouldDownload(
+                canShowMIMEType: navigationResponse.canShowMIMEType,
+                contentDisposition: disposition
+            ) ? .download : .allow)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+            DownloadStore.shared.track(download, tabId: nil, origin: .page)
+        }
+
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+            DownloadStore.shared.track(download, tabId: nil, origin: .page)
         }
 
         // MARK: - WKUIDelegate

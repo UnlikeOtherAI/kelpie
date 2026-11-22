@@ -122,6 +122,7 @@ set(WINDOWS_APP_SOURCES
   src/windows_cookie_sync.cpp
   src/page_color_sampler.cpp
   src/win32_shell.cpp
+  src/downloads_popup.cpp
   src/window_placement.cpp
   src/shell_tabs.cpp
   src/shell_chrome.cpp
@@ -439,6 +440,7 @@ if(BUILD_TESTING)
     tests/test_manifest.rc
     ${WINDOWS_THEME_SOURCES}
     src/win32_shell.cpp
+    src/downloads_popup.cpp
     src/shell_tabs.cpp
     src/shell_chrome.cpp
     src/favorites_bar.cpp

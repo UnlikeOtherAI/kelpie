@@ -537,6 +537,7 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->client.get_life_span_handler = GetLifeSpanHandler;
     client->client.get_load_handler = GetLoadHandler;
     client->client.get_display_handler = GetDisplayHandler;
+    client->client.get_download_handler = CEFBridgeDownloadHandler;
     client->client.get_frame_handler = GetFrameHandler;
     client->client.get_jsdialog_handler = GetJSDialogHandler;
     client->client.get_permission_handler = GetPermissionHandler;

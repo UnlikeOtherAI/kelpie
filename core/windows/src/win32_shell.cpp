@@ -1,4 +1,5 @@
 #include "win32_shell.h"
+#include "downloads_popup.h"
 
 #include <commctrl.h>
 #include <windowsx.h>
@@ -204,6 +205,13 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       favorites_bar_.Attach(hwnd_, instance_, [this](const std::string& url) { delegate_->OnNavigateRequested(url); },
                             [this](const std::string& id) { delegate_->OnRemoveFavoriteRequested(id); });
       url_bar_.Create(hwnd_, instance_, rect, delegate_);
+      delegate_->downloads.visibility_changed = [this](bool visible) {
+        url_bar_.SetDownloadsVisible(visible);
+        RECT client{};
+        GetClientRect(hwnd_, &client);
+        LayoutChildren(client.right, client.bottom);
+      };
+      url_bar_.SetDownloadsVisible(!delegate_->downloads.items().empty());
       UpdateChromePalette();
       browser_view_->Create(hwnd_, instance_, rect, observer_);
       toast_.Create(hwnd_, instance_);
@@ -304,6 +312,9 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         case IDC_FORWARD_BUTTON: delegate_->OnForwardRequested(); return 0;
         case IDC_RELOAD_BUTTON: delegate_->OnReloadRequested(); return 0;
         case IDC_BOOKMARKS_BUTTON: ShowPanel(IDM_VIEW_BOOKMARKS); return 0;
+        case IDC_DOWNLOADS_BUTTON:
+          ShowDownloadsPopup(hwnd_, GetDlgItem(hwnd_, IDC_DOWNLOADS_BUTTON), delegate_->downloads);
+          return 0;
         case IDC_HISTORY_BUTTON: ShowPanel(IDM_VIEW_HISTORY); return 0;
         case IDC_NETWORK_BUTTON: ShowPanel(IDM_VIEW_NETWORK); return 0;
         case IDC_INSPECTOR_3D_BUTTON: delegate_->OnToggle3DInspectorRequested(); return 0;
@@ -342,6 +353,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     }
     case WM_CLOSE: delegate_->OnWindowCloseRequested(); return 0;
     case WM_DESTROY:
+      delegate_->downloads.visibility_changed = {};
       url_bar_.Destroy();
       tab_tooltips_.Destroy();
       if (accelerators_ != nullptr) DestroyAcceleratorTable(accelerators_);

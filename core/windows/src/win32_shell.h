@@ -13,6 +13,7 @@
 #endif
 #include <windows.h>
 
+#include "../../native/engine-chromium-desktop/include/kelpie/download_history.h"
 #include "favorites_bar.h"
 #include "favicon_cache.h"
 #include "theme/chrome_palette.h"
@@ -34,6 +35,7 @@ inline constexpr int kTabMaxWidthDip = 220;
 class ShellDelegate : public UrlBarDelegate {
  public:
   ~ShellDelegate() override = default;
+  DownloadHistory downloads;
   virtual std::string GetBookmarksJson() const = 0;
   virtual std::string GetHistoryJson() const = 0;
   virtual std::string GetNetworkJson() const = 0;
