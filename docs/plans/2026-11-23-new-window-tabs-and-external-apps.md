@@ -75,6 +75,10 @@ Eligibility, applied before any lookup or prompt, on tabs and pop-ups alike:
   Third-party frames cannot ask.
 - A link activation / user gesture may always ask. Without one, a document may ask once; the
   allowance resets when a new main-frame document commits. One prompt at a time per window.
+  WebKit only reports link clicks as activation, so macOS (AppKit event monitor, ignoring
+  sheets) and iOS (a touch-down recognizer that always fails) record the person's last input;
+  input in the previous 2 s that the page has not already used counts as one activation. This
+  keeps "Launch app" buttons on launch pages working after a cancelled first prompt.
 - The prompt names the requesting origin (from the source frame's security origin) and, where
   the OS can resolve it, the target app.
 

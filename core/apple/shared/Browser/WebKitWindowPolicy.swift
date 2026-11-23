@@ -89,6 +89,11 @@ extension WebKitWindowPolicy {
 @MainActor
 final class ExternalAppAllowance {
     private static let allowances = NSMapTable<WKWebView, ExternalAppAllowance>.weakToStrongObjects()
+    /// WebKit only reports link clicks as activation, so each platform records
+    /// when the person last clicked, tapped or typed; script run by that input
+    /// (a "Launch app" button) may ask once more.
+    static var lastUserInput: Date?
+    private static let activationWindow: TimeInterval = 2
 
     static func of(_ webView: WKWebView) -> ExternalAppAllowance {
         if let existing = allowances.object(forKey: webView) { return existing }
@@ -98,14 +103,22 @@ final class ExternalAppAllowance {
     }
 
     private var documentMayAsk = true
+    private var lastAsked: Date?
 
     /// A new main-frame document may ask once again.
     func documentCommitted() { documentMayAsk = true }
 
-    func permits(userActivated: Bool) -> Bool {
-        if userActivated { return true }
+    func permits(userActivated: Bool, now: Date = Date()) -> Bool {
+        defer { lastAsked = now }
+        if userActivated || hasUnusedUserInput(now: now) { return true }
         guard documentMayAsk else { return false }
         documentMayAsk = false
         return true
+    }
+
+    /// Recent input the page has not already used to ask.
+    private func hasUnusedUserInput(now: Date) -> Bool {
+        guard let input = Self.lastUserInput, now.timeIntervalSince(input) < Self.activationWindow else { return false }
+        return lastAsked.map { input > $0 } ?? true
     }
 }

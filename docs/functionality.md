@@ -185,7 +185,7 @@ With WebKit (macOS, iOS) and on Android, a page keeps a handle to a tab it opene
 
 When a page links to another app, such as Slack, Zoom or Mail (`slack:`, `zoommtg:`, `mailto:`), Kelpie asks before opening it, as Chrome and Safari do. The prompt names the site that asked and, on macOS, Windows and Linux, the app the system will use. Choose **Open** to launch the app, or **Cancel** to stay on the page. On macOS, Windows and Linux, a link no installed app can open is ignored without a prompt.
 
-A page may ask once on its own each time it loads, which covers "Launching…" pages that hand off to a desktop app. After that, only clicking a link can ask again, so a page cannot repeat the prompt. Only the page itself and frames from the same site can ask; third-party frames cannot. On Android, `intent:` links open the app they name, or the page's fallback web address when that app is not installed. Windows and Linux never open schemes that Chrome blocks, such as `shell:` and `vbscript:`.
+A page may ask once on its own each time it loads, which covers "Launching…" pages that hand off to a desktop app. After that, only a click, tap or key press on the page can ask again, once per input, so a page cannot repeat the prompt on its own. Only the page itself and frames from the same site can ask; third-party frames cannot. On Android, `intent:` links open the app they name, or the page's fallback web address when that app is not installed. Windows and Linux never open schemes that Chrome blocks, such as `shell:` and `vbscript:`.
 
 ### Website microphone access
 

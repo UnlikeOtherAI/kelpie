@@ -97,6 +97,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             webView.scrollView.delaysContentTouches = false
             webView.navigationDelegate = self
             webView.uiDelegate = self
+            ExternalAppPrompt.trackUserInput(on: webView)
             container.addSubview(webView)
 
             currentWebView = webView

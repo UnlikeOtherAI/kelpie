@@ -100,6 +100,7 @@ final class WebKitPopupTests: XCTestCase {
     func testAppLinkAsksOnceWithoutActivation() {
         XCTAssertTrue(WebKitWindowPolicy.opensExternalApp(URL(string: "slack://open")!, in: WKWebViewConfiguration()))
         XCTAssertFalse(WebKitWindowPolicy.opensExternalApp(URL(string: "https://slack.com")!, in: WKWebViewConfiguration()))
+        ExternalAppAllowance.lastUserInput = nil
         let allowance = ExternalAppAllowance.of(WKWebView())
         XCTAssertTrue(allowance.permits(userActivated: false))
         XCTAssertFalse(allowance.permits(userActivated: false))

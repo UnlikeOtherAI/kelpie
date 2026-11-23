@@ -92,12 +92,23 @@ final class WebKitNewWindowTests: XCTestCase {
     }
 
     func testAppLinkAllowanceIsOncePerDocumentWithoutActivation() {
+        ExternalAppAllowance.lastUserInput = nil
+        defer { ExternalAppAllowance.lastUserInput = nil }
         let allowance = ExternalAppAllowance.of(WKWebView())
-        XCTAssertTrue(allowance.permits(userActivated: false))
-        XCTAssertFalse(allowance.permits(userActivated: false), "A page must not loop the prompt")
-        XCTAssertTrue(allowance.permits(userActivated: true))
+        let start = Date()
+        XCTAssertTrue(allowance.permits(userActivated: false, now: start))
+        XCTAssertFalse(allowance.permits(userActivated: false, now: start + 1), "A page must not loop the prompt")
+        XCTAssertTrue(allowance.permits(userActivated: true, now: start + 2))
+
+        // A click lets the script it runs ask once more, but only once and only briefly.
+        ExternalAppAllowance.lastUserInput = start + 3
+        XCTAssertTrue(allowance.permits(userActivated: false, now: start + 3.5))
+        XCTAssertFalse(allowance.permits(userActivated: false, now: start + 3.6))
+        ExternalAppAllowance.lastUserInput = start + 4
+        XCTAssertFalse(allowance.permits(userActivated: false, now: start + 7), "Old input must not count")
+
         allowance.documentCommitted()
-        XCTAssertTrue(allowance.permits(userActivated: false))
+        XCTAssertTrue(allowance.permits(userActivated: false, now: start + 8))
     }
 
     // MARK: - Helpers

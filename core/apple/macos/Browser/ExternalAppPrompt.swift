@@ -3,6 +3,21 @@ import AppKit
 /// Asks before a page hands a link to another app, as Safari and Chrome do.
 @MainActor
 enum ExternalAppPrompt {
+    private static var inputMonitor: Any?
+
+    /// Records clicks and key presses in browser windows, so script a click
+    /// runs (a "Launch app" button) may ask again. Input to a sheet, such as
+    /// this prompt's own Cancel, does not count, so cancelling cannot re-arm it.
+    static func trackUserInput() {
+        guard inputMonitor == nil else { return }
+        inputMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown]) { event in
+            if let window = event.window, window.sheetParent == nil, !(window is NSPanel) {
+                MainActor.assumeIsolated { ExternalAppAllowance.lastUserInput = Date() }
+            }
+            return event
+        }
+    }
+
     /// Shows a sheet naming the requesting site and the app macOS resolved for
     /// the link. Nothing is shown when no app handles the link, the page is not
     /// on screen, or its window already shows a sheet.

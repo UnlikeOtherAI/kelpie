@@ -1,4 +1,5 @@
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
 /// Asks before a page hands a link to another app, as Safari does.
@@ -26,6 +27,13 @@ enum ExternalAppPrompt {
         presenter.present(alert, animated: true)
     }
 
+    /// Records taps on a page, so script a tap runs (a "Launch app" button) may
+    /// ask again. Taps on the alert itself never reach the page.
+    static func trackUserInput(on webView: WKWebView) {
+        guard !(webView.gestureRecognizers ?? []).contains(where: { $0 is UserInputRecognizer }) else { return }
+        webView.addGestureRecognizer(UserInputRecognizer())
+    }
+
     /// Applies the shared app-link rules to a navigation and answers WebKit.
     static func decide(
         _ action: WKNavigationAction,
@@ -41,5 +49,21 @@ enum ExternalAppPrompt {
             decisionHandler(.cancel)
             present(request, from: webView)
         }
+    }
+}
+
+/// Records the moment a finger touches the page, then fails at once, so it
+/// never delays, cancels or competes with the page's own touch handling.
+private final class UserInputRecognizer: UIGestureRecognizer {
+    init() {
+        super.init(target: nil, action: nil)
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        ExternalAppAllowance.lastUserInput = Date()
+        state = .failed
     }
 }

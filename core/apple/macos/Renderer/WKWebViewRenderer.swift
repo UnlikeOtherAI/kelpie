@@ -125,6 +125,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        ExternalAppPrompt.trackUserInput()
         webView.allowsBackForwardNavigationGestures = true
         webView.customUserAgent = Self.browserUserAgent
 

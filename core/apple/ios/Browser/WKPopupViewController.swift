@@ -58,6 +58,7 @@ final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUID
         webView.customUserAgent = opener.customUserAgent
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        ExternalAppPrompt.trackUserInput(on: webView)
         title = "Pop-up"
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(close))
         navigationItem.rightBarButtonItem?.accessibilityLabel = "Close pop-up"

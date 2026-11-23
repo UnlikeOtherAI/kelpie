@@ -8,6 +8,7 @@ import XCTest
 @MainActor
 final class ExternalAppPromptTests: XCTestCase {
     func testLaunchPageAsksOnceAndNamesRequesterAndApp() async throws {
+        ExternalAppAllowance.lastUserInput = nil
         let link = try XCTUnwrap(URL(string: "mailto:kelpie@example.com"))
         let app = try XCTUnwrap(NSWorkspace.shared.urlForApplication(toOpen: link), "This Mac needs a mail handler")
         let tab = KelpieBrowser.Tab(spec: TabSpec(dataStore: .nonPersistent()))
