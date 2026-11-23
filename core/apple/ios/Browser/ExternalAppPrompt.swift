@@ -1,4 +1,3 @@
-import UIKit
 import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
