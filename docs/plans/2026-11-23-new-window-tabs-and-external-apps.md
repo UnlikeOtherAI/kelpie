@@ -49,10 +49,11 @@ Follow Chrome's split between tabs and pop-ups:
   the `TabStore`. `onCloseWindow` closes a script-opened tab.
 - **CEF (all three):** `OnBeforePopup` cannot hand a Chromium context to a tab, so tab-like opens
   are cancelled and replayed as a new tab for the target URL, as the desktop engine did before
-  #251. Replay only happens when it is safe enough: the open came from a user gesture and has a
-  real URL. Empty or `about:blank` targets (pages that write into or navigate the new window
-  later) and opens without a gesture keep the native pop-up. Known limits of replay: no
-  `window.opener`, and a form POST to a new window becomes a GET.
+  #251. Replay only happens for a real http(s) URL. Empty or `about:blank` targets (pages that
+  write into or navigate the new window later) keep the native pop-up. Known limits of replay:
+  no `window.opener`, and a form POST to a new window becomes a GET. A user-gesture requirement
+  was tried and dropped: automation clicks (`element.click()`) carry no gesture, so agents saw
+  pop-ups where people saw tabs, and the gesture did not address the replay limits anyway.
   - Desktop partition lookup fails closed: the source is the opener tab, or the root tab a
     native pop-up was opened from; if that tab is gone or closing, nothing opens.
   - macOS Chromium native pop-ups have no tab owner (#251); their own new-window opens stay
@@ -125,8 +126,8 @@ Codex (GPT) reviewed the first draft adversarially. Accepted:
   without a gesture, one prompt at a time, revalidate on confirm, name the requesting origin and
   launch the named app.
 - Android intents are rebuilt from scratch rather than "sanitised" in place.
-- CEF replay is limited to gesture-initiated opens with a real URL; blank targets keep the native
-  pop-up; replay limits are documented. Desktop partition lookup fails closed.
+- CEF replay is limited to opens with a real URL; blank targets keep the native pop-up; replay
+  limits are documented. Desktop partition lookup fails closed.
 - No blanket `window.opener` promise; tests cover plain `window.open` and `noopener` separately.
 - Script-opened tabs live in the root store and close on `window.close()`.
 - Pop-up delegates (iOS `WKPopupViewController`, Android `WebPopupPresenter`) get the same

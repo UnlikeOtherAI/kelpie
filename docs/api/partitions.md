@@ -154,10 +154,13 @@ that is Chromium's own behaviour, not a partition limitation. A login that must
 survive a restart needs a cookie with an expiry; `localStorage` and IndexedDB
 persist either way.
 
-`window.open` inherits the opener's context. Windows and Linux cancel the CEF popup and
-reopens the target as one of its own tabs, so the opener's partition is copied
-onto the new tab explicitly — an isolated tab cannot open its way out of its
-partition.
+A sized pop-up (`window.open` with a width or height, such as a sign-in provider)
+keeps CEF's own window and inherits the opener's context. Any other new window
+with an http(s) address is cancelled and reopened as one of Kelpie's tabs, so the
+opener's partition is copied onto the new tab explicitly — an isolated tab cannot
+open its way out of its partition. A native pop-up's new windows use the
+partition of the tab that opened the pop-up. If that tab is closing or its
+partition is being deleted, nothing opens.
 
 Each tab's `name` and `partition` are recorded in the Windows session snapshot
 (`session.json`) and rebound on restore, so a persistent partition's logins
