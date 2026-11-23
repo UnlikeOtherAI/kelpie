@@ -53,6 +53,11 @@ class DesktopEngine final : public DesktopBrowserControl {
   using MicrophoneDecision = std::function<void(bool)>;
   using MicrophonePrompt = std::function<void(std::string origin, MicrophoneDecision)>;
 
+  // Ask whether to open an app link (`slack:`, `mailto:`) on the CEF UI
+  // thread. The engine has already checked that the page may ask; `requester`
+  // is its http(s) origin or empty. The shell opens the link on consent.
+  using ExternalAppPrompt = std::function<void(std::string requester, std::string url)>;
+
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
@@ -91,6 +96,7 @@ class DesktopEngine final : public DesktopBrowserControl {
     // Optional native upload picker for shells with no CEF-owned window.
     FileChooser file_chooser;
     MicrophonePrompt microphone_prompt;
+    ExternalAppPrompt external_app_prompt;
     // Supplies the `kelpie://start` data payload. The engine owns no stores, so
     // the application wires this to its BookmarkStore and HistoryStore. Called
     // on the CEF IO thread; the implementation must be thread-safe.

@@ -89,6 +89,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   }
   engine.file_chooser=file_chooser_;
   engine.microphone_prompt = microphone_prompt_;
+  engine.external_app_prompt = external_app_prompt_;
   engine.mode=DesktopEngine::Mode::kOffscreen; engine.argc=impl_->argc; engine.argv=impl_->argv;
   engine.viewport={std::max(1,width),std::max(1,height)};
   impl_->view_width=engine.viewport.width; impl_->view_height=engine.viewport.height;

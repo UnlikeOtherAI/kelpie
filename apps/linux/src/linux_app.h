@@ -65,6 +65,7 @@ class LinuxApp {
   std::pair<int,int> TakeResizeRequest();
   bool AttachBrowserHost(std::uintptr_t parent_window, int width, int height);
   void SetMicrophonePrompt(DesktopEngine::MicrophonePrompt prompt) { microphone_prompt_ = std::move(prompt); }
+  void SetExternalAppPrompt(DesktopEngine::ExternalAppPrompt prompt) { external_app_prompt_ = std::move(prompt); }
   void SetFileChooser(DesktopEngine::FileChooser chooser) { file_chooser_ = std::move(chooser); }
   void ResizeBrowserHost(int width, int height);
   bool HasNativeBrowser() const;
@@ -122,6 +123,7 @@ class LinuxApp {
   json HandleBrowserGateway(const json& request, bool mcp);
   DesktopEngine::FileChooser file_chooser_;
   DesktopEngine::MicrophonePrompt microphone_prompt_;
+  DesktopEngine::ExternalAppPrompt external_app_prompt_;
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

@@ -9,6 +9,7 @@
 #include "include/cef_parser.h"
 #include "include/cef_version.h"
 #include "kelpie/favicon_registry.h"
+#include "new_window_policy.h"
 
 #include "desktop_cef_client.h"
 
@@ -79,7 +80,7 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
 #endif
                                      const CefString& target_url,
                                      const CefString&,
-                                     WindowOpenDisposition,
+                                     WindowOpenDisposition target_disposition,
                                      bool,
                                      const CefPopupFeatures&,
                                      CefWindowInfo& window_info,
@@ -88,24 +89,9 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
                                      CefRefPtr<CefDictionaryValue>&,
                                      bool*) {
   if (owner_->shutting_down) return true;
-  if (!owner_->config.native_popups) {
-    if (target_url.empty()) return true;
-    NewTabRequest request;
-    request.url = target_url.ToString();
-    if (const auto* source = owner_->FindTab(opener)) {
-      request.partition = source->partition;
-      if (source->partition) {
-        const auto* entry = owner_->partitions.Find(*source->partition);
-        request.persistent = entry == nullptr || entry->persistent;
-      }
-    }
-    TabSnapshot created;
-    if (owner_->CreateTabOnUi(request, &created).ok) {
-      if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
-        owner_->browser = tab->browser;
-        owner_->UpdateActiveState();
-      }
-    }
+  const std::string url = target_url.ToString();
+  if (!owner_->config.native_popups || OpensAsTab(target_disposition == CEF_WOD_NEW_POPUP, url)) {
+    ReplayPopupAsTab(opener, url);
     return true;
   }
   // Let Chromium create the context so it inherits the request context and
@@ -147,6 +133,7 @@ bool DesktopCefClient::DoClose(CefRefPtr<CefBrowser> browser) {
 }
 
 void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
+  app_link_asked_.erase(browser->GetIdentifier());
   if (opener_ != 0) {
     std::erase_if(owner_->popups, [&browser](const auto& popup) { return popup.browser->IsSame(browser); });
     return;
@@ -216,6 +203,7 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
 void DesktopCefClient::OnLoadStart(CefRefPtr<CefBrowser> browser,CefRefPtr<CefFrame> frame,
                                   TransitionType) {
   if(frame && frame->IsMain()) {
+    app_link_asked_.erase(browser->GetIdentifier());
     if (auto* tab = owner_->FindTab(browser)) {
       tab->document_version = NextDocumentVersion();
       tab->inspector = {};

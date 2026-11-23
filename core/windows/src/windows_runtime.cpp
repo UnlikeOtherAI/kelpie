@@ -7,6 +7,7 @@
 #include "kelpie/desktop_mcp_server.h"
 #include "kelpie/screenshot_fit.h"
 #include "windows_utf.h"
+#include "external_app_prompt.h"
 #include "kelpie/account_login_window.h"
 
 #include <algorithm>
@@ -253,6 +254,10 @@ bool WindowsApp::InitializeDesktopRuntime() {
     const int answer = MessageBoxW(window, message.c_str(), L"Allow microphone access?",
                                    MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION);
     decide(answer == IDYES && !close_lifecycle_.requested());
+  };
+  runtime.engine.external_app_prompt = [this](std::string requester, std::string url) {
+    if (shell_ == nullptr || close_lifecycle_.requested()) return;
+    windows::PromptToOpenExternalApp(shell_->hwnd(), requester, url);
   };
   runtime.engine.mode = DesktopEngine::Mode::kWindowed;
   runtime.engine.downloads = &downloads;

@@ -6,6 +6,7 @@
 #include "bookmarks_view.h"
 #include "gtk_browser_view.h"
 #include "gtk_file_chooser.h"
+#include "gtk_external_app_prompt.h"
 #include "gtk_microphone_prompt.h"
 #include "history_view.h"
 #include "linux_app.h"
@@ -34,6 +35,10 @@ int GUIShell::Run() {
   GtkMicrophonePrompt microphone(window);
   app_.SetMicrophonePrompt([&microphone](auto origin, auto decide) {
     microphone.Show(origin, std::move(decide));
+  });
+  GtkExternalAppPrompt external_app(window);
+  app_.SetExternalAppPrompt([&external_app](auto requester, auto url) {
+    external_app.Show(requester, url);
   });
   WindowGeometry geometry(window,app_.config().profile_dir);
   StandaloneUpdates updates(app_,window);
@@ -115,7 +120,9 @@ int GUIShell::Run() {
   },&context);
   gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(app_.Tabs()); gtk_main();
   microphone.Cancel();
+  external_app.Cancel();
   app_.SetMicrophonePrompt({});
+  app_.SetExternalAppPrompt({});
   app_.SetFileChooser({});
   g_source_remove(timer); geometry.Save(); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
 #else
