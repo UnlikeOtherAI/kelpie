@@ -43,7 +43,7 @@ internal class ExternalAppPrompt(
             AlertDialog
                 .Builder(activity)
                 .setTitle("Open in another app?")
-                .setMessage("$requester wants to open a “${request.url.scheme}:” link in another app.")
+                .setMessage("$requester wants to open “${request.url.scheme}:” in another app.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Open") { _, _ ->
                     if (view.isShown) launch(view, url, intent)

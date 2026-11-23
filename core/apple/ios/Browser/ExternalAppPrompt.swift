@@ -15,7 +15,7 @@ enum ExternalAppPrompt {
         let scheme = request.url.scheme ?? "app"
         let alert = UIAlertController(
             title: "Open in another app?",
-            message: "\(request.requester ?? "This page") wants to open a “\(scheme):” link in another app.",
+            message: "\(request.requester ?? "This page") wants to open “\(scheme):” in another app.",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
