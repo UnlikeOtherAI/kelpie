@@ -39,7 +39,7 @@ core/native/.build-*/
 coverage/
 vendor/
 .ninja/
-apps/macos/Frameworks/
+apps/macos/Frameworks
 tmp/
 .cache/
 
@@ -59,7 +59,7 @@ assets/old/
 apps/ios/.releasebuild/
 
 # Embeddable browser build outputs and downloaded runtimes
-core/apple/macos/Frameworks/
+core/apple/macos/Frameworks
 core/apple/macos/vendor/
 core/apple/*.xcodeproj/
 core/apple/.build/
