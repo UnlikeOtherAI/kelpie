@@ -149,6 +149,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/account_login_window.cpp
     src/desktop_engine.cpp
     src/desktop_engine_client.cpp
+    src/desktop_engine_new_windows.cpp
     src/desktop_engine_downloads.cpp
     src/desktop_engine_cookie_store.cpp
     src/desktop_cookie_store_cef.cpp

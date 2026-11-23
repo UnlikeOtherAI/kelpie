@@ -156,6 +156,11 @@ final class WindowRegistry {
         registrationOrder.compactMap { entries[$0] }
     }
 
+    /// The window showing `tabStore`, attached or not.
+    func entry(hosting tabStore: TabStore) -> Entry? {
+        allEntriesIncludingDetached().first { $0.tabStore === tabStore }
+    }
+
     func openPartitionNames() -> Set<String> {
         Set(allEntriesIncludingDetached().flatMap { $0.tabStore.tabs.compactMap(\.partition) })
     }

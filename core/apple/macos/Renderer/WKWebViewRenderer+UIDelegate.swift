@@ -34,10 +34,10 @@ extension WKWebViewRenderer: WKUIDelegate {
         guard navigationAction.targetFrame == nil else { return nil }
         // WebKit loads the original request in the returned view and links
         // the native browsing contexts, including a window.open() handle.
-        return onOpenPopup?(configuration, windowFeatures)
+        return onOpenWindow?(configuration, windowFeatures)
     }
 
-    func webViewDidClose(_ webView: WKWebView) { onClosePopup?() }
+    func webViewDidClose(_ webView: WKWebView) { onClose?() }
 
     // MARK: - JavaScript dialogs
 

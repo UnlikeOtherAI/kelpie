@@ -173,9 +173,19 @@ macOS (Safari/WebKit and Chrome/Chromium), Windows, Linux, iOS, and Android.
 Choose one or more files as allowed by the page, or cancel to dismiss the
 picker without adding files.
 
-### Website pop-ups
+### New windows and pop-ups
 
-Sites can open a separate window on macOS, Windows and Linux, or a dismissible sheet on iOS and Android. This includes sign-in buttons that hand off to an embedded provider. The original tab stays open, and the pop-up inherits its storage profile and existing sign-in session. The site can return its result to the original tab and close the pop-up, and you can also dismiss it with the close control. Linux requires the graphical app for native pop-up windows.
+Links that open a new window (`target="_blank"`) and pages that call `window.open()` without a window size open a new selected tab in the same browser window, with the original tab's storage profile. The original tab stays as it was. Links opened from inside a pop-up also open as tabs in the main window, and stay open when the pop-up closes.
+
+Sign-in providers and other pages that ask for a window size open a pop-up instead: a separate window on macOS, Windows and Linux, or a dismissible sheet on iOS and Android. The pop-up inherits the original tab's storage profile and existing sign-in session. The site can return its result to the original tab and close the pop-up, and you can also dismiss it with the close control. Linux requires the graphical app for native pop-up windows.
+
+With WebKit (macOS, iOS) and on Android, a page keeps a handle to a tab it opened with `window.open()` and can close it; links that drop the opener (`noopener`, and `target="_blank"` links by default) do not. With Chromium on macOS, Windows and Linux the new tab loads its address fresh, so the opening page cannot script or close it, and a form posted to a new window arrives as a plain page load. A blank window a page opens to fill in later stays a pop-up there.
+
+### Links that open other apps
+
+When a page links to another app, such as Slack, Zoom or Mail (`slack:`, `zoommtg:`, `mailto:`), Kelpie asks before opening it, as Chrome and Safari do. The prompt names the site that asked and, on macOS, Windows and Linux, the app the system will use. Choose **Open** to launch the app, or **Cancel** to stay on the page. On macOS, Windows and Linux, a link no installed app can open is ignored without a prompt.
+
+A page may ask once on its own each time it loads, which covers "Launching…" pages that hand off to a desktop app. After that, only a click, tap or key press on the page can ask again, once per input, so a page cannot repeat the prompt on its own. Only the page itself and frames from the same site can ask; third-party frames cannot. On Android, `intent:` links open the app they name, or the page's fallback web address when that app is not installed. Windows and Linux never open schemes that Chrome blocks, such as `shell:` and `vbscript:`.
 
 ### Website microphone access
 

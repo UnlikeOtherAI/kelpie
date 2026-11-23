@@ -119,6 +119,7 @@ set(WINDOWS_APP_SOURCES
   src/shell_actions.cpp
   src/account_menu.cpp
   src/windows_runtime.cpp
+  src/external_app_prompt.cpp
   src/windows_cookie_sync.cpp
   src/page_color_sampler.cpp
   src/win32_shell.cpp

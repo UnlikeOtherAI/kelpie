@@ -16,6 +16,7 @@
 #include "include/capi/cef_devtools_message_observer_capi.h"
 #include "include/capi/cef_request_context_capi.h"
 #include "include/capi/cef_permission_handler_capi.h"
+#include "include/capi/cef_request_handler_capi.h"
 #include "include/capi/cef_frame_capi.h"
 #include "include/capi/cef_registration_capi.h"
 #include "include/internal/cef_time.h"
@@ -46,6 +47,12 @@ int CEFBridgeRequestMicrophoneAccess(CEFBridge * _Nullable owner,
                                     uint32_t permissions,
                                     cef_media_access_callback_t *callback);
 void CEFBridgeNullifyJSDialogHandler(cef_jsdialog_handler_t *handler);
+/// Cancels app links (`slack:`, `mailto:`) and hands eligible ones to the owner.
+cef_request_handler_t *CEFBridgeCreateRequestHandler(CEFBridge * _Nullable owner);
+void CEFBridgeNullifyRequestHandler(cef_request_handler_t *handler);
+/// 1 when a new-window open was handed to the owner as a tab and must be cancelled.
+int CEFBridgeOpenPopupAsTab(CEFBridge * _Nullable owner, const cef_string_t * _Nullable targetURL,
+                            cef_window_open_disposition_t disposition);
 
 /// Shared bounded CDP command transport; each result callback completes once.
 void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
@@ -77,6 +84,11 @@ void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser);
 - (void)cefBridgeUpdateMainFrameHTTPStatusCode:(NSInteger)statusCode;
 - (void)cefBridgeUpdateCurrentTitle:(NSString *)title;
 - (void)cefBridgeUpdateLoadingProgress:(double)progress;
+- (void)cefBridgeResetAppLinkAllowance;
+- (void)cefBridgeRequestAppLink:(NSURL *)url
+                      requester:(nullable NSString *)requester
+                       fromPage:(BOOL)fromPage
+                    userGesture:(BOOL)userGesture;
 - (void)cefBridgeHandleConsoleMessage:(NSString *)message
                                source:(NSString *)source
                                  line:(NSInteger)line

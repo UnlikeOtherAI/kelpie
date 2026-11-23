@@ -95,6 +95,12 @@ typedef void (^CEFBridgeMicrophoneHandler)(
 /// Resolve a visible, main-frame microphone request through the host's permission policy.
 @property (nonatomic, copy, nullable) CEFBridgeMicrophoneHandler onMicrophoneRequest;
 
+/// A clicked link or `window.open` asked for a new tab. Chromium's own window
+/// was cancelled; the host opens a tab for the URL.
+@property (nonatomic, copy, nullable) void (^onOpenTab)(NSURL *url);
+/// The page asked to open another app. Chromium's navigation was cancelled;
+/// the host confirms with the person before handing the link to the OS.
+@property (nonatomic, copy, nullable) void (^onAppLinkRequest)(NSURL *url, NSString *_Nullable requester);
 /// Set callback for CEF dialog-state resets such as navigation cancellation.
 @property (nonatomic, copy, nullable) void (^onJavaScriptDialogReset)(void);
 

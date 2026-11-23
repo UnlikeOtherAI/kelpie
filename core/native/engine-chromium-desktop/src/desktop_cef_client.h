@@ -1,5 +1,7 @@
 #pragma once
 
+#include <set>
+#include <string>
 #include <vector>
 
 #include "include/cef_browser.h"
@@ -9,6 +11,7 @@
 #include "include/cef_jsdialog_handler.h"
 #include "include/cef_permission_handler.h"
 #include "include/cef_render_handler.h"
+#include "include/cef_request_handler.h"
 #include "include/cef_version.h"
 
 #include "desktop_engine_impl.h"
@@ -29,7 +32,8 @@ class DesktopCefClient final : public CefClient,
                                public CefDialogHandler,
                                public CefDownloadHandler,
                                public CefJSDialogHandler,
-                               public CefPermissionHandler {
+                               public CefPermissionHandler,
+                               public CefRequestHandler {
  public:
   explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
   DesktopCefClient(DesktopEngine::Impl* owner, int opener) : owner_(owner), opener_(opener) {}
@@ -51,6 +55,13 @@ class DesktopCefClient final : public CefClient,
   CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
 
   CefRefPtr<CefPermissionHandler> GetPermissionHandler() override { return this; }
+  CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
+  // App links and new-window replay live in `desktop_engine_new_windows.cpp`.
+  bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
+                      CefRefPtr<CefFrame> frame,
+                      CefRefPtr<CefRequest> request,
+                      bool user_gesture,
+                      bool is_redirect) override;
   bool OnRequestMediaAccessPermission(CefRefPtr<CefBrowser> browser,
                                       CefRefPtr<CefFrame> frame,
                                       const CefString& requesting_origin,
@@ -65,7 +76,7 @@ class DesktopCefClient final : public CefClient,
 #endif
                      const CefString& target_url,
                      const CefString& target_frame_name,
-                     WindowOpenDisposition target_disposition,
+                     CefLifeSpanHandler::WindowOpenDisposition target_disposition,
                      bool user_gesture,
                      const CefPopupFeatures& popup_features,
                      CefWindowInfo& window_info,
@@ -132,9 +143,13 @@ class DesktopCefClient final : public CefClient,
                int height) override;
 
  private:
+  void ReplayPopupAsTab(CefRefPtr<CefBrowser> opener, const std::string& url);
+
   DesktopEngine::Impl* owner_;
   int opener_ = 0;
   bool microphone_prompt_pending_ = false;
+  // Browsers whose current document already asked to open an app without a gesture.
+  std::set<int> app_link_asked_;
 
   IMPLEMENT_REFCOUNTING(DesktopCefClient);
 };
