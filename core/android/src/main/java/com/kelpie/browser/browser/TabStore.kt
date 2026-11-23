@@ -17,7 +17,11 @@ class TabStore(
     private val browserState: BrowserState,
 ) {
     private val previewSampler = context.kelpieActivity()?.window?.let(::ChromeSampler)
-    internal val popupPresenter = context.kelpieActivity()?.let(::WebPopupPresenter)
+    internal val externalApps = context.kelpieActivity()?.let(::ExternalAppPrompt)
+    internal val popupPresenter =
+        context.kelpieActivity()?.let { activity ->
+            WebPopupPresenter(activity, externalApps) { partition, result -> openPageTab(partition, result) }
+        }
     internal val fileChooser = (context.kelpieActivity() as? ComponentActivity)?.let(::WebFileChooser)
     internal val microphonePermission =
         (context.kelpieActivity() as? ComponentActivity)?.let { activity ->
@@ -99,6 +103,35 @@ class TabStore(
         }
         persistSession()
         return tab
+    }
+
+    /**
+     * Hosts a page's new-window context as a selected tab. Chromium loads the request into the
+     * transported WebView and keeps the opener relationship it chose (none for `noopener`). An
+     * unavailable partition opens nothing rather than falling back to the default store.
+     */
+    internal fun openPageTab(
+        partition: String?,
+        result: android.os.Message,
+    ): Boolean {
+        val transport = result.obj as? WebView.WebViewTransport ?: return false
+        val profile =
+            try {
+                partition?.let { PartitionRegistry.resolve(it, restoring = true) }
+            } catch (_: PartitionRegistry.Failure) {
+                return false
+            }
+        com.kelpie.browser.connect.NessieConnection
+            .personChangedTab()
+        activeTab?.webView?.let { microphonePermission?.cancel(it) }
+        captureActivePreview()
+        val tab = createTab(isStartPage = false, partition = partition, profile = profile)
+        _tabs.value = _tabs.value + tab
+        _activeTabId.value = tab.id
+        persistSession()
+        transport.webView = tab.webView
+        result.sendToTarget()
+        return true
     }
 
     fun closeTab(id: String) {

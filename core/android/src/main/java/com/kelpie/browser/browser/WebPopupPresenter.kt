@@ -16,6 +16,8 @@ import android.widget.TextView
 /** Presents the WebView paired with the Chromium opener by WebViewTransport. */
 internal class WebPopupPresenter(
     private val activity: Activity,
+    private val externalApps: ExternalAppPrompt?,
+    private val openTab: (partition: String?, result: Message) -> Boolean,
 ) {
     private data class Popup(
         val opener: WebView,
@@ -64,6 +66,19 @@ internal class WebPopupPresenter(
             }
         view.webViewClient =
             object : WebViewClient() {
+                override fun onPageStarted(
+                    view: WebView,
+                    url: String,
+                    favicon: android.graphics.Bitmap?,
+                ) {
+                    externalApps?.documentStarted(view)
+                }
+
+                override fun shouldOverrideUrlLoading(
+                    view: WebView,
+                    request: android.webkit.WebResourceRequest,
+                ): Boolean = externalApps?.intercept(view, request) ?: ExternalAppLinks.isAppLink(request.url)
+
                 override fun onPageCommitVisible(
                     view: WebView,
                     url: String,
@@ -86,7 +101,7 @@ internal class WebPopupPresenter(
                     isDialog: Boolean,
                     isUserGesture: Boolean,
                     resultMsg: Message,
-                ): Boolean = open(view, partition, resultMsg)
+                ): Boolean = if (isDialog) open(view, partition, resultMsg) else openTab(partition, resultMsg)
 
                 override fun onCloseWindow(window: WebView) = dialog.dismiss()
             }

@@ -37,7 +37,7 @@ class WebPopupFlowTest {
                 <button onclick="window.postMessage('open', '*')">Sign in</button>
                 <script>
                 window.addEventListener('message', event => {
-                    if (event.data === 'open') window.child = window.open('about:blank', 'sign-in');
+                    if (event.data === 'open') window.child = window.open('about:blank', 'sign-in', 'width=480,height=640');
                     else document.title = event.data;
                 });
                 </script>
@@ -57,6 +57,35 @@ class WebPopupFlowTest {
         ui.waitUntil(5000) { evaluate(webView, "document.title") == "\"Signed in\"" }
         ui.waitUntil(5000) { evaluate(webView, "window.child.closed") == "true" }
         ui.waitUntil(5000) { ui.runOnIdle { webView.hasWindowFocus() } }
+    }
+
+    @Test
+    fun newWindowLinkOpensSelectedTabAndKeepsOpenerPage() {
+        if (ui.onAllNodesWithText("Get Started").fetchSemanticsNodes().isNotEmpty()) {
+            ui.onNodeWithText("Get Started").performClick()
+        }
+        val webView = ui.runOnIdle { requireNotNull(ui.activity.window.decorView.browserView()) }
+        ui.runOnIdle {
+            webView.loadDataWithBaseURL(
+                "https://popup.test/",
+                """
+                <title>Workspaces</title>
+                <button onclick="window.child = window.open('about:blank')">Open</button>
+                """.trimIndent(),
+                "text/html",
+                "utf-8",
+                null,
+            )
+        }
+        ui.waitUntil(5000) { evaluate(webView, "document.title") == "\"Workspaces\"" }
+        evaluate(webView, "document.querySelector('button').click()")
+        ui.waitUntil(5000) { ui.runOnIdle { ui.activity.window.decorView.browserView() !== webView } }
+        val tab = ui.runOnIdle { requireNotNull(ui.activity.window.decorView.browserView()) }
+        assertEquals("true", evaluate(webView, "!!window.child && !window.child.closed"))
+        assertEquals("true", evaluate(tab, "window.opener !== null"))
+        assertEquals("\"Workspaces\"", evaluate(webView, "document.title"))
+        evaluate(webView, "window.child.close()")
+        ui.waitUntil(5000) { ui.runOnIdle { ui.activity.window.decorView.browserView() === webView } }
     }
 
     private fun evaluate(

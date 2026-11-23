@@ -54,6 +54,7 @@ private fun tabWebViewClient(
         ) {
             tabStore.fileChooser?.cancel(view)
             tabStore.microphonePermission?.cancel(view)
+            tabStore.externalApps?.documentStarted(view)
             val previousVersion = tab.documentVersion
             tab.documentVersion =
                 java.util.UUID
@@ -159,7 +160,7 @@ private fun tabWebViewClient(
         override fun shouldOverrideUrlLoading(
             view: WebView,
             request: WebResourceRequest,
-        ): Boolean = false
+        ): Boolean = tabStore.externalApps?.intercept(view, request) ?: ExternalAppLinks.isAppLink(request.url)
     }
 
 private fun tabWebChromeClient(
@@ -176,7 +177,17 @@ private fun tabWebChromeClient(
             isDialog: Boolean,
             isUserGesture: Boolean,
             resultMsg: Message,
-        ): Boolean = isActive() && tabStore.popupPresenter?.open(view, tab.partition, resultMsg) == true
+        ): Boolean =
+            isActive() &&
+                if (isDialog) {
+                    tabStore.popupPresenter?.open(view, tab.partition, resultMsg) == true
+                } else {
+                    tabStore.openPageTab(tab.partition, resultMsg)
+                }
+
+        override fun onCloseWindow(window: WebView) {
+            if (tabStore.tabs.value.any { it === tab }) tabStore.closeTab(tab.id)
+        }
 
         override fun onPermissionRequest(request: PermissionRequest) {
             val microphone = tabStore.microphonePermission
