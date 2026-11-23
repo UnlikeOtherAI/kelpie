@@ -76,7 +76,7 @@ class DesktopCefClient final : public CefClient,
 #endif
                      const CefString& target_url,
                      const CefString& target_frame_name,
-                     WindowOpenDisposition target_disposition,
+                     CefLifeSpanHandler::WindowOpenDisposition target_disposition,
                      bool user_gesture,
                      const CefPopupFeatures& popup_features,
                      CefWindowInfo& window_info,

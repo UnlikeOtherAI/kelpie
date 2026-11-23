@@ -80,7 +80,7 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
 #endif
                                      const CefString& target_url,
                                      const CefString&,
-                                     WindowOpenDisposition target_disposition,
+                                     CefLifeSpanHandler::WindowOpenDisposition target_disposition,
                                      bool,
                                      const CefPopupFeatures&,
                                      CefWindowInfo& window_info,
