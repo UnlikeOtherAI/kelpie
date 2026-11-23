@@ -168,6 +168,7 @@ struct BridgeClient {
     FrameHandler *frame;
     cef_jsdialog_handler_t *jsDialog;
     PermissionHandler *permission;
+    cef_request_handler_t *request;
 };
 
 struct DevToolsScreenshotObserver {
@@ -302,6 +303,13 @@ static cef_jsdialog_handler_t *GetJSDialogHandler(cef_client_t *self) {
     return client->jsDialog;
 }
 
+static cef_request_handler_t *GetRequestHandler(cef_client_t *self) {
+    auto *client = StructFromBase<BridgeClient>(&self->base, offsetof(BridgeClient, client));
+    if (client->request == nullptr) return nullptr;
+    client->request->base.add_ref(&client->request->base);
+    return client->request;
+}
+
 static cef_permission_handler_t *GetPermissionHandler(cef_client_t *self) {
     auto *client = StructFromBase<BridgeClient>(&self->base, offsetof(BridgeClient, client));
     auto *handler = &client->permission->handler;
@@ -351,6 +359,10 @@ static int ClientRelease(cef_base_ref_counted_t *base) {
             client->jsDialog->base.release(&client->jsDialog->base);
             client->jsDialog = nullptr;
         }
+        if (client->request != nullptr) {
+            client->request->base.release(&client->request->base);
+            client->request = nullptr;
+        }
         if (client->permission != nullptr) client->permission->handler.base.release(&client->permission->handler.base);
         delete client;
         return 1;
@@ -376,8 +388,13 @@ static T *CreateHandler(CEFBridge *owner) {
     return handler;
 }
 
-static int OnBeforePopup(cef_life_span_handler_t *self, cef_browser_t *browser, cef_frame_t *frame, int, const cef_string_t *, const cef_string_t *, cef_window_open_disposition_t, int, const cef_popup_features_t *, cef_window_info_t *, cef_client_t **client, cef_browser_settings_t *, cef_dictionary_value_t **, int *) {
+static int OnBeforePopup(cef_life_span_handler_t *self, cef_browser_t *browser, cef_frame_t *frame, int, const cef_string_t *targetURL, const cef_string_t *, cef_window_open_disposition_t disposition, int, const cef_popup_features_t *, cef_window_info_t *, cef_client_t **client, cef_browser_settings_t *, cef_dictionary_value_t **, int *) {
     auto *handler = StructFromBase<LifeSpanHandler>(&self->base, offsetof(LifeSpanHandler, handler));
+    if (CEFBridgeOpenPopupAsTab(handler->owner, targetURL, disposition)) {
+        if (browser != nullptr) browser->base.release(&browser->base);
+        if (frame != nullptr) frame->base.release(&frame->base);
+        return 1;
+    }
     // CEF owns the real browsing context. A window without a tab owner must
     // never deliver its navigation and lifecycle callbacks into the opener.
     if (client != nullptr && handler->owner != nil) {
@@ -540,6 +557,7 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->client.get_download_handler = CEFBridgeDownloadHandler;
     client->client.get_frame_handler = GetFrameHandler;
     client->client.get_jsdialog_handler = GetJSDialogHandler;
+    client->client.get_request_handler = GetRequestHandler;
     client->client.get_permission_handler = GetPermissionHandler;
 
     client->lifeSpan = CreateHandler<LifeSpanHandler>(owner);
@@ -562,6 +580,8 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
         client->client.get_frame_handler = nullptr;
         client->client.get_jsdialog_handler = nullptr;
         client->client.get_permission_handler = nullptr;
+        // An ownerless pop-up cannot ask the person, so its app links are dropped.
+        client->request = CEFBridgeCreateRequestHandler(nil);
         client->lifeSpan->handler.on_after_created = nullptr;
         client->lifeSpan->handler.do_close = nullptr;
         client->lifeSpan->handler.on_before_close = nullptr;
@@ -594,6 +614,7 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->frame->handler.on_main_frame_changed = OnMainFrameChanged;
 
     client->jsDialog = CEFBridgeCreateJSDialogHandler(owner);
+    client->request = CEFBridgeCreateRequestHandler(owner);
     client->permission = CreateHandler<PermissionHandler>(owner);
     client->permission->handler.base.add_ref = PermissionAddRef;
     client->permission->handler.base.release = PermissionRelease;
@@ -615,6 +636,7 @@ void CEFBridgeNullifyClientOwner(BridgeClient *client) {
     if (client->display  != nullptr) { client->display->owner  = nil; }
     if (client->frame    != nullptr) { client->frame->owner    = nil; }
     if (client->jsDialog != nullptr) { CEFBridgeNullifyJSDialogHandler(client->jsDialog); }
+    if (client->request  != nullptr) { CEFBridgeNullifyRequestHandler(client->request); }
     client->permission->owner = nil;
 }
 

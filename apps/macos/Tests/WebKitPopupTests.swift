@@ -16,7 +16,7 @@ final class WebKitPopupTests: XCTestCase {
                 window.result = '';
                 document.querySelector('#open').onclick = () => window.postMessage('open', '*');
                 window.addEventListener('message', event => {
-                    if (event.data === 'open') window.child = window.open('about:blank', 'sign-in');
+                    if (event.data === 'open') window.child = window.open('about:blank', 'sign-in', 'width=480,height=640');
                     else window.result = event.data;
                 });
             </script>

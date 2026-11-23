@@ -189,7 +189,13 @@ struct WebViewContainer: UIViewRepresentable {
         // MARK: - WKUIDelegate
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            WKPopupViewController.present(from: webView, configuration: configuration)
+            // The external display has a single surface and no tabs, so a
+            // tab-like window replaces its page, as before pop-ups existed.
+            guard WebKitWindowPolicy.placement(for: windowFeatures) == .popup else {
+                webView.load(navigationAction.request)
+                return nil
+            }
+            return WKPopupViewController.present(from: webView, configuration: configuration) { _ in nil }
         }
 
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {

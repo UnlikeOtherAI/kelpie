@@ -19,6 +19,7 @@ struct TabWebViewContainer: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
+            tabStore: tabStore,
             browserState: browserState,
             handlerContext: handlerContext,
             onScrollDirectionChange: onScrollDirectionChange,
@@ -51,6 +52,7 @@ struct TabWebViewContainer: UIViewRepresentable {
     // MARK: - Coordinator
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        weak var tabStore: TabStore?
         let browserState: BrowserState
         weak var handlerContext: HandlerContext?
         let onScrollDirectionChange: (ScrollDirection) -> Void
@@ -68,11 +70,13 @@ struct TabWebViewContainer: UIViewRepresentable {
         private var chromeScroll = BrowserChromeScroll()
 
         init(
+            tabStore: TabStore,
             browserState: BrowserState,
             handlerContext: HandlerContext?,
             onScrollDirectionChange: @escaping (ScrollDirection) -> Void,
             onWebViewReady: @escaping (WKWebView) -> Void
         ) {
+            self.tabStore = tabStore
             self.browserState = browserState
             self.handlerContext = handlerContext
             self.onScrollDirectionChange = onScrollDirectionChange
@@ -214,6 +218,7 @@ struct TabWebViewContainer: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            ExternalAppAllowance.of(webView).documentCommitted()
             syncBrowserState(from: webView)
         }
 
@@ -263,7 +268,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
         ) {
-            decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+            ExternalAppPrompt.decide(navigationAction, in: webView, decisionHandler: decisionHandler)
         }
 
         func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -282,7 +287,30 @@ struct TabWebViewContainer: UIViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            WKPopupViewController.present(from: webView, configuration: configuration)
+            let openTab = pageTabOpener(partition: tabStore?.tabs.first { $0.webView === webView }?.partition)
+            switch WebKitWindowPolicy.placement(for: windowFeatures) {
+            case .popup:
+                return WKPopupViewController.present(from: webView, configuration: configuration, openTab: openTab)
+            case .tab:
+                return openTab(configuration)
+            }
+        }
+
+        func webViewDidClose(_ webView: WKWebView) {
+            tabStore?.closeBrowserTab(hosting: webView)
+        }
+
+        /// Opens tabs for the root tab's pages and pop-ups, in its partition.
+        private func pageTabOpener(partition: String?) -> (WKWebViewConfiguration) -> WKWebView? {
+            { [weak self] configuration in
+                guard let self, let tabStore = self.tabStore else { return nil }
+                let webView = tabStore.openPageTab(configuration: configuration, partition: partition)
+                // WebKit starts loading into the view at once, before the
+                // container installs it, so its policies must already apply.
+                webView.navigationDelegate = self
+                webView.uiDelegate = self
+                return webView
+            }
         }
 
         func webView(

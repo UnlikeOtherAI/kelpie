@@ -15,12 +15,11 @@ final class WKPopupWindow: NSObject, NSWindowDelegate {
     private weak var openerWindow: NSWindow?
     private var urlObservation: AnyCancellable?
 
-    init(opener: Tab, configuration: WKWebViewConfiguration, features: WKWindowFeatures) {
+    init(opener: Tab, configuration: WKWebViewConfiguration, features: WKWindowFeatures, tabHost: TabStore) {
         let renderer = WKWebViewRenderer(configuration: configuration)
-        let spec = TabSpec(partition: opener.partition, persistent: opener.persistent)
-        let tab = Tab(spec: spec, renderer: renderer)
-        tab.isStartPage = false
-        tabStore = TabStore(isolatedTab: tab)
+        let spec = TabSpec(partition: opener.partition, persistent: opener.persistent, pageRenderer: renderer)
+        let tab = Tab(spec: spec)
+        tabStore = TabStore(isolatedTab: tab, tabHost: tabHost)
         webView = renderer.webView
 
         let parent = opener.renderer.webView.window
@@ -43,7 +42,7 @@ final class WKPopupWindow: NSObject, NSWindowDelegate {
         window.setFrameOrigin(NSPoint(x: available.midX - width / 2, y: available.midY - window.frame.height / 2))
         window.contentView = webView
         window.delegate = self
-        renderer.onClosePopup = { [weak self] in self?.close() }
+        renderer.onClose = { [weak self] in self?.close() }
         urlObservation = tab.$currentURL.sink { [weak self] url in
             self?.setWindowTitle(url)
         }

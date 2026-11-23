@@ -27,6 +27,7 @@
     _mainFrameHTTPStatusCode = statusCode;
     if (statusCode == 0) {
         [self cancelPendingMicrophoneAccess];
+        [self cefBridgeResetAppLinkAllowance];
         @synchronized (self) { _documentVersion = NSUUID.UUID.UUIDString; ++_documentNavigationCount; }
     }
 }

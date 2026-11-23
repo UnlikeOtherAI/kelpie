@@ -83,8 +83,10 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
-    var onOpenPopup: ((WKWebViewConfiguration, WKWindowFeatures) -> WKWebView?)?
-    var onClosePopup: (() -> Void)?
+    /// Hosts a browsing context the page opened (a tab or a pop-up window).
+    var onOpenWindow: ((WKWebViewConfiguration, WKWindowFeatures) -> WKWebView?)?
+    /// The page called `window.close()` on a context it opened.
+    var onClose: (() -> Void)?
     /// The owning tab, reported on downloads this page starts.
     var downloadTabId: String?
     var downloadStore: DownloadStore = .shared
@@ -356,8 +358,20 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        // `<a download>` asks for a file before any response arrives.
-        decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+        switch WebKitWindowPolicy.externalAppDecision(for: navigationAction, in: webView) {
+        case .load:
+            // `<a download>` asks for a file before any response arrives.
+            decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+        case .drop:
+            decisionHandler(.cancel)
+        case .ask(let request):
+            decisionHandler(.cancel)
+            ExternalAppPrompt.present(request, from: webView)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        ExternalAppAllowance.of(webView).documentCommitted()
     }
 
     // The navigation is cancelled and the tab keeps its current document.

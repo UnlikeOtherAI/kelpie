@@ -61,6 +61,8 @@ final class CEFRenderer: RendererEngine {
 
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
+    /// The page opened a new-window link that belongs in a tab.
+    var onOpenTab: ((URL) -> Void)?
     let dialogState = DialogState()
 
     /// Initialize CEF on a clean run loop iteration. Must be called before
@@ -132,6 +134,7 @@ final class CEFRenderer: RendererEngine {
         pendingURL = nil
         onStateChange = nil
         onScriptMessage = nil
+        onOpenTab = nil
         let view = containerView
         view.isHidden = true
         guard let bridge else {
@@ -180,6 +183,15 @@ final class CEFRenderer: RendererEngine {
             }
         }
 
+        bridge.onOpenTab = { [weak self] url in
+            MainActor.assumeIsolated { self?.onOpenTab?(url) }
+        }
+        bridge.onAppLinkRequest = { [weak self] url, requester in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                ExternalAppPrompt.present(ExternalAppRequest(url: url, requester: requester), from: self.containerView)
+            }
+        }
         bridge.onJavaScriptDialogReset = { [weak self] in
             Task { @MainActor in
                 self?.dialogState.cancelCurrent()

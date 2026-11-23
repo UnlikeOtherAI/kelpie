@@ -31,6 +31,8 @@ NS_ASSUME_NONNULL_BEGIN
     cef_browser_t *_callbackBrowser;
     void (^_retirementCompletion)(void);
     void (^_cancelMicrophoneRequest)(void);
+    /// The current document already asked to open an app without a gesture.
+    BOOL _appLinkAsked;
 }
 
 /// Returns the live browser handle, preferring `_createdBrowser` over `_callbackBrowser`.

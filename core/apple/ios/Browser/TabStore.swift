@@ -116,6 +116,27 @@ final class TabStore: ObservableObject {
         tab.capturePreview()
     }
 
+    /// Hosts a page's new-window context as a selected tab. WebKit loads the
+    /// request into the returned view and keeps the opener relationship it
+    /// chose (none for `noopener`). `configuration` carries the opener's data
+    /// store; `partition` is the opener's label for it.
+    func openPageTab(configuration: WKWebViewConfiguration, partition: String?) -> WKWebView {
+        NessieConnection.shared.personChangedTab()
+        captureActivePreview()
+        let tab = makeBrowserTab(configuration: configuration, isStartPage: false, partition: partition, name: nil)
+        bind(tab)
+        tabs.append(tab)
+        activeBrowserTabID = tab.id
+        persistSession()
+        return tab.webView
+    }
+
+    /// The page called `window.close()` on a context it may close.
+    func closeBrowserTab(hosting webView: WKWebView) {
+        guard let tab = tabs.first(where: { $0.webView === webView }) else { return }
+        closeBrowserTab(id: tab.id)
+    }
+
     private func createBrowserTab(
         isStartPage: Bool = true,
         dataStore: WKWebsiteDataStore? = nil,
@@ -126,7 +147,18 @@ final class TabStore: ObservableObject {
         config.allowsInlineMediaPlayback = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.websiteDataStore = dataStore ?? WebViewDefaults.sharedWebsiteDataStore
+        return makeBrowserTab(configuration: config, isStartPage: isStartPage, partition: partition, name: name)
+    }
 
+    /// A WebKit-supplied configuration still holds the opener's controller, so
+    /// every tab gets a fresh one with its own bridges.
+    private func makeBrowserTab(
+        configuration config: WKWebViewConfiguration,
+        isStartPage: Bool,
+        partition: String?,
+        name: String?
+    ) -> BrowserTab {
+        config.userContentController = WKUserContentController()
         if let handlerContext {
             let ucc = config.userContentController
             let proxy = WeakScriptMessageHandler(handlerContext)

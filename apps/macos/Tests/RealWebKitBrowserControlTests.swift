@@ -264,7 +264,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         window.makeKeyAndVisible()
         let browserState = BrowserState()
         let coordinator = TabWebViewContainer.Coordinator(
-            browserState: browserState, handlerContext: context,
+            tabStore: store, browserState: browserState, handlerContext: context,
             onScrollDirectionChange: { _ in }, onWebViewReady: { _ in }
         )
         coordinator.install(webView: webView, in: container)

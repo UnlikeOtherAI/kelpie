@@ -7,12 +7,18 @@ import WebKit
 final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     let webView: WKWebView
     private weak var opener: WKWebView?
+    /// Opens tab-like windows this pop-up's pages ask for in the root browser.
+    private let openTab: (WKWebViewConfiguration) -> WKWebView?
 
-    static func present(from opener: WKWebView, configuration: WKWebViewConfiguration) -> WKWebView? {
+    static func present(
+        from opener: WKWebView,
+        configuration: WKWebViewConfiguration,
+        openTab: @escaping (WKWebViewConfiguration) -> WKWebView?
+    ) -> WKWebView? {
         guard let root = opener.window?.rootViewController else { return nil }
         let presenter = topPresenter(from: root)
         guard !presenter.isBeingDismissed, !presenter.isBeingPresented else { return nil }
-        let popup = WKPopupViewController(opener: opener, configuration: configuration)
+        let popup = WKPopupViewController(opener: opener, configuration: configuration, openTab: openTab)
         let navigation = UINavigationController(rootViewController: popup)
         navigation.modalPresentationStyle = .pageSheet
         presenter.present(navigation, animated: true)
@@ -38,8 +44,13 @@ final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUID
         return presenter
     }
 
-    init(opener: WKWebView, configuration: WKWebViewConfiguration) {
+    init(
+        opener: WKWebView,
+        configuration: WKWebViewConfiguration,
+        openTab: @escaping (WKWebViewConfiguration) -> WKWebView?
+    ) {
         self.opener = opener
+        self.openTab = openTab
         // The opener's automation bridge belongs to the opener's document.
         configuration.userContentController = WKUserContentController()
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -72,7 +83,7 @@ final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUID
         decidePolicyFor navigationAction: WKNavigationAction,
         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
     ) {
-        decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+        ExternalAppPrompt.decide(navigationAction, in: webView, decisionHandler: decisionHandler)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -86,6 +97,7 @@ final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUID
     override func loadView() { view = webView }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        ExternalAppAllowance.of(webView).documentCommitted()
         guard let url = webView.url, let host = url.host, let scheme = url.scheme,
               scheme == "https" || scheme == "http" else { title = "Pop-up"; return }
         title = "\(scheme)://\(host)\(url.port.map { ":\($0)" } ?? "")"
@@ -97,7 +109,10 @@ final class WKPopupViewController: UIViewController, WKNavigationDelegate, WKUID
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        Self.present(from: webView, configuration: configuration)
+        switch WebKitWindowPolicy.placement(for: windowFeatures) {
+        case .popup: Self.present(from: webView, configuration: configuration, openTab: openTab)
+        case .tab: openTab(configuration)
+        }
     }
 
     func webViewDidClose(_ webView: WKWebView) { close() }

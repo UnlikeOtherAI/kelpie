@@ -14,6 +14,9 @@ struct TabSpec {
     var partition: String?
     var persistent = true
     var dataStore: WKWebsiteDataStore?
+    /// A browsing context WebKit already created for a page's new window. Its
+    /// configuration carries the opener's data store, so `dataStore` is unused.
+    var pageRenderer: WKWebViewRenderer?
 }
 
 @MainActor
@@ -57,11 +60,13 @@ final class Tab: ObservableObject, Identifiable {
     private var lastHistoryTitle: String = ""
     private var lastObservedHistoryClearGeneration = HistoryStore.shared.clearGeneration
 
-    init(spec: TabSpec = TabSpec(), renderer suppliedRenderer: WKWebViewRenderer? = nil) {
+    init(spec: TabSpec = TabSpec()) {
         self.name = spec.name
         self.partition = spec.partition
         self.persistent = spec.persistent
-        self.renderer = suppliedRenderer ?? WKWebViewRenderer(dataStore: spec.dataStore)
+        self.renderer = spec.pageRenderer ?? WKWebViewRenderer(dataStore: spec.dataStore)
+        // WebKit is about to load the page's request into a supplied context.
+        self.isStartPage = spec.pageRenderer == nil
         self.chatSession = AIChatSession(tabId: id.uuidString)
         renderer.downloadTabId = id.uuidString
     }
@@ -126,6 +131,10 @@ final class TabStore: ObservableObject {
     private var tabSinks: [UUID: AnyCancellable] = [:]
     private var popups: [UUID: [UUID: WKPopupWindow]] = [:]
     private var sessionPersistence = true
+    /// The browser store that receives tabs this store's pages open. A pop-up's
+    /// isolated store hands them to its root browser window, so closing the
+    /// pop-up does not close them.
+    private weak var tabHost: TabStore?
 
     init(engine: RendererState.Engine = .webkit) {
         self.engine = engine
@@ -153,8 +162,9 @@ final class TabStore: ObservableObject {
 
     /// An isolated renderer harness owns in-memory tabs without touching the
     /// person's browser session or history.
-    init(isolatedTab: Tab) {
+    init(isolatedTab: Tab, tabHost: TabStore? = nil) {
         sessionPersistence = false
+        self.tabHost = tabHost
         bind(isolatedTab)
         tabs = [isolatedTab]
         activeTabID = isolatedTab.id
@@ -249,9 +259,17 @@ final class TabStore: ObservableObject {
     }
 
     private func bind(_ tab: Tab) {
-        tab.renderer.onOpenPopup = { [weak self, weak tab] configuration, features in
+        tab.renderer.onOpenWindow = { [weak self, weak tab] configuration, features in
             guard let self, let tab, self.engine == .webkit else { return nil }
-            return self.openPopup(for: tab, configuration: configuration, features: features)
+            switch WebKitWindowPolicy.placement(for: features) {
+            case .popup:
+                return self.openPopup(for: tab, configuration: configuration, features: features)
+            case .tab:
+                guard let host = self.tabHost else { return self.openPageTab(from: tab, configuration: configuration) }
+                let webView = host.openPageTab(from: tab, configuration: configuration)
+                WindowRegistry.shared.entry(hosting: host)?.window?.makeKeyAndOrderFront(nil)
+                return webView
+            }
         }
         tab.renderer.onStateChange = { [weak self, weak tab] in
             guard let self, let tab else { return }
@@ -264,8 +282,37 @@ final class TabStore: ObservableObject {
             }
     }
 
+    /// Hosts a page's new-window context as a selected tab in this store's
+    /// window, through the same path as a tab the person opens. WebKit loads
+    /// the request into the returned view and keeps the opener relationship it
+    /// chose (none for `noopener`).
+    private func openPageTab(from opener: Tab, configuration: WKWebViewConfiguration) -> WKWebView? {
+        guard !isClosed, engine == .webkit else { return nil }
+        let renderer = WKWebViewRenderer(configuration: configuration)
+        let spec = TabSpec(partition: opener.partition, persistent: opener.persistent, pageRenderer: renderer)
+        let callbacks = WindowRegistry.shared.entry(hosting: self)?.callbacks
+        let tab = callbacks?.onNewTab(spec) ?? addTab(spec: spec)
+        let tabID = tab.id
+        renderer.onClose = { [weak self] in
+            guard let self else { return }
+            if let callbacks { callbacks.onCloseTab(tabID) } else { self.closeTab(id: tabID) }
+        }
+        return renderer.webView
+    }
+
+    /// Chromium cannot hand its new-window context to a tab, so a clicked
+    /// new-window link is replayed as a selected tab for its URL.
+    private func openChromiumTab(_ url: URL, from opener: Tab) {
+        guard !isClosed, engine == .chromium else { return }
+        let spec = TabSpec(partition: opener.partition, persistent: opener.persistent)
+        let tab = WindowRegistry.shared.entry(hosting: self)?.callbacks?.onNewTab(spec) ?? addTab(spec: spec)
+        tab.isStartPage = false
+        tab.currentURL = url.absoluteString
+        renderer(for: tab)?.load(url: url)
+    }
+
     private func openPopup(for opener: Tab, configuration: WKWebViewConfiguration, features: WKWindowFeatures) -> WKWebView {
-        let popup = WKPopupWindow(opener: opener, configuration: configuration, features: features)
+        let popup = WKPopupWindow(opener: opener, configuration: configuration, features: features, tabHost: tabHost ?? self)
         let openerID = opener.id
         let popupID = popup.id
         popups[openerID, default: [:]][popupID] = popup
@@ -290,8 +337,8 @@ final class TabStore: ObservableObject {
         SitePreviewCapturer.shared.tabClosed(tab.id)
         tab.chatSession.close()
         tab.renderer.onStateChange = nil
-        tab.renderer.onOpenPopup = nil
-        tab.renderer.onClosePopup = nil
+        tab.renderer.onOpenWindow = nil
+        tab.renderer.onClose = nil
         closePopups(for: tab.id)
         #if !KELPIE_WEBKIT_ONLY
         tab.chromiumRenderer?.retire()
@@ -333,6 +380,10 @@ final class TabStore: ObservableObject {
         chromium.onStateChange = { [weak self, weak tab, weak chromium] in
             guard let self, let tab, let chromium else { return }
             self.rendererStateChanged(tab, from: chromium)
+        }
+        chromium.onOpenTab = { [weak self, weak tab] url in
+            guard let self, let tab else { return }
+            self.openChromiumTab(url, from: tab)
         }
         if !tab.isStartPage, let url = URL(string: tab.currentURL), !tab.currentURL.isEmpty {
             chromium.load(url: url)
