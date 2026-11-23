@@ -64,7 +64,7 @@ class WebPopupFlowTest {
         if (ui.onAllNodesWithText("Get Started").fetchSemanticsNodes().isNotEmpty()) {
             ui.onNodeWithText("Get Started").performClick()
         }
-        val webView = ui.runOnIdle { requireNotNull(ui.activity.window.decorView.browserView()) }
+        val webView = shownBrowserView()
         ui.runOnIdle {
             webView.loadDataWithBaseURL(
                 "https://popup.test/",
@@ -79,13 +79,18 @@ class WebPopupFlowTest {
         }
         ui.waitUntil(5000) { evaluate(webView, "document.title") == "\"Workspaces\"" }
         evaluate(webView, "document.querySelector('button').click()")
-        ui.waitUntil(5000) { ui.runOnIdle { ui.activity.window.decorView.browserView() !== webView } }
-        val tab = ui.runOnIdle { requireNotNull(ui.activity.window.decorView.browserView()) }
+        ui.waitUntil(5000) { shownBrowserView() !== webView }
+        val tab = shownBrowserView()
         assertEquals("true", evaluate(webView, "!!window.child && !window.child.closed"))
         assertEquals("true", evaluate(tab, "window.opener !== null"))
         assertEquals("\"Workspaces\"", evaluate(webView, "document.title"))
         evaluate(webView, "window.child.close()")
-        ui.waitUntil(5000) { ui.runOnIdle { ui.activity.window.decorView.browserView() === webView } }
+        ui.waitUntil(5000) { shownBrowserView() === webView }
+    }
+
+    private fun shownBrowserView(): WebView {
+        val decor = ui.runOnIdle { ui.activity.window.decorView }
+        return ui.runOnIdle { requireNotNull(decor.browserView()) }
     }
 
     private fun evaluate(
