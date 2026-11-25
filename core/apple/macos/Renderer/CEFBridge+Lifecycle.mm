@@ -1,5 +1,6 @@
 #import "CEFBridgeSupport.h"
 #import <objc/runtime.h>
+#include "include/capi/cef_request_context_handler_capi.h"
 #include <atomic>
 
 namespace {
@@ -56,12 +57,46 @@ static BOOL gCEFInitialized = NO;
 static BOOL gAccountScoped = NO;
 static NSString *gProfile;
 static cef_request_context_t *gProfileContext = nullptr;
+static NSUInteger gProfileGeneration = 0;
+static BOOL gProfileReady = NO;
+static NSMutableArray<void (^)(void)> *gProfileWaiters;
 
 static NSString *EmbeddedCacheRoot(void) {
     NSString *support = [NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory
                                                              inDomains:NSUserDomainMask].firstObject.path;
     NSString *identifier = NSBundle.mainBundle.bundleIdentifier ?: @"kelpie-host";
     return [[support stringByAppendingPathComponent:identifier] stringByAppendingPathComponent:@"kelpie-cef-cache"];
+}
+
+// Context creation returns before the Chromium profile is ready for a synchronous browser.
+// CEF owns the handler reference passed to create_context.
+struct ProfileHandler {
+    cef_request_context_handler_t api{};
+    std::atomic<int> references{1};
+    NSUInteger generation;
+};
+
+static cef_request_context_handler_t *NewProfileHandler(void) {
+    auto *handler = new ProfileHandler();
+    handler->generation = gProfileGeneration;
+    ConfigureReferences(*handler);
+    handler->api.base.release = [](cef_base_ref_counted_t *base) -> int {
+        auto *owner = reinterpret_cast<ProfileHandler *>(base);
+        if (owner->references.fetch_sub(1) != 1) return 0;
+        delete owner;
+        return 1;
+    };
+    handler->api.on_request_context_initialized = [](cef_request_context_handler_t *self, cef_request_context_t *) {
+        NSUInteger generation = reinterpret_cast<ProfileHandler *>(self)->generation;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (generation != gProfileGeneration) return;
+            gProfileReady = YES;
+            NSArray *waiters = gProfileWaiters;
+            gProfileWaiters = nil;
+            for (void (^ready)(void) in waiters) ready();
+        });
+    };
+    return &handler->api;
 }
 
 cef_request_context_t *CEFBridgeCopyActiveContext(void) {
@@ -72,7 +107,7 @@ cef_request_context_t *CEFBridgeCopyActiveContext(void) {
         cef_request_context_settings_t settings = {};
         settings.size = sizeof(settings);
         settings.cache_path = CEFBridgeStringCreate([EmbeddedCacheRoot() stringByAppendingPathComponent:gProfile]);
-        gProfileContext = cef_request_context_create_context(&settings, nullptr);
+        gProfileContext = cef_request_context_create_context(&settings, NewProfileHandler());
         CEFBridgeStringClear(&settings.cache_path);
     }
     if (gProfileContext) gProfileContext->base.base.add_ref(&gProfileContext->base.base);
@@ -120,10 +155,25 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 + (void)selectEmbeddedProfile:(NSString *)profile {
     gAccountScoped = YES;
     if (profile && [gProfile isEqualToString:profile]) return;
+    gProfileGeneration++;
+    gProfileReady = NO;
+    gProfileWaiters = nil;
     if (gProfileContext) gProfileContext->base.base.release(&gProfileContext->base.base);
     gProfileContext = nullptr;
     NSCharacterSet *invalid = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"].invertedSet;
     gProfile = profile.length == 64 && [profile rangeOfCharacterFromSet:invalid].location == NSNotFound ? [profile copy] : nil;
+}
+
++ (void)whenBrowserContextReady:(void (^)(void))ready {
+    if (!gAccountScoped || gProfileReady) {
+        ready();
+        return;
+    }
+    cef_request_context_t *context = CEFBridgeCopyActiveContext();
+    if (!context) return;
+    context->base.base.release(&context->base.base);
+    if (!gProfileWaiters) gProfileWaiters = [NSMutableArray array];
+    [gProfileWaiters addObject:[ready copy]];
 }
 
 + (BOOL)initializeCEF {
@@ -187,6 +237,9 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     if (!gCEFInitialized) {
         return;
     }
+    gProfileGeneration++;
+    gProfileReady = NO;
+    gProfileWaiters = nil;
     if (gProfileContext) gProfileContext->base.base.release(&gProfileContext->base.base);
     gProfileContext = nullptr;
     cef_shutdown();

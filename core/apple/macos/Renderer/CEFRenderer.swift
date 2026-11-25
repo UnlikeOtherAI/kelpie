@@ -46,6 +46,8 @@ final class CEFRenderer: RendererEngine {
     var bridge: CEFBridge?
     let containerView: CEFHostView
     private var pendingURL: URL?
+    private var waitingForContext = false
+    private var contextReady = false
     private var isActive = false
     private var isRetired = false
     private var documentNavigationStart = Date()
@@ -115,6 +117,17 @@ final class CEFRenderer: RendererEngine {
 
     private func prepareAttachedSurface() {
         guard Self.cefInitialized, surfaceReady else { return }
+        guard contextReady else {
+            if !waitingForContext {
+                waitingForContext = true
+                CEFBridge.whenBrowserContextReady { [weak self] in
+                    guard let self, !self.isRetired else { return }
+                    self.contextReady = true
+                    self.prepareAttachedSurface()
+                }
+            }
+            return
+        }
         if bridge == nil {
             let bridge = CEFBridge(parentView: containerView, url: "about:blank", identifier: connectionTabID)
             configureBridge(bridge)

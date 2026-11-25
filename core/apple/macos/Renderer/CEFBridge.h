@@ -124,6 +124,9 @@ typedef void (^CEFBridgeMicrophoneHandler)(
 /// Select the containing account's storage. Passing nil retires its Chromium context.
 + (void)selectEmbeddedProfile:(nullable NSString *)profile;
 
+/// Run on the main thread once the current browser profile can create a tab.
++ (void)whenBrowserContextReady:(void (^)(void))ready NS_SWIFT_NAME(whenBrowserContextReady(_:));
+
 /// Shut down CEF. Call before app termination.
 + (void)shutdownCEF;
 
