@@ -4,7 +4,7 @@
 #include <atomic>
 #include <string.h>
 
-// CEF's global cookie manager. Ownership follows the CEF C API: a struct passed into a
+// CEF's active cookie manager. Ownership follows the CEF C API: a struct passed into a
 // CEF function hands CEF one reference, which CEF releases when it no longer needs the
 // struct. A visitor's release therefore marks the end of its visit, which is the only
 // completion signal CEF gives when the store holds no cookies at all.
@@ -245,13 +245,17 @@ void DeleteCookiesComplete(cef_delete_cookies_callback_t *self, int deleted) {
 
 cef_cookie_manager_t *sTestingManager = nullptr;
 
-/// A new reference to the global manager, or nullptr before CEF has initialized.
+/// A new reference to the active manager, or nullptr while the context is unavailable.
 cef_cookie_manager_t *CopyGlobalManager() {
     if (sTestingManager != nullptr) {
         sTestingManager->base.add_ref(&sTestingManager->base);
         return sTestingManager;
     }
-    return CEFBridgeIsCEFInitialized() ? cef_cookie_manager_get_global_manager(nullptr) : nullptr;
+    cef_request_context_t *context = CEFBridgeCopyActiveContext();
+    if (!context) return nullptr;
+    cef_cookie_manager_t *manager = context->get_cookie_manager(context, nullptr);
+    context->base.base.release(&context->base.base);
+    return manager;
 }
 
 BOOL VisitWasComplete(CEFCookieOperation *operation) {
@@ -320,7 +324,10 @@ void CEFBridgeUseCookieManagerForTesting(cef_cookie_manager_t *manager) {
 @implementation CEFBridge (Cookies)
 
 + (BOOL)isGlobalCookieStoreAvailable {
-    return sTestingManager != nullptr || CEFBridgeIsCEFInitialized();
+    cef_cookie_manager_t *manager = CopyGlobalManager();
+    if (!manager) return NO;
+    manager->base.release(&manager->base);
+    return YES;
 }
 
 + (void)visitGlobalCookiesWithCompletion:(void (^)(BOOL complete, NSArray<NSDictionary<NSString *, id> *> *cookies))completion {

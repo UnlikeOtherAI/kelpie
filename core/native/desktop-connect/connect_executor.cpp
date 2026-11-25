@@ -70,6 +70,13 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
   if(timeout.count()<=0)return Failed("DEADLINE_EXCEEDED");
   if(cancelled->load())return {{"state","cancelled"},{"error","Stopped on this device"}};
   const auto operation=command.at("operation").get<std::string>(); const auto input=command.at("input");
+  if (operation=="present") {
+    if (!present_ || !input.is_object() || !input.empty() || !command.at("tabId").is_null() ||
+        !command.at("tabVersion").is_null()) return Failed("INVALID_ARGUMENTS");
+    const Authorization authorized=[cancelled,deadline] { return !cancelled->load() && std::chrono::steady_clock::now()<deadline; };
+    if (!present_(authorized)) return Failed("WINDOW_UNAVAILABLE");
+    return {{"state","completed"},{"output",{{"presented",true}}}};
+  }
   if(operation=="control") {
     if(!control_ || !input.contains("request") || !input["request"].is_object())
       return {{"state","completed"},{"output",{{"response",ControlFailure("INVALID_ARGUMENTS")}}}};

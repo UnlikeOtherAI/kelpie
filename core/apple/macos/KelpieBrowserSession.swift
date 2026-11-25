@@ -76,6 +76,17 @@ public final class KelpieBrowserSession: ObservableObject {
         NessieConnection.shared.setForeground(foreground)
     }
 
+    fileprivate func sceneActivityChanged(_ active: Bool) {
+        // An embedding host with a presenter tracks its own window visibility.
+        if NessieConnection.shared.presentWindow == nil { setForeground(active) }
+    }
+
+    /// The embedding app owns window presentation. Standalone sessions expose no launch command.
+    public func setWindowPresentation(_ present: @escaping @MainActor () async throws -> Void) {
+        guard !closed, !started, !KelpieStorage.standalone else { return }
+        NessieConnection.shared.presentWindow = present
+    }
+
     public func makeSurface(ownsWindowChrome: Bool = false) -> KelpieBrowserSurface {
         precondition(!closed, "A closed browser session cannot create another surface")
         let surface = KelpieBrowserSurface(session: self, ownsWindowChrome: ownsWindowChrome)
@@ -201,9 +212,9 @@ public struct KelpieBrowserView: View {
         .background(BrowserInteractionRegion(session: surface.session))
         .onAppear {
             surface.session.start()
-            surface.session.setForeground(scenePhase == .active)
+            surface.session.sceneActivityChanged(scenePhase == .active)
         }
-        .onChange(of: scenePhase) { phase in surface.session.setForeground(phase == .active) }
+        .onChange(of: scenePhase) { phase in surface.session.sceneActivityChanged(phase == .active) }
         .frame(minWidth: surface.ownsWindowChrome ? ViewportState.minimumShellSize.width : nil,
                minHeight: surface.ownsWindowChrome ? ViewportState.minimumShellSize.height : nil)
     }

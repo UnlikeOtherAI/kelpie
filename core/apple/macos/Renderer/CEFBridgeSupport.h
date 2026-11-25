@@ -34,6 +34,8 @@ NSString *CEFBridgeJSONStringForValue(id _Nullable value);
 cef_basetime_t CEFBridgeBaseTimeFromDate(NSDate * _Nullable value);
 /// YES once cef_initialize succeeded; CEF globals are unusable before that.
 BOOL CEFBridgeIsCEFInitialized(void);
+/// A retained context for browser creation and cookie access, or NULL after retirement.
+cef_request_context_t *_Nullable CEFBridgeCopyActiveContext(void);
 /// Tests only: the cookie bridge uses `manager` instead of CEF's global manager; NULL restores it.
 void CEFBridgeUseCookieManagerForTesting(cef_cookie_manager_t *_Nullable manager);
 

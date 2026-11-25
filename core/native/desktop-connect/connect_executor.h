@@ -10,10 +10,11 @@ class Executor {
   using Admission=std::function<std::shared_ptr<void>(const std::string&,const Json&)>;
   using Authorization=std::function<bool()>;
   using Control=std::function<Json(const Json&,const TabLease&,const Authorization&)>;
-  Executor(DesktopBrowserControl& browser,Infer infer={},Admission admission={},Control control={})
-      :browser_(browser),infer_(std::move(infer)),admission_(std::move(admission)),control_(std::move(control)) {}
+  using Present=std::function<bool(const Authorization&)>;
+  Executor(DesktopBrowserControl& browser,Infer infer={},Admission admission={},Control control={},Present present={})
+      :browser_(browser),infer_(std::move(infer)),admission_(std::move(admission)),control_(std::move(control)),present_(std::move(present)) {}
   Json Execute(const Json& command,std::shared_ptr<const std::atomic<bool>> cancelled);
  private:
-  DesktopBrowserControl& browser_; Infer infer_; Admission admission_; Control control_;
+  DesktopBrowserControl& browser_; Infer infer_; Admission admission_; Control control_; Present present_;
 };
 }

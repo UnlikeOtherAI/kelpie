@@ -20,7 +20,7 @@ constexpr const char* kResultTooLarge =
     "observe the page before continuing.";
 const std::set<std::string> kOperations = {
     "tabs", "open", "control", "navigate", "snapshot", "click", "type", "scroll",
-    "back", "forward", "reload", "extract"};
+    "back", "forward", "reload", "extract", "present"};
 std::string Text(const Json& value, const char* key) {
   if (!value.contains(key) || !value[key].is_string()) throw std::invalid_argument(key);
   return value[key].get<std::string>();
@@ -154,6 +154,9 @@ struct KelpieConnect {
         if (request_tab.empty() || Text(frame, "tabId") != request_tab || Text(frame, "tabVersion").empty())
           throw std::invalid_argument("A matching browser-control tab pin is required");
       }
+    } else if (operation == "present") {
+      if (!frame.at("input").empty() || !frame.at("tabId").is_null() || !frame.at("tabVersion").is_null())
+        throw std::invalid_argument("Window presentation takes no page input");
     } else if (operation != "tabs" && operation != "open") {
       if (Text(frame, "tabId").empty() || Text(frame, "tabVersion").empty())
         throw std::invalid_argument("A pinned tab document is required");

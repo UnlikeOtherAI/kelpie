@@ -29,6 +29,7 @@ final class NessieConnection: ObservableObject {
     private var owner: String?
     private var generation: String?
     private var foreground = true
+    var presentWindow: (@MainActor () async throws -> Void)?
     private var controlledTab: String?
     private var remoteTabMutation = false
     private var epoch = UUID()
@@ -86,6 +87,7 @@ final class NessieConnection: ObservableObject {
         personInputMonitor = nil
         acceptsPersonEvent = { _ in true }
         #endif
+        presentWindow = nil
     }
 
     func stop() {
@@ -123,7 +125,18 @@ final class NessieConnection: ObservableObject {
         return await action()
     }
 
-    private var lifecycle: String { foreground && !paused && browser?.isReady == true ? "ready" : "paused" }
+    private var lifecycle: String {
+        if paused { return "paused" }
+        if !foreground, presentWindow != nil { return "standby" }
+        return foreground && browser?.isReady == true ? "ready" : "paused"
+    }
+
+    private var capabilities: [String] {
+        var values = ["browser.control", "page.extract"]
+        if browser?.supportsControlV1 == true { values.append("browser.control.v1") }
+        if presentWindow != nil { values.append("browser.present.v1") }
+        return values
+    }
     var canMutate: Bool { foreground && !paused && browser?.isReady == true && socket != nil && generation != nil && owner != nil && UOAAccount.shared.profile?.sub == owner }
 
     func authorizes(_ command: [String: Any]) -> Bool {
@@ -175,7 +188,7 @@ final class NessieConnection: ObservableObject {
                 try await send([
                     "type": "hello", "protocol": 1, "ticket": ticket.value,
                     "installationId": installationID, "label": deviceLabel, "platform": platform,
-                    "capabilities": ["browser.control"] + (browser?.supportsControlV1 == true ? ["browser.control.v1"] : []) + ["page.extract"], "lifecycle": lifecycle,
+                    "capabilities": capabilities, "lifecycle": lifecycle,
                     "modelReady": ready, "modelInstalled": browser?.modelInstalled ?? false,
                     "modelCapabilities": ["text"], "delegatedBrowsing": false
                 ], connection: connection)
@@ -255,7 +268,9 @@ final class NessieConnection: ObservableObject {
         switch decision["kind"] as? String {
         case "command":
             guard let command = decision["command"] as? [String: Any] else { return }
-            if running || lifecycle != "ready" || !canMutate || socket !== connection {
+            let presenting = command["operation"] as? String == "present" && presentWindow != nil && !paused
+                && owner != nil && owner == UOAAccount.shared.profile?.sub && generation != nil
+            if running || (!presenting && !canMutate) || socket !== connection {
                 try await finish(command, state: "failed", error: "Device is paused or busy", connection: connection)
                 return
             }
@@ -286,7 +301,25 @@ final class NessieConnection: ObservableObject {
                 self?.stopCurrent(reason: "Job deadline expired; reconcile page before continuing")
             }
             guard let browser else { throw ConnectBrowser.Failure("Browser unavailable") }
-            let output = try await browser.execute(command)
+            let output: [String: Any]
+            if command["operation"] as? String == "present" {
+                guard let presentWindow, !paused, socket === connection, owner != nil,
+                      owner == UOAAccount.shared.profile?.sub else { throw ConnectBrowser.Failure("Browser unavailable") }
+                try Task.checkCancellation()
+                try await presentWindow()
+                // SwiftUI registers the surface on its first layout turn.
+                while !canMutate {
+                    guard !paused, foreground, socket === connection, owner != nil,
+                          owner == UOAAccount.shared.profile?.sub, date > Date() else {
+                        throw ConnectBrowser.Failure("Browser unavailable")
+                    }
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                }
+                await publishHeartbeat(connection)
+                output = ["presented": true]
+            } else {
+                output = try await browser.execute(command)
+            }
             try Task.checkCancellation()
             try await finish(command, state: "completed", output: output, connection: connection)
         } catch {

@@ -74,8 +74,10 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
     settings.size = sizeof(settings);
 
     cef_string_t initialURL = CEFBridgeStringCreate(_currentURL);
-    cef_browser_t *createdBrowser =
-        cef_browser_host_create_browser_sync(&windowInfo, CEFBridgeClientHandle(_client), &initialURL, &settings, nullptr, nullptr);
+    cef_request_context_t *context = CEFBridgeCopyActiveContext();
+    cef_browser_t *createdBrowser = context ?
+        cef_browser_host_create_browser_sync(&windowInfo, CEFBridgeClientHandle(_client), &initialURL, &settings, nullptr, context) : nullptr;
+    if (context) context->base.base.release(&context->base.base);
     CEFBridgeStringClear(&initialURL);
 
     @synchronized (self) {

@@ -48,6 +48,10 @@ keyboard commands; the containing app chooses whether to install those global en
 The Mac standalone host uses `KelpieBrowserSession.standalone()` to preserve
 `--port` and eager control-service startup before a window appears. Embedded
 hosts start their session explicitly or when its view appears.
+An embedded Mac host can install `setWindowPresentation` on its session and keep
+the signed-in browser available while its window is closed. A standby browser
+accepts a request to show the window. Page actions require a visible, ready
+browser. Chromium tabs and cookie operations share the active embedded profile.
 The browser resource bundle is a library dependency and owns the artwork, font,
 diagnostics and inspector scripts. Hosts keep only their launch icons. The Mac test scheme loads CEF from the packaged standalone fixture without launching
 its browser or account lifecycle. Chromium hosts also package

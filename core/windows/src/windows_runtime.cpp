@@ -354,10 +354,18 @@ bool WindowsApp::InitializeDesktopRuntime() {
           DesktopMcpServer::Config config; config.platform=Platform::kWindows; config.engine="chromium";
           config.screenshot_base64_limit=kAccountScreenshotBase64Limit;
           return desktop_app_->mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
+        },[this](const connect::Executor::Authorization& authorize) {
+          return native_control_.Invoke([this,authorize] {
+            if (!authorize() || !config_.hosted || !config_.uoa_session || !config_.present_window ||
+                !connection_ || connection_->paused() || !connection_->enabled() || IsClosing()) return false;
+            if (!config_.present_window(window())) return false;
+            SetForeground(true);
+            return true;
+          },std::chrono::seconds(5));
         });
         return executor.Execute(command,guard);
       },[this](const auto& guard) { if(inference_)inference_->CancelOwned(guard); },
-      [] { return connect::MakeTransport(); },true);
+      [] { return connect::MakeTransport(); },true,config_.hosted && config_.uoa_session && config_.present_window);
   startup_diagnostics_.Ready();
   return true;
 }

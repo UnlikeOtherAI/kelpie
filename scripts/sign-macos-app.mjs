@@ -94,6 +94,36 @@ async function main() {
   process.stdout.write('Verified Developer ID signature, hardened runtime and timestamp.\n');
 }
 
+/** Embed only Chromium's runtime and subprocesses. The containing app retains its own signer and entitlements. */
+export async function embedSignedMacChromium({ app, source, identity, team }) {
+  validateSigner(identity, team);
+  const plist = join(app, 'Contents/Info.plist');
+  const value = async key => (await run('/usr/libexec/PlistBuddy', ['-c', 'Print :' + key, plist])).stdout.trim();
+  const identifier = await value('CFBundleIdentifier');
+  const version = await value('CFBundleShortVersionString');
+  const build = await value('CFBundleVersion');
+  const helperEntitlements = join(repository, 'core/apple/Helpers/KelpieHelper.entitlements');
+  const framework = 'Chromium Embedded Framework.framework';
+  const helpers = ['Kelpie Helper', ...['Renderer', 'GPU', 'Plugin', 'Alerts'].map(role => 'Kelpie Helper (' + role + ')')];
+  for (const name of [framework, ...helpers.map(helper => helper + '.app')]) {
+    const destination = join(app, 'Contents/Frameworks', name);
+    await run('ditto', [join(source, name), destination]);
+    if (name !== framework) {
+      const metadata = join(destination, 'Contents/Info.plist');
+      const role = /\((\w+)\)/.exec(name)?.[1]?.toLowerCase();
+      await run('plutil', ['-replace', 'CFBundleIdentifier', '-string', identifier + '.kelpie.helper' + (role ? '.' + role : ''), metadata]);
+      await run('plutil', ['-replace', 'CFBundleVersion', '-string', build, metadata]);
+      await run('plutil', ['-insert', 'CFBundleShortVersionString', '-string', version, metadata]);
+    }
+    const targets = await discover(destination);
+    targets.push({ path: destination, kind: 'bundle' });
+    for (const target of signingPlan(app, targets).slice(0, -1)) {
+      await run('codesign', signingArguments(target, identity, helperEntitlements));
+    }
+    await run('codesign', ['--verify', '--deep', '--strict', destination]);
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(error => { console.error(error.message); process.exitCode = 1; });
 }

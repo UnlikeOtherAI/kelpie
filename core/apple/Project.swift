@@ -86,5 +86,6 @@ let iosResources = Target.target(
 
 let project = Project(
     name: "KelpieBrowser",
-    targets: [macResources, iosResources, macBrowser, iosBrowser]
+    targets: [macResources, iosResources, macBrowser, iosBrowser] +
+        (KelpieBrowserBuild.webKitOnly ? [] : [KelpieBrowserBuild.cefHelper(core: "..")])
 )

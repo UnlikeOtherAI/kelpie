@@ -53,6 +53,31 @@ cef_app_t* MessagePumpApplication() {
 }
 
 static BOOL gCEFInitialized = NO;
+static BOOL gAccountScoped = NO;
+static NSString *gProfile;
+static cef_request_context_t *gProfileContext = nullptr;
+
+static NSString *EmbeddedCacheRoot(void) {
+    NSString *support = [NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory
+                                                             inDomains:NSUserDomainMask].firstObject.path;
+    NSString *identifier = NSBundle.mainBundle.bundleIdentifier ?: @"kelpie-host";
+    return [[support stringByAppendingPathComponent:identifier] stringByAppendingPathComponent:@"kelpie-cef-cache"];
+}
+
+cef_request_context_t *CEFBridgeCopyActiveContext(void) {
+    if (!gCEFInitialized) return nullptr;
+    if (!gAccountScoped) return cef_request_context_get_global_context();
+    if (!gProfile) return nullptr;
+    if (!gProfileContext) {
+        cef_request_context_settings_t settings = {};
+        settings.size = sizeof(settings);
+        settings.cache_path = CEFBridgeStringCreate([EmbeddedCacheRoot() stringByAppendingPathComponent:gProfile]);
+        gProfileContext = cef_request_context_create_context(&settings, nullptr);
+        CEFBridgeStringClear(&settings.cache_path);
+    }
+    if (gProfileContext) gProfileContext->base.base.add_ref(&gProfileContext->base.base);
+    return gProfileContext;
+}
 
 BOOL CEFBridgeIsCEFInitialized(void) {
     return gCEFInitialized;
@@ -91,6 +116,15 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 @end
 
 @implementation CEFBridge (Lifecycle)
+
++ (void)selectEmbeddedProfile:(NSString *)profile {
+    gAccountScoped = YES;
+    if (profile && [gProfile isEqualToString:profile]) return;
+    if (gProfileContext) gProfileContext->base.base.release(&gProfileContext->base.base);
+    gProfileContext = nullptr;
+    NSCharacterSet *invalid = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"].invertedSet;
+    gProfile = profile.length == 64 && [profile rangeOfCharacterFromSet:invalid].location == NSNotFound ? [profile copy] : nil;
+}
 
 + (BOOL)initializeCEF {
     if (gCEFInitialized) {
@@ -133,19 +167,18 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 
     NSString *identifier = [NSBundle mainBundle].bundleIdentifier ?: @"kelpie-host";
     BOOL standalone = [identifier isEqualToString:@"com.kelpie.browser.macos"];
-    NSString *cacheBase = standalone ? NSTemporaryDirectory() :
-        [[[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject.path
-            stringByAppendingPathComponent:identifier];
-    NSString *cachePath = [cacheBase stringByAppendingPathComponent:@"kelpie-cef-cache"];
+    NSString *cachePath = standalone ? [NSTemporaryDirectory() stringByAppendingPathComponent:@"kelpie-cef-cache"] : EmbeddedCacheRoot();
     [[NSFileManager defaultManager] createDirectoryAtPath:cachePath withIntermediateDirectories:YES attributes:nil error:nil];
     cef_string_t cachePathCEF = CEFBridgeStringCreate(cachePath);
     settings.cache_path = cachePathCEF;
+    settings.root_cache_path = CEFBridgeStringCreate(cachePath);
 
     const int ok = cef_initialize(&mainArgs, &settings, MessagePumpApplication(), nullptr);
     CEFBridgeStringClear(&settings.browser_subprocess_path);
     CEFBridgeStringClear(&settings.framework_dir_path);
     CEFBridgeStringClear(&settings.main_bundle_path);
     CEFBridgeStringClear(&settings.cache_path);
+    CEFBridgeStringClear(&settings.root_cache_path);
     gCEFInitialized = ok != 0;
     return gCEFInitialized;
 }
@@ -154,6 +187,8 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     if (!gCEFInitialized) {
         return;
     }
+    if (gProfileContext) gProfileContext->base.base.release(&gProfileContext->base.base);
+    gProfileContext = nullptr;
     cef_shutdown();
     gCEFInitialized = NO;
 }

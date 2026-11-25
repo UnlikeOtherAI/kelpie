@@ -121,6 +121,9 @@ typedef void (^CEFBridgeMicrophoneHandler)(
 /// NO if this is a helper subprocess (caller should exit).
 + (BOOL)initializeCEF;
 
+/// Select the containing account's storage. Passing nil retires its Chromium context.
++ (void)selectEmbeddedProfile:(nullable NSString *)profile;
+
 /// Shut down CEF. Call before app termination.
 + (void)shutdownCEF;
 

@@ -2,12 +2,12 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// Cookie access to CEF's global cookie manager, implemented in CEFBridge+Cookies.mm.
+/// Cookie access to the active Chromium request context, implemented in CEFBridge+Cookies.mm.
 ///
-/// Every Kelpie browser is created on CEF's global request context and CEF has no
-/// partitions on macOS, so the global manager is the one Chromium cookie store. It needs
-/// no browser view or DevTools session and reports real HttpOnly, Secure, SameSite and
-/// expiry. Completions run on the main queue exactly once.
+/// Standalone browsers use the global context. Embedded browsers use the selected
+/// profile's persistent context and require an active profile for cookie access.
+/// The manager reports HttpOnly, Secure, SameSite and expiry without a browser view
+/// or DevTools session. Completions run on the main queue exactly once.
 ///
 /// Cookie dictionaries use: `name`, `value`, `domain` (a leading dot marks a domain
 /// cookie; no dot is host-only), `path`, `secure`, `httpOnly`, `sameSite`
@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// and `expires` (Unix seconds as a double; absent for a session cookie).
 @interface CEFBridge (Cookies)
 
-/// YES once CEF has initialized. Before that the global store cannot be reached.
+/// YES when the active request context can supply its cookie manager.
 + (BOOL)isGlobalCookieStoreAvailable;
 
 /// Visits every cookie. `complete` is YES only when CEF finished the visit; a refused

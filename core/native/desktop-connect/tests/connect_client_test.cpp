@@ -31,6 +31,7 @@ struct Wire {
   std::deque<std::string> incoming;
   std::vector<Json> sent;
   bool command=true,disconnect=false,control_v1=false;
+  bool can_present=false;
 };
 class Socket final:public Transport {
  public:
@@ -40,7 +41,9 @@ class Socket final:public Transport {
     const auto frame=Json::parse(raw);std::lock_guard lock(wire_->mutex);wire_->sent.push_back(frame);
     if(frame["type"]=="hello") {
       assert(frame["ticket"]=="scoped" && !frame.contains("access_token"));
-      auto capabilities=Json::array({"browser.control"});if(wire_->control_v1)capabilities.push_back("browser.control.v1");capabilities.push_back("page.extract");
+      auto capabilities=Json::array({"browser.control"});if(wire_->control_v1)capabilities.push_back("browser.control.v1");
+      if(wire_->can_present)capabilities.push_back("browser.present.v1");
+      capabilities.push_back("page.extract");
       assert(frame["capabilities"]==capabilities && !frame["label"].get<std::string>().empty());
       wire_->incoming.push_back(Json{{"type","welcome"},{"protocol",1},{"generation",kGeneration},{"deviceId",kDevice}}.dump());
       if(wire_->command)wire_->incoming.push_back(Json{{"type","command"},{"generation",kGeneration},{"jobId",kJob},{"attemptId",kAttempt},
@@ -155,6 +158,35 @@ int main() {
     client.Shutdown();assert(Wait([&] { return client.Drain(); }));
   }
   std::filesystem::remove_all(foreground_profile);
+  const auto standby_profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
+  auto standby=std::make_shared<Wire>(); standby->command=false; standby->can_present=true;
+  std::atomic<int> presentations=0;
+  {
+    Client client(account,standby_profile,"windows",kDevice,[&](const Json& command,const auto&) {
+      assert(command["operation"]=="present"); ++presentations;
+      return Json{{"state","completed"},{"output",{{"presented",true}}}};
+    },{},[standby] { return std::make_unique<Socket>(standby); },false,true);
+    client.SetForeground(false);
+    client.Update(false);
+    assert(Wait([&] { std::lock_guard lock(standby->mutex);
+      return !standby->sent.empty() && standby->sent.front()["lifecycle"]=="standby"; }));
+    auto send=[&](const char* job,bool present) {
+      Json command={{"type","command"},{"generation",kGeneration},{"jobId",job},{"attemptId",job},{"seq",1},
+        {"deadline",Deadline()},{"operation",present?"present":"tabs"},{"tabId",nullptr},{"tabVersion",nullptr},{"input",Json::object()}};
+      std::lock_guard lock(standby->mutex); standby->incoming.push_back(command.dump());
+    };
+    auto received=[&](const char* job,const char* state) {
+      return Wait([&] { std::lock_guard lock(standby->mutex);
+        for(const auto& frame:standby->sent) if(frame["type"]=="event" && frame["jobId"]==job && frame["state"]==state)return true;
+        return false; });
+    };
+    send(kJob,false); assert(received(kJob,"failed")); assert(presentations==0);
+    send(kAttempt,true); assert(received(kAttempt,"completed")); assert(presentations==1);
+    client.Pause(true);
+    send(kDevice,true); assert(received(kDevice,"failed")); assert(presentations==1);
+    client.Shutdown(); assert(Wait([&] { return client.Drain(); }));
+  }
+  std::filesystem::remove_all(standby_profile);
   const auto resume_profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
   auto resumed=std::make_shared<Wire>();std::mutex guards_mutex;
   std::vector<std::shared_ptr<const std::atomic<bool>>> guards;
@@ -173,6 +205,10 @@ int main() {
     client.Update(false);assert(Wait([&] { std::lock_guard lock(guards_mutex);return guards.size()==1; }));
     auto pausing=std::async(std::launch::async,[&] { client.Pause(true); });
     assert(Wait([&] { return callback_waiting.load(); }));client.Pause(false);
+    // The gateway can dispatch the next job once the previous attempt has drained.
+    assert(Wait([&] { std::lock_guard lock(resumed->mutex);
+      for(const auto& frame:resumed->sent) if(frame["type"]=="event" && frame["jobId"]==kJob && frame["state"]=="cancelled")return true;
+      return false; }));
     constexpr auto next="10000000-0000-4000-8000-000000000008";
     { std::lock_guard lock(resumed->mutex);resumed->incoming.push_back(Json{{"type","command"},
       {"generation",kGeneration},{"jobId",next},{"attemptId",next},{"seq",1},{"deadline",Deadline()},

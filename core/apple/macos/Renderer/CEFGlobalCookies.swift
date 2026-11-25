@@ -2,8 +2,7 @@
 @_implementationOnly import KelpieChromium
 import Foundation
 
-/// Chromium's one cookie store: CEF's global cookie manager. Needs no browser view and
-/// reads and writes HttpOnly cookies with their real attributes.
+/// The current profile's Chromium cookie manager, including its HttpOnly cookies.
 @MainActor
 enum CEFGlobalCookies {
     struct Unavailable: Error {}
@@ -34,9 +33,13 @@ enum CEFGlobalCookies {
 
     /// Sets many cookies concurrently and returns one result per cookie, in order.
     static func set(_ cookies: [BrowserCookie]) async -> [Bool] {
-        await withTaskGroup(of: (Int, Bool).self) { group in
+        let profile = KelpieStorage.profileID
+        return await withTaskGroup(of: (Int, Bool).self) { group in
             for (index, cookie) in cookies.enumerated() {
-                group.addTask { @MainActor in (index, await set(cookie)) }
+                group.addTask { @MainActor in
+                    guard KelpieStorage.profileID == profile else { return (index, false) }
+                    return (index, await set(cookie))
+                }
             }
             var results = [Bool](repeating: false, count: cookies.count)
             for await (index, ok) in group { results[index] = ok }

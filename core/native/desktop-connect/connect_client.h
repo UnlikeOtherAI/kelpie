@@ -14,7 +14,7 @@ class Client {
   using Factory=std::function<std::unique_ptr<Transport>()>;
   Client(account::AccountService& account,const std::filesystem::path& profile,
       std::string platform,std::string installation,Execute execute,Cancel cancel={},Factory factory=MakeTransport,
-      bool browser_control_v1=false);
+      bool browser_control_v1=false, bool can_present=false);
   ~Client();
   void Update(bool model_ready,bool model_installed=false);
   void Pause(bool paused);
@@ -34,6 +34,7 @@ class Client {
   std::shared_ptr<account::EncryptedBlobStore> journal_,settings_;
   std::string platform_,installation_;
   bool browser_control_v1_=false;
+  bool can_present_=false;
   Execute execute_; Cancel cancel_; Factory factory_;
   mutable std::mutex mutex_; std::condition_variable changed_;
   std::string owner_,status_="Nessie: signed out";

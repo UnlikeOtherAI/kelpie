@@ -46,6 +46,8 @@ struct AppConfig {
   bool hosted = false;
   HWND parent_window = nullptr;
   std::shared_ptr<account::HostSession> uoa_session;
+  // Called on the window thread for an authorized, account-bound presentation.
+  std::function<bool(HWND)> present_window;
   int port = 8420;
   std::filesystem::path profile_dir;
   std::string initial_url = "https://example.com";

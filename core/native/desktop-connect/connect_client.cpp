@@ -22,10 +22,11 @@ std::string DeviceLabel(const std::string& platform) {
 namespace kelpie::connect {
 using Json=nlohmann::json;
 Client::Client(account::AccountService& account,const std::filesystem::path& profile,
-    std::string platform,std::string installation,Execute execute,Cancel cancel,Factory factory,bool browser_control_v1)
+    std::string platform,std::string installation,Execute execute,Cancel cancel,Factory factory,bool browser_control_v1,bool can_present)
     :account_(account),journal_(account::MakeEncryptedBlobStore(profile,"nessie.journal.v1",32*1024*1024)),
      settings_(account::MakeEncryptedBlobStore(profile,"nessie.controls.v1",4096)),platform_(std::move(platform)),
-     installation_(std::move(installation)),browser_control_v1_(browser_control_v1),execute_(std::move(execute)),cancel_(std::move(cancel)),factory_(std::move(factory)) {
+     installation_(std::move(installation)),browser_control_v1_(browser_control_v1),can_present_(can_present),
+     execute_(std::move(execute)),cancel_(std::move(cancel)),factory_(std::move(factory)) {
   try { if(auto raw=settings_->Load()) {
     const auto value=Json::parse(*raw,nullptr,false);
     if(!value.is_object() || !value.at("enabled").is_boolean() || !value.at("paused").is_boolean())throw std::runtime_error("Invalid connection controls");
@@ -105,8 +106,13 @@ void Client::Run() {
   };
   unsigned failures=0;
   while(!shutdown_) {
-    std::string owner; bool enabled,paused,ready,installed;
-    { std::unique_lock lock(mutex_); owner=owner_; enabled=enabled_; paused=paused_ || !foreground_; ready=model_ready_;installed=model_installed_;
+    const auto lifecycle_locked = [this]() -> std::string {
+      if (paused_) return "paused";
+      if (foreground_) return "ready";
+      return can_present_ ? "standby" : "paused";
+    };
+    std::string owner, lifecycle; bool enabled,ready,installed;
+    { std::unique_lock lock(mutex_); owner=owner_; enabled=enabled_; lifecycle=lifecycle_locked(); ready=model_ready_;installed=model_installed_;
       if(owner.empty() || !enabled) {
         status_=owner.empty()?"Nessie: signed out":"Nessie: stopped";
         changed_.wait_for(lock,std::chrono::milliseconds(250));
@@ -129,17 +135,22 @@ void Client::Run() {
       auto socket=factory_(); socket->Open(); generation.clear();
       auto caps=Json::array({"browser.control"});
       if(browser_control_v1_)caps.push_back("browser.control.v1");
+      if(can_present_)caps.push_back("browser.present.v1");
       if(platform_=="windows")caps.push_back("page.extract");
       socket->Send(Json{{"type","hello"},{"protocol",1},{"ticket",ticket.at("connection_ticket")},
           {"installationId",installation_},{"label",DeviceLabel(platform_)},{"platform",platform_},
-          {"capabilities",caps},{"lifecycle",paused?"paused":"ready"},{"modelReady",ready},{"modelInstalled",installed},{"modelCapabilities",ready?Json::array({"text"}):Json::array()},{"delegatedBrowsing",false}}.dump());
+          {"capabilities",caps},{"lifecycle",lifecycle},{"modelReady",ready},{"modelInstalled",installed},{"modelCapabilities",ready?Json::array({"text"}):Json::array()},{"delegatedBrowsing",false}}.dump());
       auto expiry=Clock::now()+std::chrono::milliseconds(static_cast<int>(ticket.at("expires_in").get<double>()*1000));
       auto renewal=Clock::now()+std::chrono::milliseconds(std::min(60000,static_cast<int>(ticket.at("expires_in").get<double>()*500)));
 
       auto beat=Clock::now(); const auto welcome_deadline=Clock::now()+std::chrono::seconds(10);
       auto send=[&](const Json& decision) { for(const auto& frame:decision.value("frames",Json::array()))socket->Send(frame.dump()); };
       while(!shutdown_) {
-        { std::lock_guard lock(mutex_); if(owner!=owner_ || !enabled_)break; paused=paused_ || !foreground_; ready=model_ready_;installed=model_installed_; }
+        const auto finished=finish();
+        { std::lock_guard lock(mutex_); if(owner!=owner_ || !enabled_)break;
+          const auto current=lifecycle_locked();
+          if(current!=lifecycle) { lifecycle=current; beat=Clock::now(); }
+          ready=model_ready_;installed=model_installed_; }
         if(Clock::now()>=expiry)throw std::runtime_error("Connection ticket expired");
         if(generation.empty() && Clock::now()>welcome_deadline)throw std::runtime_error("Gateway unavailable");
         if(!generation.empty() && Clock::now()>=renewal) {
@@ -148,18 +159,18 @@ void Client::Run() {
           expiry=Clock::now()+std::chrono::milliseconds(static_cast<int>(ticket.at("expires_in").get<double>()*1000));
           renewal=Clock::now()+std::chrono::milliseconds(std::min(60000,static_cast<int>(ticket.at("expires_in").get<double>()*500)));
         }
-        if(!task.valid() && !generation.empty())SetStatus(paused?"Nessie: paused":"Nessie: connected");
+        if(!task.valid() && !generation.empty())SetStatus(lifecycle=="paused"?"Nessie: paused":"Nessie: connected");
         if(!generation.empty() && Clock::now()>=beat) {
-          socket->Send(Json{{"type","heartbeat"},{"generation",generation},{"lifecycle",paused?"paused":"ready"},{"modelReady",ready},{"modelInstalled",installed},{"modelCapabilities",ready?Json::array({"text"}):Json::array()},{"delegatedBrowsing",false}}.dump());
+          socket->Send(Json{{"type","heartbeat"},{"generation",generation},{"lifecycle",lifecycle},{"modelReady",ready},{"modelInstalled",installed},{"modelCapabilities",ready?Json::array({"text"}):Json::array()},{"delegatedBrowsing",false}}.dump());
           beat=Clock::now()+std::chrono::seconds(5);
         }
-        send(finish());
+        send(finished);
         const auto raw=socket->Receive(std::chrono::milliseconds(100)); if(!raw)continue;
         const auto frame=Json::parse(*raw);
         if(frame.value("type","")=="auth_ok" || frame.value("type","")=="heartbeat_ack")continue;
         const auto decision=persist("receive",frame); send(decision);
         const auto kind=decision.value("kind","");
-        if(kind=="welcome") { generation=frame.at("generation"); failures=0; SetStatus(paused?"Nessie: paused":"Nessie: connected"); }
+        if(kind=="welcome") { generation=frame.at("generation"); failures=0; SetStatus(lifecycle=="paused"?"Nessie: paused":"Nessie: connected"); }
         if(kind=="cancel" && task.valid() && active.value("jobId",Json())==frame.at("jobId")
             && active.value("attemptId",Json())==frame.at("attemptId")) {
           cancelled_.load()->store(true); if(cancel_)cancel_(cancelled_.load());
@@ -167,16 +178,17 @@ void Client::Run() {
         if(kind=="command") {
           const auto command=decision.at("command");
           bool allowed;
-          { std::lock_guard lock(mutex_); allowed=owner==owner_ && enabled_ && !paused_ && foreground_ && !shutdown_ && !task.valid();
+          const bool presenting=can_present_ && command.at("operation")=="present";
+          { std::lock_guard lock(mutex_); allowed=owner==owner_ && enabled_ && !paused_ && (foreground_ || presenting) && !shutdown_ && !task.valid();
             if(allowed) { cancelled_.store(std::make_shared<std::atomic<bool>>(false));working_=true; } }
           if(!allowed) { send(persist("complete",Json{{"jobId",command.at("jobId")},{"attemptId",command.at("attemptId")},
-              {"state","failed"},{"error",paused?"DEVICE_PAUSED":"DEVICE_BUSY"}})); continue; }
+              {"state","failed"},{"error",lifecycle!="ready"?"DEVICE_PAUSED":"DEVICE_BUSY"}})); continue; }
           active=command; SetStatus("Nessie: working — "+command.at("operation").get<std::string>());
           task=std::async(std::launch::async,[this,command,guard=cancelled_.load()] {
             try { return execute_(command,guard); } catch(...) { return Json{{"state","failed"},{"error","Operation failed; reconcile page before retry"}}; }
           });
         }
-        if(!task.valid() && !generation.empty())SetStatus(paused?"Nessie: paused":"Nessie: connected");
+        if(!task.valid() && !generation.empty())SetStatus(lifecycle=="paused"?"Nessie: paused":"Nessie: connected");
       }
       cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_(cancelled_.load());
       socket->Close();
