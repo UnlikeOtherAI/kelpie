@@ -3,11 +3,11 @@ param([string]$CacheRoot = (Join-Path $PSScriptRoot "..\.cache\cef-windows-build
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$version = "158.0.3+g8c29be2+chromium-158.0.8127.18"
+$version = "158.0.6+g23f1736+chromium-158.0.8127.89"
 $archiveName = "cef_binary_" + $version + "_windows64_minimal.tar.bz2"
 $archiveUrl = "https://cef-builds.spotifycdn.com/" + $archiveName
-$expectedSha256 = "A5659888CCA36E3B7FDE841C05C67F923065C3BB2D62609BA379C7F79986A02B"
-$expectedSha1 = "A8634573A10FB514FB9E8BC9FCF39016A2FB17BD"
+$expectedSha256 = "1DA0B9FE0E915BD41448939F944003D848F8D9E4D15C7D85D7A17CCE656B1A9A"
+$expectedSha1 = "2ABB78FCD3B07EA0FB2014E3867A0902F19F1731"
 
 # The caller captures this script's output to read CEF_ROOT, so progress has
 # to go to the host: a stalled stage otherwise leaves the log blank.

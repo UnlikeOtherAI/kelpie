@@ -23,7 +23,7 @@
 set -euo pipefail
 
 # Keep the default in sync with install_macos_arm64 in download-cef.sh.
-CEF_VERSION="${1:-158.0.3+g8c29be2+chromium-158.0.8127.18}"
+CEF_VERSION="${1:-158.0.6+g23f1736+chromium-158.0.8127.89}"
 CEF_PLATFORM="macosarm64"
 
 if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "arm64" ]; then
