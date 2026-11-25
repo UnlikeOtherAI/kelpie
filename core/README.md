@@ -96,6 +96,13 @@ a retained session: it cancels current agent work and rejects new commands witho
 changing the person's Pause choice. Restore foreground on presentation. CEF's
 bootstrap sandbox contract still applies.
 
+An embedded Windows host that supplies its own control connection sets
+`AppConfig.local_control_enabled = false`. Its browser still handles commands
+from the host and opens no inbound socket. Set `host_version` to the containing
+app's release version. After staging, `scripts/brand-bootstrap-windows.ps1`
+copies the host DLL's version and icon into the verified CEF bootstrap before
+the executable is signed.
+
 Windows Chromium hosts enter through `BootstrapBrowserHost`, preserving CEF's
 subprocess dispatch, SDK version and sandbox checks. Signed Chromium hosts must
 sign their launcher, chrome_elf.dll and client DLL with the same primary

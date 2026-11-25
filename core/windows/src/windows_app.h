@@ -44,6 +44,8 @@ namespace kelpie::windows {
 
 struct AppConfig {
   bool hosted = false;
+  bool local_control_enabled = true;
+  std::string host_version;
   HWND parent_window = nullptr;
   std::shared_ptr<account::HostSession> uoa_session;
   // Displayed while the signed-in containing app's live UOA profile loads.

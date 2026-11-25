@@ -377,7 +377,7 @@ bool DesktopApp::Start(const Config& config) {
   server_config.engine = config.engine_name;
   server_config.server_name = config.app_name;
   server_config.server_version = config.app_version;
-  if (!impl_->http_server.Start(server_config)) {
+  if (config.local_control_enabled && !impl_->http_server.Start(server_config)) {
     impl_->last_error = "The control listener did not start";
     if (!impl_->engine.Shutdown()) {
       impl_->last_error = impl_->engine.last_error();
@@ -388,7 +388,7 @@ bool DesktopApp::Start(const Config& config) {
     return false;
   }
 
-  if (config.mdns != nullptr) {
+  if (config.local_control_enabled && config.mdns != nullptr) {
     config.mdns->Start(impl_->http_server.bound_port(), impl_->BuildTxtRecord());
   }
 
@@ -399,7 +399,7 @@ bool DesktopApp::Start(const Config& config) {
 
 void DesktopApp::BeginShutdown() {
   if (!impl_->running) return;
-  if (impl_->config.mdns != nullptr) {
+  if (impl_->config.local_control_enabled && impl_->config.mdns != nullptr) {
     impl_->config.mdns->Stop();
   }
   // This closes listener admission but does not join HTTP workers. The native

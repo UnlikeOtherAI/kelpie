@@ -150,8 +150,9 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.register_handlers = [this](DesktopRouter& router) { inference_->Register(router); };
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
+  runtime.local_control_enabled = config_.local_control_enabled;
   runtime.app_name = "kelpie";
-  runtime.app_version = KELPIE_WINDOWS_VERSION;
+  runtime.app_version = config_.host_version.empty() ? KELPIE_WINDOWS_VERSION : config_.host_version;
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.cookie_sync_status = [this] { return CookieSyncStatus(); };
@@ -320,25 +321,24 @@ bool WindowsApp::InitializeDesktopRuntime() {
     ShutdownDesktopRuntime();
     return false;
   }
-  startup_diagnostics_.Enter(StartupStage::kHttpListener);
-  const int bound_port = desktop_app_->http_server().bound_port();
-  if (bound_port <= 0) {
-    startup_diagnostics_.Fail(StartupStage::kHttpListener, "The loopback listener did not bind");
-    ShutdownDesktopRuntime();
-    return false;
-  }
-  // Public discovery must report the socket that actually bound, never only
-  // the requested configuration value.
   connection_installation_id_ = runtime.device_id;
-  device_info_provider_.Configure(bound_port, config_.width, config_.height, runtime.app_version);
-  StartCookieSync(device_info_provider_.Collect(bound_port, config_.width, config_.height, runtime.app_version).name);
-  startup_diagnostics_.Enter(StartupStage::kReadinessPublication);
-  std::string readiness_error;
-  if (!profile_session_.PublishReadiness(runtime.device_id, bound_port,
-                                         runtime.start_stdio_mcp, &readiness_error)) {
-    startup_diagnostics_.Fail(StartupStage::kReadinessPublication, readiness_error);
-    ShutdownDesktopRuntime();
-    return false;
+  if (runtime.local_control_enabled) {
+    startup_diagnostics_.Enter(StartupStage::kHttpListener);
+    const int bound_port = desktop_app_->http_server().bound_port();
+    if (bound_port <= 0) {
+      startup_diagnostics_.Fail(StartupStage::kHttpListener, "The control listener did not bind");
+      ShutdownDesktopRuntime();
+      return false;
+    }
+    device_info_provider_.Configure(bound_port, config_.width, config_.height, runtime.app_version);
+    StartCookieSync(device_info_provider_.Collect(bound_port, config_.width, config_.height, runtime.app_version).name);
+    startup_diagnostics_.Enter(StartupStage::kReadinessPublication);
+    std::string readiness_error;
+    if (!profile_session_.PublishReadiness(runtime.device_id, bound_port, runtime.start_stdio_mcp, &readiness_error)) {
+      startup_diagnostics_.Fail(StartupStage::kReadinessPublication, readiness_error);
+      ShutdownDesktopRuntime();
+      return false;
+    }
   }
   browser_view_->ShowFallback(false);
   SetTimer(shell_->hwnd(), 3, 300, nullptr);

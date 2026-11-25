@@ -38,6 +38,7 @@ class DesktopApp {
     std::string app_name = "kelpie-desktop";
     std::string app_version = "0.0.1";
     bool start_stdio_mcp = false;
+    bool local_control_enabled = true;
     std::string bind_host = "::";
     bool approval_available = false;
     std::string control_token;
