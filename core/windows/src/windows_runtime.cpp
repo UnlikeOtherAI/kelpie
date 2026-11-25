@@ -411,7 +411,9 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
     }
     const auto state = account_->State();
     if (!state.signing_in) CloseAccountLoginWindow();
-    shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(account::AccountLabel(state)), !state.error.empty(), state.busy);
+    const auto label = config_.uoa_session && !config_.host_account_label.empty() && !state.signed_in
+        ? config_.host_account_label : account::AccountLabel(state);
+    shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(label), !state.error.empty(), state.busy);
   }
   std::vector<TabSnapshot> tabs;
   if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::milliseconds(20)).ok) return;

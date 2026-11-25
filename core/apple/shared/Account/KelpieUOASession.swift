@@ -24,6 +24,8 @@ public final class KelpieUOASession: ObservableObject {
     public typealias SettingsSocket = (String, String) async throws -> URLSessionWebSocketTask
 
     @Published public private(set) var subject: String?
+    /// The containing app's account label is for display while its live UOA profile loads.
+    public let accountLabel: String?
     let request: Request
     let settingsSocket: SettingsSocket
     let signIn: () -> Void
@@ -31,12 +33,14 @@ public final class KelpieUOASession: ObservableObject {
 
     public init(
         subject: String?,
+        accountLabel: String? = nil,
         request: @escaping Request,
         settingsSocket: @escaping SettingsSocket,
         signIn: @escaping () -> Void,
         signOut: @escaping () -> Void
     ) {
         self.subject = subject
+        self.accountLabel = accountLabel
         self.request = request
         self.settingsSocket = settingsSocket
         self.signIn = signIn

@@ -46,6 +46,8 @@ struct AppConfig {
   bool hosted = false;
   HWND parent_window = nullptr;
   std::shared_ptr<account::HostSession> uoa_session;
+  // Displayed while the signed-in containing app's live UOA profile loads.
+  std::string host_account_label;
   // Called on the window thread for an authorized, account-bound presentation.
   std::function<bool(HWND)> present_window;
   int port = 8420;

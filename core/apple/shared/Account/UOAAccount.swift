@@ -38,6 +38,7 @@ final class UOAAccount: ObservableObject {
     private var accessToken: String?
     private var expiresAt = Date.distantPast
     private var hostSession: KelpieUOASession?
+    var hostAccountLabel: String? { hostSession?.accountLabel }
     private var hostSubscription: AnyCancellable?
 
     func retireProfile() {

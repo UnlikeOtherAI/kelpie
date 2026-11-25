@@ -25,7 +25,8 @@ std::wstring MenuLabel(const std::string& text) {
 void WindowsApp::OnAccountRequested() {
   if (!account_) return;
   const auto state=account_->State();
-  if (!state.signed_in && !state.signing_in) {
+  const bool shared_account = config_.uoa_session && !config_.host_account_label.empty();
+  if (!state.signed_in && !state.signing_in && !shared_account) {
     if (!account_->StartSignIn(config_.profile_dir,[this](const std::string& url) {
       const auto window=[this](const std::string& login) {
         return OpenAccountLoginWindow(login,[this] { if(connection_)connection_->SignOut();if (account_) account_->SignOut(); });
@@ -44,8 +45,11 @@ void WindowsApp::OnAccountRequested() {
       AppendMenuW(menu,MF_STRING|MF_DISABLED,0,MenuLabel(connection_->Status()).c_str());
       AppendMenuW(menu,MF_STRING,4,connection_->paused()?L"Resume Nessie work":L"Pause Nessie work");
       AppendMenuW(menu,MF_STRING,5,connection_->enabled()?L"Stop Nessie connection":L"Connect to Nessie");
-      AppendMenuW(menu,MF_STRING,6,L"Sign in again to grant Nessie access");
+      if (!shared_account) AppendMenuW(menu,MF_STRING,6,L"Sign in again to grant Nessie access");
     }
+  } else if (shared_account) {
+    AppendMenuW(menu,MF_STRING|MF_DISABLED,0,MenuLabel(config_.host_account_label).c_str());
+    AppendMenuW(menu,MF_STRING,3,L"Sign out");
   } else if (state.signing_in) {
     AppendMenuW(menu,MF_STRING|MF_DISABLED,0,L"Complete login/register");
     AppendMenuW(menu,MF_STRING,3,L"Cancel sign-in");

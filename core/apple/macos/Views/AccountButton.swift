@@ -5,6 +5,7 @@ struct AccountButton: View {
     @ObservedObject private var account = UOAAccount.shared
     @ObservedObject private var bookmarks = BookmarkStore.shared
     @State private var isPresented = false
+    private var offersSignIn: Bool { account.profile == nil && account.hostAccountLabel == nil }
 
     var body: some View {
         ZStack {
@@ -19,8 +20,8 @@ struct AccountButton: View {
         .frame(width: 28, height: 28)
         .clipShape(Circle())
         .overlay(Circle().stroke(Color(nsColor: tintColor).opacity(0.18), lineWidth: 0.5))
-        .overlay(AppKitInvisibleButton(accessibilityID: "browser.account", accessibilityLabel: account.profile == nil ? "Login/register" : "Account", isEnabled: true) {
-            if account.profile == nil && !account.signingIn {
+        .overlay(AppKitInvisibleButton(accessibilityID: "browser.account", accessibilityLabel: offersSignIn ? "Login/register" : "Account", isEnabled: true) {
+            if offersSignIn && !account.signingIn {
                 account.signIn()
             } else {
                 isPresented.toggle()
@@ -40,6 +41,9 @@ struct AccountButton: View {
                     Text(bookmarks.isSyncing ? "Syncing favourites…" : "Account favourites")
                         .font(.caption).foregroundStyle(.secondary)
                     action("Refresh favourites", id: "refresh", action: bookmarks.refreshAccountBookmarks)
+                    action("Sign out", id: "sign-out", action: account.signOut)
+                } else if let label = account.hostAccountLabel {
+                    Text(label).font(.subheadline.weight(.semibold))
                     action("Sign out", id: "sign-out", action: account.signOut)
                 } else if account.signingIn {
                     Text("Complete login/register.").foregroundStyle(.secondary)
