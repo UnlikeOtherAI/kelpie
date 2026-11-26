@@ -147,7 +147,7 @@ as a separate runtime dependency.
 ## Native macOS window rendering
 
 Build the Kelpie scheme in Debug to start AppReveal on port 8421. Discover
-`AppReveal-com.kelpie.browser.macos` via `_appreveal._tcp` and check its
+`AppReveal-com.unlikeotherai.kelpie` via `_appreveal._tcp` and check its
 `launch_context` before using `screenshot` for the whole window. Kelpie's
 browser screenshot captures only WebKit content, so compare the two when
 diagnosing blank windows. Release builds omit the AppReveal service.

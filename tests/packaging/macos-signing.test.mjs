@@ -8,6 +8,7 @@ const app = resolve('artifacts/Kelpie.app');
 
 test('rejects ad-hoc, development and mismatched identities before signing', () => {
   assert.doesNotThrow(() => validateSigner(identity, '23B7GTLBN7'));
+  assert.throws(() => validateSigner(identity.replace('23B7GTLBN7', 'OTHER'), 'OTHER'));
   for (const invalid of ['-', 'Apple Development: Example', identity.replace('23B7GTLBN7', 'OTHER')]) {
     assert.throws(() => validateSigner(invalid, '23B7GTLBN7'));
   }
@@ -24,6 +25,10 @@ test('seals Mach-O children and their bundles before the containing app', () => 
 test('keeps Chromium helper exceptions out of the main app and signs with a timestamp', () => {
   const helper = { path: app + '/Contents/Frameworks/Kelpie Helper (Renderer).app', kind: 'bundle' };
   assert(signingArguments(helper, identity, 'helper.plist', 'app.plist').includes('helper.plist'));
+  const provider = { path: resolve(app, 'Contents/PlugIns/KelpieAutoFill.appex'), kind: 'bundle' };
+  const extension = signingArguments(provider, identity, 'helper.plist', 'app.plist', 'provider.plist', app);
+  assert(extension.includes('provider.plist'));
+  assert(!extension.includes('app.plist'));
   const main = signingArguments({ path: app, kind: 'bundle' }, identity, 'helper.plist', 'app.plist');
   assert(main.includes('app.plist'));
   assert(!main.includes('helper.plist'));

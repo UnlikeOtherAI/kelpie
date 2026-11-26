@@ -3,7 +3,7 @@ import Foundation
 /// Browser preferences and files belong to the browser, independently of host UI state.
 enum KelpieStorage {
     private static let bundleID = Bundle.main.bundleIdentifier ?? "kelpie-host"
-    static let standalone = ["com.kelpie.browser.macos", "com.unlikeotherai.kelpie"].contains(bundleID)
+    static let standalone = bundleID == "com.unlikeotherai.kelpie"
     private static let lock = NSLock()
     private static var selectedProfile = "default"
     private static let values = KelpieProfileValue<UserDefaults>()

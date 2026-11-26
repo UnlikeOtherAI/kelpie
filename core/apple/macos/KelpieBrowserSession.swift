@@ -53,6 +53,7 @@ public final class KelpieBrowserSession: ObservableObject {
     public func start() {
         guard !started, !closed else { return }
         started = true
+        WebsitePasswordSuggestions.refresh(from: WebsitePasswordStore())
         _ = AIState.shared
         serverState.startHTTPServer(rendererState: rendererState, listen: localControlEnabled)
         UOALoginCookies.context = serverState.handlerContext
@@ -74,6 +75,7 @@ public final class KelpieBrowserSession: ObservableObject {
     public func setForeground(_ foreground: Bool) {
         guard !closed else { return }
         NessieConnection.shared.setForeground(foreground)
+        if foreground { WebsitePasswordSuggestions.refresh(from: WebsitePasswordStore()) }
     }
 
     public func makeSurface(ownsWindowChrome: Bool = false) -> KelpieBrowserSurface {

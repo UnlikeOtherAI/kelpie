@@ -16,7 +16,7 @@ DMG_NAME="${APP_NAME}.dmg"
 
 SIGN=false
 IDENTITY=""
-BUNDLE_ID="com.kelpie.browser.macos"
+BUNDLE_ID="com.unlikeotherai.kelpie"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

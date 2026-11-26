@@ -1,3 +1,4 @@
+import Foundation
 import ProjectDescription
 import ProjectDescriptionHelpers
 
@@ -110,11 +111,48 @@ let embedGeckoHelper = TargetScript.post(
 // MARK: - Targets
 
 
+let passwordHostID = "com.unlikeotherai.kelpie"
+let manifestDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+let hostPlist = try PropertyListSerialization.propertyList(
+    from: Data(contentsOf: manifestDirectory.appendingPathComponent("Kelpie/Info.plist")), format: nil
+) as? [String: Any]
+guard let hostVersion = hostPlist?["CFBundleShortVersionString"] as? String,
+      let hostBuild = hostPlist?["CFBundleVersion"] as? String else { fatalError("Missing Kelpie version") }
+let passwordProvider = Target.target(
+    name: "KelpieAutoFill",
+    destinations: .macOS,
+    product: .appExtension,
+    bundleId: passwordHostID + ".autofill",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .extendingDefault(with: [
+        "CFBundleDisplayName": "Kelpie",
+        "CFBundleShortVersionString": .string(hostVersion),
+        "CFBundleVersion": .string(hostBuild),
+        "NSExtension": [
+            "NSExtensionPointIdentifier": "com.apple.authentication-services-credential-provider-ui",
+            "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).CredentialProviderViewController",
+            "NSExtensionAttributes": [
+                "ASCredentialProviderExtensionCapabilities": ["ProvidesPasswords": true, "ShowsConfigurationUI": true]
+            ]
+        ]
+    ]),
+    sources: [
+        .glob("PasswordAutoFill/*.swift"),
+        .glob("../../core/apple/macos/Passwords/WebsitePasswordStore.swift"),
+        .glob("../../core/apple/macos/Passwords/WebsitePasswordSuggestions.swift")
+    ],
+    entitlements: .file(path: "PasswordAutoFill/AutoFill.entitlements"),
+    settings: .settings(base: [
+        "APPLICATION_EXTENSION_API_ONLY": "YES",
+        "KELPIE_PASSWORD_HOST_ID": .string(passwordHostID)
+    ])
+)
+
 let kelpieApp = Target.target(
     name: "Kelpie",
     destinations: .macOS,
     product: .app,
-    bundleId: KelpieBrowserBuild.webKitOnly ? "com.unlikeotherai.kelpie" : "com.kelpie.browser.macos",
+    bundleId: passwordHostID,
     deploymentTargets: .macOS("14.0"),
     infoPlist: .file(path: "Kelpie/Info.plist"),
     sources: KelpieBrowserBuild.webKitOnly
@@ -133,6 +171,7 @@ let kelpieApp = Target.target(
     dependencies: [
         .project(target: "KelpieBrowserMac", path: "../../core/apple"),
         .package(product: "AppReveal"),
+        .target(name: "KelpieAutoFill"),
     ] + (KelpieBrowserBuild.webKitOnly ? [] : [
         .target(name: "KelpieHelper")
     ]),
@@ -228,7 +267,7 @@ let kelpieTests = Target.target(
     name: "KelpieTests",
     destinations: .macOS,
     product: .unitTests,
-    bundleId: "com.kelpie.browser.macos.tests",
+    bundleId: passwordHostID + ".tests",
     deploymentTargets: .macOS("14.0"),
     infoPlist: .default,
     sources: [
@@ -269,6 +308,7 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
+        passwordProvider,
         kelpieLibraryTestHost,
         kelpieEmbeddingHost,
         kelpieEmbeddingUITests,

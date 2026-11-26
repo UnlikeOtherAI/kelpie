@@ -9,5 +9,8 @@
     <key>com.apple.security.files.downloads.read-write</key><true/>
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <key>com.apple.developer.authentication-services.autofill-credential-provider</key><true/>
+    <key>keychain-access-groups</key>
+    <array><string>23B7GTLBN7.com.unlikeotherai.kelpie.website-passwords</string></array>
 </dict>
 </plist>

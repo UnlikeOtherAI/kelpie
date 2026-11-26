@@ -6,7 +6,7 @@ final class LinkPreviewUITests: XCTestCase {
     @MainActor
     func testHoverPreviewDoesNotReserveSpaceOrInterceptLinks() throws {
         continueAfterFailure = false
-        let app = XCUIApplication(bundleIdentifier: "com.kelpie.browser.macos")
+        let app = XCUIApplication(bundleIdentifier: "com.unlikeotherai.kelpie")
         app.activate()
         app.typeKey("t", modifierFlags: .command)
         defer { app.typeKey("w", modifierFlags: .command) }

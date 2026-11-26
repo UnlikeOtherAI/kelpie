@@ -45,6 +45,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     nonisolated private static let operationTimeoutSeconds: TimeInterval = 8
 
     let webView: WKWebView
+    let websitePasswords = WebsitePasswordController()
     private var progressObservation: NSKeyValueObservation?
     private var titleObservation: NSKeyValueObservation?
     private var urlObservation: NSKeyValueObservation?
@@ -121,6 +122,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
         ucc.add(self, name: "kelpieNetwork")
         ucc.add(self, name: "kelpieConsole")
+        ucc.add(websitePasswords, contentWorld: WebsitePasswordForm.world, name: "kelpieLoginSubmit")
         ucc.add(self, name: "kelpie3DSnapshot")
 
         webView.navigationDelegate = self
@@ -142,6 +144,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         let ucc = webView.configuration.userContentController
         ucc.removeScriptMessageHandler(forName: "kelpieNetwork")
         ucc.removeScriptMessageHandler(forName: "kelpieConsole")
+        ucc.removeScriptMessageHandler(forName: "kelpieLoginSubmit", contentWorld: WebsitePasswordForm.world)
         ucc.removeScriptMessageHandler(forName: "kelpie3DSnapshot")
     }
 
@@ -362,7 +365,11 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         switch WebKitWindowPolicy.externalAppDecision(for: navigationAction, in: webView) {
         case .load:
             // `<a download>` asks for a file before any response arrives.
-            decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
+            if navigationAction.shouldPerformDownload {
+                decisionHandler(.download)
+            } else if !websitePasswords.submit(navigationAction, in: webView, proceed: { decisionHandler(.allow) }) {
+                decisionHandler(.allow)
+            }
         case .drop:
             decisionHandler(.cancel)
         case .ask(let request):

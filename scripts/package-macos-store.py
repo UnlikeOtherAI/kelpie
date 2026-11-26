@@ -5,11 +5,12 @@ import hashlib
 import os
 import plistlib
 import re
-import shutil
 import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+
+from macos_autofill_signing import EXTENSION, prepare
 
 
 TEAM = "23B7GTLBN7"
@@ -63,7 +64,7 @@ def verify_signature(path, identifier, certificate, scratch):
     require(Path(f"{prefix}0").read_bytes() == certificate, f"Unexpected signing certificate in {path.name}")
 
 
-def package(archive, profile, version, build, output):
+def package(archive, profile, provider_profile, version, build, output):
     source = archive / "Products/Applications/Kelpie.app"
     info = read_plist(source / "Contents/Info.plist")
     require(info["CFBundleIdentifier"] == BUNDLE_ID, "Archive the WebKit-only Kelpie App Store target")
@@ -87,7 +88,9 @@ def package(archive, profile, version, build, output):
         resources = app / RESOURCES
         require(read_plist(resources / "Contents/Info.plist")["CFBundleIdentifier"] == RESOURCES_ID,
                 "Unexpected browser resources identifier")
-        for container in ("Frameworks", "PlugIns", "Helpers", "XPCServices"):
+        plugins = app / "Contents/PlugIns"
+        require(set(plugins.iterdir()) == {app / EXTENSION}, "Expected only the Kelpie AutoFill extension")
+        for container in ("Frameworks", "Helpers", "XPCServices"):
             location = app / "Contents" / container
             require(not location.exists() or not any(location.iterdir()),
                     f"Unexpected packaged code in Contents/{container} in the WebKit-only app")
@@ -95,12 +98,15 @@ def package(archive, profile, version, build, output):
         info.update(CFBundleShortVersionString=version, CFBundleVersion=build)
         write_plist(app / "Contents/Info.plist", info)
         embedded_profile = Path("Contents/embedded.provisionprofile")
-        shutil.copyfile(profile, app / embedded_profile)
-        entitlements = scratch / "Store.entitlements"
-        store_entitlements = read_plist(Path(__file__).resolve().parents[1] / "apps/macos/Kelpie/Store.entitlements")
-        store_entitlements["com.apple.application-identifier"] = APP_IDENTIFIER
-        store_entitlements["com.apple.developer.team-identifier"] = TEAM
-        write_plist(entitlements, store_entitlements)
+        allowed = prepare(app, profile, provider_profile, scratch, "store")
+        require(identity in allowed, "The AutoFill provider profile must permit the distribution identity")
+        provider_info = app / EXTENSION / "Contents/Info.plist"
+        extension_info = read_plist(provider_info)
+        extension_info.update(CFBundleShortVersionString=version, CFBundleVersion=build)
+        write_plist(provider_info, extension_info)
+        entitlements = scratch / "host.plist"
+        store_entitlements = read_plist(entitlements)
+        command("codesign", "--force", "--sign", identity, "--entitlements", scratch / "provider.plist", app / EXTENSION)
 
         command("codesign", "--force", "--sign", identity, "--identifier", RESOURCES_ID, resources)
         command("codesign", "--force", "--sign", identity, "--identifier", BUNDLE_ID,
@@ -119,6 +125,12 @@ def package(archive, profile, version, build, output):
         require(read_plist(payload / "Contents/Info.plist") == info, "Packaged app metadata differs")
         require((payload / embedded_profile).read_bytes() == profile.read_bytes(),
                 "Packaged app is missing the selected provisioning profile")
+        require((payload / EXTENSION / embedded_profile).read_bytes() == provider_profile.read_bytes(),
+                "Packaged AutoFill provider profile differs")
+        verify_signature(payload / EXTENSION, BUNDLE_ID + ".autofill", certificate, scratch)
+        provider_entitlements = command("codesign", "-d", "--entitlements", "-", "--xml", payload / EXTENSION).stdout
+        require(plistlib.loads(provider_entitlements) == read_plist(scratch / "provider.plist"),
+                "Packaged AutoFill provider entitlements differ")
         verify_signature(payload / RESOURCES, RESOURCES_ID, certificate, scratch)
         verify_signature(payload, BUNDLE_ID, certificate, scratch)
         signed_entitlements = command("codesign", "-d", "--entitlements", "-", "--xml", payload).stdout
@@ -131,13 +143,15 @@ def package(archive, profile, version, build, output):
 def main():
     parser = argparse.ArgumentParser(description="Package a Kelpie macOS archive for App Store Connect.")
     parser.add_argument("--archive", required=True, type=Path)
-    parser.add_argument("--profile", required=True, type=Path)
+    profiles = Path.home() / ".config/unlikeotherai/signing/kelpie-autofill"
+    parser.add_argument("--profile", type=Path, default=profiles / "MAC_APP_STORE-host.provisionprofile")
+    parser.add_argument("--provider-profile", type=Path, default=profiles / "MAC_APP_STORE-provider.provisionprofile")
     parser.add_argument("--version", required=True)
     parser.add_argument("--build", required=True)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     try:
-        package(args.archive.resolve(), args.profile.resolve(), args.version, args.build, args.output.resolve())
+        package(args.archive.resolve(), args.profile.resolve(), args.provider_profile.resolve(), args.version, args.build, args.output.resolve())
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         if isinstance(error, subprocess.CalledProcessError) and error.stderr:
             print(error.stderr.decode(errors="replace").strip())

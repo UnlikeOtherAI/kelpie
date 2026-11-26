@@ -782,8 +782,8 @@ Button("Close Tab") {
 
 And at the top of `KelpieApp.swift` (in the `Notification.Name` extension):
 ```swift
-static let newTab   = Notification.Name("com.kelpie.browser.macos.new-tab")
-static let closeTab = Notification.Name("com.kelpie.browser.macos.close-tab")
+static let newTab   = Notification.Name("com.unlikeotherai.kelpie.new-tab")
+static let closeTab = Notification.Name("com.unlikeotherai.kelpie.close-tab")
 ```
 
 In `BrowserView.body`, add to the chain of `.onReceive` modifiers:

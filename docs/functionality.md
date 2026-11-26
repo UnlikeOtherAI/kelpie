@@ -562,6 +562,16 @@ configuration changes cannot leak an old listener or stop the replacement server
 
 List all iframes on the page with their URLs, names, positions, and cross-origin status. Switch context into an iframe to interact with its content, then switch back to the main frame.
 
+## Saved website passwords on Mac
+
+In a regular WebKit tab, submitting a same-origin HTTPS password form can offer **Save Password** or **Update Password**. **Not Now** continues the sign-in. Click a sign-in field and choose a saved username to fill it. For a site that handles sign-in with JavaScript, focus the filled login field and choose **Passwords for This Login…** from the View menu (Browser menu in an embedded host).
+
+**Settings → Passwords → Manage Saved Passwords…** lists the site and username. Delete one login or confirm **Clear All** to remove this browser profile’s website passwords from macOS Keychain. Named partitions and temporary tabs keep the regular profile’s passwords private.
+
+In standalone Kelpie, open macOS AutoFill settings from the Passwords pane and enable **Kelpie** once to see its saved logins in Safari. Safari can then request the password for a selected account. Manage those entries in Kelpie. Clearing them removes Kelpie’s suggestions and leaves entries saved by Apple Passwords or other providers intact. macOS controls device unlock and the system AutoFill picker.
+
+The WebKit network inspector records origin, method, timing and status for fetch and XMLHttpRequest traffic from a document containing a password field. Sign-in request and response payloads are omitted.
+
 ## Cookies and Storage
 
 Full read/write access to cookies (with domain, path, expiry, httpOnly, secure, sameSite attributes) and both localStorage and sessionStorage. Clear individual items or wipe everything.

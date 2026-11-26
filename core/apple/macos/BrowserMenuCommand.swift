@@ -2,11 +2,11 @@ import AppKit
 
 enum BrowserMenuCommand: String, CaseIterable, Identifiable {
     case newTab, closeTab, newWindow, addBookmark, hardRefresh, fullScreen
-    case welcome, website, repository, unlikeOtherAI
+    case welcome, website, repository, unlikeOtherAI, passwords
     var id: String { rawValue }
 
     static let tabs: [Self] = [.newTab, .closeTab, .newWindow]
-    static let tools: [Self] = [.addBookmark, .hardRefresh]
+    static let tools: [Self] = [.addBookmark, .hardRefresh, .passwords]
     static let help: [Self] = [.website, .repository, .unlikeOtherAI]
 
     var title: String {
@@ -16,6 +16,7 @@ enum BrowserMenuCommand: String, CaseIterable, Identifiable {
         case .newWindow: return "New Window"
         case .addBookmark: return "Add bookmark"
         case .hardRefresh: return "Hard Refresh"
+        case .passwords: return "Passwords for This Login…"
         case .fullScreen: return "Toggle Full Screen"
         case .welcome: return "Show Welcome Screen"
         case .website: return "Open Kelpie Website"
@@ -45,6 +46,10 @@ enum BrowserMenuCommand: String, CaseIterable, Identifiable {
         case .newWindow: session.openWindow()
         case .addBookmark: BrowserCommandRouter.shared.addBookmark()
         case .hardRefresh: BrowserCommandRouter.shared.hardReload()
+        case .passwords:
+            if let renderer = WindowRegistry.shared.defaultEntry()?.tabStore.activeRenderer as? WKWebViewRenderer {
+                renderer.websitePasswords.offer(in: renderer.webView, at: nil, explicit: true)
+            }
         case .fullScreen: WindowRegistry.shared.defaultEntry()?.ownedWindow?.toggleFullScreen(nil)
         case .welcome:
             NotificationCenter.default.post(name: .showWelcomeCard, object: WelcomeCardPresentationSource.helpMenu.rawValue)

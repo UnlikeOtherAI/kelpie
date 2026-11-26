@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var showHFTokenField = false
     @State private var hfTokenDraft = ""
     @State private var showPairedClients = false
+    @State private var showPasswords = false
 
     private var huggingFaceToken: String { aiState.huggingFaceToken }
 
@@ -26,6 +27,16 @@ struct SettingsView: View {
                     row("ID", serverState.deviceInfo.id)
                     row("Platform", serverState.deviceInfo.platform)
                     row("Resolution", "\(serverState.deviceInfo.width) x \(serverState.deviceInfo.height)")
+                }
+
+                Section("Passwords") {
+                    AppKitPairingButton(
+                        title: "Manage Saved Passwords…",
+                        style: .normal,
+                        accessibilityID: "settings.passwords",
+                        action: { showPasswords = true }
+                    )
+                    .fixedSize()
                 }
 
                 Section("Renderer") {
@@ -192,6 +203,7 @@ struct SettingsView: View {
             .padding()
         }
         .frame(width: 400, height: 600)
+        .sheet(isPresented: $showPasswords) { WebsitePasswordsView() }
         .sheet(isPresented: $showPairedClients) {
             PairedClientsView(coordinator: serverState.pairingCoordinator)
         }

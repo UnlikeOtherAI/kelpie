@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension Notification.Name {
-    static let showWelcomeCard = Notification.Name("com.kelpie.browser.macos.show-welcome-card")
+    static let showWelcomeCard = Notification.Name("com.unlikeotherai.kelpie.show-welcome-card")
 }
 
 enum WelcomeCardPresentationSource: String {

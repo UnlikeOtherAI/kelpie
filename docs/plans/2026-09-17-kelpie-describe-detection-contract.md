@@ -139,7 +139,7 @@ when unknown.
 New doc `docs/install-layout.md` stating, as a stable contract, what Kelpie
 installs where and how a script detects each piece:
 
-- macOS app: `/Applications/Kelpie.app`, bundle id `com.kelpie.browser.macos`
+- macOS app: `/Applications/Kelpie.app`, bundle ID `com.unlikeotherai.kelpie`
   (helper `com.kelpie.browser.helper`), version readable from
   `Contents/Info.plist` → `CFBundleShortVersionString` (no code change needed —
   already present).

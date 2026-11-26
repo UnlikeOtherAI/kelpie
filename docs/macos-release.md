@@ -37,11 +37,10 @@ this build. Archive the `Kelpie` scheme on the signing Mac.
 TUIST_KELPIE_WEBKIT_ONLY=true tuist generate --path apps/macos --no-open
 xcodebuild -workspace apps/macos/Kelpie.xcworkspace -scheme Kelpie \
   -configuration Release -destination 'generic/platform=macOS' \
-  -archivePath /absolute/staging/Kelpie.xcarchive CODE_SIGN_IDENTITY=- archive
+  -archivePath /absolute/staging/Kelpie.xcarchive CODE_SIGNING_ALLOWED=NO archive
 
 python3 scripts/package-macos-store.py \
   --archive /absolute/staging/Kelpie.xcarchive \
-  --profile /absolute/signing/Kelpie-Mac-App-Store.provisionprofile \
   --version "$store_version" --build "$store_build" \
   --output /absolute/staging/Kelpie-App-Store.pkg
 ```
@@ -67,6 +66,10 @@ node scripts/sign-macos-app.mjs --app /absolute/staging/Kelpie.app \
   --identity "Developer ID Application: UnlikeOtherAI s.r.o. (23B7GTLBN7)" \
   --team 23B7GTLBN7
 ```
+
+Both distribution channels use the App Store ID `com.unlikeotherai.kelpie` and the extension ID `com.unlikeotherai.kelpie.autofill` on team `23B7GTLBN7`. Enable AutoFill Credential Provider for both IDs. Issue a matching host and extension profile for each distribution channel. Direct installations originally signed with the retired bundle ID need a one-time installation of the signed replacement. The updater verifies the installed and downloaded bundle IDs before replacing the app.
+
+The signing Mac keeps the profiles in `~/.config/unlikeotherai/signing/kelpie-autofill/`. Renew them as `MAC_APP_DIRECT-host.provisionprofile`, `MAC_APP_DIRECT-provider.provisionprofile`, `MAC_APP_STORE-host.provisionprofile`, and `MAC_APP_STORE-provider.provisionprofile`. Both signers read their channel’s profiles from this directory and verify their entitlements and certificate before signing.
 
 The signer seals nested Mach-O files, their bundles and the containing app in
 that order, with hardened runtime and secure timestamps. It preserves the

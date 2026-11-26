@@ -23,6 +23,24 @@ enum NetworkBridge {
                 return ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT'].includes(upper) ? upper : String(method);
             }
 
+            // Sign-in payloads can contain passwords or session tokens. Keep them out
+            // of the inspector, including when a page removes its form before sending.
+            var handledPassword = false;
+            document.addEventListener('focusin', function(event) {
+                if (event.target instanceof HTMLInputElement && event.target.type === 'password') handledPassword = true;
+            }, true);
+            function isLoginDocument() {
+                handledPassword = handledPassword || !!document.querySelector('input[type="password" i]');
+                return handledPassword;
+            }
+
+            function recordLoginRequest(method, url, type, started, status) {
+                try {
+                    _post({ method: method, url: new URL(url).origin, type: type, started: started,
+                        statusCode: status, duration: Math.round(performance.timeOrigin + performance.now() - started) });
+                } catch(e) {}
+            }
+
             // --- XMLHttpRequest interception ---
             var origOpen = XMLHttpRequest.prototype.open;
             var origSend = XMLHttpRequest.prototype.send;
@@ -39,6 +57,14 @@ enum NetworkBridge {
             };
 
             XMLHttpRequest.prototype.send = function(body) {
+                if (isLoginDocument()) {
+                    var meta = this._mltv;
+                    var started = performance.timeOrigin + performance.now();
+                    if (meta) this.addEventListener('loadend', function() {
+                        recordLoginRequest(meta.method, meta.url, 'xhr', started, this.status);
+                    }, {once: true});
+                    return origSend.apply(this, arguments);
+                }
                 if (this._mltv) {
                     this._mltv.body = typeof body === 'string' ? body.substring(0, 10000) : null;
                     this._mltv.startTime = performance.timeOrigin + performance.now();
@@ -88,6 +114,17 @@ enum NetworkBridge {
                 var startTime = performance.timeOrigin + performance.now();
                 var method = requestMethod((init && init.method) || (input instanceof Request && input.method) || 'GET');
                 var url = requestUrl(input);
+                if (isLoginDocument()) {
+                    return origFetch.apply(this, arguments).then(function(response) {
+                        _pendingFetches--;
+                        recordLoginRequest(method, url, 'fetch', startTime, response.status);
+                        return response;
+                    }, function(error) {
+                        _pendingFetches--;
+                        recordLoginRequest(method, url, 'fetch', startTime, 0);
+                        throw error;
+                    });
+                }
                 var reqHeaders = {};
                 if (init && init.headers) {
                     if (init.headers instanceof Headers) {

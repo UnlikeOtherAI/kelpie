@@ -58,9 +58,9 @@ Do not patch around a failure before understanding the defect. Diagnose and docu
 
 Before patching, ask whether the right fix is to simplify. Every change must reduce or hold total system complexity — never increase it.
 
-### No Keychain (CRITICAL)
+### macOS storage (CRITICAL)
 
-Never use the macOS Keychain for storage. Use UserDefaults or file-based storage. CEF must use `--use-mock-keychain` to avoid Chromium Safe Storage prompts.
+Store website passwords the person elects to remember in Kelpie's profile-scoped macOS Keychain service. Keep ordinary browser preferences and state in UserDefaults or files. CEF must use `--use-mock-keychain` to avoid Chromium Safe Storage prompts.
 
 ### No Manual Recovery (CRITICAL)
 

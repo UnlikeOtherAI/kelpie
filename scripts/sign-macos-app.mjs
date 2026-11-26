@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { open, readdir } from 'node:fs/promises';
+import { mkdtemp, open, readdir, rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -9,7 +10,7 @@ const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const machoMagic = new Set(['feedface', 'cefaedfe', 'feedfacf', 'cffaedfe', 'cafebabe', 'bebafeca', 'cafebabf', 'bfbafeca']);
 
 export function validateSigner(identity, team) {
-  if (!identity?.startsWith('Developer ID Application: ') || !team || !identity.endsWith('(' + team + ')')) {
+  if (team !== '23B7GTLBN7' || !identity?.startsWith('Developer ID Application: ') || !identity.endsWith('(' + team + ')')) {
     throw new Error('Use the existing Developer ID Application identity and its matching team.');
   }
 }
@@ -36,11 +37,12 @@ export function signingPlan(app, entries) {
   return [...plan, { path: root, kind: 'bundle' }];
 }
 
-export function signingArguments(target, identity, helperEntitlements, appEntitlements) {
+export function signingArguments(target, identity, helperEntitlements, appEntitlements, providerEntitlements, root = target.path) {
   const args = ['--force', '--options', 'runtime', '--timestamp', '--sign', identity];
-  if (target.kind === 'bundle' && target.path.endsWith('.app')) {
-    args.push('--entitlements', target.path.includes('Kelpie Helper') || target.path.includes('KelpieGeckoHelper')
-      ? helperEntitlements : appEntitlements);
+  if (target.kind === 'bundle') {
+    if (resolve(target.path) === resolve(root, 'Contents/PlugIns/KelpieAutoFill.appex')) args.push('--entitlements', providerEntitlements);
+    else if (/Kelpie(?: Helper.*|GeckoHelper)\.app$/.test(target.path)) args.push('--entitlements', helperEntitlements);
+    else if (target.path === root && root.endsWith('.app')) args.push('--entitlements', appEntitlements);
   }
   return [...args, target.path];
 }
@@ -52,7 +54,7 @@ async function discover(directory) {
     if (entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) {
       targets.push(...await discover(path));
-      if (/\.(app|framework|bundle)$/.test(entry.name)) targets.push({ path, kind: 'bundle' });
+      if (/\.(app|appex|framework|bundle)$/.test(entry.name)) targets.push({ path, kind: 'bundle' });
     } else if (entry.isFile()) {
       const file = await open(path, 'r');
       try {
@@ -81,9 +83,24 @@ async function main() {
   validateBluetoothUsage(JSON.parse(stdout));
   const targets = signingPlan(app, await discover(resolve(app)));
   const helperEntitlements = join(repository, 'core/apple/Helpers/KelpieHelper.entitlements');
-  const appEntitlements = join(repository, 'apps/macos/Kelpie/Kelpie.entitlements');
-  for (const target of targets) {
-    await run('codesign', signingArguments(target, identity, helperEntitlements, appEntitlements));
+  const profileDirectory = join(homedir(), '.config/unlikeotherai/signing/kelpie-autofill');
+  const hostProfile = options.get('--host-profile') ?? join(profileDirectory, 'MAC_APP_DIRECT-host.provisionprofile');
+  const providerProfile = options.get('--provider-profile') ?? join(profileDirectory, 'MAC_APP_DIRECT-provider.provisionprofile');
+  const scratch = await mkdtemp(join(tmpdir(), 'kelpie-autofill-sign-'));
+  try {
+    const profiles = await run('python3', [join(repository, 'scripts/macos_autofill_signing.py'),
+      '--app', app, '--host-profile', hostProfile, '--provider-profile', providerProfile, '--scratch', scratch]);
+    const allowed = new Set(profiles.stdout.trim().split(/\s+/));
+    const identities = await run('security', ['find-identity', '-v', '-p', 'codesigning']);
+    const match = identities.stdout.split('\n').map(line => line.match(/\b([A-F0-9]{40}) "([^"]+)"/))
+      .find(entry => entry && entry[2] === identity && allowed.has(entry[1]));
+    if (!match) throw new Error('The selected Developer ID identity must be permitted by both profiles.');
+    for (const target of targets) {
+      await run('codesign', signingArguments(target, match[1], helperEntitlements,
+        join(scratch, 'host.plist'), join(scratch, 'provider.plist'), resolve(app)));
+    }
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
   }
   await run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', app]);
   const { stderr } = await run('codesign', ['-dvv', app]);

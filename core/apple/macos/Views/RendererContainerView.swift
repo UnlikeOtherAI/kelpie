@@ -22,6 +22,7 @@ struct RendererContainerView: NSViewRepresentable {
         weak var attachedRenderer: (any RendererEngine)?
         private var eventMonitor: Any?
         private var scrollMonitor: Any?
+        private var passwordClickMonitor: Any?
         let hoverTracker = RendererHoverTracker()
         let chromeSampler = BrowserChromeSampler()
         var chromeUnderlap: CGFloat = 0
@@ -33,6 +34,21 @@ struct RendererContainerView: NSViewRepresentable {
         /// receive mouse events normally.
         func installEventMonitor(for container: NSView) {
             guard eventMonitor == nil else { return }
+            passwordClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .keyUp]) { [weak self, weak container] event in
+                guard let renderer = self?.attachedRenderer as? WKWebViewRenderer, let container,
+                      let window = container.window, event.window === window, let content = window.contentView else { return event }
+                if event.type == .keyUp {
+                    if event.keyCode == 48, let responder = window.firstResponder as? NSView, responder.isDescendant(of: renderer.webView) {
+                        renderer.websitePasswords.offer(in: renderer.webView, at: nil, explicit: false)
+                    }
+                    return event
+                }
+                guard let hit = content.hitTest(content.convert(event.locationInWindow, from: nil)),
+                      hit === renderer.webView || hit.isDescendant(of: renderer.webView) else { return event }
+                let point = renderer.webView.convert(event.locationInWindow, from: nil)
+                renderer.websitePasswords.offer(in: renderer.webView, at: point, explicit: false)
+                return event
+            }
             scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self, weak container] event in
                 guard let container, let window = container.window, event.window === window,
                       window.attachedSheet == nil,
@@ -65,6 +81,7 @@ struct RendererContainerView: NSViewRepresentable {
         deinit {
             if let monitor = eventMonitor { NSEvent.removeMonitor(monitor) }
             if let monitor = scrollMonitor { NSEvent.removeMonitor(monitor) }
+            if let monitor = passwordClickMonitor { NSEvent.removeMonitor(monitor) }
         }
     }
 

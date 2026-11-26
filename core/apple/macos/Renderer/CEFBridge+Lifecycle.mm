@@ -132,7 +132,7 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     settings.main_bundle_path = bundlePathCEF;
 
     NSString *identifier = [NSBundle mainBundle].bundleIdentifier ?: @"kelpie-host";
-    BOOL standalone = [identifier isEqualToString:@"com.kelpie.browser.macos"];
+    BOOL standalone = [identifier isEqualToString:@"com.unlikeotherai.kelpie"];
     NSString *cacheBase = standalone ? NSTemporaryDirectory() :
         [[[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject.path
             stringByAppendingPathComponent:identifier];

@@ -30,6 +30,8 @@ Check iOS, Android, macOS, Windows, and Linux for shared browser-behavior change
 - If deeper scoped behavior is needed, use `.claude/rules/` files.
 - Prefer single-responsibility functions. When touching a method that mixes multiple concerns, split it along readability and responsibility boundaries before adding more logic.
 
+Website passwords saved by the person use the profile-scoped macOS Keychain service documented in AGENTS.md. Keep the existing CEF mock-keychain setting.
+
 ## macOS SwiftUI + WebView Hit Testing
 
 Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS.md. Short version: **any button in a window containing a WebView must be an AppKit-backed NSButton subclass**. SwiftUI `Button` + WebView first-responder = broken every time.
